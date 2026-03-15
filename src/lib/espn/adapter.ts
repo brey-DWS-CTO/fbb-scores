@@ -162,7 +162,8 @@ function buildTeam(
     side.rosterForCurrentScoringPeriod?.entries ?? [];
   const rosterEntries = matchupEntries.length > 0 ? matchupEntries : currentEntries;
   const rosterCount = rosterEntries.filter((e) => isActiveSlot(e.lineupSlotId)).length;
-  const currentScore = side.totalPoints;
+  // Use totalPointsLive for real-time scores (includes in-progress games)
+  const currentScore = side.totalPointsLive ?? side.totalPoints;
 
   // Count games played from matchup period roster
   const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);

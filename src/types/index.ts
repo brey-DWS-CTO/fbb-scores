@@ -120,12 +120,14 @@ export interface EspnMatchupRaw {
   home: {
     teamId: number;
     totalPoints: number;
+    totalPointsLive?: number;
     rosterForCurrentScoringPeriod?: { entries: EspnRosterEntry[] };
     rosterForMatchupPeriod?: { entries: EspnRosterEntry[] };
   };
   away: {
     teamId: number;
     totalPoints: number;
+    totalPointsLive?: number;
     rosterForCurrentScoringPeriod?: { entries: EspnRosterEntry[] };
     rosterForMatchupPeriod?: { entries: EspnRosterEntry[] };
   };
