@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { EspnClient } from '../../src/lib/espn/client.js';
-import { normalizeLeagueResponse } from '../../src/lib/espn/adapter.js';
+import { normalizeLeagueResponse, normalizeMatchupDetail } from '../../src/lib/espn/adapter.js';
 
 const router = Router();
 
@@ -110,6 +110,102 @@ router.get('/espn/debug', async (req, res) => {
       currentMatchupPeriod: cmp,
       matchupPeriods: raw.settings.scheduleSettings.matchupPeriods[String(cmp)],
       debug,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+  }
+});
+
+/**
+ * GET /api/espn/matchup/:matchupId
+ * Fetches detailed player data for a specific matchup.
+ */
+router.get('/espn/matchup/:matchupId', async (req, res) => {
+  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
+  if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
+    res.status(500).json({ error: 'Missing credentials' });
+    return;
+  }
+
+  const matchupId = parseInt(req.params.matchupId, 10);
+  if (isNaN(matchupId)) {
+    res.status(400).json({ error: 'Invalid matchup ID' });
+    return;
+  }
+
+  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
+  const cookieString = buildCookieString(req);
+
+  try {
+    const client = new EspnClient({
+      leagueId: ESPN_LEAGUE_ID, seasonId,
+      espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: cookieString,
+    });
+
+    // Get current period info first, then fetch with per-player stats
+    const scoringPeriodId = await client.getCurrentScoringPeriod();
+    const raw = await client.fetchMatchupDetail(scoringPeriodId);
+    const matchupDetail = normalizeMatchupDetail(raw, matchupId);
+
+    if (!matchupDetail) {
+      res.status(404).json({ error: 'Matchup not found' });
+      return;
+    }
+
+    res.json(matchupDetail);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[ESPN proxy] Error fetching matchup detail:', message);
+    res.status(502).json({ error: message });
+  }
+});
+
+/**
+ * GET /api/espn/debug-stats — inspect raw player stat entries to debug rolling averages.
+ */
+router.get('/espn/debug-stats', async (req, res) => {
+  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
+  if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
+    res.status(500).json({ error: 'Missing credentials' });
+    return;
+  }
+
+  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
+  const cookieString = buildCookieString(req);
+
+  try {
+    const client = new EspnClient({
+      leagueId: ESPN_LEAGUE_ID, seasonId,
+      espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: cookieString,
+    });
+
+    const scoringPeriodId = await client.getCurrentScoringPeriod();
+    const raw = await client.fetchMatchupDetail(scoringPeriodId);
+    const cmp = raw.status.currentMatchupPeriod;
+    const matchup = raw.schedule.find((m: any) => m.matchupPeriodId === cmp);
+    if (!matchup) { res.json({ error: 'No matchup found' }); return; }
+
+    // Get first player's raw stats to understand structure
+    const entries = (matchup as any).home.rosterForMatchupPeriod?.entries ??
+                    (matchup as any).home.rosterForCurrentScoringPeriod?.entries ?? [];
+    const firstEntry = entries[0];
+    if (!firstEntry) { res.json({ error: 'No roster entries' }); return; }
+
+    const player = firstEntry.playerPoolEntry.player;
+    const statEntries = player.stats ?? [];
+
+    res.json({
+      scoringPeriodId,
+      playerName: player.fullName,
+      totalStatEntries: statEntries.length,
+      statEntrySummary: statEntries.map((s: any) => ({
+        statSplitTypeId: s.statSplitTypeId,
+        statSourceId: s.statSourceId,
+        scoringPeriodId: s.scoringPeriodId,
+        seasonId: s.seasonId,
+        hasStats: !!s.stats,
+        appliedTotal: s.appliedTotal,
+      })),
     });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'Unknown error' });

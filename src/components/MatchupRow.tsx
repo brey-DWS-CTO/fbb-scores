@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Link } from 'react-router-dom';
 import type { Matchup } from '../types/index.js';
 import TeamPanel from './TeamPanel.js';
 
@@ -24,11 +25,15 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
   const accentColor = ACCENT_COLORS[index % ACCENT_COLORS.length];
 
   return (
-    <div
-      className="slide-in relative w-full"
+    <Link
+      to={`/matchup/${matchup.id}`}
+      className="slide-in relative w-full block no-underline"
       style={{
         animationDelay: `${index * 0.1}s`,
         animationFillMode: 'both',
+        textDecoration: 'none',
+        color: 'inherit',
+        cursor: 'pointer',
       }}
     >
       {/* Accent line on top */}
@@ -67,7 +72,13 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
         {/* Desktop: horizontal layout / Mobile: stacked */}
         <div className="flex flex-col md:flex-row items-stretch justify-center gap-3 md:gap-4">
           {/* Home team */}
-          <div className="w-full md:w-80 flex-shrink-0">
+          <div
+            className="w-full md:w-80 flex-shrink-0"
+            style={{
+              borderLeft: '3px solid var(--neon-blue)',
+              background: 'linear-gradient(90deg, #001a4408, transparent)',
+            }}
+          >
             <TeamPanel team={home} isWinner={homeWinning} side="home" isPlayoffs={isPlayoffs} />
           </div>
 
@@ -127,12 +138,18 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
           </div>
 
           {/* Away team */}
-          <div className="w-full md:w-80 flex-shrink-0">
+          <div
+            className="w-full md:w-80 flex-shrink-0"
+            style={{
+              borderLeft: '3px solid var(--neon-orange)',
+              background: 'linear-gradient(90deg, #33001108, transparent)',
+            }}
+          >
             <TeamPanel team={away} isWinner={awayWinning} side="away" isPlayoffs={isPlayoffs} />
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

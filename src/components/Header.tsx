@@ -5,9 +5,11 @@ interface HeaderProps {
   leagueName: string;
   playoff: PlayoffInfo;
   fetchedAt: string;
+  onRefresh: () => void;
+  isRefreshing: boolean;
 }
 
-const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt }) => {
+const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, isRefreshing }) => {
   const updatedTime = new Date(fetchedAt).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -124,6 +126,23 @@ const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt }) => {
           >
             UPDATED {updatedTime}
           </span>
+
+          {/* Refresh button */}
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="pixel-text cursor-pointer px-3 py-1"
+            style={{
+              fontSize: '0.45rem',
+              color: isRefreshing ? '#444466' : 'var(--neon-teal)',
+              background: isRefreshing ? 'transparent' : '#00ffcc0a',
+              border: `1px solid ${isRefreshing ? '#333355' : 'var(--neon-teal)'}`,
+              boxShadow: isRefreshing ? 'none' : '0 0 6px #00ffcc33',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
+          </button>
         </div>
       </div>
 

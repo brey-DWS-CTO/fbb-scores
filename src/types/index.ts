@@ -92,7 +92,7 @@ export interface EspnRosterEntry {
   lineupSlotId: number;
   playerPoolEntry: {
     appliedStatTotal: number;
-    playerPoolEntryId: number;
+    id: number;
     player: {
       fullName: string;
       defaultPositionId: number;
@@ -100,6 +100,7 @@ export interface EspnRosterEntry {
       stats?: Array<{
         statSplitTypeId: number;
         statSourceId: number;
+        scoringPeriodId?: number;
         stats?: Record<string, number>;
       }>;
     };
@@ -149,6 +150,13 @@ export interface EspnLeagueResponse {
     rosterSettings: {
       lineupSlotStatLimits?: Record<string, { limitValue: number; statId: number }>;
     };
+    scoringSettings?: {
+      scoringItems: Array<{
+        statId: number;
+        pointsOverrides?: Record<string, number>;
+        points: number;
+      }>;
+    };
   };
   scoringPeriodId: number;
   seasonId: number;
@@ -156,6 +164,81 @@ export interface EspnLeagueResponse {
   teams: EspnTeamRaw[];
   schedule: EspnMatchupRaw[];
   members?: Array<{ id: string; displayName: string; firstName: string; lastName: string }>;
+}
+
+// ─── Scoring Settings ───────────────────────────────────────────────────────
+
+export interface ScoringItem {
+  statId: number;
+  pointsOverrides?: Record<string, number>;
+  points: number;
+}
+
+export interface ScoringSettings {
+  scoringItems: ScoringItem[];
+}
+
+// ─── Matchup Detail types ───────────────────────────────────────────────────
+
+export interface PlayerGameStats {
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  fgm: number;
+  fga: number;
+  ftm: number;
+  fta: number;
+  threepm: number;
+  to: number;
+  pf: number;
+  min: number;
+  gp: number;
+}
+
+export interface RollingAverages {
+  last7: number;
+  last15: number;
+  last30: number;
+}
+
+export interface MatchupPlayer {
+  playerId: number;
+  name: string;
+  position: string;
+  nbaTeamAbbrev: string;
+  lineupSlotId: number;
+  isStarter: boolean;
+  fpts: number;
+  stats: PlayerGameStats;
+  averages: RollingAverages;
+  /** Player's headshot URL */
+  imageUrl: string | null;
+}
+
+export interface MatchupDetailTeam {
+  id: number;
+  name: string;
+  abbreviation: string;
+  ownerName: string;
+  logoUrl: string | null;
+  currentScore: number;
+  avgPointsPerGame: number;
+  gamesPlayed: number;
+  maxGames: number;
+  playoffSeed: number | null;
+  players: MatchupPlayer[];
+}
+
+export interface MatchupDetail {
+  matchupId: number;
+  home: MatchupDetailTeam;
+  away: MatchupDetailTeam;
+  scoringPeriodId: number;
+  matchupPeriodId: number;
+  isCompleted: boolean;
+  scoringSettings: ScoringSettings;
 }
 
 // ─── Supabase snapshot types ──────────────────────────────────────────────────

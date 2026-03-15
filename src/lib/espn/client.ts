@@ -93,4 +93,25 @@ export class EspnClient {
 
     return data;
   }
+
+  /**
+   * Fetch detailed player data for matchup detail view.
+   * Requests per-scoring-period stats for the last 30 days to compute rolling averages.
+   */
+  async fetchMatchupDetail(scoringPeriodId: number): Promise<EspnLeagueResponse> {
+    // mRoster provides team roster with pre-computed rolling averages (split types 1/2/3)
+    // mMatchup provides matchup-period aggregated stats (split type 5)
+    const { data } = await this.http.get<EspnLeagueResponse>('', {
+      params: {
+        view: ['mMatchup', 'mMatchupScore', 'mRoster', 'mTeam', 'mSettings', 'mStatus'],
+        scoringPeriodId,
+        _: Date.now(),
+      },
+      paramsSerializer: {
+        indexes: null,
+      },
+    });
+
+    return data;
+  }
 }
