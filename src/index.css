@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+@import "tailwindcss";
+
+:root {
+  --neon-red:    #ff2222;
+  --neon-blue:   #00aaff;
+  --neon-teal:   #00ffcc;
+  --neon-yellow: #ffe600;
+  --neon-purple: #cc00ff;
+  --neon-orange: #ff6600;
+  --dark-bg:     #0a0a0f;
+  --panel-bg:    #0f0f1a;
+  --panel-border:#1a1a33;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: #e0e0e0;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  overflow-x: hidden;
+}
+
+/* CRT scanline overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.07) 2px,
+    rgba(0,0,0,0.07) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+#root {
+  min-height: 100%;
+  width: 100%;
+}
+
+.pixel-text { font-family: 'Press Start 2P', monospace; letter-spacing: 0.05em; }
+
+.glow-teal   { text-shadow: 0 0 8px #00ffcc, 0 0 20px #00ffcc44; }
+.glow-red    { text-shadow: 0 0 8px #ff2222, 0 0 20px #ff222244; }
+.glow-blue   { text-shadow: 0 0 8px #00aaff, 0 0 20px #00aaff44; }
+.glow-yellow { text-shadow: 0 0 8px #ffe600, 0 0 20px #ffe60044; }
+.glow-purple { text-shadow: 0 0 8px #cc00ff, 0 0 20px #cc00ff44; }
+
+@keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+.blink { animation: blink 1s step-end infinite; }
+
+@keyframes pulse-glow {
+  0%,100% { box-shadow: 0 0 4px #00ffcc44; }
+  50%     { box-shadow: 0 0 16px #00ffcc, 0 0 32px #00ffcc44; }
+}
+.pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+@keyframes slide-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.slide-in { animation: slide-in 0.4s ease-out forwards; }
+
+.panel {
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  position: relative;
+  overflow: hidden;
+}
+.panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.score-display {
+  font-family: 'VT323', monospace;
+  font-size: 3.5rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
+/* Slot machine score roll animations */
+@keyframes slot-roll-up {
+  0%   { transform: translateY(100%); opacity: 0; }
+  15%  { transform: translateY(-20%);  opacity: 1; }
+  25%  { transform: translateY(10%); }
+  35%  { transform: translateY(-5%); }
+  50%  { transform: translateY(0); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes slot-roll-down {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  15%  { transform: translateY(20%);   opacity: 1; }
+  25%  { transform: translateY(-10%); }
+  35%  { transform: translateY(5%); }
+  50%  { transform: translateY(0); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.slot-roll-up {
+  animation: slot-roll-up 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  color: #00ff88 !important;
+  text-shadow: 0 0 12px #00ff88, 0 0 32px #00ff8866 !important;
+}
+.slot-roll-down {
+  animation: slot-roll-down 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  color: #ff4444 !important;
+  text-shadow: 0 0 12px #ff4444, 0 0 32px #ff444466 !important;
+}
+/* Fade color back to normal after roll */
+.slot-roll-up, .slot-roll-down {
+  transition: color 1.5s ease 0.6s, text-shadow 1.5s ease 0.6s;
+}
+
+@keyframes slot-flash {
+  0%   { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+.slot-flash {
+  animation: slot-flash 0.8s ease-out forwards;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--dark-bg); }
+::-webkit-scrollbar-thumb { background: #1a1a33; border-radius: 3px; }
