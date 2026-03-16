@@ -174,45 +174,95 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
                   </span>
                 </div>
 
-                {/* Projected score summary */}
-                {homeBreakdown && awayBreakdown && (
-                  <div
-                    className="flex items-center justify-center gap-6 mb-4 p-4"
-                    style={{ background: '#0a0a1a', border: '1px solid #1a1a33' }}
-                  >
-                    <div className="flex flex-col items-center">
-                      <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-blue)' }}>
-                        {matchup.home.name}
-                      </span>
-                      <span
-                        className="score-display glow-teal"
-                        style={{
-                          fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
-                          color: homeBreakdown.projectedTotal >= awayBreakdown.projectedTotal ? 'var(--neon-teal)' : '#aaaacc',
-                          textShadow: homeBreakdown.projectedTotal >= awayBreakdown.projectedTotal ? '0 0 12px #00ffcc' : 'none',
-                        }}
-                      >
-                        {homeBreakdown.projectedTotal.toFixed(1)}
-                      </span>
+                {/* Projected score summary with margin and win prob */}
+                {homeBreakdown && awayBreakdown && (() => {
+                  const margin = Math.abs(homeBreakdown.projectedTotal - awayBreakdown.projectedTotal);
+                  const homeLeading = homeBreakdown.projectedTotal >= awayBreakdown.projectedTotal;
+                  const leader = homeLeading ? matchup.home.name : matchup.away.name;
+                  const homePct = matchup.winProbability.homeWinPct;
+                  const awayPct = matchup.winProbability.awayWinPct;
+
+                  return (
+                    <div
+                      className="flex flex-col items-center gap-3 mb-4 p-4"
+                      style={{ background: '#0a0a1a', border: '1px solid #1a1a33' }}
+                    >
+                      {/* Score comparison */}
+                      <div className="flex items-center justify-center gap-4 sm:gap-6 w-full">
+                        <div className="flex flex-col items-center min-w-0">
+                          <span
+                            className="truncate"
+                            style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-blue)', maxWidth: '120px' }}
+                          >
+                            {matchup.home.name}
+                          </span>
+                          <span
+                            className="score-display"
+                            style={{
+                              fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
+                              color: homeLeading ? 'var(--neon-teal)' : '#aaaacc',
+                              textShadow: homeLeading ? '0 0 12px #00ffcc' : 'none',
+                            }}
+                          >
+                            {homeBreakdown.projectedTotal.toFixed(1)}
+                          </span>
+                          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.8rem', color: '#555577' }}>
+                            {homeBreakdown.gameSlotsFilled}/{homeBreakdown.maxGames} GP
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="pixel-text glow-red" style={{ fontSize: '0.5rem', color: 'var(--neon-red)' }}>VS</span>
+                          <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-purple)' }}>
+                            {margin.toFixed(1)} PT GAP
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center min-w-0">
+                          <span
+                            className="truncate"
+                            style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-orange)', maxWidth: '120px' }}
+                          >
+                            {matchup.away.name}
+                          </span>
+                          <span
+                            className="score-display"
+                            style={{
+                              fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
+                              color: !homeLeading ? 'var(--neon-teal)' : '#aaaacc',
+                              textShadow: !homeLeading ? '0 0 12px #00ffcc' : 'none',
+                            }}
+                          >
+                            {awayBreakdown.projectedTotal.toFixed(1)}
+                          </span>
+                          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.8rem', color: '#555577' }}>
+                            {awayBreakdown.gameSlotsFilled}/{awayBreakdown.maxGames} GP
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Win probability bar */}
+                      <div className="w-full max-w-md flex flex-col items-center gap-1">
+                        <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466' }}>
+                          WIN PROBABILITY
+                        </span>
+                        <div className="flex items-center gap-1 w-full">
+                          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-blue)', minWidth: '2.2rem', textAlign: 'right' }}>
+                            {homePct}%
+                          </span>
+                          <div style={{ flex: 1, height: '8px', background: '#111122', border: '1px solid #1a1a33', display: 'flex', overflow: 'hidden' }}>
+                            <div style={{ width: `${homePct}%`, background: 'var(--neon-blue)', boxShadow: '0 0 4px var(--neon-blue)', transition: 'width 0.3s ease' }} />
+                            <div style={{ width: `${awayPct}%`, background: 'var(--neon-orange)', boxShadow: '0 0 4px var(--neon-orange)', transition: 'width 0.3s ease' }} />
+                          </div>
+                          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-orange)', minWidth: '2.2rem', textAlign: 'left' }}>
+                            {awayPct}%
+                          </span>
+                        </div>
+                        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: homeLeading ? 'var(--neon-blue)' : 'var(--neon-orange)' }}>
+                          {leader} FAVORED BY {margin.toFixed(1)}
+                        </span>
+                      </div>
                     </div>
-                    <span className="pixel-text glow-red" style={{ fontSize: '0.5rem', color: 'var(--neon-red)' }}>VS</span>
-                    <div className="flex flex-col items-center">
-                      <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-orange)' }}>
-                        {matchup.away.name}
-                      </span>
-                      <span
-                        className="score-display glow-teal"
-                        style={{
-                          fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
-                          color: awayBreakdown.projectedTotal >= homeBreakdown.projectedTotal ? 'var(--neon-teal)' : '#aaaacc',
-                          textShadow: awayBreakdown.projectedTotal >= homeBreakdown.projectedTotal ? '0 0 12px #00ffcc' : 'none',
-                        }}
-                      >
-                        {awayBreakdown.projectedTotal.toFixed(1)}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Side-by-side breakdowns */}
                 <div className="flex flex-col lg:flex-row gap-4">
