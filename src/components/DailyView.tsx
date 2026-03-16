@@ -3,7 +3,7 @@ import type { DailyMatchup, DailyTeam, DailyPlayer } from '../types/index.js';
 
 const LINEUP_SLOT_LABELS: Record<number, string> = {
   0: 'PG', 1: 'SG', 2: 'SF', 3: 'PF', 4: 'C', 5: 'G', 6: 'F', 11: 'UTL',
-  20: 'BE', 21: 'IR', 23: 'IR+',
+  12: 'BE', 13: 'IR', 20: 'BE', 21: 'IR', 23: 'IR+',
 };
 
 interface DailyViewProps {

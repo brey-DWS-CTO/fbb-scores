@@ -1,6 +1,8 @@
 import type { EspnRosterEntry, PlayerGameStats, TopPlayer } from '../../types/index.js';
 
-const BENCH_IR_SLOTS = new Set([20, 21, 23]);
+// ESPN lineup slot IDs for non-active (bench/IR) positions
+// 12 = Bench, 13 = IR, 20 = Bench (alt), 21 = IR (alt), 23 = IR+ (alt)
+const BENCH_IR_SLOTS = new Set([12, 13, 20, 21, 23]);
 
 export const POSITION_MAP: Record<number, string> = {
   1: 'PG',
