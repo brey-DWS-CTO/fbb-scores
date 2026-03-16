@@ -575,20 +575,19 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
   }
 
   try {
-    // Fetch scoreboard for each remaining date
-    const fetches = dates.map(async (date) => {
-      const dateStr = date.replace(/-/g, ''); // YYYYMMDD
-      const { data } = await axios.get<EspnNbaScoreboard>(
-        `${NBA_SCOREBOARD_URL}?dates=${dateStr}`,
-        { timeout: 5000 },
-      );
-      return data;
-    });
+    // ESPN scoreboard API supports date ranges (YYYYMMDD-YYYYMMDD).
+    // Use a single request for efficiency, especially for 14-day finals periods.
+    const sortedDates = [...dates].sort();
+    const startDate = sortedDates[0].replace(/-/g, '');
+    const endDate = sortedDates[sortedDates.length - 1].replace(/-/g, '');
+    const dateParam = startDate === endDate ? startDate : `${startDate}-${endDate}`;
 
-    const results = await Promise.all(fetches);
+    const { data } = await axios.get<EspnNbaScoreboard>(
+      `${NBA_SCOREBOARD_URL}?dates=${dateParam}`,
+      { timeout: 10000 },
+    );
 
-    for (const data of results) {
-      if (!data.events) continue;
+    if (data.events) {
       for (const event of data.events) {
         const comp = event.competitions?.[0];
         if (!comp?.competitors) continue;
