@@ -26,14 +26,18 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
 
   const gp = player.stats.gp || 1;
 
-  // Rolling average trend detection
+  // Season FPTS per game — the baseline for color coding
+  const seasonFptsPerGame = player.fpts > 0 && gp > 0 ? player.fpts / gp : 0;
+
+  // Rolling averages
   const last7 = player.averages.last7;
   const last15 = player.averages.last15;
   const last30 = player.averages.last30;
 
-  const trendDirection = (shortTerm: number, longTerm: number) => {
-    if (shortTerm <= 0 || longTerm <= 0) return 'neutral';
-    return shortTerm > longTerm ? 'up' : shortTerm < longTerm ? 'down' : 'neutral';
+  // Color code rolling averages vs season baseline
+  const avgVsBaseline = (avg: number) => {
+    if (avg <= 0 || seasonFptsPerGame <= 0) return 'neutral';
+    return avg > seasonFptsPerGame ? 'up' : avg < seasonFptsPerGame ? 'down' : 'neutral';
   };
 
   const trendColor = (dir: string) =>
@@ -195,6 +199,41 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
           </div>
         </div>
 
+        {/* ── Season FPTS/G headline ── */}
+        {seasonFptsPerGame > 0 && (
+          <div
+            className="flex items-center justify-center gap-3 px-4 py-3"
+            style={{
+              background: 'linear-gradient(135deg, #00ffcc08, #0a0a14)',
+              borderBottom: '1px solid #1a1a33',
+            }}
+          >
+            <span
+              className="pixel-text"
+              style={{ fontSize: '0.3rem', color: '#777799', letterSpacing: '0.1em' }}
+            >
+              SEASON AVG
+            </span>
+            <span
+              className="glow-teal"
+              style={{
+                fontFamily: "'VT323', monospace",
+                fontSize: '2rem',
+                color: 'var(--neon-teal)',
+                letterSpacing: '0.08em',
+              }}
+            >
+              {seasonFptsPerGame.toFixed(1)}
+            </span>
+            <span
+              className="pixel-text"
+              style={{ fontSize: '0.3rem', color: '#777799', letterSpacing: '0.1em' }}
+            >
+              FPTS/G
+            </span>
+          </div>
+        )}
+
         {/* ── Season Stats ── */}
         <div className="px-4 pt-3 pb-2">
           <span
@@ -247,9 +286,9 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
           </span>
           <div className="grid grid-cols-3 gap-2 mt-2">
             {([
-              { label: 'LAST 7', value: last7, dir: trendDirection(last7, last30) },
-              { label: 'LAST 15', value: last15, dir: trendDirection(last15, last30) },
-              { label: 'LAST 30', value: last30, dir: 'neutral' as const },
+              { label: 'LAST 7', value: last7, dir: avgVsBaseline(last7) },
+              { label: 'LAST 15', value: last15, dir: avgVsBaseline(last15) },
+              { label: 'LAST 30', value: last30, dir: avgVsBaseline(last30) },
             ] as const).map((card) => (
               <div
                 key={card.label}
@@ -281,7 +320,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
                     className="pixel-text"
                     style={{ fontSize: '0.22rem', color: trendColor(card.dir) }}
                   >
-                    {trendArrow(card.dir)} FPTS/G
+                    {trendArrow(card.dir)} {card.dir === 'up' ? 'ABOVE' : 'BELOW'} AVG
                   </span>
                 )}
               </div>
