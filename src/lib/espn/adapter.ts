@@ -251,14 +251,17 @@ function buildTeam(
 
   }
 
-  // Compute L15 rolling averages from team roster entries (has raw stats for splitTypeId 2).
+  // Compute L15 rolling averages and season FPTS/G from team roster entries.
   // Roster view stats are per-game averages (same as season split type 0),
   // so computeFpts directly gives FPTS/G — no GP division needed.
+  const playerSeasonAvg = new Map<number, number>();
+
   if (team?.roster?.entries) {
     for (const entry of team.roster.entries) {
       const playerId = entry.playerPoolEntry.id;
       const playerStats = entry.playerPoolEntry.player.stats ?? [];
 
+      // L15 rolling average (splitTypeId 2)
       const rolling15Stat = playerStats.find(
         (s) => s.statSplitTypeId === 2 && s.statSourceId === 0,
       );
@@ -266,6 +269,17 @@ function buildTeam(
         const fpts15 = computeFpts(rolling15Stat.stats, scoringItems);
         if (fpts15 > 0) {
           playerRollingAvg15.set(playerId, round1(fpts15));
+        }
+      }
+
+      // Season FPTS/G (splitTypeId 0) — used as fallback when L15 and matchup avg are missing
+      const seasonStat = playerStats.find(
+        (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
+      );
+      if (seasonStat?.stats) {
+        const fptsSeason = computeFpts(seasonStat.stats, scoringItems);
+        if (fptsSeason > 0) {
+          playerSeasonAvg.set(playerId, round1(fptsSeason));
         }
       }
     }
@@ -290,7 +304,7 @@ function buildTeam(
       const proTeamId = entry.playerPoolEntry.player.proTeamId;
       const nbaAbbrev = getNbaTeamAbbrev(proTeamId);
 
-      const rollingAvg15 = playerRollingAvg15.get(playerId) ?? playerMatchupAvgs.get(playerId) ?? 0;
+      const rollingAvg15 = playerRollingAvg15.get(playerId) ?? playerMatchupAvgs.get(playerId) ?? playerSeasonAvg.get(playerId) ?? 0;
       const matchupAvgPerGame = playerMatchupAvgs.get(playerId) ?? 0;
 
       // For future matchups: no games have started, so no live data to use.
@@ -314,6 +328,7 @@ function buildTeam(
         playerId,
         proTeamId,
         isActive: isActiveSlot(entry.lineupSlotId),
+        isOnIR: [13, 21, 23].includes(entry.lineupSlotId),
         todayFpts,
         rollingAvg15,
         matchupAvgPerGame,

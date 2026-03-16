@@ -134,10 +134,18 @@ export function computeWinProbability(
   // For in-progress games, use the projected bonus as a proxy for remaining variance
   const homeLiveVariance = homeHasLiveBonus && homeRemaining === 0
     ? (homeProjectedTotal - homeScore) * 0.3  // ~30% uncertainty on live game extrapolation
-    : homeAvgPpg * Math.sqrt(homeRemaining) * 0.15;
+    : homeAvgPpg > 0
+      ? homeAvgPpg * Math.sqrt(homeRemaining) * 0.15
+      : homeProjectedTotal > 0
+        ? homeProjectedTotal * 0.10  // ~10% uncertainty on full projection (future matchup)
+        : 0;
   const awayLiveVariance = awayHasLiveBonus && awayRemaining === 0
     ? (awayProjectedTotal - awayScore) * 0.3
-    : awayAvgPpg * Math.sqrt(awayRemaining) * 0.15;
+    : awayAvgPpg > 0
+      ? awayAvgPpg * Math.sqrt(awayRemaining) * 0.15
+      : awayProjectedTotal > 0
+        ? awayProjectedTotal * 0.10  // ~10% uncertainty on full projection (future matchup)
+        : 0;
   const combinedStdDev = Math.sqrt(homeLiveVariance * homeLiveVariance + awayLiveVariance * awayLiveVariance);
 
   // If no variance, fall back to projected score comparison
@@ -332,6 +340,7 @@ export function computeTeamProjection(
   if (gameSlotsFilled < maxGames) {
     const benchProjections: Array<{ player: PlayerProjectionInput; baseline: number; futureGames: number }> = [];
     for (const player of bench) {
+      if (player.isOnIR) continue; // IR/IL players should not be smart-filled
       const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
       if (baseline <= 0) continue;
 

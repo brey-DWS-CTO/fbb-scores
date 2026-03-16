@@ -2,13 +2,15 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMatchupDetail } from '../hooks/useMatchupDetail.js';
 import { useDailyView } from '../hooks/useDailyView.js';
+import { useScoreboard } from '../hooks/useScoreboard.js';
 import MatchupDetailHeader from './matchup/MatchupDetailHeader.js';
 import TeamRoster from './matchup/TeamRoster.js';
 import DailyView from './DailyView.js';
+import ProjectionBreakdown from './ProjectionBreakdown.js';
 import type { FC } from 'react';
 import type { MatchupDetail, MatchupPlayer } from '../types/index.js';
 
-type ViewTab = 'today' | 'matchup';
+type ViewTab = 'today' | 'matchup' | 'projections';
 
 const MatchupDetailPage: FC = () => {
   const { matchupId } = useParams<{ matchupId: string }>();
@@ -18,6 +20,11 @@ const MatchupDetailPage: FC = () => {
   const headerRef = useRef<HTMLDivElement>(null);
   const { data, isLoading, isError, error } = useMatchupDetail(id);
   const { data: dailyData, isLoading: dailyLoading } = useDailyView(id);
+  const { data: scoreboardData } = useScoreboard();
+
+  // Find matching matchup from scoreboard for projection data
+  const matchup = scoreboardData?.matchups.find(m => m.id === id);
+  const hasProjections = !!(matchup?.home.projectionBreakdown || matchup?.away.projectionBreakdown);
 
   // Build player lookup map for daily view player card clicks
   const playerMap = useMemo(() => {
@@ -100,6 +107,13 @@ const MatchupDetailPage: FC = () => {
           isActive={activeTab === 'matchup'}
           onClick={() => setActiveTab('matchup')}
         />
+        {hasProjections && (
+          <TabButton
+            label="PROJECTIONS"
+            isActive={activeTab === 'projections'}
+            onClick={() => setActiveTab('projections')}
+          />
+        )}
       </div>
 
       {/* Tab content */}
@@ -125,6 +139,25 @@ const MatchupDetailPage: FC = () => {
         <div className="flex flex-col lg:flex-row gap-4">
           <TeamRoster team={data.home} side="home" />
           <TeamRoster team={data.away} side="away" />
+        </div>
+      )}
+
+      {activeTab === 'projections' && matchup && (
+        <div className="flex flex-col lg:flex-row gap-4">
+          {matchup.home.projectionBreakdown && (
+            <ProjectionBreakdown
+              breakdown={matchup.home.projectionBreakdown}
+              teamName={matchup.home.name}
+              side="home"
+            />
+          )}
+          {matchup.away.projectionBreakdown && (
+            <ProjectionBreakdown
+              breakdown={matchup.away.projectionBreakdown}
+              teamName={matchup.away.name}
+              side="away"
+            />
+          )}
         </div>
       )}
     </section>

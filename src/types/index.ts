@@ -373,6 +373,8 @@ export interface PlayerProjectionInput {
   remainingGamesAfterToday: number;
   /** Future hook: augment projection accuracy with pace/game-total data */
   overrideProjection?: number;
+  /** Whether the player is on IR/IL (should not be smart-filled) */
+  isOnIR?: boolean;
 }
 
 /** NBA team schedule: proTeamId → number of remaining games in the matchup period */
