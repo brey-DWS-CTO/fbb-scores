@@ -129,8 +129,8 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
                 WIN PROB
               </span>
               <div className="flex items-center gap-1" style={{ width: '100%' }}>
-                <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.75rem', color: 'var(--neon-blue)', opacity: 0.7, flexShrink: 0 }}>
-                  {matchup.home.abbreviation}
+                <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.75rem', color: 'var(--neon-blue)', opacity: 0.7, flexShrink: 0, maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {matchup.home.name}
                 </span>
                 <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-blue)', minWidth: '2.2rem', textAlign: 'right', flexShrink: 0 }}>
                   {matchup.isCompleted
@@ -172,8 +172,8 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
                     ? (matchup.away.currentScore > matchup.home.currentScore ? '100%' : '0%')
                     : `${matchup.winProbability.awayWinPct}%`}
                 </span>
-                <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.75rem', color: 'var(--neon-orange)', opacity: 0.7, flexShrink: 0 }}>
-                  {matchup.away.abbreviation}
+                <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.75rem', color: 'var(--neon-orange)', opacity: 0.7, flexShrink: 0, maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {matchup.away.name}
                 </span>
               </div>
             </div>

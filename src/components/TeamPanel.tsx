@@ -9,7 +9,7 @@ interface TeamPanelProps {
   isPlayoffs: boolean;
 }
 
-const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs }) => {
+const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPlayoffs }) => {
   const hasFirePlayer = team.topPlayer && team.topPlayer.points > 50;
   const gpPercent = team.maxGames > 0 ? (team.gamesPlayed / team.maxGames) * 100 : 0;
 
@@ -25,8 +25,8 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs }) => 
         transition: 'box-shadow 0.3s ease',
       }}
     >
-      {/* Side label + seed */}
-      <div className="flex items-center justify-between w-full">
+      {/* Side label */}
+      <div className="flex items-center w-full">
         <span
           className="pixel-text"
           style={{
@@ -37,17 +37,6 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs }) => 
         >
           {side === 'home' ? 'HOME' : 'AWAY'}
         </span>
-        {isPlayoffs && team.playoffSeed && (
-          <span
-            className="pixel-text"
-            style={{
-              fontSize: '0.4rem',
-              color: '#777799',
-            }}
-          >
-            #{team.playoffSeed} SEED
-          </span>
-        )}
       </div>
 
       {/* Logo / abbreviation fallback */}

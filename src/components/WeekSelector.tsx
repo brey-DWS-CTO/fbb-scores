@@ -65,7 +65,7 @@ const WeekSelector: FC<WeekSelectorProps> = ({ leagueInfo, selectedPeriod, onSel
         {/* Left arrow */}
         <button
           onClick={() => scroll('left')}
-          className="pixel-text cursor-pointer shrink-0 px-2 py-1"
+          className="pixel-text cursor-pointer shrink-0 px-3 py-2"
           style={{
             fontSize: '0.4rem',
             color: 'var(--neon-teal)',
@@ -115,16 +115,16 @@ const WeekSelector: FC<WeekSelectorProps> = ({ leagueInfo, selectedPeriod, onSel
                 key={period}
                 ref={isSelected ? selectedRef : undefined}
                 onClick={() => onSelectPeriod(period)}
-                className="pixel-text cursor-pointer shrink-0 px-2 py-1 whitespace-nowrap"
+                className="pixel-text cursor-pointer shrink-0 px-3 py-2 whitespace-nowrap"
                 style={{
-                  fontSize: '0.35rem',
+                  fontSize: '0.4rem',
                   color,
                   background: bg,
                   border: `1px solid ${borderColor}`,
                   boxShadow: shadow,
                   transition: 'all 0.15s ease',
                   lineHeight: 1,
-                  minWidth: '36px',
+                  minWidth: '44px',
                   textAlign: 'center',
                 }}
                 onMouseEnter={(e) => {
@@ -149,7 +149,7 @@ const WeekSelector: FC<WeekSelectorProps> = ({ leagueInfo, selectedPeriod, onSel
         {/* Right arrow */}
         <button
           onClick={() => scroll('right')}
-          className="pixel-text cursor-pointer shrink-0 px-2 py-1"
+          className="pixel-text cursor-pointer shrink-0 px-3 py-2"
           style={{
             fontSize: '0.4rem',
             color: 'var(--neon-teal)',

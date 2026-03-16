@@ -2,18 +2,19 @@ import { useState, useMemo, type FC } from 'react';
 import type { LeagueScoreboard, Matchup } from '../types/index.js';
 import MatchupRow from './MatchupRow.js';
 import PlayoffBracket from './PlayoffBracket.js';
+import Leaderboard from './Leaderboard.js';
 
 interface ScoreboardProps {
   data: LeagueScoreboard;
   selectedPeriod?: number;
 }
 
-type ViewMode = 'list' | 'bracket';
+type ViewMode = 'list' | 'bracket' | 'leaderboard';
 
 const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod }) => {
   const [sortByScore, setSortByScore] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('bracket');
   const { playoff } = data;
+  const [viewMode, setViewMode] = useState<ViewMode>(playoff.isPlayoffs ? 'bracket' : 'list');
 
   // Separate winner's bracket from consolation
   const { winnersBracket, consolation } = useMemo(() => {
@@ -40,6 +41,18 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
       return maxB - maxA;
     });
   };
+
+  // Available view modes depend on playoff status
+  const viewModes: Array<{ key: ViewMode; label: string }> = playoff.isPlayoffs
+    ? [
+        { key: 'bracket', label: 'BRACKET' },
+        { key: 'list', label: 'LIST' },
+        { key: 'leaderboard', label: 'STANDINGS' },
+      ]
+    : [
+        { key: 'list', label: 'LIST' },
+        { key: 'leaderboard', label: 'STANDINGS' },
+      ];
 
   return (
     <section
@@ -69,34 +82,30 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Bracket / List toggle (playoffs only) */}
-          {playoff.isPlayoffs && (
-            <div
-              className="flex"
-              style={{
-                border: '2px solid #333355',
-                overflow: 'hidden',
-              }}
-            >
+        <div className="flex items-center gap-2 flex-wrap justify-center">
+          {/* View mode toggle */}
+          <div
+            className="flex"
+            style={{
+              border: '2px solid #333355',
+              overflow: 'hidden',
+            }}
+          >
+            {viewModes.map((mode) => (
               <ViewToggleBtn
-                label="BRACKET"
-                active={viewMode === 'bracket'}
-                onClick={() => setViewMode('bracket')}
+                key={mode.key}
+                label={mode.label}
+                active={viewMode === mode.key}
+                onClick={() => setViewMode(mode.key)}
               />
-              <ViewToggleBtn
-                label="LIST"
-                active={viewMode === 'list'}
-                onClick={() => setViewMode('list')}
-              />
-            </div>
-          )}
+            ))}
+          </div>
 
-          {/* Sort toggle (list view or regular season) */}
-          {(!playoff.isPlayoffs || viewMode === 'list') && (
+          {/* Sort toggle (list view only) */}
+          {viewMode === 'list' && (
             <button
               onClick={() => setSortByScore((prev) => !prev)}
-              className="pixel-text cursor-pointer px-4 py-2"
+              className="pixel-text cursor-pointer px-5 py-2.5"
               style={{
                 fontSize: '0.45rem',
                 color: sortByScore ? 'var(--neon-teal)' : '#777799',
@@ -127,8 +136,13 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
         <PlayoffBracket matchups={data.matchups} playoff={playoff} />
       )}
 
+      {/* Leaderboard view */}
+      {viewMode === 'leaderboard' && (
+        <Leaderboard matchups={data.matchups} />
+      )}
+
       {/* List view: Winner's bracket matchups */}
-      {(!playoff.isPlayoffs || viewMode === 'list') && (
+      {viewMode === 'list' && (
         <div className="flex flex-col gap-2">
           {sortMatchups(winnersBracket).map((matchup, i) => (
             <MatchupRow key={matchup.id} matchup={matchup} index={i} isPlayoffs={playoff.isPlayoffs} />
@@ -136,8 +150,8 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
         </div>
       )}
 
-      {/* Consolation bracket (list view or regular season) */}
-      {consolation.length > 0 && (!playoff.isPlayoffs || viewMode === 'list') && (
+      {/* Consolation bracket (list view only) */}
+      {consolation.length > 0 && viewMode === 'list' && (
         <>
           <div className="flex flex-col items-center sm:items-start gap-1 mt-8 mb-6 px-2">
             <h2
@@ -207,7 +221,7 @@ interface ViewToggleBtnProps {
 const ViewToggleBtn: FC<ViewToggleBtnProps> = ({ label, active, onClick }) => (
   <button
     onClick={onClick}
-    className="pixel-text cursor-pointer px-3 py-1.5"
+    className="pixel-text cursor-pointer px-4 py-2.5"
     style={{
       fontSize: '0.4rem',
       color: active ? 'var(--neon-yellow)' : '#555577',

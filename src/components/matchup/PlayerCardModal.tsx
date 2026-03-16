@@ -35,16 +35,19 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
   const last30 = player.averages.last30;
 
   // Color code rolling averages vs season baseline
+  // 'near' = within 5% of baseline → amber instead of red
   const avgVsBaseline = (avg: number) => {
     if (avg <= 0 || seasonFptsPerGame <= 0) return 'neutral';
-    return avg > seasonFptsPerGame ? 'up' : avg < seasonFptsPerGame ? 'down' : 'neutral';
+    const pctDiff = Math.abs(avg - seasonFptsPerGame) / seasonFptsPerGame;
+    if (pctDiff <= 0.05) return 'near';
+    return avg > seasonFptsPerGame ? 'up' : 'down';
   };
 
   const trendColor = (dir: string) =>
-    dir === 'up' ? 'var(--neon-teal)' : dir === 'down' ? 'var(--neon-red)' : '#aaaacc';
+    dir === 'up' ? 'var(--neon-teal)' : dir === 'near' ? 'var(--neon-yellow)' : dir === 'down' ? 'var(--neon-red)' : '#aaaacc';
 
   const trendArrow = (dir: string) =>
-    dir === 'up' ? '▲' : dir === 'down' ? '▼' : '—';
+    dir === 'up' ? '▲' : dir === 'near' ? '≈' : dir === 'down' ? '▼' : '—';
 
   // Sparkline data
   const fptsData = trend?.dataPoints.map((d) => d.fpts) ?? [];
@@ -320,7 +323,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
                     className="pixel-text"
                     style={{ fontSize: '0.22rem', color: trendColor(card.dir) }}
                   >
-                    {trendArrow(card.dir)} {card.dir === 'up' ? 'ABOVE' : 'BELOW'} AVG
+                    {trendArrow(card.dir)} {card.dir === 'up' ? 'ABOVE' : card.dir === 'near' ? 'NEAR' : 'BELOW'} AVG
                   </span>
                 )}
               </div>

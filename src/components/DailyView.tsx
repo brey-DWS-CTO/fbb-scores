@@ -1,5 +1,6 @@
-import type { FC } from 'react';
-import type { DailyMatchup, DailyTeam, DailyPlayer } from '../types/index.js';
+import { useState, type FC } from 'react';
+import type { DailyMatchup, DailyTeam, DailyPlayer, MatchupPlayer } from '../types/index.js';
+import PlayerCardModal from './matchup/PlayerCardModal.js';
 
 const LINEUP_SLOT_LABELS: Record<number, string> = {
   0: 'PG', 1: 'SG', 2: 'SF', 3: 'PF', 4: 'C', 5: 'G', 6: 'F', 11: 'UTL',
@@ -8,15 +9,26 @@ const LINEUP_SLOT_LABELS: Record<number, string> = {
 
 interface DailyViewProps {
   data: DailyMatchup;
+  /** Map of playerId → full MatchupPlayer data for opening player cards */
+  playerMap?: Map<number, MatchupPlayer>;
 }
 
-const DailyView: FC<DailyViewProps> = ({ data }) => {
+const DailyView: FC<DailyViewProps> = ({ data, playerMap }) => {
+  const [selectedPlayer, setSelectedPlayer] = useState<MatchupPlayer | null>(null);
+
   const formattedDate = new Date(data.date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
   });
+
+  const handlePlayerClick = (playerId: number) => {
+    if (playerMap) {
+      const player = playerMap.get(playerId);
+      if (player) setSelectedPlayer(player);
+    }
+  };
 
   return (
     <div className="w-full">
@@ -38,9 +50,17 @@ const DailyView: FC<DailyViewProps> = ({ data }) => {
           border: '1px solid #1a1a33',
         }}
       >
-        <div className="flex flex-col items-center">
-          <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-blue)' }}>
-            {data.home.abbreviation}
+        <div className="flex flex-col items-center min-w-0">
+          <span
+            className="truncate"
+            style={{
+              fontFamily: "'VT323', monospace",
+              fontSize: '1rem',
+              color: 'var(--neon-blue)',
+              maxWidth: '120px',
+            }}
+          >
+            {data.home.name}
           </span>
           <span
             className="score-display"
@@ -61,9 +81,17 @@ const DailyView: FC<DailyViewProps> = ({ data }) => {
           VS
         </span>
 
-        <div className="flex flex-col items-center">
-          <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-orange)' }}>
-            {data.away.abbreviation}
+        <div className="flex flex-col items-center min-w-0">
+          <span
+            className="truncate"
+            style={{
+              fontFamily: "'VT323', monospace",
+              fontSize: '1rem',
+              color: 'var(--neon-orange)',
+              maxWidth: '120px',
+            }}
+          >
+            {data.away.name}
           </span>
           <span
             className="score-display"
@@ -83,9 +111,17 @@ const DailyView: FC<DailyViewProps> = ({ data }) => {
 
       {/* Side-by-side rosters */}
       <div className="flex flex-col lg:flex-row gap-4">
-        <DailyTeamRoster team={data.home} side="home" />
-        <DailyTeamRoster team={data.away} side="away" />
+        <DailyTeamRoster team={data.home} side="home" onPlayerClick={handlePlayerClick} hasPlayerMap={!!playerMap} />
+        <DailyTeamRoster team={data.away} side="away" onPlayerClick={handlePlayerClick} hasPlayerMap={!!playerMap} />
       </div>
+
+      {/* Player card modal */}
+      {selectedPlayer && (
+        <PlayerCardModal
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 };
@@ -95,9 +131,11 @@ const DailyView: FC<DailyViewProps> = ({ data }) => {
 interface DailyTeamRosterProps {
   team: DailyTeam;
   side: 'home' | 'away';
+  onPlayerClick: (playerId: number) => void;
+  hasPlayerMap: boolean;
 }
 
-const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side }) => {
+const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side, onPlayerClick, hasPlayerMap }) => {
   const sideColor = side === 'home' ? 'var(--neon-blue)' : 'var(--neon-orange)';
 
   return (
@@ -151,7 +189,13 @@ const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side }) => {
           </thead>
           <tbody>
             {team.players.map((player, i) => (
-              <DailyPlayerRow key={player.playerId} player={player} isEven={i % 2 === 0} />
+              <DailyPlayerRow
+                key={player.playerId}
+                player={player}
+                isEven={i % 2 === 0}
+                onClick={() => onPlayerClick(player.playerId)}
+                clickable={hasPlayerMap}
+              />
             ))}
           </tbody>
         </table>
@@ -165,9 +209,11 @@ const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side }) => {
 interface DailyPlayerRowProps {
   player: DailyPlayer;
   isEven: boolean;
+  onClick: () => void;
+  clickable: boolean;
 }
 
-const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven }) => {
+const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clickable }) => {
   const slotLabel = LINEUP_SLOT_LABELS[player.lineupSlotId] ?? '??';
   const isBenched = !player.isStarted;
   const gameStatus = player.gameInfo?.status;
@@ -185,11 +231,20 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven }) => {
 
   return (
     <tr
+      onClick={clickable ? onClick : undefined}
       style={{
         borderBottom: '1px solid #1a1a2e',
         background: rowBg,
         opacity: isBenched ? 0.5 : 1,
         borderLeft: isLive ? '2px solid #ffe60088' : '2px solid transparent',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'background 0.15s ease',
+      }}
+      onMouseEnter={(e) => {
+        if (clickable) (e.currentTarget as HTMLElement).style.background = '#1a1a3366';
+      }}
+      onMouseLeave={(e) => {
+        if (clickable) (e.currentTarget as HTMLElement).style.background = rowBg;
       }}
     >
       {/* Slot */}

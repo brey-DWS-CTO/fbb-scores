@@ -336,7 +336,7 @@ export interface PlayerProjectionInput {
   gameStatus: GameStatus | 'none';
   minutesRemaining: number;
   remainingGamesAfterToday: number;
-  /** Future hook: vegas/pace override per game */
+  /** Future hook: augment projection accuracy with pace/game-total data */
   overrideProjection?: number;
 }
 

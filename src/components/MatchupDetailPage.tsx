@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMatchupDetail } from '../hooks/useMatchupDetail.js';
 import { useDailyView } from '../hooks/useDailyView.js';
@@ -6,7 +6,7 @@ import MatchupDetailHeader from './matchup/MatchupDetailHeader.js';
 import TeamRoster from './matchup/TeamRoster.js';
 import DailyView from './DailyView.js';
 import type { FC } from 'react';
-import type { MatchupDetail } from '../types/index.js';
+import type { MatchupDetail, MatchupPlayer } from '../types/index.js';
 
 type ViewTab = 'today' | 'matchup';
 
@@ -18,6 +18,15 @@ const MatchupDetailPage: FC = () => {
   const headerRef = useRef<HTMLDivElement>(null);
   const { data, isLoading, isError, error } = useMatchupDetail(id);
   const { data: dailyData, isLoading: dailyLoading } = useDailyView(id);
+
+  // Build player lookup map for daily view player card clicks
+  const playerMap = useMemo(() => {
+    if (!data) return undefined;
+    const map = new Map<number, MatchupPlayer>();
+    for (const p of data.home.players) map.set(p.playerId, p);
+    for (const p of data.away.players) map.set(p.playerId, p);
+    return map;
+  }, [data]);
 
   // Detect when user scrolls past the full header
   useEffect(() => {
@@ -52,8 +61,8 @@ const MatchupDetailPage: FC = () => {
         </span>
         <Link
           to="/"
-          className="pixel-text px-4 py-2"
-          style={{ fontSize: '0.45rem', color: 'var(--neon-teal)', border: '1px solid var(--neon-teal)', textDecoration: 'none' }}
+          className="pixel-text px-5 py-2.5"
+          style={{ fontSize: '0.5rem', color: 'var(--neon-teal)', border: '1px solid var(--neon-teal)', textDecoration: 'none' }}
         >
           BACK TO SCOREBOARD
         </Link>
@@ -65,8 +74,8 @@ const MatchupDetailPage: FC = () => {
     <section className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
       <Link
         to="/"
-        className="pixel-text inline-block mb-4 px-3 py-1"
-        style={{ fontSize: '0.4rem', color: 'var(--neon-teal)', border: '1px solid #333355', textDecoration: 'none' }}
+        className="pixel-text inline-block mb-4 px-4 py-2.5"
+        style={{ fontSize: '0.5rem', color: 'var(--neon-teal)', border: '1px solid #333355', textDecoration: 'none' }}
       >
         &lt; BACK TO SCOREBOARD
       </Link>
@@ -102,7 +111,7 @@ const MatchupDetailPage: FC = () => {
             </span>
           </div>
         ) : dailyData ? (
-          <DailyView data={dailyData} />
+          <DailyView data={dailyData} playerMap={playerMap} />
         ) : (
           <div className="flex items-center justify-center py-12">
             <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.2rem', color: '#555577' }}>
@@ -209,9 +218,9 @@ interface TabButtonProps {
 const TabButton: FC<TabButtonProps> = ({ label, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className="pixel-text px-4 py-2"
+    className="pixel-text px-5 py-2.5"
     style={{
-      fontSize: '0.4rem',
+      fontSize: '0.45rem',
       color: isActive ? '#0a0a14' : 'var(--neon-teal)',
       background: isActive ? 'var(--neon-teal)' : 'transparent',
       border: `1px solid ${isActive ? 'var(--neon-teal)' : '#333355'}`,
