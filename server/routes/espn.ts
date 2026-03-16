@@ -63,8 +63,15 @@ router.get('/espn/scoreboard', async (req, res) => {
     const matchupScoringPeriods = raw.settings.scheduleSettings.matchupPeriods[String(effectiveMatchupPeriod)] ?? [];
     const todayScoringPeriod = raw.scoringPeriodId;
 
-    // Get remaining days in matchup period (after today)
-    const remainingDates = getRemainingMatchupDates(matchupScoringPeriods, todayScoringPeriod);
+    // Get remaining days in matchup period.
+    // For playoff rounds, matchupPeriods may be empty — fall back to playoffMatchupPeriodLength.
+    let remainingDates = getRemainingMatchupDates(matchupScoringPeriods, todayScoringPeriod);
+    if (remainingDates.length === 0) {
+      const { scheduleSettings } = raw.settings;
+      const playoffLength = scheduleSettings.playoffMatchupPeriodLength ?? 14;
+      console.log(`[NBA Schedule] matchupScoringPeriods empty for period ${effectiveMatchupPeriod}, using playoffMatchupPeriodLength=${playoffLength}`);
+      remainingDates = generateDateRange(playoffLength);
+    }
 
     const [nbaScoreboard, nbaSchedule] = await Promise.all([
       fetchNbaScoreboard(),
@@ -427,6 +434,21 @@ router.get('/espn/trends/team/:teamId', async (req, res) => {
 // ─── NBA Schedule Helpers ────────────────────────────────────────────────────
 
 /**
+ * Fallback for playoffs when matchupScoringPeriods is empty.
+ * Generate YYYY-MM-DD date strings from today through `days` days from now.
+ */
+function generateDateRange(days: number): string[] {
+  const dates: string[] = [];
+  const today = new Date();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    dates.push(d.toISOString().split('T')[0]);
+  }
+  return dates;
+}
+
+/**
  * Given the scoring periods in a matchup and today's scoring period,
  * return the dates for remaining days (including today and future) as YYYY-MM-DD strings.
  *
@@ -478,6 +500,22 @@ interface EspnNbaScoreboard {
  * Fetch today's NBA scoreboard from ESPN's public API (no auth required).
  * Returns a map of NBA team abbreviation → game info.
  */
+/**
+ * ESPN's public scoreboard API uses different abbreviations for some teams
+ * compared to the fantasy API. Normalize to our standard abbreviations.
+ */
+const SCOREBOARD_ABBREV_MAP: Record<string, string> = {
+  GS: 'GSW',
+  SA: 'SAS',
+  NY: 'NYK',
+  NO: 'NOP',
+  UTAH: 'UTA',
+  WSH: 'WAS',
+};
+function normalizeNbaAbbrev(abbr: string): string {
+  return SCOREBOARD_ABBREV_MAP[abbr] ?? abbr;
+}
+
 async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
   const gameMap = new Map<string, NbaGameInfo>();
 
@@ -535,8 +573,8 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
       const away = comp.competitors?.find(c => c.homeAway === 'away');
       if (!home?.team?.abbreviation || !away?.team?.abbreviation) continue;
 
-      const homeAbbr = home.team.abbreviation;
-      const awayAbbr = away.team.abbreviation;
+      const homeAbbr = normalizeNbaAbbrev(home.team.abbreviation);
+      const awayAbbr = normalizeNbaAbbrev(away.team.abbreviation);
       const scoreDisplay = `${awayAbbr} ${away.score ?? 0} - ${homeAbbr} ${home.score ?? 0}`;
 
       // Add entry for home team
@@ -579,7 +617,7 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
   const teamGamesRemaining = new Map<number, number>();
   if (dates.length === 0) return teamGamesRemaining;
 
-  // Reverse lookup: NBA abbreviation → ESPN proTeamId
+  // Reverse lookup: normalized NBA abbreviation → ESPN proTeamId
   const abbrevToProTeamId = new Map<string, number>();
   for (const [id, abbr] of Object.entries(NBA_TEAM_ABBREV)) {
     abbrevToProTeamId.set(abbr, parseInt(id, 10));
@@ -587,10 +625,12 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
 
   // Deduplicate dates (in case today appears both in scoreboard and schedule)
   const uniqueDates = [...new Set(dates)].sort();
+  console.log(`[NBA Schedule] Fetching ${uniqueDates.length} dates: ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`);
 
-  // Fetch each date individually — ESPN scoreboard API only returns one day per request
-  const fetchOneDate = async (dateStr: string): Promise<void> => {
+  // Fetch one date from ESPN scoreboard API
+  const fetchOneDate = async (dateStr: string): Promise<number> => {
     const dateParam = dateStr.replace(/-/g, '');
+    let gamesFound = 0;
     try {
       const { data } = await axios.get<EspnNbaScoreboard>(
         `${NBA_SCOREBOARD_URL}?dates=${dateParam}`,
@@ -601,11 +641,14 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
           const comp = event.competitions?.[0];
           if (!comp?.competitors) continue;
           for (const team of comp.competitors) {
-            const abbr = team.team?.abbreviation;
-            if (!abbr) continue;
+            const rawAbbr = team.team?.abbreviation;
+            if (!rawAbbr) continue;
+            // Normalize: ESPN scoreboard uses GS/SA/NY/NO/UTAH/WSH
+            const abbr = normalizeNbaAbbrev(rawAbbr);
             const proTeamId = abbrevToProTeamId.get(abbr);
             if (proTeamId != null) {
               teamGamesRemaining.set(proTeamId, (teamGamesRemaining.get(proTeamId) ?? 0) + 1);
+              gamesFound++;
             }
           }
         }
@@ -613,16 +656,19 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
     } catch (err) {
       console.error(`[NBA Schedule] Failed to fetch ${dateStr}:`, err instanceof Error ? err.message : err);
     }
+    return gamesFound;
   };
 
-  // Fetch all dates in parallel (typically 7-14 days for playoff matchups)
-  await Promise.all(uniqueDates.map(fetchOneDate));
-
-  if (teamGamesRemaining.size > 0) {
-    console.log(`[NBA Schedule] Found games for ${teamGamesRemaining.size} teams across ${uniqueDates.length} dates`);
-  } else if (uniqueDates.length > 0) {
-    console.warn(`[NBA Schedule] No games found for ${uniqueDates.length} dates (${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]})`);
+  // Fetch in batches of 4 to avoid rate limiting from ESPN
+  const BATCH_SIZE = 4;
+  let totalGames = 0;
+  for (let i = 0; i < uniqueDates.length; i += BATCH_SIZE) {
+    const batch = uniqueDates.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(batch.map(fetchOneDate));
+    totalGames += results.reduce((a, b) => a + b, 0);
   }
+
+  console.log(`[NBA Schedule] Found ${totalGames} team-games for ${teamGamesRemaining.size} teams across ${uniqueDates.length} dates`);
 
   return teamGamesRemaining;
 }
