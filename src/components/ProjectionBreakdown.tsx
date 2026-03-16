@@ -45,20 +45,20 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
 
       {/* Player projection table */}
       <div className="overflow-x-auto">
-        <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: '380px' }}>
+        <table className="w-full" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #222244' }}>
-              <th className="text-left px-2 py-2" style={{ width: '40%' }}>
+              <th className="text-left px-2 py-2">
                 <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>PLAYER</span>
               </th>
-              <th className="text-center px-2 py-2">
+              <th className="text-center px-2 py-2 hidden sm:table-cell">
                 <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>TEAM</span>
               </th>
               <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)' }}>L15 AVG</span>
+                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)' }}>L15</span>
               </th>
               <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)' }}>GAMES</span>
+                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)' }}>GM</span>
               </th>
               <th className="text-right px-2 py-2">
                 <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)' }}>PROJ</span>
@@ -71,7 +71,7 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
             ))}
             {unused.length > 0 && (
               <tr>
-                <td colSpan={5} className="px-2 py-2">
+                <td colSpan={99} className="px-2 py-2">
                   <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#444466' }}>
                     NOT PROJECTED ({unused.length})
                   </span>
@@ -149,7 +149,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
             <img
               src={player.imageUrl}
               alt=""
-              className="w-6 h-5 object-cover"
+              className="w-6 h-5 object-cover hidden sm:block"
               style={{ borderRadius: '2px', flexShrink: 0 }}
               loading="lazy"
             />
@@ -171,6 +171,9 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
               <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.7rem', color: '#555577' }}>
                 {player.position}
               </span>
+              <span className="sm:hidden" style={{ fontFamily: "'VT323', monospace", fontSize: '0.7rem', color: '#444466' }}>
+                {player.nbaTeamAbbrev}
+              </span>
               {player.isSmartFilled && (
                 <span
                   className="pixel-text"
@@ -190,8 +193,8 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
         </div>
       </td>
 
-      {/* NBA Team */}
-      <td className="text-center px-2 py-1.5">
+      {/* NBA Team (hidden on mobile) */}
+      <td className="text-center px-2 py-1.5 hidden sm:table-cell">
         <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: '#777799' }}>
           {player.nbaTeamAbbrev}
         </span>
