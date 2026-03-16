@@ -228,9 +228,12 @@ export interface MatchupPlayer {
   nbaTeamAbbrev: string;
   lineupSlotId: number;
   isStarter: boolean;
+  /** Matchup period total FPTS */
   fpts: number;
   stats: PlayerGameStats;
   averages: RollingAverages;
+  /** Season FPTS per game average (from season stats split type 0) */
+  seasonFptsPerGame: number;
   /** Player's headshot URL */
   imageUrl: string | null;
 }

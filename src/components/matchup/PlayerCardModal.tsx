@@ -26,8 +26,8 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
 
   const gp = player.stats.gp || 1;
 
-  // Season FPTS per game — the baseline for color coding
-  const seasonFptsPerGame = player.fpts > 0 && gp > 0 ? player.fpts / gp : 0;
+  // Season FPTS per game — from actual season stats (split type 0), not matchup period
+  const seasonFptsPerGame = player.seasonFptsPerGame;
 
   // Rolling averages
   const last7 = player.averages.last7;

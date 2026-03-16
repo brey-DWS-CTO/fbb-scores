@@ -453,9 +453,22 @@ export function normalizeMatchupDetail(
       );
       const rawStats = matchupStats?.stats ?? {};
 
-      // Get rolling averages from team roster stats (has split types 1/2/3)
+      // Get season stats (splitTypeId 0) for true season FPTS/G
       const playerId = entry.playerPoolEntry.id;
       const rosterStats = playerRosterStats.get(playerId) ?? playerStats;
+      const seasonStats = (rosterStats as EspnStatEntry[]).find(
+        (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
+      );
+      let seasonFptsPerGame = 0;
+      if (seasonStats?.stats) {
+        const seasonGp = seasonStats.stats['42'] ?? 0;
+        if (seasonGp > 0) {
+          const seasonTotalFpts = computeFpts(seasonStats.stats, scoringItems);
+          seasonFptsPerGame = round1(seasonTotalFpts / seasonGp);
+        }
+      }
+
+      // Get rolling averages from team roster stats (has split types 1/2/3)
       const averages = extractRollingAverages(
         rosterStats as EspnStatEntry[],
         scoringItems,
@@ -471,6 +484,7 @@ export function normalizeMatchupDetail(
         fpts: entry.playerPoolEntry.appliedStatTotal,
         stats: extractPlayerStats(rawStats),
         averages,
+        seasonFptsPerGame,
         imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${playerId}.png&w=96&h=70&cb=1`,
       };
     });
