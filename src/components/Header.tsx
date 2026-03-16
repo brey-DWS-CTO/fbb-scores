@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import { useState, useEffect, type FC } from 'react';
 import type { PlayoffInfo } from '../types/index.js';
 
 interface HeaderProps {
@@ -9,12 +9,25 @@ interface HeaderProps {
   isRefreshing: boolean;
 }
 
+const REFRESH_INTERVAL_S = 30;
+
 const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, isRefreshing }) => {
   const updatedTime = new Date(fetchedAt).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
   });
+
+  // Auto-refresh countdown (seconds since last fetch)
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed((e) => Math.min(e + 1, REFRESH_INTERVAL_S)), 1000);
+    return () => clearInterval(timer);
+  }, [fetchedAt]);
+
+  const refreshPct = Math.min((elapsed / REFRESH_INTERVAL_S) * 100, 100);
+  const secondsLeft = Math.max(0, REFRESH_INTERVAL_S - elapsed);
 
   return (
     <header
@@ -116,33 +129,56 @@ const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, is
             {playoff.roundLabel}
           </span>
 
-          {/* Updated time */}
-          <span
-            style={{
-              fontFamily: "'VT323', monospace",
-              fontSize: '1rem',
-              color: '#666688',
-            }}
-          >
-            UPDATED {updatedTime}
-          </span>
+          {/* Updated time + countdown + refresh */}
+          <div className="flex items-center gap-2">
+            <span
+              style={{
+                fontFamily: "'VT323', monospace",
+                fontSize: '1rem',
+                color: '#666688',
+              }}
+            >
+              UPDATED {updatedTime}
+            </span>
 
-          {/* Refresh button */}
-          <button
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            className="pixel-text cursor-pointer px-3 py-1"
-            style={{
-              fontSize: '0.45rem',
-              color: isRefreshing ? '#444466' : 'var(--neon-teal)',
-              background: isRefreshing ? 'transparent' : '#00ffcc0a',
-              border: `1px solid ${isRefreshing ? '#333355' : 'var(--neon-teal)'}`,
-              boxShadow: isRefreshing ? 'none' : '0 0 6px #00ffcc33',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
-          </button>
+            {/* Auto-refresh countdown bar */}
+            <div
+              style={{
+                width: '48px',
+                height: '4px',
+                background: '#1a1a33',
+                border: '1px solid #222244',
+                overflow: 'hidden',
+              }}
+              title={`Auto-refresh in ${secondsLeft}s`}
+            >
+              <div
+                style={{
+                  width: `${refreshPct}%`,
+                  height: '100%',
+                  background: refreshPct >= 90 ? 'var(--neon-teal)' : 'var(--neon-purple)',
+                  boxShadow: refreshPct >= 90 ? '0 0 4px var(--neon-teal)' : 'none',
+                  transition: 'width 1s linear, background 0.3s ease',
+                }}
+              />
+            </div>
+
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="pixel-text cursor-pointer px-3 py-1"
+              style={{
+                fontSize: '0.45rem',
+                color: isRefreshing ? '#444466' : 'var(--neon-teal)',
+                background: isRefreshing ? 'transparent' : '#00ffcc0a',
+                border: `1px solid ${isRefreshing ? '#333355' : 'var(--neon-teal)'}`,
+                boxShadow: isRefreshing ? 'none' : '0 0 6px #00ffcc33',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -200,43 +200,16 @@ function buildMatchup(
   };
 }
 
-function buildTeam(
-  side: EspnMatchupRaw['home'],
-  teamById: Map<number, EspnTeamRaw>,
-  memberById: Map<string, string>,
-  maxGames: number,
-  nbaScoreboard?: NbaScoreboardMap,
-  nbaSchedule?: NbaScheduleMap,
-  scoringItems: Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }> = [],
-  isFutureMatchup = false,
-): FantasyTeam {
-  const team = teamById.get(side.teamId);
-  // Use matchup period roster for top player (has full matchup stats),
-  // fall back to current scoring period roster
-  const matchupEntries: EspnRosterEntry[] =
-    side.rosterForMatchupPeriod?.entries ?? [];
-  const currentEntries: EspnRosterEntry[] =
-    side.rosterForCurrentScoringPeriod?.entries ?? [];
-  const rosterEntries = matchupEntries.length > 0 ? matchupEntries : currentEntries;
-  const rosterCount = rosterEntries.filter((e) => isActiveSlot(e.lineupSlotId)).length;
-  // Use totalPointsLive for real-time scores (includes in-progress games)
-  const currentScore = side.totalPointsLive ?? side.totalPoints;
+// ─── Player Average Extraction Helpers ─────────────────────────────────────
 
-  // Count games played from matchup period roster
-  const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
+type ScoringItemsList = Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }>;
 
-  const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
-
-  // ── Per-player projection engine ──────────────────────────────────────
-  // Build rolling average and matchup avg for each player
-  const playerMatchupAvgs = new Map<number, number>();
-  const playerRollingAvg15 = new Map<number, number>();
-
+/** Extract per-game matchup averages (splitTypeId 5) from matchup roster entries. */
+function extractMatchupAvgs(matchupEntries: EspnRosterEntry[]): Map<number, number> {
+  const avgs = new Map<number, number>();
   for (const entry of matchupEntries) {
     const playerId = entry.playerPoolEntry.id;
     const playerStats = entry.playerPoolEntry.player.stats ?? [];
-
-    // Matchup period per-game average (splitTypeId 5)
     const matchupStat = playerStats.find(
       (s: { statSplitTypeId: number; statSourceId: number }) =>
         s.statSplitTypeId === 5 && s.statSourceId === 0,
@@ -245,149 +218,233 @@ function buildTeam(
       const playerGp = matchupStat.stats['42'] ?? 0;
       const totalApplied = entry.playerPoolEntry.appliedStatTotal ?? 0;
       if (playerGp > 0) {
-        playerMatchupAvgs.set(playerId, round1(totalApplied / playerGp));
-      }
-    }
-
-  }
-
-  // Compute L15 rolling averages and season FPTS/G from team roster entries.
-  // Roster view stats are per-game averages (same as season split type 0),
-  // so computeFpts directly gives FPTS/G — no GP division needed.
-  const playerSeasonAvg = new Map<number, number>();
-
-  if (team?.roster?.entries) {
-    for (const entry of team.roster.entries) {
-      const playerId = entry.playerPoolEntry.id;
-      const playerStats = entry.playerPoolEntry.player.stats ?? [];
-
-      // L15 rolling average (splitTypeId 2)
-      const rolling15Stat = playerStats.find(
-        (s) => s.statSplitTypeId === 2 && s.statSourceId === 0,
-      );
-      if (rolling15Stat?.stats) {
-        const fpts15 = computeFpts(rolling15Stat.stats, scoringItems);
-        if (fpts15 > 0) {
-          playerRollingAvg15.set(playerId, round1(fpts15));
-        }
-      }
-
-      // Season FPTS/G (splitTypeId 0) — used as fallback when L15 and matchup avg are missing
-      const seasonStat = playerStats.find(
-        (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
-      );
-      if (seasonStat?.stats) {
-        const fptsSeason = computeFpts(seasonStat.stats, scoringItems);
-        if (fptsSeason > 0) {
-          playerSeasonAvg.set(playerId, round1(fptsSeason));
-        }
+        avgs.set(playerId, round1(totalApplied / playerGp));
       }
     }
   }
+  return avgs;
+}
 
-  // Build PlayerProjectionInput for each roster player
+/**
+ * Extract L15 rolling averages and season FPTS/G from team roster entries.
+ * Roster view stats are per-game averages — computeFpts directly gives FPTS/G.
+ */
+function extractRosterAvgs(
+  rosterEntries: EspnRosterEntry[] | undefined,
+  scoringItems: ScoringItemsList,
+): { rolling15: Map<number, number>; season: Map<number, number> } {
+  const rolling15 = new Map<number, number>();
+  const season = new Map<number, number>();
+  if (!rosterEntries) return { rolling15, season };
+
+  for (const entry of rosterEntries) {
+    const playerId = entry.playerPoolEntry.id;
+    const playerStats = entry.playerPoolEntry.player.stats ?? [];
+
+    const rolling15Stat = playerStats.find(
+      (s) => s.statSplitTypeId === 2 && s.statSourceId === 0,
+    );
+    if (rolling15Stat?.stats) {
+      const fpts = computeFpts(rolling15Stat.stats, scoringItems);
+      if (fpts > 0) rolling15.set(playerId, round1(fpts));
+    }
+
+    const seasonStat = playerStats.find(
+      (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
+    );
+    if (seasonStat?.stats) {
+      const fpts = computeFpts(seasonStat.stats, scoringItems);
+      if (fpts > 0) season.set(playerId, round1(fpts));
+    }
+  }
+  return { rolling15, season };
+}
+
+/** IR slot IDs for excluding from smart-fill. */
+const IR_SLOTS = new Set([13, 21, 23]);
+
+/** Build projection inputs and player name map from roster entries. */
+function buildProjectionInputs(
+  entries: EspnRosterEntry[],
+  playerRollingAvg15: Map<number, number>,
+  playerMatchupAvgs: Map<number, number>,
+  playerSeasonAvg: Map<number, number>,
+  nbaScoreboard: NbaScoreboardMap,
+  nbaSchedule: NbaScheduleMap,
+  isFutureMatchup: boolean,
+): { inputs: PlayerProjectionInput[]; names: Map<number, { name: string; position: string; nbaTeamAbbrev: string }> } {
+  const inputs: PlayerProjectionInput[] = [];
+  const names = new Map<number, { name: string; position: string; nbaTeamAbbrev: string }>();
+
+  for (const entry of entries) {
+    const playerId = entry.playerPoolEntry.id;
+    const p = entry.playerPoolEntry.player;
+    const proTeamId = p.proTeamId;
+    const nbaAbbrev = getNbaTeamAbbrev(proTeamId);
+
+    const rollingAvg15 = playerRollingAvg15.get(playerId) ?? playerMatchupAvgs.get(playerId) ?? playerSeasonAvg.get(playerId) ?? 0;
+    const matchupAvgPerGame = playerMatchupAvgs.get(playerId) ?? 0;
+
+    let todayFpts = 0;
+    let gameStatus: GameStatus | 'none' = 'none';
+    let minutesRemaining = 0;
+    const remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
+
+    if (!isFutureMatchup) {
+      todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
+      const gameInfo: NbaGameInfo | undefined = nbaScoreboard.get(nbaAbbrev);
+      if (gameInfo) {
+        gameStatus = gameInfo.status;
+        minutesRemaining = gameInfo.minutesRemaining;
+      }
+    }
+
+    inputs.push({
+      playerId, proTeamId,
+      isActive: isActiveSlot(entry.lineupSlotId),
+      isOnIR: IR_SLOTS.has(entry.lineupSlotId),
+      todayFpts, rollingAvg15, matchupAvgPerGame,
+      gameStatus, minutesRemaining, remainingGamesAfterToday,
+    });
+
+    names.set(playerId, {
+      name: p.fullName,
+      position: POSITION_MAP[p.defaultPositionId] ?? 'Unknown',
+      nbaTeamAbbrev: nbaAbbrev,
+    });
+  }
+
+  return { inputs, names };
+}
+
+/** Resolve owner name and basic team metadata. */
+function resolveTeamMeta(
+  teamId: number,
+  team: EspnTeamRaw | undefined,
+  memberById: Map<string, string>,
+): { name: string; abbreviation: string; ownerName: string; logoUrl: string | null; playoffSeed: number | null } {
+  let ownerName = 'Unknown Owner';
+  if (team?.owners?.[0]) {
+    ownerName = memberById.get(team.owners[0]) ?? 'Unknown Owner';
+  }
+  return {
+    name: team?.name ?? `Team ${teamId}`,
+    abbreviation: team?.abbrev ?? '???',
+    ownerName,
+    logoUrl: team?.logo ?? null,
+    playoffSeed: team?.playoffSeed ?? null,
+  };
+}
+
+// ─── Build Team (Scoreboard) ─────────────────────────────────────────────────
+
+function buildTeam(
+  side: EspnMatchupRaw['home'],
+  teamById: Map<number, EspnTeamRaw>,
+  memberById: Map<string, string>,
+  maxGames: number,
+  nbaScoreboard?: NbaScoreboardMap,
+  nbaSchedule?: NbaScheduleMap,
+  scoringItems: ScoringItemsList = [],
+  isFutureMatchup = false,
+): FantasyTeam {
+  const team = teamById.get(side.teamId);
+  const matchupEntries: EspnRosterEntry[] = side.rosterForMatchupPeriod?.entries ?? [];
+  const currentEntries: EspnRosterEntry[] = side.rosterForCurrentScoringPeriod?.entries ?? [];
+  const rosterEntries = matchupEntries.length > 0 ? matchupEntries : currentEntries;
+  const rosterCount = rosterEntries.filter((e) => isActiveSlot(e.lineupSlotId)).length;
+  const currentScore = side.totalPointsLive ?? side.totalPoints;
+  const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
+  const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
+
+  // Extract player averages from both matchup and roster data
+  const playerMatchupAvgs = extractMatchupAvgs(matchupEntries);
+  const { rolling15: playerRollingAvg15, season: playerSeasonAvg } = extractRosterAvgs(team?.roster?.entries, scoringItems);
+
+  // Run projection engine
   let projectedScore: number;
   let projectionBreakdown: ProjectionBreakdown | null = null;
 
   if (nbaScoreboard && nbaSchedule) {
-    // ── New per-player projection engine ──
-    const projectionInputs: PlayerProjectionInput[] = [];
-
-    // For future matchups, use team roster entries (has rolling averages, no today's game context).
-    // For current matchups, use current period entries (has today's live data).
+    // Per-player projection engine: pick entries based on matchup timing
     const allEntries = isFutureMatchup
       ? (team?.roster?.entries ?? matchupEntries)
       : (currentEntries.length > 0 ? currentEntries : matchupEntries);
 
-    for (const entry of allEntries) {
-      const playerId = entry.playerPoolEntry.id;
-      const proTeamId = entry.playerPoolEntry.player.proTeamId;
-      const nbaAbbrev = getNbaTeamAbbrev(proTeamId);
-
-      const rollingAvg15 = playerRollingAvg15.get(playerId) ?? playerMatchupAvgs.get(playerId) ?? playerSeasonAvg.get(playerId) ?? 0;
-      const matchupAvgPerGame = playerMatchupAvgs.get(playerId) ?? 0;
-
-      // For future matchups: no games have started, so no live data to use.
-      // All games in the period are "remaining" and come from nbaSchedule.
-      let todayFpts = 0;
-      let gameStatus: GameStatus | 'none' = 'none';
-      let minutesRemaining = 0;
-      let remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
-
-      if (!isFutureMatchup) {
-        // Current matchup: use today's live game data
-        todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
-        const gameInfo: NbaGameInfo | undefined = nbaScoreboard.get(nbaAbbrev);
-        if (gameInfo) {
-          gameStatus = gameInfo.status;
-          minutesRemaining = gameInfo.minutesRemaining;
-        }
-      }
-
-      projectionInputs.push({
-        playerId,
-        proTeamId,
-        isActive: isActiveSlot(entry.lineupSlotId),
-        isOnIR: [13, 21, 23].includes(entry.lineupSlotId),
-        todayFpts,
-        rollingAvg15,
-        matchupAvgPerGame,
-        gameStatus,
-        minutesRemaining,
-        remainingGamesAfterToday,
-      });
-    }
-
-    // Build player names map for breakdown display
-    const playerNamesMap = new Map<number, { name: string; position: string; nbaTeamAbbrev: string }>();
-    for (const entry of allEntries) {
-      const p = entry.playerPoolEntry.player;
-      playerNamesMap.set(entry.playerPoolEntry.id, {
-        name: p.fullName,
-        position: POSITION_MAP[p.defaultPositionId] ?? 'Unknown',
-        nbaTeamAbbrev: getNbaTeamAbbrev(p.proTeamId),
-      });
-    }
-
-    const projResult = computeTeamProjection(currentScore, gamesPlayed, maxGames, projectionInputs, playerNamesMap);
+    const { inputs, names } = buildProjectionInputs(
+      allEntries, playerRollingAvg15, playerMatchupAvgs, playerSeasonAvg,
+      nbaScoreboard, nbaSchedule, isFutureMatchup,
+    );
+    const projResult = computeTeamProjection(currentScore, gamesPlayed, maxGames, inputs, names);
     projectedScore = projResult.projectedScore;
     projectionBreakdown = projResult.breakdown;
   } else {
-    // ── Fallback: old pace-based projection ──
+    // Fallback: pace-based projection with live game bonus
     projectedScore = computeProjectedScore(currentScore, gamesPlayed, maxGames);
-
-    // Old heuristic for live game bonus
-    const playerRollingAvgs = new Map<number, number>();
-    for (const [id, avg] of playerMatchupAvgs) {
-      playerRollingAvgs.set(id, avg);
-    }
-    const liveBonus = estimateLiveGameProjection(currentEntries, playerRollingAvgs);
+    const liveBonus = estimateLiveGameProjection(currentEntries, playerMatchupAvgs);
     if (liveBonus > 0) {
       projectedScore = round1(Math.max(projectedScore, currentScore + liveBonus));
     }
   }
 
-  // Resolve owner name from members list
-  let ownerName = 'Unknown Owner';
-  if (team?.owners?.[0]) {
-    ownerName = memberById.get(team.owners[0]) ?? 'Unknown Owner';
-  }
+  const meta = resolveTeamMeta(side.teamId, team, memberById);
 
   return {
     id: side.teamId,
-    name: team?.name ?? `Team ${side.teamId}`,
-    abbreviation: team?.abbrev ?? '???',
-    ownerName,
-    logoUrl: team?.logo ?? null,
+    ...meta,
     currentScore,
     avgPointsPerGame,
     gamesPlayed,
     maxGames,
     projectedScore,
     rosterCount,
-    playoffSeed: team?.playoffSeed ?? null,
     topPlayer: findTopPlayer(rosterEntries),
     projectionBreakdown,
+  };
+}
+
+// ─── Matchup-Period Efficiency ───────────────────────────────────────────────
+
+/**
+ * Compute lineup efficiency for a matchup period: actual score vs optimal
+ * lineup (top maxGames game-entries by per-game average).
+ */
+function computeMatchupEfficiency(
+  rosterEntries: EspnRosterEntry[],
+  scoringItems: ScoringItemsList,
+  currentScore: number,
+  maxGames: number,
+): TeamEfficiency {
+  const gameEntries: number[] = [];
+  for (const entry of rosterEntries) {
+    const playerStats = entry.playerPoolEntry.player.stats ?? [];
+    const matchupStat = playerStats.find(
+      (s: { statSplitTypeId: number; statSourceId: number; stats?: Record<string, number> }) =>
+        s.statSplitTypeId === 5 && s.statSourceId === 0,
+    );
+    if (!matchupStat?.stats) continue;
+
+    const totalFpts = computeFpts(matchupStat.stats, scoringItems);
+    const playerGp = matchupStat.stats['42'] ?? 0;
+    if (playerGp <= 0 || totalFpts <= 0) continue;
+
+    const avgPerGame = totalFpts / playerGp;
+    for (let g = 0; g < playerGp; g++) {
+      gameEntries.push(avgPerGame);
+    }
+  }
+
+  gameEntries.sort((a, b) => b - a);
+  const maxPossibleScore = round1(gameEntries.slice(0, maxGames).reduce((sum, v) => sum + v, 0));
+  const efficiencyPct = maxPossibleScore > 0
+    ? round1((currentScore / maxPossibleScore) * 100)
+    : 100;
+
+  return {
+    actualScore: currentScore,
+    maxPossibleScore,
+    efficiencyPct,
+    missedPoints: round1(Math.max(0, maxPossibleScore - currentScore)),
   };
 }
 
@@ -520,62 +577,16 @@ export function normalizeMatchupDetail(
       return a.lineupSlotId - b.lineupSlotId;
     });
 
-    let ownerName = 'Unknown Owner';
-    if (team?.owners?.[0]) {
-      ownerName = memberById.get(team.owners[0]) ?? 'Unknown Owner';
-    }
-
-    // ── Matchup-period efficiency ───────────────────────────────────
-    // For each player, get their total FPTS from raw stats (all games played,
-    // regardless of lineup slot). Then build a pool of per-game averages and
-    // pick the top maxGames entries as the "optimal lineup" total.
-    const gameEntries: number[] = [];
-    for (const entry of rosterEntries) {
-      const playerStats = entry.playerPoolEntry.player.stats ?? [];
-      const matchupStat = playerStats.find(
-        (s: { statSplitTypeId: number; statSourceId: number; stats?: Record<string, number> }) =>
-          s.statSplitTypeId === 5 && s.statSourceId === 0,
-      );
-      if (!matchupStat?.stats) continue;
-
-      // Compute total FPTS from raw stats using scoring settings
-      const totalFpts = computeFpts(matchupStat.stats, scoringItems);
-      const playerGp = matchupStat.stats['42'] ?? 0;
-      if (playerGp <= 0 || totalFpts <= 0) continue;
-
-      // Create individual "game entries" at the per-game average
-      const avgPerGame = totalFpts / playerGp;
-      for (let g = 0; g < playerGp; g++) {
-        gameEntries.push(avgPerGame);
-      }
-    }
-
-    // Sort descending and take top maxGames
-    gameEntries.sort((a, b) => b - a);
-    const optimalEntries = gameEntries.slice(0, maxGames);
-    const maxPossibleScore = round1(optimalEntries.reduce((sum, v) => sum + v, 0));
-    const efficiencyPct = maxPossibleScore > 0
-      ? round1((currentScore / maxPossibleScore) * 100)
-      : 100;
-
-    const efficiency: TeamEfficiency = {
-      actualScore: currentScore,
-      maxPossibleScore,
-      efficiencyPct,
-      missedPoints: round1(Math.max(0, maxPossibleScore - currentScore)),
-    };
+    const meta = resolveTeamMeta(side.teamId, team, memberById);
+    const efficiency = computeMatchupEfficiency(rosterEntries, scoringItems, currentScore, maxGames);
 
     return {
       id: side.teamId,
-      name: team?.name ?? `Team ${side.teamId}`,
-      abbreviation: team?.abbrev ?? '???',
-      ownerName,
-      logoUrl: team?.logo ?? null,
+      ...meta,
       currentScore,
       avgPointsPerGame,
       gamesPlayed,
       maxGames,
-      playoffSeed: team?.playoffSeed ?? null,
       players,
       efficiency,
     };
