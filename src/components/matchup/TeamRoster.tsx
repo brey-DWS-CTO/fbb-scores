@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import type { FC } from 'react';
 import type { MatchupDetailTeam, MatchupPlayer } from '../../types/index.js';
 import PlayerRow from './PlayerRow.js';
@@ -118,9 +118,8 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
           </thead>
           <tbody>
             {sortedPlayers.map((player, i) => (
-              <>
+              <Fragment key={player.playerId ?? i}>
                 <PlayerRow
-                  key={player.playerId ?? i}
                   player={player}
                   isEven={i % 2 === 0}
                   isExpanded={expandedPlayerId === player.playerId}
@@ -135,7 +134,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
                     colSpan={TOTAL_COLUMNS}
                   />
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
