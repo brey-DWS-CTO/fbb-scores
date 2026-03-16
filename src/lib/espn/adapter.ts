@@ -74,8 +74,10 @@ export function normalizeLeagueResponse(
     (m) => m.matchupPeriodId === effectiveMatchupPeriod,
   );
 
+  const scoringItems = raw.settings.scoringSettings?.scoringItems ?? [];
+
   const matchups: Matchup[] = relevantMatchups.map((m) =>
-    buildMatchup(m, currentPeriod, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule),
+    buildMatchup(m, currentPeriod, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems),
   );
 
   return {
@@ -168,11 +170,12 @@ function buildMatchup(
   maxGames: number,
   nbaScoreboard?: NbaScoreboardMap,
   nbaSchedule?: NbaScheduleMap,
+  scoringItems: Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }> = [],
 ): Matchup {
   const playoffTierType = (m.playoffTierType as PlayoffTierType) ?? 'NONE';
 
-  const home = buildTeam(m.home, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule);
-  const away = buildTeam(m.away, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule);
+  const home = buildTeam(m.home, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems);
+  const away = buildTeam(m.away, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems);
 
   const winProbability = computeWinProbability(
     home.currentScore, home.gamesPlayed, home.maxGames, home.avgPointsPerGame,
@@ -198,6 +201,7 @@ function buildTeam(
   maxGames: number,
   nbaScoreboard?: NbaScoreboardMap,
   nbaSchedule?: NbaScheduleMap,
+  scoringItems: Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }> = [],
 ): FantasyTeam {
   const team = teamById.get(side.teamId);
   // Use matchup period roster for top player (has full matchup stats),
@@ -238,42 +242,23 @@ function buildTeam(
       }
     }
 
-    // Last 15 rolling average (splitTypeId 2)
-    const rolling15Stat = playerStats.find(
-      (s: { statSplitTypeId: number; statSourceId: number }) =>
-        s.statSplitTypeId === 2 && s.statSourceId === 0,
-    );
-    if (rolling15Stat?.stats) {
-      const gp15 = rolling15Stat.stats['42'] ?? 0;
-      if (gp15 > 0) {
-        // appliedStatTotal on the entry is for the matchup period, not L15
-        // We need to compute L15 total from the stats
-        const totalApplied15 = entry.playerPoolEntry.appliedStatTotal ?? 0;
-        // Use matchup avg as fallback since we may not have L15 FPTS directly
-        playerRollingAvg15.set(playerId, round1(totalApplied15 / gp15));
-      }
-    }
   }
 
-  // Also check team roster for L15 data (more reliable source)
-  const teamRaw = team;
-  if (teamRaw?.roster?.entries) {
-    for (const entry of teamRaw.roster.entries) {
+  // Compute L15 rolling averages from team roster entries (has raw stats for splitTypeId 2).
+  // Roster view stats are per-game averages (same as season split type 0),
+  // so computeFpts directly gives FPTS/G — no GP division needed.
+  if (team?.roster?.entries) {
+    for (const entry of team.roster.entries) {
       const playerId = entry.playerPoolEntry.id;
       const playerStats = entry.playerPoolEntry.player.stats ?? [];
+
       const rolling15Stat = playerStats.find(
         (s) => s.statSplitTypeId === 2 && s.statSourceId === 0,
       );
       if (rolling15Stat?.stats) {
-        const gp15 = rolling15Stat.stats['42'] ?? 0;
-        if (gp15 > 0) {
-          // For L15, compute total FPTS from raw stats if possible
-          // appliedStatTotal on the poolEntry is matchup total, not L15
-          // Use the matchup avg as a proxy for now
-          const existing = playerRollingAvg15.get(playerId);
-          if (!existing) {
-            playerRollingAvg15.set(playerId, playerMatchupAvgs.get(playerId) ?? 0);
-          }
+        const fpts15 = computeFpts(rolling15Stat.stats, scoringItems);
+        if (fpts15 > 0) {
+          playerRollingAvg15.set(playerId, round1(fpts15));
         }
       }
     }
@@ -368,7 +353,8 @@ function buildTeam(
 /**
  * Extract rolling averages from ESPN's pre-computed split types.
  * Split type 1 = last 7 days, 2 = last 15 days, 3 = last 30 days.
- * These are total FPTS for the window — divide by GP to get per-game average.
+ * Roster view stats are per-game averages (same as type 0 season stats),
+ * so computeFpts directly gives FPTS/G — no need to divide by GP.
  */
 function extractRollingAverages(
   playerStats: EspnStatEntry[],
@@ -379,10 +365,7 @@ function extractRollingAverages(
       (s) => s.statSplitTypeId === splitTypeId && s.statSourceId === 0,
     );
     if (!stat?.stats) return 0;
-    const gp = stat.stats['42'] ?? 0;
-    if (gp === 0) return 0;
-    const totalFpts = computeFpts(stat.stats, scoringItems);
-    return round1(totalFpts / gp);
+    return round1(computeFpts(stat.stats, scoringItems));
   };
 
   return {
