@@ -343,40 +343,60 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum, accentCo
         />
 
         {/* Win Probability indicator */}
-        {matchup.winProbability.homeWinPct > 0 && matchup.winProbability.homeWinPct < 100 && (
-          <div
-            className="flex items-center gap-2 px-4 py-1.5"
-            style={{
-              borderTop: '1px solid #1a1a33',
-              background: '#0a0a1408',
-            }}
-          >
-            <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-blue)', minWidth: '2rem', textAlign: 'right' }}>
-              {matchup.winProbability.homeWinPct}%
-            </span>
-            <div style={{ flex: 1, height: '4px', background: '#111122', display: 'flex', overflow: 'hidden' }}>
-              <div
-                style={{
-                  width: `${matchup.winProbability.homeWinPct}%`,
-                  background: 'var(--neon-blue)',
-                  boxShadow: '0 0 3px var(--neon-blue)',
-                  transition: 'width 0.3s ease',
-                }}
-              />
-              <div
-                style={{
-                  width: `${matchup.winProbability.awayWinPct}%`,
-                  background: 'var(--neon-orange)',
-                  boxShadow: '0 0 3px var(--neon-orange)',
-                  transition: 'width 0.3s ease',
-                }}
-              />
-            </div>
-            <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-orange)', minWidth: '2rem', textAlign: 'left' }}>
-              {matchup.winProbability.awayWinPct}%
-            </span>
+        <div
+          className="flex items-center gap-2 px-4 py-1.5"
+          style={{
+            borderTop: '1px solid #1a1a33',
+            background: '#0a0a1408',
+          }}
+        >
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.75rem', color: 'var(--neon-blue)', opacity: 0.7, flexShrink: 0 }}>
+            {home.abbreviation}
+          </span>
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-blue)', minWidth: '2.2rem', textAlign: 'right', flexShrink: 0 }}>
+            {matchup.isCompleted
+              ? (home.currentScore > away.currentScore ? '100%' : '0%')
+              : `${matchup.winProbability.homeWinPct}%`}
+          </span>
+          <div style={{ flex: 1, height: '4px', background: '#111122', display: 'flex', overflow: 'hidden' }}>
+            {(() => {
+              const homePct = matchup.isCompleted
+                ? (home.currentScore > away.currentScore ? 100 : home.currentScore === away.currentScore ? 50 : 0)
+                : matchup.winProbability.homeWinPct;
+              const awayPct = matchup.isCompleted
+                ? (away.currentScore > home.currentScore ? 100 : away.currentScore === home.currentScore ? 50 : 0)
+                : matchup.winProbability.awayWinPct;
+              return (
+                <>
+                  <div
+                    style={{
+                      width: `${homePct}%`,
+                      background: 'var(--neon-blue)',
+                      boxShadow: '0 0 3px var(--neon-blue)',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: `${awayPct}%`,
+                      background: 'var(--neon-orange)',
+                      boxShadow: '0 0 3px var(--neon-orange)',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </>
+              );
+            })()}
           </div>
-        )}
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-orange)', minWidth: '2.2rem', textAlign: 'left', flexShrink: 0 }}>
+            {matchup.isCompleted
+              ? (away.currentScore > home.currentScore ? '100%' : '0%')
+              : `${matchup.winProbability.awayWinPct}%`}
+          </span>
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.75rem', color: 'var(--neon-orange)', opacity: 0.7, flexShrink: 0 }}>
+            {away.abbreviation}
+          </span>
+        </div>
       </div>
     </Link>
   );
