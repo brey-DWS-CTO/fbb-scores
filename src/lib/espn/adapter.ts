@@ -8,11 +8,16 @@ import type {
   EspnStatEntry,
   EspnTeamRaw,
   FantasyTeam,
+  GameStatus,
   LeagueScoreboard,
   Matchup,
   MatchupDetail,
   MatchupDetailTeam,
   MatchupPlayer,
+  NbaGameInfo,
+  NbaScoreboardMap,
+  NbaScheduleMap,
+  PlayerProjectionInput,
   PlayoffInfo,
   PlayoffTierType,
   RollingAverages,
@@ -20,7 +25,9 @@ import type {
 } from '../../types/index.js';
 import {
   computeFpts,
+  computePlayerGameProjection,
   computeProjectedScore,
+  computeTeamProjection,
   computeWinProbability,
   estimateLiveGameProjection,
   extractPlayerStats,
@@ -34,7 +41,12 @@ import {
 /**
  * Normalize a raw ESPN league API response into our app's LeagueScoreboard shape.
  */
-export function normalizeLeagueResponse(raw: EspnLeagueResponse, overrideMatchupPeriod?: number): LeagueScoreboard {
+export function normalizeLeagueResponse(
+  raw: EspnLeagueResponse,
+  overrideMatchupPeriod?: number,
+  nbaScoreboard?: NbaScoreboardMap,
+  nbaSchedule?: NbaScheduleMap,
+): LeagueScoreboard {
   // Build lookup maps
   const teamById = new Map<number, EspnTeamRaw>();
   for (const t of raw.teams) {
@@ -63,7 +75,7 @@ export function normalizeLeagueResponse(raw: EspnLeagueResponse, overrideMatchup
   );
 
   const matchups: Matchup[] = relevantMatchups.map((m) =>
-    buildMatchup(m, currentPeriod, teamById, memberById, maxGames),
+    buildMatchup(m, currentPeriod, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule),
   );
 
   return {
@@ -154,11 +166,13 @@ function buildMatchup(
   teamById: Map<number, EspnTeamRaw>,
   memberById: Map<string, string>,
   maxGames: number,
+  nbaScoreboard?: NbaScoreboardMap,
+  nbaSchedule?: NbaScheduleMap,
 ): Matchup {
   const playoffTierType = (m.playoffTierType as PlayoffTierType) ?? 'NONE';
 
-  const home = buildTeam(m.home, teamById, memberById, maxGames);
-  const away = buildTeam(m.away, teamById, memberById, maxGames);
+  const home = buildTeam(m.home, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule);
+  const away = buildTeam(m.away, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule);
 
   const winProbability = computeWinProbability(
     home.currentScore, home.gamesPlayed, home.maxGames, home.avgPointsPerGame,
@@ -182,6 +196,8 @@ function buildTeam(
   teamById: Map<number, EspnTeamRaw>,
   memberById: Map<string, string>,
   maxGames: number,
+  nbaScoreboard?: NbaScoreboardMap,
+  nbaSchedule?: NbaScheduleMap,
 ): FantasyTeam {
   const team = teamById.get(side.teamId);
   // Use matchup period roster for top player (has full matchup stats),
@@ -200,15 +216,16 @@ function buildTeam(
 
   const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
 
-  // Base projection from pace extrapolation
-  let projectedScore = computeProjectedScore(currentScore, gamesPlayed, maxGames);
+  // ── Per-player projection engine ──────────────────────────────────────
+  // Build rolling average and matchup avg for each player
+  const playerMatchupAvgs = new Map<number, number>();
+  const playerRollingAvg15 = new Map<number, number>();
 
-  // Build rolling average estimates from matchup period data for in-progress game detection
-  // For each player, use their matchup-period per-game average as a proxy for their expected output
-  const playerRollingAvgs = new Map<number, number>();
   for (const entry of matchupEntries) {
     const playerId = entry.playerPoolEntry.id;
     const playerStats = entry.playerPoolEntry.player.stats ?? [];
+
+    // Matchup period per-game average (splitTypeId 5)
     const matchupStat = playerStats.find(
       (s: { statSplitTypeId: number; statSourceId: number }) =>
         s.statSplitTypeId === 5 && s.statSourceId === 0,
@@ -217,16 +234,110 @@ function buildTeam(
       const playerGp = matchupStat.stats['42'] ?? 0;
       const totalApplied = entry.playerPoolEntry.appliedStatTotal ?? 0;
       if (playerGp > 0) {
-        playerRollingAvgs.set(playerId, round1(totalApplied / playerGp));
+        playerMatchupAvgs.set(playerId, round1(totalApplied / playerGp));
+      }
+    }
+
+    // Last 15 rolling average (splitTypeId 2)
+    const rolling15Stat = playerStats.find(
+      (s: { statSplitTypeId: number; statSourceId: number }) =>
+        s.statSplitTypeId === 2 && s.statSourceId === 0,
+    );
+    if (rolling15Stat?.stats) {
+      const gp15 = rolling15Stat.stats['42'] ?? 0;
+      if (gp15 > 0) {
+        // appliedStatTotal on the entry is for the matchup period, not L15
+        // We need to compute L15 total from the stats
+        const totalApplied15 = entry.playerPoolEntry.appliedStatTotal ?? 0;
+        // Use matchup avg as fallback since we may not have L15 FPTS directly
+        playerRollingAvg15.set(playerId, round1(totalApplied15 / gp15));
       }
     }
   }
 
-  // Enhance projection with in-progress game estimates
-  // When GP === maxGames, pace projection equals current score — but live games still have points coming
-  const liveBonus = estimateLiveGameProjection(currentEntries, playerRollingAvgs);
-  if (liveBonus > 0) {
-    projectedScore = round1(Math.max(projectedScore, currentScore + liveBonus));
+  // Also check team roster for L15 data (more reliable source)
+  const teamRaw = team;
+  if (teamRaw?.roster?.entries) {
+    for (const entry of teamRaw.roster.entries) {
+      const playerId = entry.playerPoolEntry.id;
+      const playerStats = entry.playerPoolEntry.player.stats ?? [];
+      const rolling15Stat = playerStats.find(
+        (s) => s.statSplitTypeId === 2 && s.statSourceId === 0,
+      );
+      if (rolling15Stat?.stats) {
+        const gp15 = rolling15Stat.stats['42'] ?? 0;
+        if (gp15 > 0) {
+          // For L15, compute total FPTS from raw stats if possible
+          // appliedStatTotal on the poolEntry is matchup total, not L15
+          // Use the matchup avg as a proxy for now
+          const existing = playerRollingAvg15.get(playerId);
+          if (!existing) {
+            playerRollingAvg15.set(playerId, playerMatchupAvgs.get(playerId) ?? 0);
+          }
+        }
+      }
+    }
+  }
+
+  // Build PlayerProjectionInput for each roster player
+  let projectedScore: number;
+
+  if (nbaScoreboard && nbaSchedule) {
+    // ── New per-player projection engine ──
+    const projectionInputs: PlayerProjectionInput[] = [];
+
+    // Build from current period entries (has today's live data)
+    // Cross-reference with matchup entries for averages
+    const allEntries = currentEntries.length > 0 ? currentEntries : matchupEntries;
+
+    for (const entry of allEntries) {
+      const playerId = entry.playerPoolEntry.id;
+      const proTeamId = entry.playerPoolEntry.player.proTeamId;
+      const nbaAbbrev = getNbaTeamAbbrev(proTeamId);
+      const gameInfo: NbaGameInfo | undefined = nbaScoreboard.get(nbaAbbrev);
+
+      const todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
+      const rollingAvg15 = playerRollingAvg15.get(playerId) ?? playerMatchupAvgs.get(playerId) ?? 0;
+      const matchupAvgPerGame = playerMatchupAvgs.get(playerId) ?? 0;
+
+      // Determine game status from NBA scoreboard
+      let gameStatus: GameStatus | 'none' = 'none';
+      let minutesRemaining = 0;
+      if (gameInfo) {
+        gameStatus = gameInfo.status;
+        minutesRemaining = gameInfo.minutesRemaining;
+      }
+
+      // Remaining games after today from NBA schedule
+      const remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
+
+      projectionInputs.push({
+        playerId,
+        proTeamId,
+        isActive: isActiveSlot(entry.lineupSlotId),
+        todayFpts,
+        rollingAvg15,
+        matchupAvgPerGame,
+        gameStatus,
+        minutesRemaining,
+        remainingGamesAfterToday,
+      });
+    }
+
+    projectedScore = computeTeamProjection(currentScore, gamesPlayed, maxGames, projectionInputs);
+  } else {
+    // ── Fallback: old pace-based projection ──
+    projectedScore = computeProjectedScore(currentScore, gamesPlayed, maxGames);
+
+    // Old heuristic for live game bonus
+    const playerRollingAvgs = new Map<number, number>();
+    for (const [id, avg] of playerMatchupAvgs) {
+      playerRollingAvgs.set(id, avg);
+    }
+    const liveBonus = estimateLiveGameProjection(currentEntries, playerRollingAvgs);
+    if (liveBonus > 0) {
+      projectedScore = round1(Math.max(projectedScore, currentScore + liveBonus));
+    }
   }
 
   // Resolve owner name from members list

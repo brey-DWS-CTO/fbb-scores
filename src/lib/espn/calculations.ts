@@ -1,4 +1,4 @@
-import type { EspnRosterEntry, PlayerGameStats, TopPlayer } from '../../types/index.js';
+import type { EspnRosterEntry, PlayerGameStats, PlayerProjectionInput, TopPlayer } from '../../types/index.js';
 
 // ESPN lineup slot IDs for non-active (bench/IR) positions
 // 12 = Bench, 13 = IR, 20 = Bench (alt), 21 = IR (alt), 23 = IR+ (alt)
@@ -206,6 +206,130 @@ export function estimateLiveGameProjection(
   }
 
   return round1(projectedRemaining);
+}
+
+// ─── Per-Player Game Projection ──────────────────────────────────────────────
+
+/**
+ * Compute the projected fantasy points for a single player's current/upcoming game.
+ *
+ * | Game State   | Formula                                                    |
+ * |--------------|------------------------------------------------------------|
+ * | In-progress  | todayFpts + (rollingAvg15 × minutesRemaining / 48)         |
+ * | Final        | todayFpts (actual, no projection needed)                   |
+ * | Upcoming     | rollingAvg15 (fallback: matchupAvgPerGame)                 |
+ * | No game      | 0                                                          |
+ *
+ * OT: minutesRemaining naturally includes OT time from the scoreboard.
+ * The overrideProjection hook allows future enhancements (vegas/pace) to
+ * replace the rollingAvg15 baseline per game.
+ */
+export function computePlayerGameProjection(player: PlayerProjectionInput): number {
+  if (!player.isActive) return 0;
+
+  const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
+
+  switch (player.gameStatus) {
+    case 'live': {
+      // In-progress: actual scored + projected remaining based on minutes left
+      const remainingFraction = Math.max(0, player.minutesRemaining / 48);
+      return round1(player.todayFpts + baseline * remainingFraction);
+    }
+    case 'final':
+      // Game is done — return actual points scored today
+      return round1(player.todayFpts);
+    case 'upcoming':
+      // Future game today — project full game at baseline
+      return round1(baseline);
+    case 'none':
+    default:
+      // No game today
+      return 0;
+  }
+}
+
+/**
+ * Compute the projected total score for a fantasy team for the matchup period.
+ *
+ * Strategy: "Started + smart fill"
+ * 1. For each started player, project their remaining contribution:
+ *    - Today's game (live/final/upcoming via computePlayerGameProjection)
+ *    - Future games in the matchup period (remainingGamesAfterToday × baseline)
+ * 2. Count how many game slots are left after started players are accounted for
+ * 3. Fill remaining slots with the best bench players' future game projections
+ *
+ * @param currentScore    Team's total matchup score so far
+ * @param gamesPlayed     Games played so far in the matchup
+ * @param maxGames        Max games allowed for the matchup period
+ * @param players         Projection input for each player on the roster
+ */
+export function computeTeamProjection(
+  currentScore: number,
+  gamesPlayed: number,
+  maxGames: number,
+  players: PlayerProjectionInput[],
+): number {
+  // Separate starters from bench
+  const starters = players.filter((p) => p.isActive);
+  const bench = players.filter((p) => !p.isActive);
+
+  let projectedAdditional = 0;
+  let gameSlotsFilled = gamesPlayed;
+
+  // Step 1: Project remaining points from starters
+  for (const player of starters) {
+    const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
+
+    // Today's game projection (incremental over what's already in currentScore)
+    if (player.gameStatus === 'live') {
+      // For live games, project the remaining portion of the game
+      const remainingFraction = Math.max(0, player.minutesRemaining / 48);
+      projectedAdditional += baseline * remainingFraction;
+    } else if (player.gameStatus === 'upcoming') {
+      // Upcoming game today — project full game
+      projectedAdditional += baseline;
+      gameSlotsFilled++;
+    }
+    // 'final' and 'none' — already counted in currentScore
+
+    // Future games after today
+    const futureGames = player.remainingGamesAfterToday;
+    if (futureGames > 0 && gameSlotsFilled < maxGames) {
+      const slotsToFill = Math.min(futureGames, maxGames - gameSlotsFilled);
+      projectedAdditional += baseline * slotsToFill;
+      gameSlotsFilled += slotsToFill;
+    }
+  }
+
+  // Step 2: Smart fill — if there are still empty game slots, fill with best bench players
+  if (gameSlotsFilled < maxGames) {
+    // Build list of bench players with future games, sorted by baseline descending
+    const benchProjections: Array<{ baseline: number; futureGames: number }> = [];
+    for (const player of bench) {
+      const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
+      if (baseline <= 0) continue;
+
+      let futureGames = player.remainingGamesAfterToday;
+      // Also count today's upcoming game for bench players
+      if (player.gameStatus === 'upcoming') futureGames++;
+
+      if (futureGames > 0) {
+        benchProjections.push({ baseline, futureGames });
+      }
+    }
+
+    // Sort by baseline descending (best bench players first)
+    benchProjections.sort((a, b) => b.baseline - a.baseline);
+
+    for (const bp of benchProjections) {
+      if (gameSlotsFilled >= maxGames) break;
+      const slotsToFill = Math.min(bp.futureGames, maxGames - gameSlotsFilled);
+      projectedAdditional += bp.baseline * slotsToFill;
+      gameSlotsFilled += slotsToFill;
+    }
+  }
+
+  return round1(currentScore + projectedAdditional);
 }
 
 export function extractPlayerStats(stats: Record<string, number>): PlayerGameStats {

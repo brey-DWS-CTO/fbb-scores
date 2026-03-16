@@ -318,7 +318,33 @@ export interface NbaGameInfo {
   opponent: string;
   /** Whether the player's team is the home team */
   isHome: boolean;
+  /** Current period (1-4 regulation, 5+ OT) */
+  period: number;
+  /** Minutes remaining in the game (including OT if applicable) */
+  minutesRemaining: number;
 }
+
+// ─── Projection types ──────────────────────────────────────────────────────
+
+export interface PlayerProjectionInput {
+  playerId: number;
+  proTeamId: number;
+  isActive: boolean;
+  todayFpts: number;
+  rollingAvg15: number;
+  matchupAvgPerGame: number;
+  gameStatus: GameStatus | 'none';
+  minutesRemaining: number;
+  remainingGamesAfterToday: number;
+  /** Future hook: vegas/pace override per game */
+  overrideProjection?: number;
+}
+
+/** NBA team schedule: proTeamId → number of remaining games in the matchup period */
+export type NbaScheduleMap = Map<number, number>;
+
+/** NBA scoreboard: nbaTeamAbbrev → NbaGameInfo */
+export type NbaScoreboardMap = Map<string, NbaGameInfo>;
 
 export interface DailyPlayer {
   playerId: number;

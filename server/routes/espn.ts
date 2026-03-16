@@ -4,7 +4,7 @@ import { EspnClient } from '../../src/lib/espn/client.js';
 import { normalizeLeagueResponse, normalizeMatchupDetail, normalizeDailyView } from '../../src/lib/espn/adapter.js';
 import { saveMatchupSnapshot, getLatestSnapshot, savePlayerSnapshots, getPlayerTrend, getTeamTrend } from '../../src/lib/supabase/snapshots.js';
 import type { EspnMatchupRaw, EspnRosterEntry, GameStatus, NbaGameInfo } from '../../src/types/index.js';
-import { getNbaTeamAbbrev } from '../../src/lib/espn/calculations.js';
+import { NBA_TEAM_ABBREV } from '../../src/lib/espn/calculations.js';
 
 const router = Router();
 
@@ -57,7 +57,21 @@ router.get('/espn/scoreboard', async (req, res) => {
     const matchupPeriod = req.query.matchupPeriod
       ? parseInt(req.query.matchupPeriod as string, 10)
       : undefined;
-    const scoreboard = normalizeLeagueResponse(raw, matchupPeriod);
+
+    // Fetch NBA scoreboard for live game data + schedule for remaining matchup days
+    const effectiveMatchupPeriod = matchupPeriod ?? raw.status.currentMatchupPeriod;
+    const matchupScoringPeriods = raw.settings.scheduleSettings.matchupPeriods[String(effectiveMatchupPeriod)] ?? [];
+    const todayScoringPeriod = raw.scoringPeriodId;
+
+    // Get remaining days in matchup period (after today)
+    const remainingDates = getRemainingMatchupDates(matchupScoringPeriods, todayScoringPeriod);
+
+    const [nbaScoreboard, nbaSchedule] = await Promise.all([
+      fetchNbaScoreboard(),
+      fetchNbaScheduleForDates(remainingDates),
+    ]);
+
+    const scoreboard = normalizeLeagueResponse(raw, matchupPeriod, nbaScoreboard, nbaSchedule);
 
     // Save snapshot to Supabase (fire-and-forget)
     saveMatchupSnapshot(scoreboard).catch((e) =>
@@ -405,6 +419,31 @@ router.get('/espn/trends/team/:teamId', async (req, res) => {
   }
 });
 
+// ─── NBA Schedule Helpers ────────────────────────────────────────────────────
+
+/**
+ * Given the scoring periods in a matchup and today's scoring period,
+ * return the dates for remaining days (after today) as YYYY-MM-DD strings.
+ *
+ * ESPN scoring periods increment by 1 per day, so we can convert them
+ * to dates by offsetting from today's date + scoring period.
+ */
+function getRemainingMatchupDates(
+  matchupScoringPeriods: number[],
+  todayScoringPeriod: number,
+): string[] {
+  const futurePeriods = matchupScoringPeriods.filter((sp) => sp > todayScoringPeriod);
+  if (futurePeriods.length === 0) return [];
+
+  const today = new Date();
+  return futurePeriods.map((sp) => {
+    const daysFromToday = sp - todayScoringPeriod;
+    const date = new Date(today);
+    date.setDate(date.getDate() + daysFromToday);
+    return date.toISOString().split('T')[0];
+  });
+}
+
 // ─── NBA Scoreboard (public API) ─────────────────────────────────────────────
 
 const NBA_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
@@ -413,6 +452,7 @@ interface EspnNbaScoreboard {
   events?: Array<{
     competitions?: Array<{
       status?: {
+        clock?: number; // seconds remaining in current period
         type?: { name?: string; shortDetail?: string };
         displayClock?: string;
         period?: number;
@@ -449,11 +489,31 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
       const displayClock = comp.displayClock ?? '';
       const period = comp.status?.period ?? 0;
 
+      // Clock is in seconds remaining in current period
+      const clockSeconds = comp.status?.clock ?? 0;
+
       let status: GameStatus = 'unknown';
       if (statusName === 'STATUS_IN_PROGRESS') status = 'live';
       else if (statusName === 'STATUS_FINAL') status = 'final';
       else if (statusName === 'STATUS_SCHEDULED') status = 'upcoming';
       else if (statusName === 'STATUS_HALFTIME') status = 'live';
+
+      // Compute minutes remaining in the game
+      // Regulation: (4 - period) * 12 + clockSeconds/60
+      // OT: each OT period is 5 minutes; add 5 per remaining OT period
+      let minutesRemaining = 0;
+      if (status === 'live' && period > 0) {
+        if (period <= 4) {
+          // Regulation: remaining full quarters + current quarter clock
+          minutesRemaining = (4 - period) * 12 + clockSeconds / 60;
+        } else {
+          // In OT: only current OT period clock remains (5 min periods)
+          minutesRemaining = clockSeconds / 60;
+        }
+      } else if (status === 'upcoming') {
+        minutesRemaining = 48; // Full game
+      }
+      // final → 0 (default)
 
       // Build status detail string
       let statusDetail = shortDetail;
@@ -478,6 +538,8 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
         scoreDisplay,
         opponent: awayAbbr,
         isHome: true,
+        period,
+        minutesRemaining,
       });
 
       // Add entry for away team
@@ -487,6 +549,8 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
         scoreDisplay,
         opponent: homeAbbr,
         isHome: false,
+        period,
+        minutesRemaining,
       });
     }
   } catch (err) {
@@ -494,6 +558,55 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
   }
 
   return gameMap;
+}
+
+/**
+ * Fetch NBA schedule for specific dates to determine which teams play on remaining days.
+ * Returns a map of ESPN proTeamId → number of remaining games.
+ */
+async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, number>> {
+  const teamGamesRemaining = new Map<number, number>();
+  if (dates.length === 0) return teamGamesRemaining;
+
+  // Reverse lookup: NBA abbreviation → ESPN proTeamId
+  const abbrevToProTeamId = new Map<string, number>();
+  for (const [id, abbr] of Object.entries(NBA_TEAM_ABBREV)) {
+    abbrevToProTeamId.set(abbr, parseInt(id, 10));
+  }
+
+  try {
+    // Fetch scoreboard for each remaining date
+    const fetches = dates.map(async (date) => {
+      const dateStr = date.replace(/-/g, ''); // YYYYMMDD
+      const { data } = await axios.get<EspnNbaScoreboard>(
+        `${NBA_SCOREBOARD_URL}?dates=${dateStr}`,
+        { timeout: 5000 },
+      );
+      return data;
+    });
+
+    const results = await Promise.all(fetches);
+
+    for (const data of results) {
+      if (!data.events) continue;
+      for (const event of data.events) {
+        const comp = event.competitions?.[0];
+        if (!comp?.competitors) continue;
+        for (const team of comp.competitors) {
+          const abbr = team.team?.abbreviation;
+          if (!abbr) continue;
+          const proTeamId = abbrevToProTeamId.get(abbr);
+          if (proTeamId != null) {
+            teamGamesRemaining.set(proTeamId, (teamGamesRemaining.get(proTeamId) ?? 0) + 1);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[NBA Schedule] Failed to fetch:', err instanceof Error ? err.message : err);
+  }
+
+  return teamGamesRemaining;
 }
 
 export default router;
