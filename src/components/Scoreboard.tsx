@@ -10,7 +10,7 @@ interface ScoreboardProps {
 
 type ViewMode = 'list' | 'bracket';
 
-const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod }) => {
+const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod }) => {
   const [sortByScore, setSortByScore] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('bracket');
   const { playoff } = data;

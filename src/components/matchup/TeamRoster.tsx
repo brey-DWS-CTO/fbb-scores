@@ -47,7 +47,7 @@ interface TeamRosterProps {
   side: 'home' | 'away';
 }
 
-const TOTAL_COLUMNS = COLUMNS.length + 1; // +1 for player name column
+// const TOTAL_COLUMNS = COLUMNS.length + 1; // +1 for player name column
 
 const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
   const sideColor = side === 'home' ? 'var(--neon-blue)' : 'var(--neon-orange)';
