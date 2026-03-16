@@ -83,6 +83,11 @@ const MatchupDetailPage: FC = () => {
             <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-blue)' }}>
               {data.home.gamesPlayed}/{data.home.maxGames} GP
             </span>
+            {data.home.gamesPlayed > 0 && (
+              <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-purple)', opacity: 0.8 }}>
+                PROJ {(data.home.currentScore / data.home.gamesPlayed * data.home.maxGames).toFixed(1)}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col items-center gap-1">
@@ -114,6 +119,11 @@ const MatchupDetailPage: FC = () => {
             <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-blue)' }}>
               {data.away.gamesPlayed}/{data.away.maxGames} GP
             </span>
+            {data.away.gamesPlayed > 0 && (
+              <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-purple)', opacity: 0.8 }}>
+                PROJ {(data.away.currentScore / data.away.gamesPlayed * data.away.maxGames).toFixed(1)}
+              </span>
+            )}
           </div>
         </div>
       </div>

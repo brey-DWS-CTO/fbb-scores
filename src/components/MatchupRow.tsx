@@ -106,33 +106,21 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
               {Math.abs(home.currentScore - away.currentScore).toFixed(1)} PT
               {Math.abs(home.currentScore - away.currentScore) !== 1 ? 'S' : ''} GAP
             </span>
-            {/* Projected winner */}
+            {/* Projected scores */}
             {home.projectedScore > 0 && away.projectedScore > 0 && (
               <div className="flex flex-col items-center gap-1 mt-1">
-                <span
-                  className="pixel-text"
-                  style={{ fontSize: '0.3rem', color: '#444466' }}
-                >
-                  PROJ WINNER
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466' }}>
+                  PROJECTED
                 </span>
-                <span
-                  className="pixel-text"
-                  style={{
-                    fontSize: '0.4rem',
-                    color: home.projectedScore > away.projectedScore
-                      ? 'var(--neon-teal)'
-                      : home.projectedScore < away.projectedScore
-                        ? 'var(--neon-orange)'
-                        : '#555577',
-                    textShadow: '0 0 6px currentColor',
-                  }}
-                >
-                  {home.projectedScore > away.projectedScore
-                    ? home.name.length > 16 ? home.name.slice(0, 16) + '...' : home.name
-                    : home.projectedScore < away.projectedScore
-                      ? away.name.length > 16 ? away.name.slice(0, 16) + '...' : away.name
-                      : 'TIE'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-purple)', opacity: 0.8 }}>
+                    {home.projectedScore.toFixed(1)}
+                  </span>
+                  <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.8rem', color: '#333355' }}>-</span>
+                  <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-purple)', opacity: 0.8 }}>
+                    {away.projectedScore.toFixed(1)}
+                  </span>
+                </div>
               </div>
             )}
           </div>

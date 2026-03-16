@@ -111,12 +111,14 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum }) => {
           <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)', textShadow: '0 0 6px #4488ff44', letterSpacing: '0.1em' }}>GP</span>
           <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)', textShadow: '0 0 6px #ffe60044', minWidth: '3rem', textAlign: 'right', letterSpacing: '0.1em' }}>AVG</span>
           <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)', textShadow: '0 0 6px #00ffcc44', minWidth: '5.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>TOTAL</span>
+          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-purple)', textShadow: '0 0 6px #8844ff44', minWidth: '5.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>PROJ</span>
         </div>
 
         <BracketTeamRow
           seed={home.playoffSeed}
           name={home.name}
           score={home.currentScore}
+          projectedScore={home.projectedScore}
           avgPointsPerGame={home.avgPointsPerGame}
           gamesPlayed={home.gamesPlayed}
           maxGames={home.maxGames}
@@ -127,6 +129,7 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum }) => {
           seed={away.playoffSeed}
           name={away.name}
           score={away.currentScore}
+          projectedScore={away.projectedScore}
           avgPointsPerGame={away.avgPointsPerGame}
           gamesPlayed={away.gamesPlayed}
           maxGames={away.maxGames}
@@ -141,6 +144,7 @@ interface BracketTeamRowProps {
   seed: number | null;
   name: string;
   score: number;
+  projectedScore: number;
   avgPointsPerGame: number;
   gamesPlayed: number;
   maxGames: number;
@@ -151,6 +155,7 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
   seed,
   name,
   score,
+  projectedScore,
   avgPointsPerGame,
   gamesPlayed,
   maxGames,
@@ -232,6 +237,21 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
         }}
       >
         {score.toFixed(1)}
+      </span>
+
+      {/* Projected */}
+      <span
+        style={{
+          fontFamily: "'VT323', monospace",
+          fontSize: '1.4rem',
+          color: 'var(--neon-purple)',
+          textShadow: '0 0 6px #8844ff44',
+          minWidth: '5.5rem',
+          textAlign: 'right',
+          opacity: 0.8,
+        }}
+      >
+        {projectedScore > 0 ? projectedScore.toFixed(1) : '-'}
       </span>
     </div>
   );
