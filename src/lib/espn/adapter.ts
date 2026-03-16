@@ -76,8 +76,12 @@ export function normalizeLeagueResponse(
 
   const scoringItems = raw.settings.scoringSettings?.scoringItems ?? [];
 
+  // Detect if we're viewing a future matchup period (all scoring periods are ahead of today)
+  const matchupScoringPeriods = raw.settings.scheduleSettings.matchupPeriods[String(effectiveMatchupPeriod)] ?? [];
+  const isFutureMatchup = matchupScoringPeriods.length > 0 && matchupScoringPeriods[0] > currentPeriod;
+
   const matchups: Matchup[] = relevantMatchups.map((m) =>
-    buildMatchup(m, currentPeriod, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems),
+    buildMatchup(m, currentPeriod, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup),
   );
 
   return {
@@ -171,11 +175,12 @@ function buildMatchup(
   nbaScoreboard?: NbaScoreboardMap,
   nbaSchedule?: NbaScheduleMap,
   scoringItems: Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }> = [],
+  isFutureMatchup = false,
 ): Matchup {
   const playoffTierType = (m.playoffTierType as PlayoffTierType) ?? 'NONE';
 
-  const home = buildTeam(m.home, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems);
-  const away = buildTeam(m.away, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems);
+  const home = buildTeam(m.home, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup);
+  const away = buildTeam(m.away, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup);
 
   const winProbability = computeWinProbability(
     home.currentScore, home.gamesPlayed, home.maxGames, home.avgPointsPerGame,
@@ -202,6 +207,7 @@ function buildTeam(
   nbaScoreboard?: NbaScoreboardMap,
   nbaSchedule?: NbaScheduleMap,
   scoringItems: Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }> = [],
+  isFutureMatchup = false,
 ): FantasyTeam {
   const team = teamById.get(side.teamId);
   // Use matchup period roster for top player (has full matchup stats),
@@ -271,35 +277,41 @@ function buildTeam(
     // ── New per-player projection engine ──
     const projectionInputs: PlayerProjectionInput[] = [];
 
-    // Build from current period entries (has today's live data)
-    // Cross-reference with matchup entries for averages
-    const allEntries = currentEntries.length > 0 ? currentEntries : matchupEntries;
+    // For future matchups, use team roster entries (has rolling averages, no today's game context).
+    // For current matchups, use current period entries (has today's live data).
+    const allEntries = isFutureMatchup
+      ? (team?.roster?.entries ?? matchupEntries)
+      : (currentEntries.length > 0 ? currentEntries : matchupEntries);
 
     for (const entry of allEntries) {
       const playerId = entry.playerPoolEntry.id;
       const proTeamId = entry.playerPoolEntry.player.proTeamId;
       const nbaAbbrev = getNbaTeamAbbrev(proTeamId);
-      const gameInfo: NbaGameInfo | undefined = nbaScoreboard.get(nbaAbbrev);
 
-      const todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
       const rollingAvg15 = playerRollingAvg15.get(playerId) ?? playerMatchupAvgs.get(playerId) ?? 0;
       const matchupAvgPerGame = playerMatchupAvgs.get(playerId) ?? 0;
 
-      // Determine game status from NBA scoreboard
+      // For future matchups: no games have started, so no live data to use.
+      // All games in the period are "remaining" and come from nbaSchedule.
+      let todayFpts = 0;
       let gameStatus: GameStatus | 'none' = 'none';
       let minutesRemaining = 0;
-      if (gameInfo) {
-        gameStatus = gameInfo.status;
-        minutesRemaining = gameInfo.minutesRemaining;
-      }
+      let remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
 
-      // Remaining games after today from NBA schedule
-      const remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
+      if (!isFutureMatchup) {
+        // Current matchup: use today's live game data
+        todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
+        const gameInfo: NbaGameInfo | undefined = nbaScoreboard.get(nbaAbbrev);
+        if (gameInfo) {
+          gameStatus = gameInfo.status;
+          minutesRemaining = gameInfo.minutesRemaining;
+        }
+      }
 
       projectionInputs.push({
         playerId,
         proTeamId,
-        isActive: isActiveSlot(entry.lineupSlotId),
+        isActive: isFutureMatchup ? isActiveSlot(entry.lineupSlotId) : isActiveSlot(entry.lineupSlotId),
         todayFpts,
         rollingAvg15,
         matchupAvgPerGame,
