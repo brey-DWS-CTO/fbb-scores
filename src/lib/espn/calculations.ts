@@ -1,4 +1,4 @@
-import type { EspnRosterEntry, PlayerGameStats, PlayerProjectionInput, TopPlayer } from '../../types/index.js';
+import type { EspnRosterEntry, PlayerGameStats, PlayerProjectionInput, PlayerProjectionBreakdown, ProjectionBreakdown, TopPlayer } from '../../types/index.js';
 
 // ESPN lineup slot IDs for non-active (bench/IR) positions
 // 12 = Bench, 13 = IR, 20 = Bench (alt), 21 = IR (alt), 23 = IR+ (alt)
@@ -248,6 +248,11 @@ export function computePlayerGameProjection(player: PlayerProjectionInput): numb
   }
 }
 
+export interface TeamProjectionResult {
+  projectedScore: number;
+  breakdown: ProjectionBreakdown;
+}
+
 /**
  * Compute the projected total score for a fantasy team for the matchup period.
  *
@@ -262,74 +267,144 @@ export function computePlayerGameProjection(player: PlayerProjectionInput): numb
  * @param gamesPlayed     Games played so far in the matchup
  * @param maxGames        Max games allowed for the matchup period
  * @param players         Projection input for each player on the roster
+ * @param playerNames     Optional map of playerId → { name, position, nbaTeamAbbrev } for breakdown
  */
 export function computeTeamProjection(
   currentScore: number,
   gamesPlayed: number,
   maxGames: number,
   players: PlayerProjectionInput[],
-): number {
+  playerNames?: Map<number, { name: string; position: string; nbaTeamAbbrev: string }>,
+): TeamProjectionResult {
   // Separate starters from bench
   const starters = players.filter((p) => p.isActive);
   const bench = players.filter((p) => !p.isActive);
 
   let projectedAdditional = 0;
   let gameSlotsFilled = gamesPlayed;
+  const breakdownPlayers: PlayerProjectionBreakdown[] = [];
 
   // Step 1: Project remaining points from starters
   for (const player of starters) {
     const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
+    let playerProjectedFpts = 0;
+    let playerRemainingGames = 0;
 
     // Today's game projection (incremental over what's already in currentScore)
     if (player.gameStatus === 'live') {
-      // For live games, project the remaining portion of the game
       const remainingFraction = Math.max(0, player.minutesRemaining / 48);
-      projectedAdditional += baseline * remainingFraction;
+      const liveProjection = baseline * remainingFraction;
+      projectedAdditional += liveProjection;
+      playerProjectedFpts += liveProjection;
     } else if (player.gameStatus === 'upcoming') {
-      // Upcoming game today — project full game
       projectedAdditional += baseline;
+      playerProjectedFpts += baseline;
       gameSlotsFilled++;
+      playerRemainingGames++;
     }
-    // 'final' and 'none' — already counted in currentScore
 
     // Future games after today
     const futureGames = player.remainingGamesAfterToday;
     if (futureGames > 0 && gameSlotsFilled < maxGames) {
       const slotsToFill = Math.min(futureGames, maxGames - gameSlotsFilled);
       projectedAdditional += baseline * slotsToFill;
+      playerProjectedFpts += baseline * slotsToFill;
       gameSlotsFilled += slotsToFill;
+      playerRemainingGames += slotsToFill;
     }
+
+    const info = playerNames?.get(player.playerId);
+    breakdownPlayers.push({
+      playerId: player.playerId,
+      name: info?.name ?? `Player ${player.playerId}`,
+      position: info?.position ?? '',
+      nbaTeamAbbrev: info?.nbaTeamAbbrev ?? getNbaTeamAbbrev(player.proTeamId),
+      isStarter: true,
+      rollingAvg15: round1(baseline),
+      remainingGames: playerRemainingGames,
+      projectedFpts: round1(playerProjectedFpts),
+      isSmartFilled: false,
+      imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${player.playerId}.png&w=96&h=70&cb=1`,
+    });
   }
 
   // Step 2: Smart fill — if there are still empty game slots, fill with best bench players
   if (gameSlotsFilled < maxGames) {
-    // Build list of bench players with future games, sorted by baseline descending
-    const benchProjections: Array<{ baseline: number; futureGames: number }> = [];
+    const benchProjections: Array<{ player: PlayerProjectionInput; baseline: number; futureGames: number }> = [];
     for (const player of bench) {
       const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
       if (baseline <= 0) continue;
 
       let futureGames = player.remainingGamesAfterToday;
-      // Also count today's upcoming game for bench players
       if (player.gameStatus === 'upcoming') futureGames++;
 
       if (futureGames > 0) {
-        benchProjections.push({ baseline, futureGames });
+        benchProjections.push({ player, baseline, futureGames });
       }
     }
 
-    // Sort by baseline descending (best bench players first)
     benchProjections.sort((a, b) => b.baseline - a.baseline);
 
     for (const bp of benchProjections) {
       if (gameSlotsFilled >= maxGames) break;
       const slotsToFill = Math.min(bp.futureGames, maxGames - gameSlotsFilled);
-      projectedAdditional += bp.baseline * slotsToFill;
+      const projFpts = bp.baseline * slotsToFill;
+      projectedAdditional += projFpts;
       gameSlotsFilled += slotsToFill;
+
+      const info = playerNames?.get(bp.player.playerId);
+      breakdownPlayers.push({
+        playerId: bp.player.playerId,
+        name: info?.name ?? `Player ${bp.player.playerId}`,
+        position: info?.position ?? '',
+        nbaTeamAbbrev: info?.nbaTeamAbbrev ?? getNbaTeamAbbrev(bp.player.proTeamId),
+        isStarter: false,
+        rollingAvg15: round1(bp.baseline),
+        remainingGames: slotsToFill,
+        projectedFpts: round1(projFpts),
+        isSmartFilled: true,
+        imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${bp.player.playerId}.png&w=96&h=70&cb=1`,
+      });
     }
   }
 
-  return round1(currentScore + projectedAdditional);
+  // Also add bench players that were NOT smart-filled (0 projected contribution)
+  for (const player of bench) {
+    if (breakdownPlayers.some((bp) => bp.playerId === player.playerId)) continue;
+    const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
+    const info = playerNames?.get(player.playerId);
+    breakdownPlayers.push({
+      playerId: player.playerId,
+      name: info?.name ?? `Player ${player.playerId}`,
+      position: info?.position ?? '',
+      nbaTeamAbbrev: info?.nbaTeamAbbrev ?? getNbaTeamAbbrev(player.proTeamId),
+      isStarter: false,
+      rollingAvg15: round1(baseline),
+      remainingGames: player.remainingGamesAfterToday + (player.gameStatus === 'upcoming' ? 1 : 0),
+      projectedFpts: 0,
+      isSmartFilled: false,
+      imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${player.playerId}.png&w=96&h=70&cb=1`,
+    });
+  }
+
+  // Sort breakdown: starters first by projected descending, then bench by projected descending
+  breakdownPlayers.sort((a, b) => {
+    if (a.isStarter && !b.isStarter) return -1;
+    if (!a.isStarter && b.isStarter) return 1;
+    return b.projectedFpts - a.projectedFpts;
+  });
+
+  const projectedScore = round1(currentScore + projectedAdditional);
+
+  return {
+    projectedScore,
+    breakdown: {
+      players: breakdownPlayers,
+      projectedTotal: projectedScore,
+      gameSlotsFilled,
+      maxGames,
+    },
+  };
 }
 
 export function extractPlayerStats(stats: Record<string, number>): PlayerGameStats {

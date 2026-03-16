@@ -20,6 +20,7 @@ import type {
   PlayerProjectionInput,
   PlayoffInfo,
   PlayoffTierType,
+  ProjectionBreakdown,
   RollingAverages,
   TeamEfficiency,
 } from '../../types/index.js';
@@ -272,6 +273,7 @@ function buildTeam(
 
   // Build PlayerProjectionInput for each roster player
   let projectedScore: number;
+  let projectionBreakdown: ProjectionBreakdown | null = null;
 
   if (nbaScoreboard && nbaSchedule) {
     // ── New per-player projection engine ──
@@ -311,7 +313,7 @@ function buildTeam(
       projectionInputs.push({
         playerId,
         proTeamId,
-        isActive: isFutureMatchup ? isActiveSlot(entry.lineupSlotId) : isActiveSlot(entry.lineupSlotId),
+        isActive: isActiveSlot(entry.lineupSlotId),
         todayFpts,
         rollingAvg15,
         matchupAvgPerGame,
@@ -321,7 +323,20 @@ function buildTeam(
       });
     }
 
-    projectedScore = computeTeamProjection(currentScore, gamesPlayed, maxGames, projectionInputs);
+    // Build player names map for breakdown display
+    const playerNamesMap = new Map<number, { name: string; position: string; nbaTeamAbbrev: string }>();
+    for (const entry of allEntries) {
+      const p = entry.playerPoolEntry.player;
+      playerNamesMap.set(entry.playerPoolEntry.id, {
+        name: p.fullName,
+        position: POSITION_MAP[p.defaultPositionId] ?? 'Unknown',
+        nbaTeamAbbrev: getNbaTeamAbbrev(p.proTeamId),
+      });
+    }
+
+    const projResult = computeTeamProjection(currentScore, gamesPlayed, maxGames, projectionInputs, playerNamesMap);
+    projectedScore = projResult.projectedScore;
+    projectionBreakdown = projResult.breakdown;
   } else {
     // ── Fallback: old pace-based projection ──
     projectedScore = computeProjectedScore(currentScore, gamesPlayed, maxGames);
@@ -357,6 +372,7 @@ function buildTeam(
     rosterCount,
     playoffSeed: team?.playoffSeed ?? null,
     topPlayer: findTopPlayer(rosterEntries),
+    projectionBreakdown,
   };
 }
 

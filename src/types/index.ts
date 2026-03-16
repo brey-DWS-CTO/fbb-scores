@@ -18,6 +18,36 @@ export interface TopPlayer {
   playerId: number;
 }
 
+export interface PlayerProjectionBreakdown {
+  playerId: number;
+  name: string;
+  position: string;
+  nbaTeamAbbrev: string;
+  /** Whether the player is in an active (starter) lineup slot */
+  isStarter: boolean;
+  /** L15 rolling average FPTS per game */
+  rollingAvg15: number;
+  /** Number of remaining games in the matchup period for this player's NBA team */
+  remainingGames: number;
+  /** Total projected FPTS contribution from this player */
+  projectedFpts: number;
+  /** Whether this bench player was "smart filled" into the projection */
+  isSmartFilled: boolean;
+  /** Player headshot URL */
+  imageUrl: string | null;
+}
+
+export interface ProjectionBreakdown {
+  /** Per-player projection details, sorted by projected contribution descending */
+  players: PlayerProjectionBreakdown[];
+  /** Total projected score */
+  projectedTotal: number;
+  /** Total game slots filled by the projection */
+  gameSlotsFilled: number;
+  /** Max games allowed */
+  maxGames: number;
+}
+
 export interface FantasyTeam {
   id: number;
   name: string;
@@ -40,6 +70,8 @@ export interface FantasyTeam {
   /** Playoff seed (1-based), or null if not in playoffs */
   playoffSeed: number | null;
   topPlayer: TopPlayer | null;
+  /** Detailed per-player projection breakdown (populated when NBA schedule available) */
+  projectionBreakdown: ProjectionBreakdown | null;
 }
 
 export type PlayoffTierType =

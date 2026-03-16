@@ -3,13 +3,14 @@ import type { LeagueScoreboard, Matchup } from '../types/index.js';
 import MatchupRow from './MatchupRow.js';
 import PlayoffBracket from './PlayoffBracket.js';
 import Leaderboard from './Leaderboard.js';
+import ProjectionBreakdownComponent from './ProjectionBreakdown.js';
 
 interface ScoreboardProps {
   data: LeagueScoreboard;
   selectedPeriod?: number;
 }
 
-type ViewMode = 'list' | 'bracket' | 'leaderboard';
+type ViewMode = 'list' | 'bracket' | 'leaderboard' | 'projections';
 
 const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod }) => {
   const [sortByScore, setSortByScore] = useState(false);
@@ -42,17 +43,18 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
     });
   };
 
+  // Check if any matchup has projection data
+  const hasProjections = data.matchups.some(
+    (m) => m.home.projectionBreakdown || m.away.projectionBreakdown,
+  );
+
   // Available view modes depend on playoff status
-  const viewModes: Array<{ key: ViewMode; label: string }> = playoff.isPlayoffs
-    ? [
-        { key: 'bracket', label: 'BRACKET' },
-        { key: 'list', label: 'LIST' },
-        { key: 'leaderboard', label: 'STANDINGS' },
-      ]
-    : [
-        { key: 'list', label: 'LIST' },
-        { key: 'leaderboard', label: 'STANDINGS' },
-      ];
+  const viewModes: Array<{ key: ViewMode; label: string }> = [
+    ...(playoff.isPlayoffs ? [{ key: 'bracket' as ViewMode, label: 'BRACKET' }] : []),
+    { key: 'list', label: 'LIST' },
+    { key: 'leaderboard', label: 'STANDINGS' },
+    ...(hasProjections ? [{ key: 'projections' as ViewMode, label: 'PROJECTIONS' }] : []),
+  ];
 
   return (
     <section
@@ -139,6 +141,100 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
       {/* Leaderboard view */}
       {viewMode === 'leaderboard' && (
         <Leaderboard matchups={data.matchups} />
+      )}
+
+      {/* Projections view */}
+      {viewMode === 'projections' && (
+        <div className="flex flex-col gap-8">
+          {winnersBracket.map((matchup, i) => {
+            const homeBreakdown = matchup.home.projectionBreakdown;
+            const awayBreakdown = matchup.away.projectionBreakdown;
+            if (!homeBreakdown && !awayBreakdown) return null;
+
+            const accentColors = [
+              'var(--neon-teal)', 'var(--neon-purple)', 'var(--neon-blue)',
+              'var(--neon-orange)', 'var(--neon-yellow)', 'var(--neon-red)',
+            ];
+            const accentColor = accentColors[i % accentColors.length];
+
+            return (
+              <div key={matchup.id}>
+                {/* Matchup header */}
+                <div className="flex justify-center mb-3">
+                  <span
+                    className="pixel-text px-3 py-1"
+                    style={{
+                      fontSize: '0.4rem',
+                      color: accentColor,
+                      border: `1px solid ${accentColor}`,
+                      background: '#0a0a0f',
+                    }}
+                  >
+                    MATCHUP {i + 1} PROJECTION
+                  </span>
+                </div>
+
+                {/* Projected score summary */}
+                {homeBreakdown && awayBreakdown && (
+                  <div
+                    className="flex items-center justify-center gap-6 mb-4 p-4"
+                    style={{ background: '#0a0a1a', border: '1px solid #1a1a33' }}
+                  >
+                    <div className="flex flex-col items-center">
+                      <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-blue)' }}>
+                        {matchup.home.name}
+                      </span>
+                      <span
+                        className="score-display glow-teal"
+                        style={{
+                          fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
+                          color: homeBreakdown.projectedTotal >= awayBreakdown.projectedTotal ? 'var(--neon-teal)' : '#aaaacc',
+                          textShadow: homeBreakdown.projectedTotal >= awayBreakdown.projectedTotal ? '0 0 12px #00ffcc' : 'none',
+                        }}
+                      >
+                        {homeBreakdown.projectedTotal.toFixed(1)}
+                      </span>
+                    </div>
+                    <span className="pixel-text glow-red" style={{ fontSize: '0.5rem', color: 'var(--neon-red)' }}>VS</span>
+                    <div className="flex flex-col items-center">
+                      <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-orange)' }}>
+                        {matchup.away.name}
+                      </span>
+                      <span
+                        className="score-display glow-teal"
+                        style={{
+                          fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
+                          color: awayBreakdown.projectedTotal >= homeBreakdown.projectedTotal ? 'var(--neon-teal)' : '#aaaacc',
+                          textShadow: awayBreakdown.projectedTotal >= homeBreakdown.projectedTotal ? '0 0 12px #00ffcc' : 'none',
+                        }}
+                      >
+                        {awayBreakdown.projectedTotal.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Side-by-side breakdowns */}
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {homeBreakdown && (
+                    <ProjectionBreakdownComponent
+                      breakdown={homeBreakdown}
+                      teamName={matchup.home.name}
+                      side="home"
+                    />
+                  )}
+                  {awayBreakdown && (
+                    <ProjectionBreakdownComponent
+                      breakdown={awayBreakdown}
+                      teamName={matchup.away.name}
+                      side="away"
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* List view: Winner's bracket matchups */}
