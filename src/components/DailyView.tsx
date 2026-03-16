@@ -170,13 +170,26 @@ interface DailyPlayerRowProps {
 const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven }) => {
   const slotLabel = LINEUP_SLOT_LABELS[player.lineupSlotId] ?? '??';
   const isBenched = !player.isStarted;
+  const gameStatus = player.gameInfo?.status;
+  const isLive = gameStatus === 'live';
+  const isFinal = gameStatus === 'final';
+
+  // Row highlight for live games
+  const rowBg = isLive
+    ? isEven ? '#1a1a0022' : '#22220033'
+    : isEven ? '#0a0a1400' : '#0f0f2233';
+
+  // Status indicator dot color
+  const dotColor = isLive ? '#ffe600' : isFinal ? '#666688' : player.isStarted ? '#00ff88' : '#444466';
+  const dotGlow = isLive ? '0 0 6px #ffe600' : player.isStarted ? '0 0 4px #00ff88' : 'none';
 
   return (
     <tr
       style={{
         borderBottom: '1px solid #1a1a2e',
-        background: isEven ? '#0a0a1400' : '#0f0f2233',
+        background: rowBg,
         opacity: isBenched ? 0.5 : 1,
+        borderLeft: isLive ? '2px solid #ffe60088' : '2px solid transparent',
       }}
     >
       {/* Slot */}
@@ -195,16 +208,17 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven }) => {
       {/* Player info */}
       <td className="px-2 py-2">
         <div className="flex items-center gap-2">
-          {/* Started indicator */}
+          {/* Status indicator dot */}
           <span
             style={{
               display: 'inline-block',
               width: '6px',
               height: '6px',
               borderRadius: '50%',
-              background: player.isStarted ? '#00ff88' : '#444466',
-              boxShadow: player.isStarted ? '0 0 4px #00ff88' : 'none',
+              background: dotColor,
+              boxShadow: dotGlow,
               flexShrink: 0,
+              animation: isLive ? 'pulse-glow-dot 1.5s ease-in-out infinite' : undefined,
             }}
           />
           {player.imageUrl && (
@@ -229,11 +243,31 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven }) => {
             >
               {player.name}
             </span>
-            <span
-              style={{ fontFamily: "'VT323', monospace", fontSize: '0.7rem', color: '#555577' }}
-            >
-              {player.position} - {player.nbaTeamAbbrev}
-            </span>
+            {/* Game info line: show live score/clock, final, or upcoming time */}
+            {player.gameInfo ? (
+              <span
+                style={{
+                  fontFamily: "'VT323', monospace",
+                  fontSize: '0.7rem',
+                  color: isLive ? 'var(--neon-yellow)' : isFinal ? '#666688' : '#555577',
+                  textShadow: isLive ? '0 0 4px #ffe60044' : 'none',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {isLive && '▶ '}
+                {player.gameInfo.isHome ? 'vs' : '@'} {player.gameInfo.opponent}
+                {player.gameInfo.scoreDisplay && ` · ${player.gameInfo.scoreDisplay}`}
+                {player.gameInfo.statusDetail && ` · ${player.gameInfo.statusDetail}`}
+              </span>
+            ) : (
+              <span
+                style={{ fontFamily: "'VT323', monospace", fontSize: '0.7rem', color: '#555577' }}
+              >
+                {player.position} - {player.nbaTeamAbbrev}
+              </span>
+            )}
           </div>
         </div>
       </td>

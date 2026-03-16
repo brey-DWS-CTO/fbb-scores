@@ -1,8 +1,10 @@
 import { Router, type Request } from 'express';
+import axios from 'axios';
 import { EspnClient } from '../../src/lib/espn/client.js';
 import { normalizeLeagueResponse, normalizeMatchupDetail, normalizeDailyView } from '../../src/lib/espn/adapter.js';
 import { saveMatchupSnapshot, getLatestSnapshot, savePlayerSnapshots, getPlayerTrend, getTeamTrend } from '../../src/lib/supabase/snapshots.js';
-import type { EspnMatchupRaw, EspnRosterEntry } from '../../src/types/index.js';
+import type { EspnMatchupRaw, EspnRosterEntry, GameStatus, NbaGameInfo } from '../../src/types/index.js';
+import { getNbaTeamAbbrev } from '../../src/lib/espn/calculations.js';
 
 const router = Router();
 
@@ -203,12 +205,27 @@ router.get('/espn/daily/:matchupId', async (req, res) => {
     });
 
     const scoringPeriodId = await client.getCurrentScoringPeriod();
-    const raw = await client.fetchMatchupDetail(scoringPeriodId);
+    const [raw, nbaGames] = await Promise.all([
+      client.fetchMatchupDetail(scoringPeriodId),
+      fetchNbaScoreboard(),
+    ]);
     const daily = normalizeDailyView(raw, matchupId);
 
     if (!daily) {
       res.status(404).json({ error: 'Matchup not found' });
       return;
+    }
+
+    // Enrich daily players with live NBA game info
+    if (nbaGames.size > 0) {
+      for (const team of [daily.home, daily.away]) {
+        for (const player of team.players) {
+          const gameInfo = nbaGames.get(player.nbaTeamAbbrev);
+          if (gameInfo) {
+            player.gameInfo = gameInfo;
+          }
+        }
+      }
     }
 
     res.json(daily);
@@ -387,5 +404,96 @@ router.get('/espn/trends/team/:teamId', async (req, res) => {
     res.status(500).json({ error: message });
   }
 });
+
+// ─── NBA Scoreboard (public API) ─────────────────────────────────────────────
+
+const NBA_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
+
+interface EspnNbaScoreboard {
+  events?: Array<{
+    competitions?: Array<{
+      status?: {
+        type?: { name?: string; shortDetail?: string };
+        displayClock?: string;
+        period?: number;
+      };
+      competitors?: Array<{
+        homeAway?: string;
+        score?: string;
+        team?: { abbreviation?: string };
+      }>;
+    }>;
+  }>;
+}
+
+/**
+ * Fetch today's NBA scoreboard from ESPN's public API (no auth required).
+ * Returns a map of NBA team abbreviation → game info.
+ */
+async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
+  const gameMap = new Map<string, NbaGameInfo>();
+
+  try {
+    const { data } = await axios.get<EspnNbaScoreboard>(NBA_SCOREBOARD_URL, {
+      timeout: 5000,
+    });
+
+    if (!data.events) return gameMap;
+
+    for (const event of data.events) {
+      const comp = event.competitions?.[0];
+      if (!comp) continue;
+
+      const statusName = comp.status?.type?.name ?? '';
+      const shortDetail = comp.status?.type?.shortDetail ?? '';
+      const displayClock = comp.displayClock ?? '';
+      const period = comp.status?.period ?? 0;
+
+      let status: GameStatus = 'unknown';
+      if (statusName === 'STATUS_IN_PROGRESS') status = 'live';
+      else if (statusName === 'STATUS_FINAL') status = 'final';
+      else if (statusName === 'STATUS_SCHEDULED') status = 'upcoming';
+      else if (statusName === 'STATUS_HALFTIME') status = 'live';
+
+      // Build status detail string
+      let statusDetail = shortDetail;
+      if (status === 'live' && displayClock && period > 0) {
+        const periodNames = ['', '1st', '2nd', '3rd', '4th', 'OT'];
+        const periodName = period <= 4 ? periodNames[period] : `${period - 4}OT`;
+        statusDetail = statusName === 'STATUS_HALFTIME' ? 'Halftime' : `${displayClock} - ${periodName}`;
+      }
+
+      const home = comp.competitors?.find(c => c.homeAway === 'home');
+      const away = comp.competitors?.find(c => c.homeAway === 'away');
+      if (!home?.team?.abbreviation || !away?.team?.abbreviation) continue;
+
+      const homeAbbr = home.team.abbreviation;
+      const awayAbbr = away.team.abbreviation;
+      const scoreDisplay = `${awayAbbr} ${away.score ?? 0} - ${homeAbbr} ${home.score ?? 0}`;
+
+      // Add entry for home team
+      gameMap.set(homeAbbr, {
+        status,
+        statusDetail,
+        scoreDisplay,
+        opponent: awayAbbr,
+        isHome: true,
+      });
+
+      // Add entry for away team
+      gameMap.set(awayAbbr, {
+        status,
+        statusDetail,
+        scoreDisplay,
+        opponent: homeAbbr,
+        isHome: false,
+      });
+    }
+  } catch (err) {
+    console.error('[NBA Scoreboard] Failed to fetch:', err instanceof Error ? err.message : err);
+  }
+
+  return gameMap;
+}
 
 export default router;

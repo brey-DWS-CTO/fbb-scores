@@ -306,6 +306,20 @@ export interface TeamTrend {
 
 // ─── Daily View types ───────────────────────────────────────────────────────
 
+export type GameStatus = 'live' | 'final' | 'upcoming' | 'unknown';
+
+export interface NbaGameInfo {
+  status: GameStatus;
+  /** e.g. "3:06 - 3rd" or "Final" or "7:00 PM" */
+  statusDetail: string;
+  /** e.g. "SAC 89 - UTAH 85" */
+  scoreDisplay: string;
+  /** Opponent team abbreviation */
+  opponent: string;
+  /** Whether the player's team is the home team */
+  isHome: boolean;
+}
+
 export interface DailyPlayer {
   playerId: number;
   name: string;
@@ -324,6 +338,8 @@ export interface DailyPlayer {
     blk: number;
     min: number;
   };
+  /** Live NBA game info (populated from ESPN public scoreboard API) */
+  gameInfo?: NbaGameInfo;
 }
 
 export interface TeamEfficiency {
