@@ -461,11 +461,9 @@ export function normalizeMatchupDetail(
       );
       let seasonFptsPerGame = 0;
       if (seasonStats?.stats) {
-        const seasonGp = seasonStats.stats['42'] ?? 0;
-        if (seasonGp > 0) {
-          const seasonTotalFpts = computeFpts(seasonStats.stats, scoringItems);
-          seasonFptsPerGame = round1(seasonTotalFpts / seasonGp);
-        }
+        // Roster view stats (split type 0) are per-game averages, same as
+        // rolling averages (types 1/2/3). computeFpts directly gives FPTS/G.
+        seasonFptsPerGame = round1(computeFpts(seasonStats.stats, scoringItems));
       }
 
       // Get rolling averages from team roster stats (has split types 1/2/3)
