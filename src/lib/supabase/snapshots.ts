@@ -1,14 +1,13 @@
 import { supabaseServer } from './server-client.js'
 import type { LeagueScoreboard, Matchup } from '../../types/index.js'
 
-const SNAPSHOT_TTL_MS = 5 * 60 * 1000 // 5 minutes
-
 /**
  * Persist a full LeagueScoreboard as individual per-matchup rows (upsert).
- * The unique constraint on (league_id, season_id, scoring_period_id, matchup_id)
- * means re-runs within the same scoring period overwrite the previous snapshot.
+ * No-op if Supabase is not configured.
  */
 export async function saveMatchupSnapshot(data: LeagueScoreboard): Promise<void> {
+  if (!supabaseServer) return
+
   const rows = data.matchups.map((matchup: Matchup) => ({
     league_id: data.leagueId,
     season_id: data.seasonId,
@@ -28,42 +27,41 @@ export async function saveMatchupSnapshot(data: LeagueScoreboard): Promise<void>
     })
 
   if (error) {
-    throw new Error(`Failed to save matchup snapshot: ${error.message}`)
+    console.error(`[Supabase] Failed to save snapshot: ${error.message}`)
   }
 }
 
 /**
  * Retrieve the most recently captured snapshot for a given scoring period.
- * Returns null when no snapshot exists yet.
+ * Returns null when no snapshot exists or Supabase is not configured.
  */
 export async function getLatestSnapshot(
   leagueId: string,
   seasonId: number,
-  scoringPeriodId: number,
+  scoringPeriodId?: number,
 ): Promise<LeagueScoreboard | null> {
-  const { data, error } = await supabaseServer
+  if (!supabaseServer) return null
+
+  let query = supabaseServer
     .from('matchup_snapshots')
     .select('data, captured_at')
     .eq('league_id', leagueId)
     .eq('season_id', seasonId)
-    .eq('scoring_period_id', scoringPeriodId)
+
+  if (scoringPeriodId !== undefined) {
+    query = query.eq('scoring_period_id', scoringPeriodId)
+  }
+
+  const { data, error } = await query
     .order('captured_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   if (error) {
-    throw new Error(`Failed to fetch snapshot: ${error.message}`)
+    console.error(`[Supabase] Failed to fetch snapshot: ${error.message}`)
+    return null
   }
 
   if (!data) return null
-
   return data.data as LeagueScoreboard
-}
-
-/**
- * Returns true if the snapshot was captured within the last 5 minutes.
- */
-export function isSnapshotFresh(snapshot: { captured_at: string }): boolean {
-  const age = Date.now() - new Date(snapshot.captured_at).getTime()
-  return age < SNAPSHOT_TTL_MS
 }

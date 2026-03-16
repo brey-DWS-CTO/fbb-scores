@@ -19,12 +19,15 @@ export function isActiveSlot(lineupSlotId: number): boolean {
   return !BENCH_IR_SLOTS.has(lineupSlotId);
 }
 
-/**
- * Average fantasy points per rostered player, rounded to 1 decimal place.
- */
-export function calcAvgPointsPerPlayer(score: number, rosterCount: number): number {
-  if (rosterCount === 0) return 0;
-  return Math.round((score / rosterCount) * 10) / 10;
+/** Round to 1 decimal place. */
+export function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/** Compute projected score by extrapolating current pace to max games. */
+export function computeProjectedScore(score: number, gamesPlayed: number, maxGames: number): number {
+  if (gamesPlayed === 0) return 0;
+  return round1((score / gamesPlayed) * maxGames);
 }
 
 /**
@@ -78,7 +81,7 @@ export function computeFpts(
     const value = stats[String(item.statId)] ?? 0;
     total += value * item.points;
   }
-  return Math.round(total * 10) / 10;
+  return round1(total);
 }
 
 // ─── Player Stats Extraction ────────────────────────────────────────────────

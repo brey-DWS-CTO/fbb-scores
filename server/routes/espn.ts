@@ -1,6 +1,8 @@
 import { Router, type Request } from 'express';
 import { EspnClient } from '../../src/lib/espn/client.js';
 import { normalizeLeagueResponse, normalizeMatchupDetail } from '../../src/lib/espn/adapter.js';
+import { saveMatchupSnapshot, getLatestSnapshot } from '../../src/lib/supabase/snapshots.js';
+import type { EspnMatchupRaw, EspnRosterEntry } from '../../src/types/index.js';
 
 const router = Router();
 
@@ -52,10 +54,25 @@ router.get('/espn/scoreboard', async (req, res) => {
     const raw = await client.fetchScoreboard();
     const scoreboard = normalizeLeagueResponse(raw);
 
+    // Save snapshot to Supabase (fire-and-forget)
+    saveMatchupSnapshot(scoreboard).catch((e) =>
+      console.error('[Supabase] Snapshot save failed:', e),
+    );
+
     res.json(scoreboard);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[ESPN proxy] Error fetching scoreboard:', message);
+
+    // Try returning cached data from Supabase as fallback
+    try {
+      const cached = await getLatestSnapshot(ESPN_LEAGUE_ID, seasonId);
+      if (cached) {
+        console.log('[ESPN proxy] Returning cached scoreboard from Supabase');
+        res.json(cached);
+        return;
+      }
+    } catch { /* ignore cache errors */ }
 
     const hint = message.includes('auth') || message.includes('401') || message.includes('302')
       ? ' — Try adding ESPN_EXTRA_COOKIES to your .env (see README for instructions)'
@@ -66,8 +83,12 @@ router.get('/espn/scoreboard', async (req, res) => {
 
 /**
  * GET /api/espn/debug — raw ESPN data for debugging score discrepancies.
+ * Only available in development.
  */
-router.get('/espn/debug', async (req, res) => {
+router.get('/espn/debug', (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') { res.status(404).json({ error: 'Not found' }); return; }
+  next();
+}, async (req, res) => {
   const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
   if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
     res.status(500).json({ error: 'Missing credentials' });
@@ -85,24 +106,21 @@ router.get('/espn/debug', async (req, res) => {
 
     const raw = await client.fetchScoreboard();
     const cmp = raw.status.currentMatchupPeriod;
-    const matchups = raw.schedule.filter((m: any) => m.matchupPeriodId === cmp);
+    const matchups = raw.schedule.filter((m) => m.matchupPeriodId === cmp);
 
-    const debug = matchups.map((m: any) => {
-      const sides = ['home', 'away'].map((side) => {
-        const s = (m as any)[side];
-        return {
-          teamId: s.teamId,
-          totalPoints: s.totalPoints,
-          totalPointsLive: s.totalPointsLive,
-          hasMatchupRoster: !!s.rosterForMatchupPeriod,
-          hasCurrentRoster: !!s.rosterForCurrentScoringPeriod,
-          currentDayPts: s.rosterForCurrentScoringPeriod?.entries?.reduce(
-            (sum: number, e: any) => sum + (e.playerPoolEntry?.appliedStatTotal || 0), 0) || 0,
-          matchupPeriodPts: s.rosterForMatchupPeriod?.entries?.reduce(
-            (sum: number, e: any) => sum + (e.playerPoolEntry?.appliedStatTotal || 0), 0) || 0,
-        };
+    const debug = matchups.map((m) => {
+      const buildSideDebug = (side: EspnMatchupRaw['home']) => ({
+        teamId: side.teamId,
+        totalPoints: side.totalPoints,
+        totalPointsLive: side.totalPointsLive,
+        hasMatchupRoster: !!side.rosterForMatchupPeriod,
+        hasCurrentRoster: !!side.rosterForCurrentScoringPeriod,
+        currentDayPts: side.rosterForCurrentScoringPeriod?.entries?.reduce(
+          (sum: number, e: EspnRosterEntry) => sum + (e.playerPoolEntry?.appliedStatTotal || 0), 0) || 0,
+        matchupPeriodPts: side.rosterForMatchupPeriod?.entries?.reduce(
+          (sum: number, e: EspnRosterEntry) => sum + (e.playerPoolEntry?.appliedStatTotal || 0), 0) || 0,
       });
-      return { id: m.id, [sides[0] ? 'home' : 'home']: sides[0], away: sides[1] };
+      return { id: m.id, home: buildSideDebug(m.home), away: buildSideDebug(m.away) };
     });
 
     res.json({
@@ -162,8 +180,12 @@ router.get('/espn/matchup/:matchupId', async (req, res) => {
 
 /**
  * GET /api/espn/debug-stats — inspect raw player stat entries to debug rolling averages.
+ * Only available in development.
  */
-router.get('/espn/debug-stats', async (req, res) => {
+router.get('/espn/debug-stats', (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') { res.status(404).json({ error: 'Not found' }); return; }
+  next();
+}, async (req, res) => {
   const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
   if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
     res.status(500).json({ error: 'Missing credentials' });
@@ -182,12 +204,12 @@ router.get('/espn/debug-stats', async (req, res) => {
     const scoringPeriodId = await client.getCurrentScoringPeriod();
     const raw = await client.fetchMatchupDetail(scoringPeriodId);
     const cmp = raw.status.currentMatchupPeriod;
-    const matchup = raw.schedule.find((m: any) => m.matchupPeriodId === cmp);
+    const matchup = raw.schedule.find((m) => m.matchupPeriodId === cmp);
     if (!matchup) { res.json({ error: 'No matchup found' }); return; }
 
     // Get first player's raw stats to understand structure
-    const entries = (matchup as any).home.rosterForMatchupPeriod?.entries ??
-                    (matchup as any).home.rosterForCurrentScoringPeriod?.entries ?? [];
+    const entries = matchup.home.rosterForMatchupPeriod?.entries ??
+                    matchup.home.rosterForCurrentScoringPeriod?.entries ?? [];
     const firstEntry = entries[0];
     if (!firstEntry) { res.json({ error: 'No roster entries' }); return; }
 
@@ -198,13 +220,11 @@ router.get('/espn/debug-stats', async (req, res) => {
       scoringPeriodId,
       playerName: player.fullName,
       totalStatEntries: statEntries.length,
-      statEntrySummary: statEntries.map((s: any) => ({
+      statEntrySummary: statEntries.map((s) => ({
         statSplitTypeId: s.statSplitTypeId,
         statSourceId: s.statSourceId,
         scoringPeriodId: s.scoringPeriodId,
-        seasonId: s.seasonId,
         hasStats: !!s.stats,
-        appliedTotal: s.appliedTotal,
       })),
     });
   } catch (err) {

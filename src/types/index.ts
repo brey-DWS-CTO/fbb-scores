@@ -114,6 +114,7 @@ export interface EspnStatEntry {
   statSourceId: number;
   statSplitTypeId: number;
   appliedTotal: number;
+  stats?: Record<string, number>;
 }
 
 export interface EspnMatchupRaw {

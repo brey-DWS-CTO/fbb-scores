@@ -2,6 +2,7 @@ import type {
   EspnLeagueResponse,
   EspnMatchupRaw,
   EspnRosterEntry,
+  EspnStatEntry,
   EspnTeamRaw,
   FantasyTeam,
   LeagueScoreboard,
@@ -15,11 +16,13 @@ import type {
 } from '../../types/index.js';
 import {
   computeFpts,
+  computeProjectedScore,
   extractPlayerStats,
   findTopPlayer,
   getNbaTeamAbbrev,
   isActiveSlot,
   POSITION_MAP,
+  round1,
 } from './calculations.js';
 
 /**
@@ -179,13 +182,8 @@ function buildTeam(
   // Count games played from matchup period roster
   const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
 
-  // Average = total score / games played
-  const avgPointsPerGame = gamesPlayed > 0 ? Math.round((currentScore / gamesPlayed) * 10) / 10 : 0;
-
-  // Projection: extrapolate to max games
-  const projectedScore = gamesPlayed > 0
-    ? Math.round((currentScore / gamesPlayed) * maxGames * 10) / 10
-    : 0;
+  const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
+  const projectedScore = computeProjectedScore(currentScore, gamesPlayed, maxGames);
 
   // Resolve owner name from members list
   let ownerName = 'Unknown Owner';
@@ -218,7 +216,7 @@ function buildTeam(
  * These are total FPTS for the window — divide by GP to get per-game average.
  */
 function extractRollingAverages(
-  playerStats: Array<{ statSplitTypeId: number; statSourceId: number; stats?: Record<string, number>; appliedTotal?: number }>,
+  playerStats: EspnStatEntry[],
   scoringItems: Array<{ statId: number; points: number }>,
 ): RollingAverages {
   const getAvg = (splitTypeId: number): number => {
@@ -229,7 +227,7 @@ function extractRollingAverages(
     const gp = stat.stats['42'] ?? 0;
     if (gp === 0) return 0;
     const totalFpts = computeFpts(stat.stats, scoringItems);
-    return Math.round((totalFpts / gp) * 10) / 10;
+    return round1(totalFpts / gp);
   };
 
   return {
@@ -267,13 +265,13 @@ export function normalizeMatchupDetail(
 
   // Build a lookup of player stats from team rosters (mRoster view).
   // Team roster entries have ESPN's pre-computed split types 1/2/3 for rolling averages.
-  const playerRosterStats = new Map<number, Array<{ statSplitTypeId: number; statSourceId: number; stats?: Record<string, number>; appliedTotal?: number }>>();
+  const playerRosterStats = new Map<number, EspnStatEntry[]>();
   for (const t of raw.teams) {
     if (t.roster?.entries) {
       for (const entry of t.roster.entries) {
         const pid = entry.playerPoolEntry.id;
         const stats = entry.playerPoolEntry.player.stats ?? [];
-        playerRosterStats.set(pid, stats as Array<{ statSplitTypeId: number; statSourceId: number; stats?: Record<string, number>; appliedTotal?: number }>);
+        playerRosterStats.set(pid, stats as EspnStatEntry[]);
       }
     }
   }
@@ -282,8 +280,7 @@ export function normalizeMatchupDetail(
     const team = teamById.get(side.teamId);
     const currentScore = side.totalPointsLive ?? side.totalPoints;
     const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
-    const avgPointsPerGame =
-      gamesPlayed > 0 ? Math.round((currentScore / gamesPlayed) * 10) / 10 : 0;
+    const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
 
     // Build player list from matchup period roster
     const rosterEntries =
@@ -305,7 +302,7 @@ export function normalizeMatchupDetail(
       const playerId = entry.playerPoolEntry.id;
       const rosterStats = playerRosterStats.get(playerId) ?? playerStats;
       const averages = extractRollingAverages(
-        rosterStats as Array<{ statSplitTypeId: number; statSourceId: number; stats?: Record<string, number>; appliedTotal?: number }>,
+        rosterStats as EspnStatEntry[],
         scoringItems,
       );
 

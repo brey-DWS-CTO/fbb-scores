@@ -101,22 +101,27 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum }) => {
             {matchup.isCompleted && ' — FINAL'}
           </span>
         </div>
-        {/* Column headers — aligned with team row data */}
+
+        {/* Column headers */}
         <div
-          className="flex items-center gap-3 px-4 pt-2 pb-1"
+          className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 pt-2 pb-1"
           style={{ borderBottom: '1px solid #1a1a33' }}
         >
-          <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466', width: '1.8rem', textAlign: 'center' }}>#</span>
+          <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466', width: '1.5rem', textAlign: 'center' }}>#</span>
           <span className="flex-1 pixel-text" style={{ fontSize: '0.35rem', color: '#555577', letterSpacing: '0.1em' }}>TEAM</span>
-          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)', textShadow: '0 0 6px #4488ff44', letterSpacing: '0.1em' }}>GP</span>
-          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)', textShadow: '0 0 6px #ffe60044', minWidth: '3rem', textAlign: 'right', letterSpacing: '0.1em' }}>AVG</span>
-          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)', textShadow: '0 0 6px #00ffcc44', minWidth: '5.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>TOTAL</span>
-          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-purple)', textShadow: '0 0 6px #8844ff44', minWidth: '5.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>PROJ</span>
+          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)', textShadow: '0 0 6px #4488ff44', letterSpacing: '0.1em' }}>GP</span>
+          <span className="pixel-text hidden md:inline" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)', textShadow: '0 0 6px #ffe60044', minWidth: '3rem', textAlign: 'right', letterSpacing: '0.1em' }}>AVG</span>
+          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)', textShadow: '0 0 6px #00ffcc44', minWidth: '3.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>
+            <span className="sm:hidden">PTS</span>
+            <span className="hidden sm:inline">TOTAL</span>
+          </span>
+          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.35rem', color: 'var(--neon-purple)', textShadow: '0 0 6px #8844ff44', minWidth: '3.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>PROJ</span>
         </div>
 
         <BracketTeamRow
           seed={home.playoffSeed}
           name={home.name}
+          abbreviation={home.abbreviation}
           score={home.currentScore}
           projectedScore={home.projectedScore}
           avgPointsPerGame={home.avgPointsPerGame}
@@ -128,6 +133,7 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum }) => {
         <BracketTeamRow
           seed={away.playoffSeed}
           name={away.name}
+          abbreviation={away.abbreviation}
           score={away.currentScore}
           projectedScore={away.projectedScore}
           avgPointsPerGame={away.avgPointsPerGame}
@@ -143,6 +149,7 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum }) => {
 interface BracketTeamRowProps {
   seed: number | null;
   name: string;
+  abbreviation: string;
   score: number;
   projectedScore: number;
   avgPointsPerGame: number;
@@ -154,6 +161,7 @@ interface BracketTeamRowProps {
 const BracketTeamRow: FC<BracketTeamRowProps> = ({
   seed,
   name,
+  abbreviation,
   score,
   projectedScore,
   avgPointsPerGame,
@@ -163,7 +171,7 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
 }) => {
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3"
+      className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3"
       style={{
         background: isWinning ? '#00ffcc08' : 'transparent',
         borderLeft: isWinning ? '4px solid var(--neon-teal)' : '4px solid transparent',
@@ -177,40 +185,45 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
         style={{
           fontSize: '0.4rem',
           color: isWinning ? 'var(--neon-teal)' : '#555577',
-          width: '1.8rem',
+          width: '1.5rem',
           textAlign: 'center',
+          flexShrink: 0,
         }}
       >
         #{seed ?? '?'}
       </span>
 
-      {/* Team name */}
+      {/* Team name — full on desktop, abbreviation on mobile */}
       <span
         className="flex-1 truncate"
         style={{
           fontFamily: "'VT323', monospace",
-          fontSize: '1.5rem',
+          fontSize: 'clamp(1.1rem, 3vw, 1.5rem)',
           color: isWinning ? 'var(--neon-teal)' : '#aaaacc',
           textShadow: isWinning ? '0 0 8px #00ffcc44' : 'none',
         }}
       >
-        {name}
+        <span className="hidden sm:inline">{name}</span>
+        <span className="sm:hidden">{abbreviation}</span>
       </span>
 
-      {/* GP */}
+      {/* GP — hidden on mobile */}
       <span
+        className="hidden sm:inline"
         style={{
           fontFamily: "'VT323', monospace",
           fontSize: '1.3rem',
           color: 'var(--neon-blue)',
           textShadow: '0 0 6px #4488ff44',
+          flexShrink: 0,
         }}
       >
         {gamesPlayed}/{maxGames}
       </span>
 
-      {/* Average */}
+      {/* Average — hidden on mobile and small tablets */}
       <span
+        className="hidden md:inline"
         style={{
           fontFamily: "'VT323', monospace",
           fontSize: '1.4rem',
@@ -218,37 +231,41 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
           textShadow: '0 0 6px #ffe60044',
           minWidth: '3rem',
           textAlign: 'right',
+          flexShrink: 0,
         }}
       >
         {avgPointsPerGame.toFixed(1)}
       </span>
 
-      {/* Score */}
+      {/* Score — always visible, responsive size */}
       <span
         className="score-display"
         style={{
-          fontSize: '2rem',
+          fontSize: 'clamp(1.4rem, 4vw, 2rem)',
           color: isWinning ? 'var(--neon-teal)' : '#aaaacc',
           textShadow: isWinning
             ? '0 0 12px #00ffcc88, 0 0 24px #00ffcc44'
             : '0 0 6px #aaaacc33',
-          minWidth: '5.5rem',
+          minWidth: '3.5rem',
           textAlign: 'right',
+          flexShrink: 0,
         }}
       >
         {score.toFixed(1)}
       </span>
 
-      {/* Projected */}
+      {/* Projected — hidden on mobile */}
       <span
+        className="hidden sm:inline"
         style={{
           fontFamily: "'VT323', monospace",
           fontSize: '1.4rem',
           color: 'var(--neon-purple)',
           textShadow: '0 0 6px #8844ff44',
-          minWidth: '5.5rem',
+          minWidth: '3.5rem',
           textAlign: 'right',
           opacity: 0.8,
+          flexShrink: 0,
         }}
       >
         {projectedScore > 0 ? projectedScore.toFixed(1) : '-'}
