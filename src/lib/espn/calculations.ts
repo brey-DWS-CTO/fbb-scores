@@ -103,30 +103,42 @@ function normalCdf(x: number): number {
 export function computeWinProbability(
   homeScore: number, homeGamesPlayed: number, homeMaxGames: number, homeAvgPpg: number,
   awayScore: number, awayGamesPlayed: number, awayMaxGames: number, awayAvgPpg: number,
+  homeProjectedScore?: number, awayProjectedScore?: number,
 ): { homeWinPct: number; awayWinPct: number } {
   const homeRemaining = Math.max(0, homeMaxGames - homeGamesPlayed);
   const awayRemaining = Math.max(0, awayMaxGames - awayGamesPlayed);
 
-  // If all games are played for both teams, return deterministic result
-  if (homeRemaining === 0 && awayRemaining === 0) {
+  // Use provided projected scores (which include live game estimates) or calculate from pace
+  const homeProjectedTotal = homeProjectedScore && homeProjectedScore > homeScore
+    ? homeProjectedScore
+    : homeScore + homeAvgPpg * homeRemaining;
+  const awayProjectedTotal = awayProjectedScore && awayProjectedScore > awayScore
+    ? awayProjectedScore
+    : awayScore + awayAvgPpg * awayRemaining;
+
+  // Check if there are truly no more points to come (all games done AND no live bonus)
+  const homeHasLiveBonus = homeProjectedTotal > homeScore;
+  const awayHasLiveBonus = awayProjectedTotal > awayScore;
+  const noMoreGames = homeRemaining === 0 && awayRemaining === 0 && !homeHasLiveBonus && !awayHasLiveBonus;
+
+  // If all games are truly finished (no in-progress games), return deterministic result
+  if (noMoreGames) {
     if (homeScore > awayScore) return { homeWinPct: 100, awayWinPct: 0 };
     if (awayScore > homeScore) return { homeWinPct: 0, awayWinPct: 100 };
     return { homeWinPct: 50, awayWinPct: 50 };
   }
 
-  // Project remaining points
-  const homeProjectedRemaining = homeAvgPpg * homeRemaining;
-  const awayProjectedRemaining = awayAvgPpg * awayRemaining;
+  // Standard deviation: account for remaining games AND in-progress game volatility
+  // For in-progress games, use the projected bonus as a proxy for remaining variance
+  const homeLiveVariance = homeHasLiveBonus && homeRemaining === 0
+    ? (homeProjectedTotal - homeScore) * 0.3  // ~30% uncertainty on live game extrapolation
+    : homeAvgPpg * Math.sqrt(homeRemaining) * 0.15;
+  const awayLiveVariance = awayHasLiveBonus && awayRemaining === 0
+    ? (awayProjectedTotal - awayScore) * 0.3
+    : awayAvgPpg * Math.sqrt(awayRemaining) * 0.15;
+  const combinedStdDev = Math.sqrt(homeLiveVariance * homeLiveVariance + awayLiveVariance * awayLiveVariance);
 
-  const homeProjectedTotal = homeScore + homeProjectedRemaining;
-  const awayProjectedTotal = awayScore + awayProjectedRemaining;
-
-  // Standard deviation based on volatility factor
-  const homeStdDev = homeAvgPpg * Math.sqrt(homeRemaining) * 0.15;
-  const awayStdDev = awayAvgPpg * Math.sqrt(awayRemaining) * 0.15;
-  const combinedStdDev = Math.sqrt(homeStdDev * homeStdDev + awayStdDev * awayStdDev);
-
-  // If no variance (e.g. both have 0 avg), fall back to current score comparison
+  // If no variance, fall back to projected score comparison
   if (combinedStdDev === 0) {
     if (homeProjectedTotal > awayProjectedTotal) return { homeWinPct: 99, awayWinPct: 1 };
     if (awayProjectedTotal > homeProjectedTotal) return { homeWinPct: 1, awayWinPct: 99 };
@@ -141,6 +153,57 @@ export function computeWinProbability(
   const awayWinPct = 100 - homeWinPct;
 
   return { homeWinPct, awayWinPct };
+}
+
+// ─── Live Game Projection ────────────────────────────────────────────────────
+
+/**
+ * Estimate projected remaining fantasy points from in-progress games.
+ *
+ * Strategy: compare each active player's today FPTS against their rolling
+ * average. If they have scored some points today but less than ~75% of their
+ * average, their game is likely still in progress. Estimate remaining =
+ * max(0, rollingAvg - todayFpts).
+ *
+ * When the ESPN API doesn't provide box-score minutes (common for live data),
+ * this heuristic-based approach provides a reasonable estimate.
+ *
+ * @param currentPeriodEntries  entries from rosterForCurrentScoringPeriod
+ * @param playerRollingAvgs    map of playerId → 7-day rolling average FPTS per game
+ * @returns projected additional points from in-progress games
+ */
+export function estimateLiveGameProjection(
+  currentPeriodEntries: EspnRosterEntry[],
+  playerRollingAvgs: Map<number, number>,
+): number {
+  let projectedRemaining = 0;
+
+  for (const entry of currentPeriodEntries) {
+    // Only consider active (started) players
+    if (!isActiveSlot(entry.lineupSlotId)) continue;
+
+    const playerId = entry.playerPoolEntry.id;
+    const todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
+    const rollingAvg = playerRollingAvgs.get(playerId) ?? 0;
+
+    // Skip players with no scoring today or no rolling average
+    if (todayFpts <= 0 || rollingAvg <= 0) continue;
+
+    // If they've scored > 0 but less than 75% of their typical game,
+    // their game is likely still in progress
+    if (todayFpts < rollingAvg * 0.75) {
+      const estimatedRemaining = Math.max(0, rollingAvg - todayFpts);
+      projectedRemaining += estimatedRemaining;
+    }
+    // If they've scored between 75-100% of their average, game might be
+    // nearly over — project a small remaining amount
+    else if (todayFpts < rollingAvg) {
+      projectedRemaining += (rollingAvg - todayFpts) * 0.5;
+    }
+    // If they've scored above their average, game is likely over — no bonus
+  }
+
+  return round1(projectedRemaining);
 }
 
 export function extractPlayerStats(stats: Record<string, number>): PlayerGameStats {

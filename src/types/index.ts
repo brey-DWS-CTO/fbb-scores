@@ -247,6 +247,8 @@ export interface MatchupDetailTeam {
   maxGames: number;
   playoffSeed: number | null;
   players: MatchupPlayer[];
+  /** Lineup efficiency: actual score vs optimal lineup across the matchup period */
+  efficiency: TeamEfficiency;
 }
 
 export interface MatchupDetail {

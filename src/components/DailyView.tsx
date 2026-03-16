@@ -1,6 +1,5 @@
 import type { FC } from 'react';
 import type { DailyMatchup, DailyTeam, DailyPlayer } from '../types/index.js';
-import EfficiencyBar from './EfficiencyBar.js';
 
 const LINEUP_SLOT_LABELS: Record<number, string> = {
   0: 'PG', 1: 'SG', 2: 'SF', 3: 'PF', 4: 'C', 5: 'G', 6: 'F', 11: 'UTL',
@@ -120,11 +119,6 @@ const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side }) => {
         <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-teal)', marginLeft: 'auto' }}>
           {team.todayScore.toFixed(1)}
         </span>
-      </div>
-
-      {/* Efficiency bar */}
-      <div className="px-3 mb-3">
-        <EfficiencyBar efficiency={team.efficiency} label="LINEUP EFFICIENCY" />
       </div>
 
       {/* Player table */}

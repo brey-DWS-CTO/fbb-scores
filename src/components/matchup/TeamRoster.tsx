@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import type { MatchupDetailTeam, MatchupPlayer } from '../../types/index.js';
 import PlayerRow from './PlayerRow.js';
 import PlayerCardModal from './PlayerCardModal.js';
+import EfficiencyBar from '../EfficiencyBar.js';
 
 type SortKey =
   | 'fpts' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'fg' | 'threepm' | 'to'
@@ -83,6 +84,11 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
       >
         <span className="pixel-text" style={{ fontSize: '0.4rem', color: sideColor }}>{side === 'home' ? 'HOME' : 'AWAY'}</span>
         <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.3rem', color: '#e0e0ff' }}>{team.name}</span>
+      </div>
+
+      {/* Lineup efficiency */}
+      <div className="px-3 mb-3">
+        <EfficiencyBar efficiency={team.efficiency} label="LINEUP EFFICIENCY" />
       </div>
 
       {/* Player stats table */}

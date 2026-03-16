@@ -22,6 +22,7 @@ import {
   computeFpts,
   computeProjectedScore,
   computeWinProbability,
+  estimateLiveGameProjection,
   extractPlayerStats,
   findTopPlayer,
   getNbaTeamAbbrev,
@@ -162,6 +163,7 @@ function buildMatchup(
   const winProbability = computeWinProbability(
     home.currentScore, home.gamesPlayed, home.maxGames, home.avgPointsPerGame,
     away.currentScore, away.gamesPlayed, away.maxGames, away.avgPointsPerGame,
+    home.projectedScore, away.projectedScore,
   );
 
   return {
@@ -197,7 +199,35 @@ function buildTeam(
   const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
 
   const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
-  const projectedScore = computeProjectedScore(currentScore, gamesPlayed, maxGames);
+
+  // Base projection from pace extrapolation
+  let projectedScore = computeProjectedScore(currentScore, gamesPlayed, maxGames);
+
+  // Build rolling average estimates from matchup period data for in-progress game detection
+  // For each player, use their matchup-period per-game average as a proxy for their expected output
+  const playerRollingAvgs = new Map<number, number>();
+  for (const entry of matchupEntries) {
+    const playerId = entry.playerPoolEntry.id;
+    const playerStats = entry.playerPoolEntry.player.stats ?? [];
+    const matchupStat = playerStats.find(
+      (s: { statSplitTypeId: number; statSourceId: number }) =>
+        s.statSplitTypeId === 5 && s.statSourceId === 0,
+    );
+    if (matchupStat?.stats) {
+      const playerGp = matchupStat.stats['42'] ?? 0;
+      const totalApplied = entry.playerPoolEntry.appliedStatTotal ?? 0;
+      if (playerGp > 0) {
+        playerRollingAvgs.set(playerId, round1(totalApplied / playerGp));
+      }
+    }
+  }
+
+  // Enhance projection with in-progress game estimates
+  // When GP === maxGames, pace projection equals current score — but live games still have points coming
+  const liveBonus = estimateLiveGameProjection(currentEntries, playerRollingAvgs);
+  if (liveBonus > 0) {
+    projectedScore = round1(Math.max(projectedScore, currentScore + liveBonus));
+  }
 
   // Resolve owner name from members list
   let ownerName = 'Unknown Owner';
@@ -346,6 +376,46 @@ export function normalizeMatchupDetail(
       ownerName = memberById.get(team.owners[0]) ?? 'Unknown Owner';
     }
 
+    // ── Matchup-period efficiency ───────────────────────────────────
+    // For each player, get their total FPTS from raw stats (all games played,
+    // regardless of lineup slot). Then build a pool of per-game averages and
+    // pick the top maxGames entries as the "optimal lineup" total.
+    const gameEntries: number[] = [];
+    for (const entry of rosterEntries) {
+      const playerStats = entry.playerPoolEntry.player.stats ?? [];
+      const matchupStat = playerStats.find(
+        (s: { statSplitTypeId: number; statSourceId: number; stats?: Record<string, number> }) =>
+          s.statSplitTypeId === 5 && s.statSourceId === 0,
+      );
+      if (!matchupStat?.stats) continue;
+
+      // Compute total FPTS from raw stats using scoring settings
+      const totalFpts = computeFpts(matchupStat.stats, scoringItems);
+      const playerGp = matchupStat.stats['42'] ?? 0;
+      if (playerGp <= 0 || totalFpts <= 0) continue;
+
+      // Create individual "game entries" at the per-game average
+      const avgPerGame = totalFpts / playerGp;
+      for (let g = 0; g < playerGp; g++) {
+        gameEntries.push(avgPerGame);
+      }
+    }
+
+    // Sort descending and take top maxGames
+    gameEntries.sort((a, b) => b - a);
+    const optimalEntries = gameEntries.slice(0, maxGames);
+    const maxPossibleScore = round1(optimalEntries.reduce((sum, v) => sum + v, 0));
+    const efficiencyPct = maxPossibleScore > 0
+      ? round1((currentScore / maxPossibleScore) * 100)
+      : 100;
+
+    const efficiency: TeamEfficiency = {
+      actualScore: currentScore,
+      maxPossibleScore,
+      efficiencyPct,
+      missedPoints: round1(Math.max(0, maxPossibleScore - currentScore)),
+    };
+
     return {
       id: side.teamId,
       name: team?.name ?? `Team ${side.teamId}`,
@@ -358,6 +428,7 @@ export function normalizeMatchupDetail(
       maxGames,
       playoffSeed: team?.playoffSeed ?? null,
       players,
+      efficiency,
     };
   }
 
