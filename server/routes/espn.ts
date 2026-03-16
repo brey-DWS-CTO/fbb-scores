@@ -1,7 +1,7 @@
 import { Router, type Request } from 'express';
 import { EspnClient } from '../../src/lib/espn/client.js';
 import { normalizeLeagueResponse, normalizeMatchupDetail } from '../../src/lib/espn/adapter.js';
-import { saveMatchupSnapshot, getLatestSnapshot } from '../../src/lib/supabase/snapshots.js';
+import { saveMatchupSnapshot, getLatestSnapshot, savePlayerSnapshots, getPlayerTrend, getTeamTrend } from '../../src/lib/supabase/snapshots.js';
 import type { EspnMatchupRaw, EspnRosterEntry } from '../../src/types/index.js';
 
 const router = Router();
@@ -170,6 +170,11 @@ router.get('/espn/matchup/:matchupId', async (req, res) => {
       return;
     }
 
+    // Save player snapshots to Supabase (fire-and-forget)
+    savePlayerSnapshots(ESPN_LEAGUE_ID, seasonId, matchupDetail).catch((e) =>
+      console.error('[Supabase] Player snapshot save failed:', e),
+    );
+
     res.json(matchupDetail);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -229,6 +234,72 @@ router.get('/espn/debug-stats', (req, res, next) => {
     });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+  }
+});
+
+/**
+ * GET /api/espn/trends/player/:playerId
+ * Returns historical trend data for a single player.
+ */
+router.get('/espn/trends/player/:playerId', async (req, res) => {
+  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID } = process.env;
+  if (!ESPN_LEAGUE_ID) {
+    res.status(500).json({ error: 'Missing ESPN_LEAGUE_ID' });
+    return;
+  }
+
+  const playerId = parseInt(req.params.playerId, 10);
+  if (isNaN(playerId)) {
+    res.status(400).json({ error: 'Invalid player ID' });
+    return;
+  }
+
+  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
+
+  try {
+    const trend = await getPlayerTrend(ESPN_LEAGUE_ID, seasonId, playerId);
+    if (!trend) {
+      res.status(404).json({ error: 'No trend data found for this player' });
+      return;
+    }
+    res.json(trend);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[ESPN proxy] Error fetching player trend:', message);
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * GET /api/espn/trends/team/:teamId
+ * Returns historical trend data for a fantasy team.
+ */
+router.get('/espn/trends/team/:teamId', async (req, res) => {
+  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID } = process.env;
+  if (!ESPN_LEAGUE_ID) {
+    res.status(500).json({ error: 'Missing ESPN_LEAGUE_ID' });
+    return;
+  }
+
+  const teamId = parseInt(req.params.teamId, 10);
+  if (isNaN(teamId)) {
+    res.status(400).json({ error: 'Invalid team ID' });
+    return;
+  }
+
+  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
+
+  try {
+    const trend = await getTeamTrend(ESPN_LEAGUE_ID, seasonId, teamId);
+    if (!trend) {
+      res.status(404).json({ error: 'No trend data found for this team' });
+      return;
+    }
+    res.json(trend);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[ESPN proxy] Error fetching team trend:', message);
+    res.status(500).json({ error: message });
   }
 });
 

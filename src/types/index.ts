@@ -242,6 +242,49 @@ export interface MatchupDetail {
   scoringSettings: ScoringSettings;
 }
 
+// ─── Player Snapshot types (for trends) ─────────────────────────────────────
+
+export interface PlayerSnapshot {
+  id?: string;
+  league_id: string;
+  season_id: number;
+  scoring_period_id: number;
+  player_id: number;
+  team_id: number;
+  player_name: string;
+  fpts: number;
+  stats: PlayerGameStats;
+  rolling_avg_7: number;
+  rolling_avg_15: number;
+  rolling_avg_30: number;
+  captured_at: string;
+}
+
+export interface PlayerTrend {
+  playerId: number;
+  playerName: string;
+  dataPoints: Array<{
+    scoringPeriodId: number;
+    fpts: number;
+    rollingAvg7: number;
+    rollingAvg15: number;
+    rollingAvg30: number;
+    capturedAt: string;
+  }>;
+}
+
+export interface TeamTrend {
+  teamId: number;
+  teamName: string;
+  dataPoints: Array<{
+    scoringPeriodId: number;
+    totalScore: number;
+    avgPointsPerGame: number;
+    gamesPlayed: number;
+    capturedAt: string;
+  }>;
+}
+
 // ─── Supabase snapshot types ──────────────────────────────────────────────────
 
 export interface MatchupSnapshot {

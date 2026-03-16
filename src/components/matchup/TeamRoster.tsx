@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import type { FC } from 'react';
 import type { MatchupDetailTeam, MatchupPlayer } from '../../types/index.js';
 import PlayerRow from './PlayerRow.js';
+import PlayerTrendRow from './PlayerTrendRow.js';
 
 type SortKey =
   | 'fpts' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'fg' | 'threepm' | 'to'
@@ -45,10 +46,13 @@ interface TeamRosterProps {
   side: 'home' | 'away';
 }
 
+const TOTAL_COLUMNS = COLUMNS.length + 1; // +1 for player name column
+
 const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
   const sideColor = side === 'home' ? 'var(--neon-blue)' : 'var(--neon-orange)';
   const [sortKey, setSortKey] = useState<SortKey>('fpts');
   const [sortDesc, setSortDesc] = useState(true);
+  const [expandedPlayerId, setExpandedPlayerId] = useState<number | null>(null);
 
   const sortedPlayers = useMemo(() => {
     return [...team.players].sort((a, b) => {
@@ -114,7 +118,24 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
           </thead>
           <tbody>
             {sortedPlayers.map((player, i) => (
-              <PlayerRow key={player.playerId ?? i} player={player} isEven={i % 2 === 0} />
+              <>
+                <PlayerRow
+                  key={player.playerId ?? i}
+                  player={player}
+                  isEven={i % 2 === 0}
+                  isExpanded={expandedPlayerId === player.playerId}
+                  onToggleTrend={() => setExpandedPlayerId(
+                    expandedPlayerId === player.playerId ? null : player.playerId,
+                  )}
+                />
+                {expandedPlayerId === player.playerId && (
+                  <PlayerTrendRow
+                    key={`trend-${player.playerId}`}
+                    playerId={player.playerId}
+                    colSpan={TOTAL_COLUMNS}
+                  />
+                )}
+              </>
             ))}
           </tbody>
         </table>

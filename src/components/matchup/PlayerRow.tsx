@@ -4,15 +4,25 @@ import type { MatchupPlayer } from '../../types/index.js';
 interface PlayerRowProps {
   player: MatchupPlayer;
   isEven: boolean;
+  isExpanded?: boolean;
+  onToggleTrend?: () => void;
 }
 
-const PlayerRow: FC<PlayerRowProps> = ({ player, isEven }) => {
+const PlayerRow: FC<PlayerRowProps> = ({ player, isEven, isExpanded, onToggleTrend }) => {
   const rowBg = isEven ? '#0a0a14' : '#0f0f1a';
   const benchStyle = !player.isStarter ? { opacity: 0.5 } : {};
   const gp = player.stats.gp || 1;
 
   return (
-    <tr style={{ background: rowBg, borderBottom: '1px solid #111122', ...benchStyle }}>
+    <tr
+      style={{
+        background: isExpanded ? '#0d0d20' : rowBg,
+        borderBottom: isExpanded ? 'none' : '1px solid #111122',
+        cursor: 'pointer',
+        ...benchStyle,
+      }}
+      onClick={onToggleTrend}
+    >
       {/* Player info */}
       <td className="px-2 py-2">
         <div className="flex items-center gap-2">

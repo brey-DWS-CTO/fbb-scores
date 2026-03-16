@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import type { MatchupDetail } from '../../types/index.js';
 import { computeProjectedScore } from '../../lib/espn/calculations.js';
+import TeamTrendCard from './TeamTrendCard.js';
 
 interface MatchupDetailHeaderProps {
   data: MatchupDetail;
@@ -38,6 +39,16 @@ const MatchupDetailHeader: FC<MatchupDetailHeaderProps> = ({ data }) => {
           opponent={data.home}
           glowColor="#ff884466"
         />
+      </div>
+
+      {/* Team trend sparklines */}
+      <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4" style={{ borderTop: '1px solid #1a1a33' }}>
+        <div className="flex-1">
+          <TeamTrendCard teamId={data.home.id} teamName={data.home.abbreviation} />
+        </div>
+        <div className="flex-1">
+          <TeamTrendCard teamId={data.away.id} teamName={data.away.abbreviation} />
+        </div>
       </div>
     </div>
   );
