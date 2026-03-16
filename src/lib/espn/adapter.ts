@@ -150,11 +150,15 @@ function buildPlayoffInfo(raw: EspnLeagueResponse, currentMatchupPeriod: number)
 /**
  * Count games played from rosterForMatchupPeriod entries.
  * Uses stat ID 42 (GP) from player stats with splitTypeId 5 (matchup period stats).
+ *
+ * Only counts GP for active (started) players to match ESPN's scoring model.
  */
 function countGamesPlayed(roster?: { entries: EspnRosterEntry[] }): number {
   if (!roster) return 0;
   let gp = 0;
   for (const entry of roster.entries) {
+    // Only count GP for active lineup slots (not bench/IR)
+    if (!isActiveSlot(entry.lineupSlotId)) continue;
     const playerStats = entry.playerPoolEntry.player.stats;
     if (playerStats) {
       for (const stat of playerStats) {
@@ -165,6 +169,26 @@ function countGamesPlayed(roster?: { entries: EspnRosterEntry[] }): number {
     }
   }
   return gp;
+}
+
+/**
+ * Estimate GP for completed matchups when roster stat data is unavailable.
+ * Uses appliedStatTotal sums from roster entries as a proxy.
+ */
+function estimateGamesPlayed(roster?: { entries: EspnRosterEntry[] }): number {
+  if (!roster) return 0;
+  let totalApplied = 0;
+  let playerCount = 0;
+  for (const entry of roster.entries) {
+    if (!isActiveSlot(entry.lineupSlotId)) continue;
+    const applied = entry.playerPoolEntry.appliedStatTotal ?? 0;
+    if (applied > 0) {
+      totalApplied += applied;
+      playerCount++;
+    }
+  }
+  // If roster entries have appliedStatTotal data, at least some games were played
+  return playerCount;
 }
 
 function buildMatchup(
@@ -227,7 +251,10 @@ function extractMatchupAvgs(matchupEntries: EspnRosterEntry[]): Map<number, numb
 
 /**
  * Extract L15 rolling averages and season FPTS/G from team roster entries.
- * Roster view stats are per-game averages — computeFpts directly gives FPTS/G.
+ *
+ * IMPORTANT: Rolling split types (1/2/3) from the mRoster view return TOTALS
+ * over the time window — NOT per-game averages. We must divide by GP (stat 42).
+ * Season split type (0) from mRoster IS a per-game average — no GP division needed.
  */
 function extractRosterAvgs(
   rosterEntries: EspnRosterEntry[] | undefined,
@@ -241,14 +268,19 @@ function extractRosterAvgs(
     const playerId = entry.playerPoolEntry.id;
     const playerStats = entry.playerPoolEntry.player.stats ?? [];
 
+    // L15 rolling stats are TOTALS — divide by GP to get per-game average
     const rolling15Stat = playerStats.find(
       (s) => s.statSplitTypeId === 2 && s.statSourceId === 0,
     );
     if (rolling15Stat?.stats) {
       const fpts = computeFpts(rolling15Stat.stats, scoringItems);
-      if (fpts > 0) rolling15.set(playerId, round1(fpts));
+      const gp = rolling15Stat.stats['42'] ?? 0;
+      if (fpts > 0 && gp > 0) {
+        rolling15.set(playerId, round1(fpts / gp));
+      }
     }
 
+    // Season stats from mRoster are already per-game averages
     const seasonStat = playerStats.find(
       (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
     );
@@ -288,7 +320,7 @@ function buildProjectionInputs(
     let todayFpts = 0;
     let gameStatus: GameStatus | 'none' = 'none';
     let minutesRemaining = 0;
-    const remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
+    let remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
 
     if (!isFutureMatchup) {
       todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
@@ -296,6 +328,9 @@ function buildProjectionInputs(
       if (gameInfo) {
         gameStatus = gameInfo.status;
         minutesRemaining = gameInfo.minutesRemaining;
+        // Today's game is included in nbaSchedule count AND handled via gameStatus.
+        // Subtract 1 to avoid double-counting when gameStatus is live/final/upcoming.
+        remainingGamesAfterToday = Math.max(0, remainingGamesAfterToday - 1);
       }
     }
 
@@ -354,7 +389,13 @@ function buildTeam(
   const rosterEntries = matchupEntries.length > 0 ? matchupEntries : currentEntries;
   const rosterCount = rosterEntries.filter((e) => isActiveSlot(e.lineupSlotId)).length;
   const currentScore = side.totalPointsLive ?? side.totalPoints;
-  const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
+  let gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
+
+  // Fallback: if score exists but GP=0 (past period with no stat data),
+  // estimate GP from roster appliedStatTotal entries
+  if (gamesPlayed === 0 && currentScore > 0) {
+    gamesPlayed = estimateGamesPlayed(side.rosterForMatchupPeriod);
+  }
   const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
 
   // Extract player averages from both matchup and roster data
@@ -453,8 +494,9 @@ function computeMatchupEfficiency(
 /**
  * Extract rolling averages from ESPN's pre-computed split types.
  * Split type 1 = last 7 days, 2 = last 15 days, 3 = last 30 days.
- * Roster view stats are per-game averages (same as type 0 season stats),
- * so computeFpts directly gives FPTS/G — no need to divide by GP.
+ *
+ * Rolling split types from mRoster return TOTALS over the time window,
+ * so we must divide by GP (stat 42) to get per-game averages.
  */
 function extractRollingAverages(
   playerStats: EspnStatEntry[],
@@ -465,7 +507,10 @@ function extractRollingAverages(
       (s) => s.statSplitTypeId === splitTypeId && s.statSourceId === 0,
     );
     if (!stat?.stats) return 0;
-    return round1(computeFpts(stat.stats, scoringItems));
+    const fpts = computeFpts(stat.stats, scoringItems);
+    const gp = stat.stats['42'] ?? 0;
+    if (fpts > 0 && gp > 0) return round1(fpts / gp);
+    return 0;
   };
 
   return {

@@ -305,10 +305,10 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum, accentCo
           className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 pt-2 pb-1"
           style={{ borderBottom: '1px solid #1a1a33' }}
         >
-          <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466', width: '1.5rem', textAlign: 'center' }}>#</span>
+          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.3rem', color: '#444466', width: '1.5rem', textAlign: 'center' }}>#</span>
           <span className="flex-1 pixel-text" style={{ fontSize: '0.35rem', color: '#555577', letterSpacing: '0.1em' }}>TEAM</span>
           <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)', textShadow: '0 0 6px #4488ff44', letterSpacing: '0.1em' }}>GP</span>
-          <span className="pixel-text hidden md:inline" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)', textShadow: '0 0 6px #ffe60044', minWidth: '3rem', textAlign: 'right', letterSpacing: '0.1em' }}>AVG</span>
+          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)', textShadow: '0 0 6px #ffe60044', minWidth: '2.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>AVG</span>
           <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)', textShadow: '0 0 6px #00ffcc44', minWidth: '3.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>
             <span className="sm:hidden">PTS</span>
             <span className="hidden sm:inline">TOTAL</span>
@@ -439,9 +439,9 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
         transition: 'background 0.2s',
       }}
     >
-      {/* Seed */}
+      {/* Seed — hidden on mobile to save space */}
       <span
-        className="pixel-text"
+        className="pixel-text hidden sm:inline"
         style={{
           fontSize: '0.4rem',
           color: isWinning ? 'var(--neon-teal)' : '#555577',
@@ -495,15 +495,14 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
         {gamesPlayed}/{maxGames}
       </span>
 
-      {/* Average — hidden on mobile and small tablets */}
+      {/* Average — always visible */}
       <span
-        className="hidden md:inline"
         style={{
           fontFamily: "'VT323', monospace",
-          fontSize: '1.4rem',
+          fontSize: 'clamp(1rem, 3vw, 1.4rem)',
           color: 'var(--neon-yellow)',
           textShadow: '0 0 6px #ffe60044',
-          minWidth: '3rem',
+          minWidth: '2.5rem',
           textAlign: 'right',
           flexShrink: 0,
         }}

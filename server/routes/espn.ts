@@ -71,6 +71,11 @@ router.get('/espn/scoreboard', async (req, res) => {
       fetchNbaScheduleForDates(remainingDates),
     ]);
 
+    // Debug: log schedule data for diagnosing projection issues
+    if (nbaSchedule.size === 0 && remainingDates.length > 0) {
+      console.warn(`[NBA Schedule] No games found for ${remainingDates.length} remaining dates (${remainingDates[0]} to ${remainingDates[remainingDates.length - 1]})`);
+    }
+
     const scoreboard = normalizeLeagueResponse(raw, matchupPeriod, nbaScoreboard, nbaSchedule);
 
     // Save snapshot to Supabase (fire-and-forget)
@@ -423,20 +428,23 @@ router.get('/espn/trends/team/:teamId', async (req, res) => {
 
 /**
  * Given the scoring periods in a matchup and today's scoring period,
- * return the dates for remaining days (after today) as YYYY-MM-DD strings.
+ * return the dates for remaining days (including today and future) as YYYY-MM-DD strings.
  *
  * ESPN scoring periods increment by 1 per day, so we can convert them
  * to dates by offsetting from today's date + scoring period.
+ *
+ * We include today (>=) so the NBA schedule has game counts for ALL remaining days.
+ * The adapter handles deduplication with the live nbaScoreboard data for today.
  */
 function getRemainingMatchupDates(
   matchupScoringPeriods: number[],
   todayScoringPeriod: number,
 ): string[] {
-  const futurePeriods = matchupScoringPeriods.filter((sp) => sp > todayScoringPeriod);
-  if (futurePeriods.length === 0) return [];
+  const remainingPeriods = matchupScoringPeriods.filter((sp) => sp >= todayScoringPeriod);
+  if (remainingPeriods.length === 0) return [];
 
   const today = new Date();
-  return futurePeriods.map((sp) => {
+  return remainingPeriods.map((sp) => {
     const daysFromToday = sp - todayScoringPeriod;
     const date = new Date(today);
     date.setDate(date.getDate() + daysFromToday);
