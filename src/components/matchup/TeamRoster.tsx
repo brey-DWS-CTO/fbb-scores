@@ -1,8 +1,8 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo } from 'react';
 import type { FC } from 'react';
 import type { MatchupDetailTeam, MatchupPlayer } from '../../types/index.js';
 import PlayerRow from './PlayerRow.js';
-import PlayerTrendRow from './PlayerTrendRow.js';
+import PlayerCardModal from './PlayerCardModal.js';
 
 type SortKey =
   | 'fpts' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'fg' | 'threepm' | 'to'
@@ -52,7 +52,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
   const sideColor = side === 'home' ? 'var(--neon-blue)' : 'var(--neon-orange)';
   const [sortKey, setSortKey] = useState<SortKey>('fpts');
   const [sortDesc, setSortDesc] = useState(true);
-  const [expandedPlayerId, setExpandedPlayerId] = useState<number | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<MatchupPlayer | null>(null);
 
   const sortedPlayers = useMemo(() => {
     return [...team.players].sort((a, b) => {
@@ -118,27 +118,23 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
           </thead>
           <tbody>
             {sortedPlayers.map((player, i) => (
-              <Fragment key={player.playerId ?? i}>
-                <PlayerRow
-                  player={player}
-                  isEven={i % 2 === 0}
-                  isExpanded={expandedPlayerId === player.playerId}
-                  onToggleTrend={() => setExpandedPlayerId(
-                    expandedPlayerId === player.playerId ? null : player.playerId,
-                  )}
-                />
-                {expandedPlayerId === player.playerId && (
-                  <PlayerTrendRow
-                    key={`trend-${player.playerId}`}
-                    playerId={player.playerId}
-                    colSpan={TOTAL_COLUMNS}
-                  />
-                )}
-              </Fragment>
+              <PlayerRow
+                key={player.playerId ?? i}
+                player={player}
+                isEven={i % 2 === 0}
+                onPlayerClick={setSelectedPlayer}
+              />
             ))}
           </tbody>
         </table>
       </div>
+
+      {selectedPlayer && (
+        <PlayerCardModal
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 };

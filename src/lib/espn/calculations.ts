@@ -86,6 +86,63 @@ export function computeFpts(
 
 // ─── Player Stats Extraction ────────────────────────────────────────────────
 
+// ─── Win Probability ─────────────────────────────────────────────────────────
+
+/** Approximate the standard normal CDF. */
+function normalCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327;
+  const p = d * Math.exp(-x * x / 2) * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.8212560 + t * 1.3302744))));
+  return x > 0 ? 1 - p : p;
+}
+
+/**
+ * Compute win probability for a matchup based on current scores,
+ * games played, max games, and average PPG.
+ */
+export function computeWinProbability(
+  homeScore: number, homeGamesPlayed: number, homeMaxGames: number, homeAvgPpg: number,
+  awayScore: number, awayGamesPlayed: number, awayMaxGames: number, awayAvgPpg: number,
+): { homeWinPct: number; awayWinPct: number } {
+  const homeRemaining = Math.max(0, homeMaxGames - homeGamesPlayed);
+  const awayRemaining = Math.max(0, awayMaxGames - awayGamesPlayed);
+
+  // If all games are played for both teams, return deterministic result
+  if (homeRemaining === 0 && awayRemaining === 0) {
+    if (homeScore > awayScore) return { homeWinPct: 100, awayWinPct: 0 };
+    if (awayScore > homeScore) return { homeWinPct: 0, awayWinPct: 100 };
+    return { homeWinPct: 50, awayWinPct: 50 };
+  }
+
+  // Project remaining points
+  const homeProjectedRemaining = homeAvgPpg * homeRemaining;
+  const awayProjectedRemaining = awayAvgPpg * awayRemaining;
+
+  const homeProjectedTotal = homeScore + homeProjectedRemaining;
+  const awayProjectedTotal = awayScore + awayProjectedRemaining;
+
+  // Standard deviation based on volatility factor
+  const homeStdDev = homeAvgPpg * Math.sqrt(homeRemaining) * 0.15;
+  const awayStdDev = awayAvgPpg * Math.sqrt(awayRemaining) * 0.15;
+  const combinedStdDev = Math.sqrt(homeStdDev * homeStdDev + awayStdDev * awayStdDev);
+
+  // If no variance (e.g. both have 0 avg), fall back to current score comparison
+  if (combinedStdDev === 0) {
+    if (homeProjectedTotal > awayProjectedTotal) return { homeWinPct: 99, awayWinPct: 1 };
+    if (awayProjectedTotal > homeProjectedTotal) return { homeWinPct: 1, awayWinPct: 99 };
+    return { homeWinPct: 50, awayWinPct: 50 };
+  }
+
+  const zScore = (homeProjectedTotal - awayProjectedTotal) / combinedStdDev;
+  let homeWinPct = Math.round(normalCdf(zScore) * 100);
+
+  // Clamp between 1% and 99%
+  homeWinPct = Math.max(1, Math.min(99, homeWinPct));
+  const awayWinPct = 100 - homeWinPct;
+
+  return { homeWinPct, awayWinPct };
+}
+
 export function extractPlayerStats(stats: Record<string, number>): PlayerGameStats {
   return {
     pts: stats['0'] ?? 0,

@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { EspnClient } from '../../src/lib/espn/client.js';
-import { normalizeLeagueResponse, normalizeMatchupDetail } from '../../src/lib/espn/adapter.js';
+import { normalizeLeagueResponse, normalizeMatchupDetail, normalizeDailyView } from '../../src/lib/espn/adapter.js';
 import { saveMatchupSnapshot, getLatestSnapshot, savePlayerSnapshots, getPlayerTrend, getTeamTrend } from '../../src/lib/supabase/snapshots.js';
 import type { EspnMatchupRaw, EspnRosterEntry } from '../../src/types/index.js';
 
@@ -52,7 +52,10 @@ router.get('/espn/scoreboard', async (req, res) => {
     });
 
     const raw = await client.fetchScoreboard();
-    const scoreboard = normalizeLeagueResponse(raw);
+    const matchupPeriod = req.query.matchupPeriod
+      ? parseInt(req.query.matchupPeriod as string, 10)
+      : undefined;
+    const scoreboard = normalizeLeagueResponse(raw, matchupPeriod);
 
     // Save snapshot to Supabase (fire-and-forget)
     saveMatchupSnapshot(scoreboard).catch((e) =>
@@ -78,6 +81,45 @@ router.get('/espn/scoreboard', async (req, res) => {
       ? ' — Try adding ESPN_EXTRA_COOKIES to your .env (see README for instructions)'
       : '';
     res.status(502).json({ error: message + hint });
+  }
+});
+
+/**
+ * GET /api/espn/league-info
+ * Returns league schedule settings for the week selector.
+ */
+router.get('/espn/league-info', async (req, res) => {
+  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
+
+  if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
+    res.status(500).json({ error: 'Missing credentials' });
+    return;
+  }
+
+  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
+  const cookieString = buildCookieString(req);
+
+  try {
+    const client = new EspnClient({
+      leagueId: ESPN_LEAGUE_ID, seasonId,
+      espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: cookieString,
+    });
+
+    const raw = await client.fetchScoreboard();
+    const { scheduleSettings } = raw.settings;
+    const totalMatchupPeriods = Object.keys(scheduleSettings.matchupPeriods).length;
+
+    res.json({
+      regularSeasonWeeks: scheduleSettings.matchupPeriodCount,
+      playoffTeamCount: scheduleSettings.playoffTeamCount,
+      currentMatchupPeriod: raw.status.currentMatchupPeriod,
+      totalMatchupPeriods,
+      matchupPeriods: scheduleSettings.matchupPeriods,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[ESPN proxy] Error fetching league info:', message);
+    res.status(502).json({ error: message });
   }
 });
 
@@ -131,6 +173,49 @@ router.get('/espn/debug', (req, res, next) => {
     });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+  }
+});
+
+/**
+ * GET /api/espn/daily/:matchupId
+ * Fetches today's per-player scoring data for a specific matchup.
+ */
+router.get('/espn/daily/:matchupId', async (req, res) => {
+  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
+  if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
+    res.status(500).json({ error: 'Missing credentials' });
+    return;
+  }
+
+  const matchupId = parseInt(req.params.matchupId, 10);
+  if (isNaN(matchupId)) {
+    res.status(400).json({ error: 'Invalid matchup ID' });
+    return;
+  }
+
+  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
+  const cookieString = buildCookieString(req);
+
+  try {
+    const client = new EspnClient({
+      leagueId: ESPN_LEAGUE_ID, seasonId,
+      espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: cookieString,
+    });
+
+    const scoringPeriodId = await client.getCurrentScoringPeriod();
+    const raw = await client.fetchMatchupDetail(scoringPeriodId);
+    const daily = normalizeDailyView(raw, matchupId);
+
+    if (!daily) {
+      res.status(404).json({ error: 'Matchup not found' });
+      return;
+    }
+
+    res.json(daily);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[ESPN proxy] Error fetching daily view:', message);
+    res.status(502).json({ error: message });
   }
 });
 

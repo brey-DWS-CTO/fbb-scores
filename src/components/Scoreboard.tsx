@@ -5,9 +5,10 @@ import PlayoffBracket from './PlayoffBracket.js';
 
 interface ScoreboardProps {
   data: LeagueScoreboard;
+  selectedPeriod?: number;
 }
 
-const Scoreboard: FC<ScoreboardProps> = ({ data }) => {
+const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod }) => {
   const [sortByScore, setSortByScore] = useState(false);
   const { playoff } = data;
 

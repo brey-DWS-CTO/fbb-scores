@@ -123,6 +123,40 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
                 </div>
               </div>
             )}
+            {/* Win Probability Bar */}
+            {matchup.winProbability.homeWinPct > 0 && matchup.winProbability.homeWinPct < 100 && (
+              <div className="flex flex-col items-center gap-1 mt-2" style={{ width: '100%', minWidth: '140px' }}>
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466' }}>
+                  WIN PROB
+                </span>
+                <div className="flex items-center gap-1" style={{ width: '100%' }}>
+                  <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-blue)', minWidth: '2.2rem', textAlign: 'right' }}>
+                    {matchup.winProbability.homeWinPct}%
+                  </span>
+                  <div style={{ flex: 1, height: '6px', background: '#111122', border: '1px solid #1a1a33', display: 'flex', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${matchup.winProbability.homeWinPct}%`,
+                        background: 'var(--neon-blue)',
+                        boxShadow: '0 0 4px var(--neon-blue)',
+                        transition: 'width 0.3s ease',
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: `${matchup.winProbability.awayWinPct}%`,
+                        background: 'var(--neon-orange)',
+                        boxShadow: '0 0 4px var(--neon-orange)',
+                        transition: 'width 0.3s ease',
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-orange)', minWidth: '2.2rem', textAlign: 'left' }}>
+                    {matchup.winProbability.awayWinPct}%
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Away team */}

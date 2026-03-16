@@ -4,11 +4,10 @@ import type { MatchupPlayer } from '../../types/index.js';
 interface PlayerRowProps {
   player: MatchupPlayer;
   isEven: boolean;
-  isExpanded?: boolean;
-  onToggleTrend?: () => void;
+  onPlayerClick?: (player: MatchupPlayer) => void;
 }
 
-const PlayerRow: FC<PlayerRowProps> = ({ player, isEven, isExpanded, onToggleTrend }) => {
+const PlayerRow: FC<PlayerRowProps> = ({ player, isEven, onPlayerClick }) => {
   const rowBg = isEven ? '#0a0a14' : '#0f0f1a';
   const benchStyle = !player.isStarter ? { opacity: 0.5 } : {};
   const gp = player.stats.gp || 1;
@@ -16,12 +15,12 @@ const PlayerRow: FC<PlayerRowProps> = ({ player, isEven, isExpanded, onToggleTre
   return (
     <tr
       style={{
-        background: isExpanded ? '#0d0d20' : rowBg,
-        borderBottom: isExpanded ? 'none' : '1px solid #111122',
+        background: rowBg,
+        borderBottom: '1px solid #111122',
         cursor: 'pointer',
         ...benchStyle,
       }}
-      onClick={onToggleTrend}
+      onClick={() => onPlayerClick?.(player)}
     >
       {/* Player info */}
       <td className="px-2 py-2">

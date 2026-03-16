@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import type { LeagueScoreboard } from '../types/index.js'
 
-export function useScoreboard() {
+export function useScoreboard(matchupPeriod?: number) {
   return useQuery({
-    queryKey: ['scoreboard'],
+    queryKey: ['scoreboard', matchupPeriod],
     queryFn: async (): Promise<LeagueScoreboard> => {
-      const { data } = await axios.get<LeagueScoreboard>('/api/espn/scoreboard')
+      const params = matchupPeriod != null ? { matchupPeriod } : undefined
+      const { data } = await axios.get<LeagueScoreboard>('/api/espn/scoreboard', { params })
       return data
     },
     refetchInterval: 30 * 1000, // refresh every 30 seconds

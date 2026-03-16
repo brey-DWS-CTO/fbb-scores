@@ -1,4 +1,7 @@
 import type {
+  DailyMatchup,
+  DailyPlayer,
+  DailyTeam,
   EspnLeagueResponse,
   EspnMatchupRaw,
   EspnRosterEntry,
@@ -13,10 +16,12 @@ import type {
   PlayoffInfo,
   PlayoffTierType,
   RollingAverages,
+  TeamEfficiency,
 } from '../../types/index.js';
 import {
   computeFpts,
   computeProjectedScore,
+  computeWinProbability,
   extractPlayerStats,
   findTopPlayer,
   getNbaTeamAbbrev,
@@ -28,7 +33,7 @@ import {
 /**
  * Normalize a raw ESPN league API response into our app's LeagueScoreboard shape.
  */
-export function normalizeLeagueResponse(raw: EspnLeagueResponse): LeagueScoreboard {
+export function normalizeLeagueResponse(raw: EspnLeagueResponse, overrideMatchupPeriod?: number): LeagueScoreboard {
   // Build lookup maps
   const teamById = new Map<number, EspnTeamRaw>();
   for (const t of raw.teams) {
@@ -43,17 +48,17 @@ export function normalizeLeagueResponse(raw: EspnLeagueResponse): LeagueScoreboa
   }
 
   const currentPeriod = raw.scoringPeriodId;
-  const currentMatchupPeriod = raw.status.currentMatchupPeriod;
+  const effectiveMatchupPeriod = overrideMatchupPeriod ?? raw.status.currentMatchupPeriod;
 
   // Calculate max games for the matchup period
-  const maxGames = calcMaxGames(raw);
+  const maxGames = calcMaxGames(raw, effectiveMatchupPeriod);
 
   // Determine playoff info
-  const playoff = buildPlayoffInfo(raw, currentMatchupPeriod);
+  const playoff = buildPlayoffInfo(raw, effectiveMatchupPeriod);
 
-  // Filter schedule to matchups for the current matchup period (weekly)
+  // Filter schedule to matchups for the effective matchup period (weekly)
   const relevantMatchups = raw.schedule.filter(
-    (m) => m.matchupPeriodId === currentMatchupPeriod,
+    (m) => m.matchupPeriodId === effectiveMatchupPeriod,
   );
 
   const matchups: Matchup[] = relevantMatchups.map((m) =>
@@ -75,10 +80,10 @@ export function normalizeLeagueResponse(raw: EspnLeagueResponse): LeagueScoreboa
  * Calculate max games allowed for the current matchup period.
  * Uses the league's lineupSlotStatLimits (games per day limit × days in matchup period).
  */
-function calcMaxGames(raw: EspnLeagueResponse): number {
+function calcMaxGames(raw: EspnLeagueResponse, matchupPeriod?: number): number {
   const { scheduleSettings, rosterSettings } = raw.settings;
-  const currentMatchupPeriod = raw.status.currentMatchupPeriod;
-  const matchupScoringPeriods = scheduleSettings.matchupPeriods[String(currentMatchupPeriod)];
+  const effectivePeriod = matchupPeriod ?? raw.status.currentMatchupPeriod;
+  const matchupScoringPeriods = scheduleSettings.matchupPeriods[String(effectivePeriod)];
   const weeksInMatchup = matchupScoringPeriods ? matchupScoringPeriods.length : 1;
 
   // lineupSlotStatLimits.15 has the games-per-day limit (statId 42 = GP)
@@ -151,13 +156,22 @@ function buildMatchup(
 ): Matchup {
   const playoffTierType = (m.playoffTierType as PlayoffTierType) ?? 'NONE';
 
+  const home = buildTeam(m.home, teamById, memberById, maxGames);
+  const away = buildTeam(m.away, teamById, memberById, maxGames);
+
+  const winProbability = computeWinProbability(
+    home.currentScore, home.gamesPlayed, home.maxGames, home.avgPointsPerGame,
+    away.currentScore, away.gamesPlayed, away.maxGames, away.avgPointsPerGame,
+  );
+
   return {
     id: m.id,
-    home: buildTeam(m.home, teamById, memberById, maxGames),
-    away: buildTeam(m.away, teamById, memberById, maxGames),
+    home,
+    away,
     scoringPeriodId,
     isCompleted: m.winner !== 'UNDECIDED',
     playoffTierType,
+    winProbability,
   };
 }
 
@@ -355,5 +369,154 @@ export function normalizeMatchupDetail(
     matchupPeriodId: currentMatchupPeriod,
     isCompleted: matchup.winner !== 'UNDECIDED',
     scoringSettings: { scoringItems },
+  };
+}
+
+// ─── Daily View ─────────────────────────────────────────────────────────────
+
+const LINEUP_SLOT_MAP: Record<number, string> = {
+  0: 'PG', 1: 'SG', 2: 'SF', 3: 'PF', 4: 'C', 5: 'G', 6: 'F', 11: 'UTL',
+  20: 'BE', 21: 'IR', 23: 'IR+',
+};
+
+/**
+ * Count the number of active (non-bench/IR) roster slots for a team.
+ */
+function countActiveSlots(entries: EspnRosterEntry[]): number {
+  return entries.filter((e) => isActiveSlot(e.lineupSlotId)).length;
+}
+
+/**
+ * Calculate team efficiency: actual points vs max possible if optimal lineup was set.
+ */
+function calculateEfficiency(players: DailyPlayer[], activeSlotCount: number): TeamEfficiency {
+  // Sort all players by todayFpts descending to find optimal lineup
+  const sortedByFpts = [...players].sort((a, b) => b.todayFpts - a.todayFpts);
+  const optimalPlayers = sortedByFpts.slice(0, activeSlotCount);
+  const maxPossibleScore = round1(optimalPlayers.reduce((sum, p) => sum + p.todayFpts, 0));
+
+  // Actual score = sum of started players' todayFpts
+  const actualScore = round1(players.filter((p) => p.isStarted).reduce((sum, p) => sum + p.todayFpts, 0));
+
+  const efficiencyPct = maxPossibleScore > 0
+    ? round1((actualScore / maxPossibleScore) * 100)
+    : 100;
+
+  return {
+    actualScore,
+    maxPossibleScore,
+    efficiencyPct,
+    missedPoints: round1(maxPossibleScore - actualScore),
+  };
+}
+
+/**
+ * Normalize raw ESPN data into a DailyMatchup for today's scoring period.
+ */
+export function normalizeDailyView(
+  raw: EspnLeagueResponse,
+  matchupId: number,
+): DailyMatchup | null {
+  const currentMatchupPeriod = raw.status.currentMatchupPeriod;
+  const matchup = raw.schedule.find(
+    (m) => m.id === matchupId && m.matchupPeriodId === currentMatchupPeriod,
+  );
+  if (!matchup) return null;
+
+  const teamById = new Map<number, EspnTeamRaw>();
+  for (const t of raw.teams) teamById.set(t.id, t);
+
+  const memberById = new Map<string, string>();
+  if (raw.members) {
+    for (const m of raw.members) memberById.set(m.id, `${m.firstName} ${m.lastName}`);
+  }
+
+  function buildDailyTeam(side: EspnMatchupRaw['home']): DailyTeam {
+    const team = teamById.get(side.teamId);
+    const totalScore = side.totalPointsLive ?? side.totalPoints;
+
+    // Use current scoring period roster for today's data
+    const currentEntries: EspnRosterEntry[] =
+      side.rosterForCurrentScoringPeriod?.entries ?? [];
+
+    const activeSlotCount = countActiveSlots(currentEntries);
+
+    const players: DailyPlayer[] = currentEntries.map((entry) => {
+      const player = entry.playerPoolEntry.player;
+      const playerId = entry.playerPoolEntry.id;
+      const todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
+
+      // Get today's stats from current scoring period (statSplitTypeId 0, statSourceId 0)
+      const playerStats = player.stats ?? [];
+      const todayStat = playerStats.find(
+        (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
+      );
+      const rawStats = todayStat?.stats ?? {};
+
+      // Get matchup period total fpts from matchup roster if available
+      const matchupEntries = side.rosterForMatchupPeriod?.entries ?? [];
+      const matchupEntry = matchupEntries.find((e) => e.playerPoolEntry.id === playerId);
+      const matchupFpts = matchupEntry?.playerPoolEntry.appliedStatTotal ?? todayFpts;
+
+      return {
+        playerId,
+        name: player.fullName,
+        position: POSITION_MAP[player.defaultPositionId] ?? 'Unknown',
+        nbaTeamAbbrev: getNbaTeamAbbrev(player.proTeamId),
+        imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${playerId}.png&w=96&h=70&cb=1`,
+        lineupSlotId: entry.lineupSlotId,
+        isStarted: isActiveSlot(entry.lineupSlotId),
+        todayFpts,
+        matchupFpts,
+        todayStats: {
+          pts: rawStats['0'] ?? 0,
+          reb: rawStats['6'] ?? 0,
+          ast: rawStats['3'] ?? 0,
+          stl: rawStats['2'] ?? 0,
+          blk: rawStats['1'] ?? 0,
+          min: rawStats['40'] ?? 0,
+        },
+      };
+    });
+
+    // Sort: starters first by lineup slot, then bench
+    players.sort((a, b) => {
+      if (a.isStarted && !b.isStarted) return -1;
+      if (!a.isStarted && b.isStarted) return 1;
+      return a.lineupSlotId - b.lineupSlotId;
+    });
+
+    const todayScore = round1(
+      players.filter((p) => p.isStarted).reduce((sum, p) => sum + p.todayFpts, 0),
+    );
+
+    let ownerName = 'Unknown Owner';
+    if (team?.owners?.[0]) {
+      ownerName = memberById.get(team.owners[0]) ?? 'Unknown Owner';
+    }
+
+    return {
+      id: side.teamId,
+      name: team?.name ?? `Team ${side.teamId}`,
+      abbreviation: team?.abbrev ?? '???',
+      ownerName,
+      logoUrl: team?.logo ?? null,
+      totalScore,
+      todayScore,
+      players,
+      efficiency: calculateEfficiency(players, activeSlotCount),
+    };
+  }
+
+  // Build today's date string
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+
+  return {
+    matchupId: matchup.id,
+    scoringPeriodId: raw.scoringPeriodId,
+    date: dateStr,
+    home: buildDailyTeam(matchup.home),
+    away: buildDailyTeam(matchup.away),
   };
 }

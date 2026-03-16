@@ -341,6 +341,42 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum, accentCo
           isWinning={awayWinning}
           isWinner={matchup.isCompleted && awayWinning}
         />
+
+        {/* Win Probability indicator */}
+        {matchup.winProbability.homeWinPct > 0 && matchup.winProbability.homeWinPct < 100 && (
+          <div
+            className="flex items-center gap-2 px-4 py-1.5"
+            style={{
+              borderTop: '1px solid #1a1a33',
+              background: '#0a0a1408',
+            }}
+          >
+            <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-blue)', minWidth: '2rem', textAlign: 'right' }}>
+              {matchup.winProbability.homeWinPct}%
+            </span>
+            <div style={{ flex: 1, height: '4px', background: '#111122', display: 'flex', overflow: 'hidden' }}>
+              <div
+                style={{
+                  width: `${matchup.winProbability.homeWinPct}%`,
+                  background: 'var(--neon-blue)',
+                  boxShadow: '0 0 3px var(--neon-blue)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+              <div
+                style={{
+                  width: `${matchup.winProbability.awayWinPct}%`,
+                  background: 'var(--neon-orange)',
+                  boxShadow: '0 0 3px var(--neon-orange)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
+            <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: 'var(--neon-orange)', minWidth: '2rem', textAlign: 'left' }}>
+              {matchup.winProbability.awayWinPct}%
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   );

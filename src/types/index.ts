@@ -1,3 +1,13 @@
+// ─── League Info (for week selector) ────────────────────────────────────────
+
+export interface LeagueInfo {
+  regularSeasonWeeks: number;
+  playoffTeamCount: number;
+  currentMatchupPeriod: number;
+  totalMatchupPeriods: number;
+  matchupPeriods: Record<string, number[]>;
+}
+
 // ─── Core domain types shared across the entire app ───────────────────────────
 
 export interface TopPlayer {
@@ -37,6 +47,11 @@ export type PlayoffTierType =
   | 'LOSERS_CONSOLATION_LADDER'
   | 'NONE';
 
+export interface WinProbability {
+  homeWinPct: number;
+  awayWinPct: number;
+}
+
 export interface Matchup {
   /** ESPN matchup ID */
   id: number;
@@ -46,6 +61,8 @@ export interface Matchup {
   isCompleted: boolean;
   /** Playoff tier for this matchup */
   playoffTierType: PlayoffTierType;
+  /** Win probability for each team */
+  winProbability: WinProbability;
 }
 
 export interface PlayoffInfo {
@@ -283,6 +300,55 @@ export interface TeamTrend {
     gamesPlayed: number;
     capturedAt: string;
   }>;
+}
+
+// ─── Daily View types ───────────────────────────────────────────────────────
+
+export interface DailyPlayer {
+  playerId: number;
+  name: string;
+  position: string;
+  nbaTeamAbbrev: string;
+  imageUrl: string | null;
+  lineupSlotId: number;
+  isStarted: boolean;
+  todayFpts: number;
+  matchupFpts: number;
+  todayStats: {
+    pts: number;
+    reb: number;
+    ast: number;
+    stl: number;
+    blk: number;
+    min: number;
+  };
+}
+
+export interface TeamEfficiency {
+  actualScore: number;
+  maxPossibleScore: number;
+  efficiencyPct: number;
+  missedPoints: number;
+}
+
+export interface DailyTeam {
+  id: number;
+  name: string;
+  abbreviation: string;
+  ownerName: string;
+  logoUrl: string | null;
+  totalScore: number;
+  todayScore: number;
+  players: DailyPlayer[];
+  efficiency: TeamEfficiency;
+}
+
+export interface DailyMatchup {
+  matchupId: number;
+  scoringPeriodId: number;
+  date: string;
+  home: DailyTeam;
+  away: DailyTeam;
 }
 
 // ─── Supabase snapshot types ──────────────────────────────────────────────────
