@@ -172,23 +172,41 @@ function countGamesPlayed(roster?: { entries: EspnRosterEntry[] }): number {
 }
 
 /**
- * Estimate GP for completed matchups when roster stat data is unavailable.
- * Uses appliedStatTotal sums from roster entries as a proxy.
+ * Estimate GP for completed matchups when stat split type 5 data is unavailable.
+ *
+ * Strategy: Try to find individual player GP from ANY stat split type.
+ * For past matchups, rosterForMatchupPeriod entries may still contain
+ * season stats (type 0) with total GP, but not matchup-specific GP.
+ * As a last resort, count active players with non-zero appliedStatTotal.
  */
 function estimateGamesPlayed(roster?: { entries: EspnRosterEntry[] }): number {
   if (!roster) return 0;
-  let totalApplied = 0;
+
+  // First pass: try to sum GP (stat 42) from matchup stats (type 5)
+  let gp = 0;
+  for (const entry of roster.entries) {
+    if (!isActiveSlot(entry.lineupSlotId)) continue;
+    const playerStats = entry.playerPoolEntry.player.stats;
+    if (!playerStats) continue;
+    for (const stat of playerStats) {
+      if (stat.statSplitTypeId === 5 && stat.statSourceId === 0 && stat.stats) {
+        gp += (stat.stats['42'] || 0);
+      }
+    }
+  }
+  if (gp > 0) return gp;
+
+  // Second pass: count active players with points as a minimum floor.
+  // Each such player played at least 1 game, and in a typical 7-day matchup
+  // an NBA player plays ~3-4 games. Use playerCount × 4 as a rough estimate.
   let playerCount = 0;
   for (const entry of roster.entries) {
     if (!isActiveSlot(entry.lineupSlotId)) continue;
     const applied = entry.playerPoolEntry.appliedStatTotal ?? 0;
-    if (applied > 0) {
-      totalApplied += applied;
-      playerCount++;
-    }
+    if (applied > 0) playerCount++;
   }
-  // If roster entries have appliedStatTotal data, at least some games were played
-  return playerCount;
+  // Rough estimate: ~4 games per active player in a typical week
+  return playerCount > 0 ? playerCount * 4 : 0;
 }
 
 function buildMatchup(
@@ -280,13 +298,16 @@ function extractRosterAvgs(
       }
     }
 
-    // Season stats from mRoster are already per-game averages
+    // Season stats (split type 0) from mRoster are TOTALS — divide by GP like rolling types
     const seasonStat = playerStats.find(
       (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
     );
     if (seasonStat?.stats) {
       const fpts = computeFpts(seasonStat.stats, scoringItems);
-      if (fpts > 0) season.set(playerId, round1(fpts));
+      const gp = seasonStat.stats['42'] ?? 0;
+      if (fpts > 0 && gp > 0) {
+        season.set(playerId, round1(fpts / gp));
+      }
     }
   }
   return { rolling15, season };
@@ -529,10 +550,9 @@ export function normalizeMatchupDetail(
   raw: EspnLeagueResponse,
   matchupId: number,
 ): MatchupDetail | null {
-  const currentMatchupPeriod = raw.status.currentMatchupPeriod;
-  const matchup = raw.schedule.find(
-    (m) => m.id === matchupId && m.matchupPeriodId === currentMatchupPeriod,
-  );
+  // Find matchup by ID across ALL matchup periods (not just current).
+  // Past playoff rounds (e.g., RD 1 when we're now in FINALS) must still be accessible.
+  const matchup = raw.schedule.find((m) => m.id === matchupId);
   if (!matchup) return null;
 
   const teamById = new Map<number, EspnTeamRaw>();
@@ -562,7 +582,11 @@ export function normalizeMatchupDetail(
   function buildDetailTeam(side: EspnMatchupRaw['home']): MatchupDetailTeam {
     const team = teamById.get(side.teamId);
     const currentScore = side.totalPointsLive ?? side.totalPoints;
-    const gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
+    let gamesPlayed = countGamesPlayed(side.rosterForMatchupPeriod);
+    // Fallback for completed past matchups where stat data is unavailable
+    if (gamesPlayed === 0 && currentScore > 0) {
+      gamesPlayed = estimateGamesPlayed(side.rosterForMatchupPeriod);
+    }
     const avgPointsPerGame = gamesPlayed > 0 ? round1(currentScore / gamesPlayed) : 0;
 
     // Build player list from matchup period roster
@@ -589,9 +613,12 @@ export function normalizeMatchupDetail(
       );
       let seasonFptsPerGame = 0;
       if (seasonStats?.stats) {
-        // Roster view stats (split type 0) are per-game averages, same as
-        // rolling averages (types 1/2/3). computeFpts directly gives FPTS/G.
-        seasonFptsPerGame = round1(computeFpts(seasonStats.stats, scoringItems));
+        // Season split type 0 from mRoster is a TOTAL — divide by GP like rolling types
+        const seasonFpts = computeFpts(seasonStats.stats, scoringItems);
+        const seasonGp = seasonStats.stats['42'] ?? 0;
+        if (seasonFpts > 0 && seasonGp > 0) {
+          seasonFptsPerGame = round1(seasonFpts / seasonGp);
+        }
       }
 
       // Get rolling averages from team roster stats (has split types 1/2/3)
@@ -642,7 +669,7 @@ export function normalizeMatchupDetail(
     home: buildDetailTeam(matchup.home),
     away: buildDetailTeam(matchup.away),
     scoringPeriodId: raw.scoringPeriodId,
-    matchupPeriodId: currentMatchupPeriod,
+    matchupPeriodId: matchup.matchupPeriodId,
     isCompleted: matchup.winner !== 'UNDECIDED',
     scoringSettings: { scoringItems },
   };
@@ -693,10 +720,8 @@ export function normalizeDailyView(
   raw: EspnLeagueResponse,
   matchupId: number,
 ): DailyMatchup | null {
-  const currentMatchupPeriod = raw.status.currentMatchupPeriod;
-  const matchup = raw.schedule.find(
-    (m) => m.id === matchupId && m.matchupPeriodId === currentMatchupPeriod,
-  );
+  // Find matchup by ID across ALL periods so past matchups are still viewable
+  const matchup = raw.schedule.find((m) => m.id === matchupId);
   if (!matchup) return null;
 
   const teamById = new Map<number, EspnTeamRaw>();

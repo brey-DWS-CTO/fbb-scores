@@ -571,6 +571,9 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
 /**
  * Fetch NBA schedule for specific dates to determine which teams play on remaining days.
  * Returns a map of ESPN proTeamId → number of remaining games.
+ *
+ * NOTE: The ESPN scoreboard API ignores date ranges — `?dates=YYYYMMDD-YYYYMMDD`
+ * returns only the start date's games. We must make individual requests per date.
  */
 async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, number>> {
   const teamGamesRemaining = new Map<number, number>();
@@ -582,35 +585,43 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
     abbrevToProTeamId.set(abbr, parseInt(id, 10));
   }
 
-  try {
-    // ESPN scoreboard API supports date ranges (YYYYMMDD-YYYYMMDD).
-    // Use a single request for efficiency, especially for 14-day finals periods.
-    const sortedDates = [...dates].sort();
-    const startDate = sortedDates[0].replace(/-/g, '');
-    const endDate = sortedDates[sortedDates.length - 1].replace(/-/g, '');
-    const dateParam = startDate === endDate ? startDate : `${startDate}-${endDate}`;
+  // Deduplicate dates (in case today appears both in scoreboard and schedule)
+  const uniqueDates = [...new Set(dates)].sort();
 
-    const { data } = await axios.get<EspnNbaScoreboard>(
-      `${NBA_SCOREBOARD_URL}?dates=${dateParam}`,
-      { timeout: 10000 },
-    );
-
-    if (data.events) {
-      for (const event of data.events) {
-        const comp = event.competitions?.[0];
-        if (!comp?.competitors) continue;
-        for (const team of comp.competitors) {
-          const abbr = team.team?.abbreviation;
-          if (!abbr) continue;
-          const proTeamId = abbrevToProTeamId.get(abbr);
-          if (proTeamId != null) {
-            teamGamesRemaining.set(proTeamId, (teamGamesRemaining.get(proTeamId) ?? 0) + 1);
+  // Fetch each date individually — ESPN scoreboard API only returns one day per request
+  const fetchOneDate = async (dateStr: string): Promise<void> => {
+    const dateParam = dateStr.replace(/-/g, '');
+    try {
+      const { data } = await axios.get<EspnNbaScoreboard>(
+        `${NBA_SCOREBOARD_URL}?dates=${dateParam}`,
+        { timeout: 10000 },
+      );
+      if (data.events) {
+        for (const event of data.events) {
+          const comp = event.competitions?.[0];
+          if (!comp?.competitors) continue;
+          for (const team of comp.competitors) {
+            const abbr = team.team?.abbreviation;
+            if (!abbr) continue;
+            const proTeamId = abbrevToProTeamId.get(abbr);
+            if (proTeamId != null) {
+              teamGamesRemaining.set(proTeamId, (teamGamesRemaining.get(proTeamId) ?? 0) + 1);
+            }
           }
         }
       }
+    } catch (err) {
+      console.error(`[NBA Schedule] Failed to fetch ${dateStr}:`, err instanceof Error ? err.message : err);
     }
-  } catch (err) {
-    console.error('[NBA Schedule] Failed to fetch:', err instanceof Error ? err.message : err);
+  };
+
+  // Fetch all dates in parallel (typically 7-14 days for playoff matchups)
+  await Promise.all(uniqueDates.map(fetchOneDate));
+
+  if (teamGamesRemaining.size > 0) {
+    console.log(`[NBA Schedule] Found games for ${teamGamesRemaining.size} teams across ${uniqueDates.length} dates`);
+  } else if (uniqueDates.length > 0) {
+    console.warn(`[NBA Schedule] No games found for ${uniqueDates.length} dates (${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]})`);
   }
 
   return teamGamesRemaining;
