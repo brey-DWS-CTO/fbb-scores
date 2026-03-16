@@ -35,6 +35,8 @@ export interface PlayerProjectionBreakdown {
   isSmartFilled: boolean;
   /** Player headshot URL */
   imageUrl: string | null;
+  /** ESPN injury designation: "OUT", "DAY_TO_DAY", "SUSPENSION", etc. */
+  injuryStatus?: string;
 }
 
 export interface ProjectionBreakdown {
@@ -146,6 +148,9 @@ export interface EspnRosterEntry {
       fullName: string;
       defaultPositionId: number;
       proTeamId: number;
+      /** ESPN injury designation: "ACTIVE", "OUT", "DAY_TO_DAY", "SUSPENSION", etc. */
+      injuryStatus?: string;
+      injured?: boolean;
       stats?: Array<{
         statSplitTypeId: number;
         statSourceId: number;
@@ -268,6 +273,8 @@ export interface MatchupPlayer {
   seasonFptsPerGame: number;
   /** Player's headshot URL */
   imageUrl: string | null;
+  /** ESPN injury designation: "OUT", "DAY_TO_DAY", "SUSPENSION", etc. */
+  injuryStatus?: string;
 }
 
 export interface MatchupDetailTeam {
@@ -375,6 +382,8 @@ export interface PlayerProjectionInput {
   overrideProjection?: number;
   /** Whether the player is on IR/IL (should not be smart-filled) */
   isOnIR?: boolean;
+  /** ESPN injury designation: "OUT", "DAY_TO_DAY", "SUSPENSION", etc. */
+  injuryStatus?: string;
 }
 
 /** NBA team schedule: proTeamId → number of remaining games in the matchup period */
@@ -403,6 +412,8 @@ export interface DailyPlayer {
   };
   /** Live NBA game info (populated from ESPN public scoreboard API) */
   gameInfo?: NbaGameInfo;
+  /** ESPN injury designation: "OUT", "DAY_TO_DAY", "SUSPENSION", etc. */
+  injuryStatus?: string;
 }
 
 export interface TeamEfficiency {

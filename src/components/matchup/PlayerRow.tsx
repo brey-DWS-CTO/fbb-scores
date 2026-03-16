@@ -38,10 +38,21 @@ const PlayerRow: FC<PlayerRowProps> = ({ player, isEven, onPlayerClick }) => {
             <span className="truncate" style={{ fontFamily: "'VT323', monospace", fontSize: '1.1rem', color: '#e0e0ff' }}>
               {player.name}
             </span>
-            <span className="pixel-text" style={{ fontSize: '0.25rem', color: '#555577' }}>
-              {player.position} - {player.nbaTeamAbbrev}
-              {!player.isStarter && ' (BENCH)'}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="pixel-text" style={{ fontSize: '0.25rem', color: '#555577' }}>
+                {player.position} - {player.nbaTeamAbbrev}
+                {!player.isStarter && ' (BENCH)'}
+              </span>
+              {player.injuryStatus === 'OUT' && (
+                <span className="pixel-text" style={{ fontSize: '0.25rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 3px', lineHeight: 1.4 }}>OUT</span>
+              )}
+              {player.injuryStatus === 'DAY_TO_DAY' && (
+                <span className="pixel-text" style={{ fontSize: '0.25rem', color: 'var(--neon-yellow)', border: '1px solid var(--neon-yellow)', padding: '0 3px', lineHeight: 1.4 }}>DTD</span>
+              )}
+              {player.injuryStatus === 'SUSPENSION' && (
+                <span className="pixel-text" style={{ fontSize: '0.25rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 3px', lineHeight: 1.4 }}>SUSP</span>
+              )}
+            </div>
           </div>
         </div>
       </td>

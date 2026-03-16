@@ -298,27 +298,33 @@ export function computeTeamProjection(
     let playerProjectedFpts = 0;
     let playerRemainingGames = 0;
 
-    // Today's game projection (incremental over what's already in currentScore)
-    if (player.gameStatus === 'live') {
-      const remainingFraction = Math.max(0, player.minutesRemaining / 48);
-      const liveProjection = baseline * remainingFraction;
-      projectedAdditional += liveProjection;
-      playerProjectedFpts += liveProjection;
-    } else if (player.gameStatus === 'upcoming') {
-      projectedAdditional += baseline;
-      playerProjectedFpts += baseline;
-      gameSlotsFilled++;
-      playerRemainingGames++;
-    }
+    // OUT / SUSPENSION players contribute 0 projected points — their game slots
+    // remain unfilled so smart-fill can pick up bench replacements.
+    const isOut = player.injuryStatus === 'OUT' || player.injuryStatus === 'SUSPENSION';
 
-    // Future games after today
-    const futureGames = player.remainingGamesAfterToday;
-    if (futureGames > 0 && gameSlotsFilled < maxGames) {
-      const slotsToFill = Math.min(futureGames, maxGames - gameSlotsFilled);
-      projectedAdditional += baseline * slotsToFill;
-      playerProjectedFpts += baseline * slotsToFill;
-      gameSlotsFilled += slotsToFill;
-      playerRemainingGames += slotsToFill;
+    if (!isOut) {
+      // Today's game projection (incremental over what's already in currentScore)
+      if (player.gameStatus === 'live') {
+        const remainingFraction = Math.max(0, player.minutesRemaining / 48);
+        const liveProjection = baseline * remainingFraction;
+        projectedAdditional += liveProjection;
+        playerProjectedFpts += liveProjection;
+      } else if (player.gameStatus === 'upcoming') {
+        projectedAdditional += baseline;
+        playerProjectedFpts += baseline;
+        gameSlotsFilled++;
+        playerRemainingGames++;
+      }
+
+      // Future games after today
+      const futureGames = player.remainingGamesAfterToday;
+      if (futureGames > 0 && gameSlotsFilled < maxGames) {
+        const slotsToFill = Math.min(futureGames, maxGames - gameSlotsFilled);
+        projectedAdditional += baseline * slotsToFill;
+        playerProjectedFpts += baseline * slotsToFill;
+        gameSlotsFilled += slotsToFill;
+        playerRemainingGames += slotsToFill;
+      }
     }
 
     const info = playerNames?.get(player.playerId);
@@ -333,6 +339,7 @@ export function computeTeamProjection(
       projectedFpts: round1(playerProjectedFpts),
       isSmartFilled: false,
       imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${player.playerId}.png&w=96&h=70&cb=1`,
+      injuryStatus: player.injuryStatus,
     });
   }
 
@@ -341,6 +348,7 @@ export function computeTeamProjection(
     const benchProjections: Array<{ player: PlayerProjectionInput; baseline: number; futureGames: number }> = [];
     for (const player of bench) {
       if (player.isOnIR) continue; // IR/IL players should not be smart-filled
+      if (player.injuryStatus === 'OUT' || player.injuryStatus === 'SUSPENSION') continue;
       const baseline = player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame);
       if (baseline <= 0) continue;
 
@@ -373,6 +381,7 @@ export function computeTeamProjection(
         projectedFpts: round1(projFpts),
         isSmartFilled: true,
         imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${bp.player.playerId}.png&w=96&h=70&cb=1`,
+        injuryStatus: bp.player.injuryStatus,
       });
     }
   }
@@ -393,6 +402,7 @@ export function computeTeamProjection(
       projectedFpts: 0,
       isSmartFilled: false,
       imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${player.playerId}.png&w=96&h=70&cb=1`,
+      injuryStatus: player.injuryStatus,
     });
   }
 

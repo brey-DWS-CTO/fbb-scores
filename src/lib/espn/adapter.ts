@@ -359,6 +359,7 @@ function buildProjectionInputs(
       playerId, proTeamId,
       isActive: isActiveSlot(entry.lineupSlotId),
       isOnIR: IR_SLOTS.has(entry.lineupSlotId),
+      injuryStatus: p.injuryStatus,
       todayFpts, rollingAvg15, matchupAvgPerGame,
       gameStatus, minutesRemaining, remainingGamesAfterToday,
     });
@@ -639,6 +640,7 @@ export function normalizeMatchupDetail(
         averages,
         seasonFptsPerGame,
         imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${playerId}.png&w=96&h=70&cb=1`,
+        injuryStatus: player.injuryStatus,
       };
     });
 
@@ -777,6 +779,7 @@ export function normalizeDailyView(
           blk: rawStats['1'] ?? 0,
           min: rawStats['40'] ?? 0,
         },
+        injuryStatus: player.injuryStatus,
       };
     });
 
