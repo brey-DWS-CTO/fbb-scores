@@ -47,6 +47,7 @@ export function normalizeLeagueResponse(
   overrideMatchupPeriod?: number,
   nbaScoreboard?: NbaScoreboardMap,
   nbaSchedule?: NbaScheduleMap,
+  injuryReturnDates?: Map<number, string>,
 ): LeagueScoreboard {
   // Build lookup maps
   const teamById = new Map<number, EspnTeamRaw>();
@@ -82,7 +83,7 @@ export function normalizeLeagueResponse(
   const isFutureMatchup = matchupScoringPeriods.length > 0 && matchupScoringPeriods[0] > currentPeriod;
 
   const matchups: Matchup[] = relevantMatchups.map((m) =>
-    buildMatchup(m, currentPeriod, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup),
+    buildMatchup(m, currentPeriod, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup, injuryReturnDates),
   );
 
   return {
@@ -219,11 +220,12 @@ function buildMatchup(
   nbaSchedule?: NbaScheduleMap,
   scoringItems: Array<{ statId: number; points: number; pointsOverrides?: Record<string, number> }> = [],
   isFutureMatchup = false,
+  injuryReturnDates?: Map<number, string>,
 ): Matchup {
   const playoffTierType = (m.playoffTierType as PlayoffTierType) ?? 'NONE';
 
-  const home = buildTeam(m.home, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup);
-  const away = buildTeam(m.away, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup);
+  const home = buildTeam(m.home, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup, injuryReturnDates);
+  const away = buildTeam(m.away, teamById, memberById, maxGames, nbaScoreboard, nbaSchedule, scoringItems, isFutureMatchup, injuryReturnDates);
 
   const winProbability = computeWinProbability(
     home.currentScore, home.gamesPlayed, home.maxGames, home.avgPointsPerGame,
@@ -325,9 +327,13 @@ function buildProjectionInputs(
   nbaScoreboard: NbaScoreboardMap,
   nbaSchedule: NbaScheduleMap,
   isFutureMatchup: boolean,
+  injuryReturnDates?: Map<number, string>,
 ): { inputs: PlayerProjectionInput[]; names: Map<number, { name: string; position: string; nbaTeamAbbrev: string }> } {
   const inputs: PlayerProjectionInput[] = [];
   const names = new Map<number, { name: string; position: string; nbaTeamAbbrev: string }>();
+
+  // Today's date string for filtering future games
+  const todayStr = new Date().toISOString().split('T')[0];
 
   for (const entry of entries) {
     const playerId = entry.playerPoolEntry.id;
@@ -338,10 +344,15 @@ function buildProjectionInputs(
     const rollingAvg15 = playerRollingAvg15.get(playerId) ?? playerMatchupAvgs.get(playerId) ?? playerSeasonAvg.get(playerId) ?? 0;
     const matchupAvgPerGame = playerMatchupAvgs.get(playerId) ?? 0;
 
+    // Get all game dates for this team in the matchup period
+    const teamGameDates = nbaSchedule.get(proTeamId) ?? [];
+    // Future games = dates strictly after today
+    const futureGameDates = teamGameDates.filter((d) => d > todayStr);
+
     let todayFpts = 0;
     let gameStatus: GameStatus | 'none' = 'none';
     let minutesRemaining = 0;
-    let remainingGamesAfterToday = nbaSchedule.get(proTeamId) ?? 0;
+    let remainingGamesAfterToday = futureGameDates.length;
 
     if (!isFutureMatchup) {
       todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
@@ -349,19 +360,27 @@ function buildProjectionInputs(
       if (gameInfo) {
         gameStatus = gameInfo.status;
         minutesRemaining = gameInfo.minutesRemaining;
-        // Today's game is included in nbaSchedule count AND handled via gameStatus.
-        // Subtract 1 to avoid double-counting when gameStatus is live/final/upcoming.
-        remainingGamesAfterToday = Math.max(0, remainingGamesAfterToday - 1);
+        // Today's game is handled via gameStatus — futureGameDates already excludes today
       }
+    }
+
+    // For injured players with a return date, count only games on/after the return date
+    const isOut = p.injuryStatus === 'OUT' || p.injuryStatus === 'SUSPENSION';
+    const returnDate = injuryReturnDates?.get(playerId);
+    if (isOut && returnDate) {
+      // Count games on or after the return date (and after today)
+      const gamesAfterReturn = futureGameDates.filter((d) => d >= returnDate).length;
+      remainingGamesAfterToday = gamesAfterReturn;
     }
 
     inputs.push({
       playerId, proTeamId,
       isActive: isActiveSlot(entry.lineupSlotId),
       isOnIR: IR_SLOTS.has(entry.lineupSlotId),
-      injuryStatus: p.injuryStatus,
+      injuryStatus: isOut && returnDate && remainingGamesAfterToday > 0 ? 'RETURNING' : p.injuryStatus,
       todayFpts, rollingAvg15, matchupAvgPerGame,
       gameStatus, minutesRemaining, remainingGamesAfterToday,
+      totalPeriodGames: teamGameDates.length,
     });
 
     names.set(playerId, {
@@ -404,6 +423,7 @@ function buildTeam(
   nbaSchedule?: NbaScheduleMap,
   scoringItems: ScoringItemsList = [],
   isFutureMatchup = false,
+  injuryReturnDates?: Map<number, string>,
 ): FantasyTeam {
   const team = teamById.get(side.teamId);
   const matchupEntries: EspnRosterEntry[] = side.rosterForMatchupPeriod?.entries ?? [];
@@ -436,7 +456,7 @@ function buildTeam(
 
     const { inputs, names } = buildProjectionInputs(
       allEntries, playerRollingAvg15, playerMatchupAvgs, playerSeasonAvg,
-      nbaScoreboard, nbaSchedule, isFutureMatchup,
+      nbaScoreboard, nbaSchedule, isFutureMatchup, injuryReturnDates,
     );
     const projResult = computeTeamProjection(currentScore, gamesPlayed, maxGames, inputs, names);
     projectedScore = projResult.projectedScore;
@@ -613,12 +633,33 @@ export function normalizeMatchupDetail(
         (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
       );
       let seasonFptsPerGame = 0;
+      let seasonPerGameStats = extractPlayerStats({});
       if (seasonStats?.stats) {
         // Season split type 0 from mRoster is a TOTAL — divide by GP like rolling types
         const seasonFpts = computeFpts(seasonStats.stats, scoringItems);
         const seasonGp = seasonStats.stats['42'] ?? 0;
         if (seasonFpts > 0 && seasonGp > 0) {
           seasonFptsPerGame = round1(seasonFpts / seasonGp);
+        }
+        // Extract per-game season stats for the player card
+        if (seasonGp > 0) {
+          const raw = seasonStats.stats;
+          seasonPerGameStats = {
+            pts: round1((raw['0'] ?? 0) / seasonGp),
+            reb: round1((raw['6'] ?? 0) / seasonGp),
+            ast: round1((raw['3'] ?? 0) / seasonGp),
+            stl: round1((raw['2'] ?? 0) / seasonGp),
+            blk: round1((raw['1'] ?? 0) / seasonGp),
+            fgm: round1((raw['13'] ?? 0) / seasonGp),
+            fga: round1((raw['14'] ?? 0) / seasonGp),
+            ftm: round1((raw['15'] ?? 0) / seasonGp),
+            fta: round1((raw['16'] ?? 0) / seasonGp),
+            threepm: round1((raw['17'] ?? 0) / seasonGp),
+            to: round1((raw['19'] ?? 0) / seasonGp),
+            pf: round1((raw['27'] ?? 0) / seasonGp),
+            min: round1((raw['40'] ?? 0) / seasonGp),
+            gp: seasonGp,
+          };
         }
       }
 
@@ -637,6 +678,7 @@ export function normalizeMatchupDetail(
         isStarter: isActiveSlot(entry.lineupSlotId),
         fpts: entry.playerPoolEntry.appliedStatTotal,
         stats: extractPlayerStats(rawStats),
+        seasonStats: seasonPerGameStats,
         averages,
         seasonFptsPerGame,
         imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${playerId}.png&w=96&h=70&cb=1`,

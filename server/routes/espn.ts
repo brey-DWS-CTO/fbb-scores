@@ -60,30 +60,52 @@ router.get('/espn/scoreboard', async (req, res) => {
 
     // Fetch NBA scoreboard for live game data + schedule for remaining matchup days
     const effectiveMatchupPeriod = matchupPeriod ?? raw.status.currentMatchupPeriod;
-    const matchupScoringPeriods = raw.settings.scheduleSettings.matchupPeriods[String(effectiveMatchupPeriod)] ?? [];
+    const matchupWeeks = raw.settings.scheduleSettings.matchupPeriods[String(effectiveMatchupPeriod)] ?? [];
     const todayScoringPeriod = raw.scoringPeriodId;
 
-    // Get remaining days in matchup period.
-    // For playoff rounds, matchupPeriods may be empty — fall back to playoffMatchupPeriodLength.
-    let remainingDates = getRemainingMatchupDates(matchupScoringPeriods, todayScoringPeriod);
-    if (remainingDates.length === 0) {
-      const { scheduleSettings } = raw.settings;
-      const playoffLength = scheduleSettings.playoffMatchupPeriodLength ?? 14;
-      console.log(`[NBA Schedule] matchupScoringPeriods empty for period ${effectiveMatchupPeriod}, using playoffMatchupPeriodLength=${playoffLength}`);
-      remainingDates = generateDateRange(playoffLength);
+    // ESPN's matchupPeriods maps matchup period → array of WEEK numbers (not scoring period IDs).
+    // Each week = 7 scoring periods. Expand weeks into actual scoring period IDs.
+    const DAYS_PER_WEEK = 7;
+    const matchupScoringPeriods: number[] = [];
+    for (const week of matchupWeeks) {
+      const weekStart = (week - 1) * DAYS_PER_WEEK + 1;
+      for (let d = 0; d < DAYS_PER_WEEK; d++) {
+        matchupScoringPeriods.push(weekStart + d);
+      }
     }
+
+    // Get ALL days in matchup period (past + remaining) for full schedule.
+    const allMatchupDates = getAllMatchupDates(matchupScoringPeriods, todayScoringPeriod);
 
     const [nbaScoreboard, nbaSchedule] = await Promise.all([
       fetchNbaScoreboard(),
-      fetchNbaScheduleForDates(remainingDates),
+      fetchNbaScheduleForDates(allMatchupDates),
     ]);
 
-    // Debug: log schedule data for diagnosing projection issues
-    if (nbaSchedule.size === 0 && remainingDates.length > 0) {
-      console.warn(`[NBA Schedule] No games found for ${remainingDates.length} remaining dates (${remainingDates[0]} to ${remainingDates[remainingDates.length - 1]})`);
+    // Collect OUT player IDs for injury return date lookup
+    const outPlayerIds: number[] = [];
+    for (const m of raw.schedule) {
+      if (m.matchupPeriodId !== effectiveMatchupPeriod) continue;
+      for (const side of [m.home, m.away]) {
+        if (!side?.rosterForCurrentScoringPeriod?.entries) continue;
+        for (const entry of side.rosterForCurrentScoringPeriod.entries) {
+          const p = entry.playerPoolEntry.player;
+          if (p.injuryStatus === 'OUT' || p.injuryStatus === 'SUSPENSION') {
+            outPlayerIds.push(entry.playerPoolEntry.id);
+          }
+        }
+      }
     }
 
-    const scoreboard = normalizeLeagueResponse(raw, matchupPeriod, nbaScoreboard, nbaSchedule);
+    // Fetch injury return dates for OUT players (fire in parallel, don't block on failure)
+    const injuryReturnDates = outPlayerIds.length > 0
+      ? await fetchInjuryReturnDates(outPlayerIds).catch((e) => {
+          console.error('[Injury] Failed to fetch return dates:', e instanceof Error ? e.message : e);
+          return new Map<number, string>();
+        })
+      : new Map<number, string>();
+
+    const scoreboard = normalizeLeagueResponse(raw, matchupPeriod, nbaScoreboard, nbaSchedule, injuryReturnDates);
 
     // Save snapshot to Supabase (fire-and-forget)
     saveMatchupSnapshot(scoreboard).catch((e) =>
@@ -434,21 +456,6 @@ router.get('/espn/trends/team/:teamId', async (req, res) => {
 // ─── NBA Schedule Helpers ────────────────────────────────────────────────────
 
 /**
- * Fallback for playoffs when matchupScoringPeriods is empty.
- * Generate YYYY-MM-DD date strings from today through `days` days from now.
- */
-function generateDateRange(days: number): string[] {
-  const dates: string[] = [];
-  const today = new Date();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().split('T')[0]);
-  }
-  return dates;
-}
-
-/**
  * Given the scoring periods in a matchup and today's scoring period,
  * return the dates for remaining days (including today and future) as YYYY-MM-DD strings.
  *
@@ -458,20 +465,61 @@ function generateDateRange(days: number): string[] {
  * We include today (>=) so the NBA schedule has game counts for ALL remaining days.
  * The adapter handles deduplication with the live nbaScoreboard data for today.
  */
-function getRemainingMatchupDates(
+/**
+ * Convert ALL scoring periods in the matchup to calendar dates.
+ * This gives the full schedule for the matchup period (past + future).
+ */
+function getAllMatchupDates(
   matchupScoringPeriods: number[],
   todayScoringPeriod: number,
 ): string[] {
-  const remainingPeriods = matchupScoringPeriods.filter((sp) => sp >= todayScoringPeriod);
-  if (remainingPeriods.length === 0) return [];
+  if (matchupScoringPeriods.length === 0) return [];
 
   const today = new Date();
-  return remainingPeriods.map((sp) => {
+  return matchupScoringPeriods.map((sp) => {
     const daysFromToday = sp - todayScoringPeriod;
     const date = new Date(today);
     date.setDate(date.getDate() + daysFromToday);
     return date.toISOString().split('T')[0];
   });
+}
+
+/**
+ * Fetch estimated injury return dates from ESPN's public athlete API.
+ * Returns a map of playerId → return date (YYYY-MM-DD).
+ */
+async function fetchInjuryReturnDates(playerIds: number[]): Promise<Map<number, string>> {
+  const returnDates = new Map<number, string>();
+  if (playerIds.length === 0) return returnDates;
+
+  const ATHLETE_URL = 'https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes';
+
+  const fetchOne = async (playerId: number): Promise<void> => {
+    try {
+      const { data } = await axios.get(`${ATHLETE_URL}/${playerId}`, { timeout: 8000 });
+      const injuries = data?.athlete?.injuries;
+      if (Array.isArray(injuries) && injuries.length > 0) {
+        const returnDate = injuries[0]?.details?.returnDate;
+        if (returnDate) {
+          // returnDate is ISO format like "2026-03-18T00:00:00.000+00:00"
+          const dateStr = returnDate.split('T')[0];
+          returnDates.set(playerId, dateStr);
+        }
+      }
+    } catch {
+      // Silently skip — player may not have public injury data
+    }
+  };
+
+  // Batch fetch, 6 at a time to avoid rate limiting
+  const BATCH_SIZE = 6;
+  for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
+    const batch = playerIds.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map(fetchOne));
+  }
+
+  console.log(`[Injury] Found return dates for ${returnDates.size}/${playerIds.length} OUT players`);
+  return returnDates;
 }
 
 // ─── NBA Scoreboard (public API) ─────────────────────────────────────────────
@@ -613,9 +661,9 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
  * NOTE: The ESPN scoreboard API ignores date ranges — `?dates=YYYYMMDD-YYYYMMDD`
  * returns only the start date's games. We must make individual requests per date.
  */
-async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, number>> {
-  const teamGamesRemaining = new Map<number, number>();
-  if (dates.length === 0) return teamGamesRemaining;
+async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, string[]>> {
+  const teamGameDates = new Map<number, string[]>();
+  if (dates.length === 0) return teamGameDates;
 
   // Reverse lookup: normalized NBA abbreviation → ESPN proTeamId
   const abbrevToProTeamId = new Map<string, number>();
@@ -647,7 +695,9 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
             const abbr = normalizeNbaAbbrev(rawAbbr);
             const proTeamId = abbrevToProTeamId.get(abbr);
             if (proTeamId != null) {
-              teamGamesRemaining.set(proTeamId, (teamGamesRemaining.get(proTeamId) ?? 0) + 1);
+              const existing = teamGameDates.get(proTeamId) ?? [];
+              existing.push(dateStr);
+              teamGameDates.set(proTeamId, existing);
               gamesFound++;
             }
           }
@@ -668,9 +718,9 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, nu
     totalGames += results.reduce((a, b) => a + b, 0);
   }
 
-  console.log(`[NBA Schedule] Found ${totalGames} team-games for ${teamGamesRemaining.size} teams across ${uniqueDates.length} dates`);
+  console.log(`[NBA Schedule] Found ${totalGames} team-games for ${teamGameDates.size} teams across ${uniqueDates.length} dates`);
 
-  return teamGamesRemaining;
+  return teamGameDates;
 }
 
 export default router;

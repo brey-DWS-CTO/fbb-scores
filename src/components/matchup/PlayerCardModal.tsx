@@ -24,9 +24,8 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const gp = player.stats.gp || 1;
-
-  // Season FPTS per game — from actual season stats (split type 0), not matchup period
+  // Use season per-game stats for the stat card (not matchup period stats)
+  const s = player.seasonStats;
   const seasonFptsPerGame = player.seasonFptsPerGame;
 
   // Rolling averages
@@ -53,19 +52,19 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
   const fptsData = trend?.dataPoints.map((d) => d.fpts) ?? [];
   const avg7Data = trend?.dataPoints.map((d) => d.rollingAvg7).filter((v) => v > 0) ?? [];
 
-  // Season per-game stats
+  // Season per-game stats (already divided by season GP in the adapter)
   const statBoxes: Array<{ label: string; value: string; highlight?: boolean }> = [
-    { label: 'PTS', value: (player.stats.pts / gp).toFixed(1), highlight: player.stats.pts / gp >= 20 },
-    { label: 'REB', value: (player.stats.reb / gp).toFixed(1), highlight: player.stats.reb / gp >= 8 },
-    { label: 'AST', value: (player.stats.ast / gp).toFixed(1), highlight: player.stats.ast / gp >= 6 },
-    { label: 'STL', value: (player.stats.stl / gp).toFixed(1), highlight: player.stats.stl / gp >= 1.5 },
-    { label: 'BLK', value: (player.stats.blk / gp).toFixed(1), highlight: player.stats.blk / gp >= 1.5 },
+    { label: 'PTS', value: s.pts.toFixed(1), highlight: s.pts >= 20 },
+    { label: 'REB', value: s.reb.toFixed(1), highlight: s.reb >= 8 },
+    { label: 'AST', value: s.ast.toFixed(1), highlight: s.ast >= 6 },
+    { label: 'STL', value: s.stl.toFixed(1), highlight: s.stl >= 1.5 },
+    { label: 'BLK', value: s.blk.toFixed(1), highlight: s.blk >= 1.5 },
     {
       label: 'FG%',
-      value: player.stats.fga > 0 ? (player.stats.fgm / player.stats.fga * 100).toFixed(0) + '%' : '-',
+      value: s.fga > 0 ? (s.fgm / s.fga * 100).toFixed(0) + '%' : '-',
     },
-    { label: '3PM', value: (player.stats.threepm / gp).toFixed(1) },
-    { label: 'TO', value: (player.stats.to / gp).toFixed(1) },
+    { label: '3PM', value: s.threepm.toFixed(1) },
+    { label: 'TO', value: s.to.toFixed(1) },
   ];
 
   // Position badge color

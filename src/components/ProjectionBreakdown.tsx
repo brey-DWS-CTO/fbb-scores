@@ -1,16 +1,26 @@
+import { useState } from 'react';
 import type { FC } from 'react';
-import type { ProjectionBreakdown as ProjectionBreakdownType, PlayerProjectionBreakdown } from '../types/index.js';
+import type { ProjectionBreakdown as ProjectionBreakdownType, PlayerProjectionBreakdown, MatchupPlayer } from '../types/index.js';
+import PlayerCardModal from './matchup/PlayerCardModal.js';
 
 interface ProjectionBreakdownProps {
   breakdown: ProjectionBreakdownType;
   teamName: string;
   side: 'home' | 'away';
+  /** Optional player lookup map — when provided, clicking a player opens the detail modal */
+  playerMap?: Map<number, MatchupPlayer>;
 }
 
-const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName, side }) => {
+const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName, side, playerMap }) => {
+  const [selectedPlayer, setSelectedPlayer] = useState<MatchupPlayer | null>(null);
   const sideColor = side === 'home' ? 'var(--neon-blue)' : 'var(--neon-orange)';
   const starters = breakdown.players.filter((p) => p.isStarter || p.isSmartFilled);
   const unused = breakdown.players.filter((p) => !p.isStarter && !p.isSmartFilled);
+
+  const handlePlayerClick = (player: PlayerProjectionBreakdown) => {
+    const full = playerMap?.get(player.playerId);
+    if (full) setSelectedPlayer(full);
+  };
 
   return (
     <div className="flex-1 min-w-0">
@@ -67,7 +77,7 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
           </thead>
           <tbody>
             {starters.map((player, i) => (
-              <ProjectionPlayerRow key={player.playerId} player={player} isEven={i % 2 === 0} />
+              <ProjectionPlayerRow key={player.playerId} player={player} isEven={i % 2 === 0} clickable={!!playerMap} onClick={() => handlePlayerClick(player)} />
             ))}
             {unused.length > 0 && (
               <tr>
@@ -84,6 +94,8 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
                 player={player}
                 isEven={i % 2 === 0}
                 dimmed
+                clickable={!!playerMap}
+                onClick={() => handlePlayerClick(player)}
               />
             ))}
           </tbody>
@@ -119,6 +131,13 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
           </tfoot>
         </table>
       </div>
+
+      {selectedPlayer && (
+        <PlayerCardModal
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 };
@@ -129,17 +148,21 @@ interface ProjectionPlayerRowProps {
   player: PlayerProjectionBreakdown;
   isEven: boolean;
   dimmed?: boolean;
+  clickable?: boolean;
+  onClick?: () => void;
 }
 
-const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dimmed }) => {
+const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dimmed, clickable, onClick }) => {
   const rowBg = isEven ? '#0a0a1400' : '#0f0f2233';
 
   return (
     <tr
+      onClick={clickable ? onClick : undefined}
       style={{
         borderBottom: '1px solid #1a1a2e',
         background: rowBg,
         opacity: dimmed ? 0.4 : 1,
+        cursor: clickable ? 'pointer' : 'default',
       }}
     >
       {/* Player info */}
@@ -228,6 +251,20 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                   }}
                 >
                   SUSP
+                </span>
+              )}
+              {player.injuryStatus === 'RETURNING' && (
+                <span
+                  className="pixel-text"
+                  style={{
+                    fontSize: '0.25rem',
+                    color: 'var(--neon-teal)',
+                    border: '1px solid var(--neon-teal)',
+                    padding: '0 3px',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  RET
                 </span>
               )}
             </div>

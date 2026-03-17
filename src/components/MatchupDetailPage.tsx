@@ -149,6 +149,7 @@ const MatchupDetailPage: FC = () => {
               breakdown={matchup.home.projectionBreakdown}
               teamName={matchup.home.name}
               side="home"
+              playerMap={playerMap}
             />
           )}
           {matchup.away.projectionBreakdown && (
@@ -156,6 +157,7 @@ const MatchupDetailPage: FC = () => {
               breakdown={matchup.away.projectionBreakdown}
               teamName={matchup.away.name}
               side="away"
+              playerMap={playerMap}
             />
           )}
         </div>

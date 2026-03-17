@@ -267,7 +267,10 @@ export interface MatchupPlayer {
   isStarter: boolean;
   /** Matchup period total FPTS */
   fpts: number;
+  /** Matchup period stats (totals for the matchup period) */
   stats: PlayerGameStats;
+  /** Season per-game stats (totals divided by season GP) */
+  seasonStats: PlayerGameStats;
   averages: RollingAverages;
   /** Season FPTS per game average (from season stats split type 0) */
   seasonFptsPerGame: number;
@@ -378,6 +381,8 @@ export interface PlayerProjectionInput {
   gameStatus: GameStatus | 'none';
   minutesRemaining: number;
   remainingGamesAfterToday: number;
+  /** Total games this player's NBA team has in the full matchup period */
+  totalPeriodGames: number;
   /** Future hook: augment projection accuracy with pace/game-total data */
   overrideProjection?: number;
   /** Whether the player is on IR/IL (should not be smart-filled) */
@@ -386,8 +391,8 @@ export interface PlayerProjectionInput {
   injuryStatus?: string;
 }
 
-/** NBA team schedule: proTeamId → number of remaining games in the matchup period */
-export type NbaScheduleMap = Map<number, number>;
+/** NBA team schedule: proTeamId → array of game dates (YYYY-MM-DD) in the matchup period */
+export type NbaScheduleMap = Map<number, string[]>;
 
 /** NBA scoreboard: nbaTeamAbbrev → NbaGameInfo */
 export type NbaScoreboardMap = Map<string, NbaGameInfo>;
