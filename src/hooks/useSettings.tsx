@@ -1,16 +1,21 @@
 import { createContext, useContext, useState, useCallback, useEffect, type FC, type ReactNode } from 'react';
 
 export type FontMode = 'retro' | 'modern';
+export type ThemeMode = 'dark' | 'light';
 
 interface Settings {
   fontMode: FontMode;
+  theme: ThemeMode;
 }
 
 interface SettingsContextValue extends Settings {
   setFontMode: (mode: FontMode) => void;
+  setTheme: (theme: ThemeMode) => void;
 }
 
 const STORAGE_KEY = 'fbb-scores-settings';
+
+const defaults: Settings = { fontMode: 'modern', theme: 'dark' };
 
 function loadSettings(): Settings {
   try {
@@ -26,33 +31,39 @@ function saveSettings(settings: Settings) {
   } catch { /* ignore */ }
 }
 
-const defaults: Settings = { fontMode: 'modern' };
-
 const SettingsContext = createContext<SettingsContextValue>({
   ...defaults,
   setFontMode: () => {},
+  setTheme: () => {},
 });
 
 export const SettingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>(loadSettings);
 
   const setFontMode = useCallback((mode: FontMode) => {
-    setSettings(prev => {
+    setSettings((prev) => {
       const next = { ...prev, fontMode: mode };
       saveSettings(next);
-      // Apply CSS class to document for global font switching
-      document.documentElement.classList.toggle('font-modern', mode === 'modern');
       return next;
     });
   }, []);
 
-  // Keep the document class in sync (covers initial load + external changes)
+  const setTheme = useCallback((theme: ThemeMode) => {
+    setSettings((prev) => {
+      const next = { ...prev, theme };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+
+  // Keep the document classes in sync (covers initial load + changes)
   useEffect(() => {
     document.documentElement.classList.toggle('font-modern', settings.fontMode === 'modern');
-  }, [settings.fontMode]);
+    document.documentElement.classList.toggle('theme-light', settings.theme === 'light');
+  }, [settings.fontMode, settings.theme]);
 
   return (
-    <SettingsContext.Provider value={{ ...settings, setFontMode }}>
+    <SettingsContext.Provider value={{ ...settings, setFontMode, setTheme }}>
       {children}
     </SettingsContext.Provider>
   );

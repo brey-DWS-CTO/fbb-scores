@@ -18,6 +18,13 @@ export interface PickTrade {
   tradeNote?: string;
 }
 
+/** Human-readable trade summary: what each side RECEIVED. */
+export interface TradeDetail {
+  date: string;
+  teams: [string, string];
+  received: Record<string, string[]>;
+}
+
 export interface ContractSeed {
   player: string;
   originalOwner: string;
@@ -81,6 +88,7 @@ export interface LeagueDataset {
   teams: TeamInfo[];
   players: DatasetPlayer[];
   pickTrades: PickTrade[];
+  tradeDetails?: TradeDetail[];
   draftRounds: number;
   keeperRounds: number; // rounds that keeper tiers span (10)
   maxKeepersPerTeam: number;
@@ -102,11 +110,17 @@ export interface DraftPickState {
   timestamp?: string;
 }
 
+export interface LeagueOverrides {
+  cap?: number | null;
+  playerRounds?: Record<string, number>;
+}
+
 export interface LeagueDynamicState {
   season: number;
   keepers: Record<string, KeeperSelection[]>;
   draft: { picks: Record<string, DraftPickState>; startedAt: string | null };
   locks: { keepersLocked: boolean };
+  overrides?: LeagueOverrides;
 }
 
 /* ---------- engine outputs ---------- */
@@ -118,6 +132,8 @@ export interface PickSlot {
   originalOwner: string;
   currentOwner: string;
   viaTradeFrom?: string; // set when currentOwner acquired this pick via trade
+  tradeNote?: string; // the trade this pick moved in (for tap/hover provenance)
+  tradeDate?: string;
 }
 
 export interface ResolvedKeeper {

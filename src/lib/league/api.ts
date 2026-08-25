@@ -1,10 +1,20 @@
 import axios from 'axios';
 import type { KeeperSelection, LeagueDynamicState } from '../keeper/types.js';
 
+export interface StateMeta {
+  draftAt: string;
+  revealed: boolean;
+  /** Keeper counts per owner — always visible even while selections are secret. */
+  keeperStatus: Record<string, number>;
+  viewer: string | null;
+  isCommissioner: boolean;
+}
+
 export interface StateResponse {
   state: LeagueDynamicState;
   version: number;
-  updatedAt: string;
+  updatedAt?: string;
+  meta?: StateMeta;
 }
 
 export interface Credentials {
@@ -14,9 +24,22 @@ export interface Credentials {
 
 const authHeaders = (c: Credentials) => ({ 'x-owner': c.owner, 'x-pin': c.pin });
 
-export async function fetchLeagueState(): Promise<StateResponse> {
-  const { data } = await axios.get<StateResponse>('/api/league/state');
+/** Pass credentials so the server can un-redact your own (or, as commissioner,
+ * everyone's) keepers before draft day. */
+export async function fetchLeagueState(credentials?: Credentials | null): Promise<StateResponse> {
+  const { data } = await axios.get<StateResponse>('/api/league/state', {
+    headers: credentials ? authHeaders(credentials) : undefined,
+  });
   return data;
+}
+
+export async function fetchPinStatus(): Promise<Array<{ owner: string; claimed: boolean }>> {
+  const { data } = await axios.get('/api/league/pin-status');
+  return data;
+}
+
+export async function claimPin(owner: string, pin: string): Promise<void> {
+  await axios.post('/api/league/claim-pin', { owner, pin });
 }
 
 export async function verifyPin(c: Credentials): Promise<{ ok: boolean; isCommissioner: boolean }> {
@@ -56,6 +79,11 @@ export async function clearDraftPick(c: Credentials, overallPick: number): Promi
   return data;
 }
 
+export async function startDraft(c: Credentials): Promise<StateResponse> {
+  const { data } = await axios.post('/api/league/draft/start', {}, { headers: authHeaders(c) });
+  return data;
+}
+
 export async function resetDraft(c: Credentials): Promise<StateResponse> {
   const { data } = await axios.post('/api/league/draft/reset', {}, { headers: authHeaders(c) });
   return data;
@@ -63,6 +91,14 @@ export async function resetDraft(c: Credentials): Promise<StateResponse> {
 
 export async function setLocks(c: Credentials, keepersLocked: boolean): Promise<StateResponse> {
   const { data } = await axios.post('/api/league/locks', { keepersLocked }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function setOverrides(
+  c: Credentials,
+  overrides: { cap?: number | null; playerRounds?: Record<string, number | null> },
+): Promise<StateResponse> {
+  const { data } = await axios.post('/api/league/overrides', overrides, { headers: authHeaders(c) });
   return data;
 }
 

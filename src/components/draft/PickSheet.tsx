@@ -51,7 +51,7 @@ function CancelButton({ onClose }: { onClose: () => void }) {
         background: 'transparent',
         border: '2px solid var(--panel-border)',
         borderRadius: 8,
-        color: '#8888aa',
+        color: 'var(--text-mid)',
         fontWeight: 700,
         cursor: 'pointer',
       }}
@@ -106,7 +106,7 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
       <div className="hub-heading glow-teal" style={{ fontSize: '0.7rem', color: 'var(--neon-teal)', marginBottom: 4 }}>
         PICK {pickLabel(cell.pick)} — {cell.pick.currentOwner.toUpperCase()}
       </div>
-      <div style={{ color: '#8888aa', fontSize: '0.8rem', marginBottom: 12 }}>
+      <div style={{ color: 'var(--text-mid)', fontSize: '0.8rem', marginBottom: 12 }}>
         #{cell.pick.overall} overall
         {cell.pick.viaTradeFrom && (
           <span style={{ color: 'var(--neon-yellow)' }}> · via {cell.pick.viaTradeFrom}</span>
@@ -125,15 +125,15 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
             }}
             renderMeta={(p) => (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#e0e0e0', fontWeight: 700, fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-hi)', fontWeight: 700, fontSize: '0.85rem' }}>
                   {p.keeper.effectiveAvg !== null ? p.keeper.effectiveAvg.toFixed(1) : '—'}
                 </span>
                 {p.keeper.round !== null && p.keeper.round <= 10 && (
                   <span
                     style={{
-                      color: '#aaaacc',
-                      border: '1px solid #2a2a4d',
-                      background: '#121222',
+                      color: 'var(--text-soft)',
+                      border: '1px solid var(--panel-border)',
+                      background: 'var(--chip-bg)',
                       borderRadius: 4,
                       padding: '1px 5px',
                       fontSize: '0.65rem',
@@ -166,7 +166,7 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: positionColor(chosen.positions) }}>
             {chosen.name}
           </div>
-          <div style={{ color: '#8888aa', margin: '4px 0 14px' }}>
+          <div style={{ color: 'var(--text-mid)', margin: '4px 0 14px' }}>
             {chosen.proTeam} · {chosen.positions.join('/')}
             {chosen.keeper.effectiveAvg !== null && <> · {chosen.keeper.effectiveAvg.toFixed(1)} FPPG</>}
           </div>
@@ -177,8 +177,8 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
             style={{
               width: '100%',
               padding: 14,
-              background: busy ? '#1a1a33' : 'var(--neon-teal)',
-              color: busy ? '#666688' : '#001a14',
+              background: busy ? 'var(--panel-border)' : 'var(--neon-teal)',
+              color: busy ? 'var(--text-dim)' : '#001a14',
               fontWeight: 800,
               fontSize: '1rem',
               border: 'none',
@@ -195,7 +195,7 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
               marginTop: 10,
               background: 'transparent',
               border: 'none',
-              color: '#8888aa',
+              color: 'var(--text-mid)',
               textDecoration: 'underline',
               cursor: 'pointer',
             }}
@@ -239,9 +239,9 @@ export function ClearPickSheet({ cell, onClose }: { cell: BoardCell; onClose: ()
       <div className="hub-heading" style={{ fontSize: '0.7rem', color: 'var(--neon-yellow)', marginBottom: 4 }}>
         PICK {pickLabel(cell.pick)} — {cell.pick.currentOwner.toUpperCase()}
       </div>
-      <div style={{ color: '#e0e0e0', fontSize: '1.05rem', fontWeight: 700, marginBottom: 12 }}>
+      <div style={{ color: 'var(--text-hi)', fontSize: '1.05rem', fontWeight: 700, marginBottom: 12 }}>
         {cell.selection?.playerName ?? 'Unknown player'}
-        <span style={{ color: '#666688', fontWeight: 400, fontSize: '0.8rem' }}>
+        <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: '0.8rem' }}>
           {' '}· #{cell.pick.overall} overall
         </span>
       </div>
@@ -252,8 +252,8 @@ export function ClearPickSheet({ cell, onClose }: { cell: BoardCell; onClose: ()
         style={{
           width: '100%',
           padding: 13,
-          background: busy ? '#1a1a33' : 'rgba(255,34,34,0.12)',
-          color: busy ? '#666688' : 'var(--neon-red)',
+          background: busy ? 'var(--panel-border)' : 'rgba(255,34,34,0.12)',
+          color: busy ? 'var(--text-dim)' : 'var(--neon-red)',
           border: '2px solid var(--neon-red)',
           borderRadius: 8,
           fontWeight: 800,

@@ -26,6 +26,7 @@ export function playerForKey(key?: string): DatasetPlayer | null {
 export interface CellDisplay {
   name: string;
   positions: string[];
+  proTeam: string | null;
   color: string;
   isKeeper: boolean;
   keeperRound: number | null; // keeper tier round, when the fill is a keeper pre-fill
@@ -38,6 +39,7 @@ export function cellDisplay(cell: BoardCell): CellDisplay | null {
     return {
       name: player?.name ?? cell.keeper.selection.playerName,
       positions: player?.positions ?? [],
+      proTeam: player?.proTeam ?? null,
       color: positionColor(player?.positions),
       isKeeper: true,
       keeperRound: cell.keeper.round,
@@ -49,6 +51,7 @@ export function cellDisplay(cell: BoardCell): CellDisplay | null {
     return {
       name: cell.selection.playerName ?? player?.name ?? 'Unknown',
       positions: player?.positions ?? [],
+      proTeam: player?.proTeam ?? null,
       color: positionColor(player?.positions),
       isKeeper: cell.selection.isKeeper === true,
       keeperRound: null,

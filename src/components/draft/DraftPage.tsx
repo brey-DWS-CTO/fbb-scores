@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
-import { leagueDataset, teamByOwner } from '../../lib/league/data.js';
-import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
+import { teamByOwner } from '../../lib/league/data.js';
+import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import { apiErrorMessage, startDraft } from '../../lib/league/api.js';
+import { formatDraftAt } from '../keepers/KeepersPage.js';
 import IdentityChip from '../league/IdentityChip.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
@@ -40,6 +42,7 @@ function PickRow({
   onTap: (cell: BoardCell) => void;
 }) {
   const d = cellDisplay(cell);
+  const [showTrade, setShowTrade] = useState(false);
   return (
     <div
       className={cell.onClock ? 'pulse-glow' : undefined}
@@ -62,22 +65,49 @@ function PickRow({
       }}
     >
       <div style={{ minWidth: 46, textAlign: 'center', flexShrink: 0 }}>
-        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#e0e0e0' }}>
+        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-hi)' }}>
           {pickLabel(cell.pick)}
         </div>
-        <div style={{ fontSize: '0.65rem', color: '#666688' }}>#{cell.pick.overall}</div>
+        <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>#{cell.pick.overall}</div>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.7rem', color: '#8888aa', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-mid)', fontWeight: 600 }}>
             {cell.pick.currentOwner}
           </span>
           {cell.pick.viaTradeFrom && (
-            <span style={{ color: 'var(--neon-yellow)', fontSize: '0.65rem' }}>
-              via {cell.pick.viaTradeFrom}
+            <span
+              title={cell.pick.tradeNote}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTrade((v) => !v);
+              }}
+              style={{
+                color: 'var(--neon-yellow)',
+                fontSize: '0.65rem',
+                textDecoration: 'underline dotted',
+                cursor: 'pointer',
+              }}
+            >
+              via {cell.pick.viaTradeFrom} ⓘ
             </span>
           )}
         </div>
+        {showTrade && cell.pick.tradeNote && (
+          <div
+            style={{
+              color: 'var(--neon-yellow)',
+              fontSize: '0.7rem',
+              background: 'rgba(255,230,0,0.06)',
+              border: '1px solid rgba(255,230,0,0.3)',
+              borderRadius: 6,
+              padding: '4px 8px',
+              margin: '4px 0',
+            }}
+          >
+            {cell.pick.tradeDate}: {cell.pick.tradeNote}
+          </div>
+        )}
         {cell.keeper && d ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', opacity: 0.8 }}>
             <span style={{ fontWeight: 700 }}>🔒 {d.name}</span>
@@ -100,13 +130,13 @@ function PickRow({
             <span style={{ fontWeight: 700 }}>{d.name}</span>
             <PosChip positions={d.positions} />
             {d.enteredBy && (
-              <span style={{ color: '#666688', fontSize: '0.65rem' }}>by {d.enteredBy}</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>by {d.enteredBy}</span>
             )}
           </div>
         ) : (
           <div
             style={{
-              color: cell.onClock ? 'var(--neon-teal)' : '#444466',
+              color: cell.onClock ? 'var(--neon-teal)' : 'var(--text-ghost)',
               fontWeight: cell.onClock ? 700 : 400,
             }}
           >
@@ -119,15 +149,30 @@ function PickRow({
 }
 
 export default function DraftPage() {
-  const { state } = useLeagueState(true);
+  const { state, meta, dataset } = useLeagueData(true);
   const { identity } = useIdentity();
+  const applyState = useApplyStateResponse();
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [pickTarget, setPickTarget] = useState<BoardCell | null>(null);
   const [clearTarget, setClearTarget] = useState<BoardCell | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
+  const [startArmed, setStartArmed] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
-  const board = useMemo(() => buildDraftBoard(leagueDataset, state), [state]);
-  const pool = useMemo(() => availablePlayers(leagueDataset, state), [state]);
+  const started = state.draft.startedAt !== null;
+
+  const doStartDraft = async () => {
+    if (!identity) return;
+    setStartArmed(false);
+    try {
+      applyState(await startDraft(identity));
+    } catch (e) {
+      setStartError(apiErrorMessage(e));
+    }
+  };
+
+  const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
+  const pool = useMemo(() => availablePlayers(dataset, state), [state, dataset]);
   const recent = useMemo(() => recentPicks(board, 5), [board]);
 
   const onClockIdx = board.findIndex((c) => c.onClock);
@@ -137,11 +182,12 @@ export default function DraftPage() {
     : [];
 
   const rounds = useMemo(
-    () => Array.from({ length: leagueDataset.draftRounds }, (_, i) => i + 1),
-    [],
+    () => Array.from({ length: dataset.draftRounds }, (_, i) => i + 1),
+    [dataset.draftRounds],
   );
 
   const onCellTap = (cell: BoardCell) => {
+    if (!started) return;
     if (cell.keeper) return;
     if (cell.selection) {
       if (identity?.isCommissioner) setClearTarget(cell);
@@ -155,6 +201,7 @@ export default function DraftPage() {
   };
 
   const isTappable = (cell: BoardCell): boolean => {
+    if (!started) return false;
     if (cell.keeper) return false;
     if (cell.selection) return identity?.isCommissioner === true;
     return true; // empty: tap picks (or opens sign-in when signed out)
@@ -201,7 +248,62 @@ export default function DraftPage() {
           border: onClock ? '2px solid var(--neon-teal)' : undefined,
         }}
       >
-        {onClock ? (
+        {!started ? (
+          <div style={{ textAlign: 'center' }}>
+            <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-purple)' }}>
+              DRAFT NOT STARTED
+            </div>
+            {meta && (
+              <div style={{ color: 'var(--text-soft)', margin: '8px 0', fontSize: '0.9rem' }}>
+                🗓️ Draft day: <strong>{formatDraftAt(meta.draftAt)}</strong>
+              </div>
+            )}
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
+              The board unlocks when the commissioner starts the draft.
+            </div>
+            {identity?.isCommissioner && (
+              <div style={{ marginTop: 12 }}>
+                {!startArmed ? (
+                  <button
+                    className="tap-btn"
+                    onClick={() => setStartArmed(true)}
+                    style={{
+                      minHeight: 48,
+                      padding: '0 26px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: 'var(--neon-teal)',
+                      color: '#001a14',
+                      fontWeight: 800,
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    ▶ START DRAFT
+                  </button>
+                ) : (
+                  <button
+                    className="tap-btn"
+                    onClick={doStartDraft}
+                    style={{
+                      minHeight: 48,
+                      padding: '0 26px',
+                      borderRadius: 10,
+                      border: '2px solid var(--neon-yellow)',
+                      background: 'rgba(255,230,0,0.1)',
+                      color: 'var(--neon-yellow)',
+                      fontWeight: 800,
+                    }}
+                  >
+                    FOR REAL? TAP TO GO LIVE
+                  </button>
+                )}
+                {startError && (
+                  <div style={{ color: 'var(--neon-red)', fontSize: '0.78rem', marginTop: 8 }}>{startError}</div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : onClock ? (
           <>
             <div className="hub-heading blink" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)' }}>
               ON THE CLOCK
@@ -212,10 +314,10 @@ export default function DraftPage() {
             >
               {onClock.pick.currentOwner.toUpperCase()}
             </div>
-            <div style={{ color: '#666688', fontSize: '0.75rem', marginBottom: 4 }}>
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
               {teamByOwner.get(onClock.pick.currentOwner)?.espnTeamName}
             </div>
-            <div style={{ color: '#aaaacc' }}>
+            <div style={{ color: 'var(--text-soft)' }}>
               Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall
               {onClock.pick.viaTradeFrom && (
                 <span style={{ color: 'var(--neon-yellow)' }}> · via {onClock.pick.viaTradeFrom}</span>
@@ -223,17 +325,17 @@ export default function DraftPage() {
             </div>
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.65rem', color: '#666688', fontWeight: 700 }}>NEXT:</span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>
                 {nextUp.map((c) => (
                   <span
                     key={c.pick.overall}
                     style={{
                       border: '1px solid var(--panel-border)',
-                      background: '#0c0c16',
+                      background: 'var(--chip-bg)',
                       borderRadius: 999,
                       padding: '3px 10px',
                       fontSize: '0.75rem',
-                      color: '#aaaacc',
+                      color: 'var(--text-soft)',
                     }}
                   >
                     {c.pick.currentOwner} · {pickLabel(c.pick)}
@@ -252,17 +354,44 @@ export default function DraftPage() {
         )}
       </div>
 
+      {meta && !meta.revealed && started && (
+        <div
+          className="panel"
+          style={{
+            borderColor: 'var(--neon-purple)',
+            borderRadius: 10,
+            padding: '10px 14px',
+            marginBottom: 12,
+            color: 'var(--neon-purple)',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            textAlign: 'center',
+          }}
+        >
+          🗓️ DRAFT DAY:{' '}
+          {new Date(meta.draftAt).toLocaleString(undefined, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
+          {' · '}keeper picks hit the board then
+          {meta.isCommissioner ? ' (you see them now, commish)' : ''}
+        </div>
+      )}
+
       {/* recent picks ticker */}
       {recent.length > 0 && (
         <div className="panel" style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
-          <div className="hub-heading" style={{ fontSize: '0.62rem', color: '#8888aa', marginBottom: 6 }}>
+          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)', marginBottom: 6 }}>
             RECENT PICKS
           </div>
           {recent.map((rp) => (
             <div key={rp.overall} style={{ display: 'flex', gap: 8, padding: '3px 0', fontSize: '0.9rem' }}>
-              <span style={{ color: '#666688', minWidth: 40 }}>#{rp.overall}</span>
-              <span style={{ color: '#aaaacc' }}>{rp.owner}</span>
-              <span style={{ color: '#666688' }}>→</span>
+              <span style={{ color: 'var(--text-dim)', minWidth: 40 }}>#{rp.overall}</span>
+              <span style={{ color: 'var(--text-soft)' }}>{rp.owner}</span>
+              <span style={{ color: 'var(--text-dim)' }}>→</span>
               <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {rp.playerName}
               </span>
@@ -283,7 +412,7 @@ export default function DraftPage() {
               padding: '9px 0',
               fontSize: '0.62rem',
               background: view === v ? 'rgba(0,255,204,0.1)' : 'var(--panel-bg)',
-              color: view === v ? 'var(--neon-teal)' : '#8888aa',
+              color: view === v ? 'var(--neon-teal)' : 'var(--text-mid)',
               border: `2px solid ${view === v ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
               borderRadius: 8,
               cursor: 'pointer',

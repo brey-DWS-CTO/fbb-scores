@@ -282,6 +282,7 @@ const dataset: LeagueDataset = {
     (a, b) => (b.keeper.effectiveAvg ?? b.api2026?.avg ?? 0) - (a.keeper.effectiveAvg ?? a.api2026?.avg ?? 0),
   ),
   pickTrades: config.pickTrades,
+  tradeDetails: config.tradeDetails ?? [],
   draftRounds: config.draftRounds,
   keeperRounds: KEEPER_ROUNDS,
   maxKeepersPerTeam: config.maxKeepersPerTeam,

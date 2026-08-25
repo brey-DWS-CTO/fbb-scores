@@ -2,6 +2,7 @@
   "_comment": "League configuration for the 2026-27 ('2027') season draft. Owners map to ESPN fantasy teams from the 2025-26 season (rosters frozen at season end are the keeper-eligible pools). Bryan inherits Sam's franchise. Contract holders reflect in-season player trades (keeper contracts travel with the player per rule 4.2.5). Draft picks named '2026 <round>' in the trade log = picks in the draft held in calendar 2026, i.e. THIS upcoming draft.",
   "season": 2027,
   "priorSeason": 2026,
+  "draftAt": "2026-10-18T14:00:00-07:00",
   "salaryCapRule": "round3max + round3min",
   "maxKeepersPerTeam": 2,
   "draftRounds": 14,
@@ -39,6 +40,40 @@
     { "player": "J. Brown",              "originalOwner": "Ryan",    "currentOwner": "Aaron",   "originalRound": 5,  "round2026": 5,  "firstKeptSeason": 2026, "lastKeepableSeason": 2028, "note": "Traded to Aaron in-season; contract travels with player" },
     { "player": "D. Booker",             "originalOwner": "Sam",     "currentOwner": "Bryan",   "originalRound": 2,  "round2026": 3,  "firstKeptSeason": 2025, "lastKeepableSeason": 2026, "expired": true, "note": "Bryan inherits Sam's franchise; contract expired regardless" },
     { "player": "B. Mathurin",           "originalOwner": "Sam",     "currentOwner": "Brey",    "originalRound": 10, "round2026": 10, "firstKeptSeason": 2026, "lastKeepableSeason": 2029, "note": "Traded to Brey in-season; contract travels with player" }
+  ],
+  "tradeDetails": [
+    {
+      "date": "2025-11-28",
+      "teams": ["Derek", "Ryan"],
+      "received": {
+        "Derek": ["Tyrese Maxey", "Ryan's 2027 9th-round pick (9.2)"],
+        "Ryan": ["LaMelo Ball", "Ausar Thompson", "Derek's 2027 3rd-round pick (3.8)"]
+      }
+    },
+    {
+      "date": "2025-12-21",
+      "teams": ["Aaron", "Ryan"],
+      "received": {
+        "Aaron": ["Jaylen Brown", "Ryan's 2027 10th-round pick (10.9)"],
+        "Ryan": ["Mikal Bridges", "Aaron's 2027 3rd-round pick (3.7)"]
+      }
+    },
+    {
+      "date": "2025-12-22",
+      "teams": ["Joel", "Kyle"],
+      "received": {
+        "Joel": ["Nikola Vucevic", "Derrick White", "Jalen Brunson", "Kyle's 2027 9th-round pick (9.5)", "Kyle's 2027 10th-round pick (10.6)"],
+        "Kyle": ["Jordan Poole", "Jaylon Tyson", "Brandin Podziemski", "Joel's 2027 3rd-round pick (3.1)", "Joel's 2027 6th-round pick (6.10)"]
+      }
+    },
+    {
+      "date": "2026-01-04",
+      "teams": ["Patrick", "Kyle"],
+      "received": {
+        "Patrick": ["Pascal Siakam", "Kyle's 2027 8th-round pick (8.6)"],
+        "Kyle": ["Jaden McDaniels", "Ryan Kalkbrenner", "Patrick's 2027 5th-round pick (5.3)"]
+      }
+    }
   ],
   "pickTrades": [
     { "date": "2025-11-28", "round": 3,  "from": "Derek",   "to": "Ryan",    "tradeNote": "Derek trades LaMelo Ball, Ausar Thompson + own 3rd for Tyrese Maxey + Ryan's 9th" },

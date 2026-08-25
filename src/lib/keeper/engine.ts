@@ -20,11 +20,42 @@ import type {
   KeeperSelection,
   LeagueDataset,
   LeagueDynamicState,
+  LeagueOverrides,
   PickSlot,
   ResolvedKeeper,
   TeamKeeperResult,
   TierBand,
 } from './types.js';
+
+/**
+ * Apply commissioner overrides (custom cap, per-player round tweaks) to the
+ * static dataset. Cheap enough to run per render behind a useMemo.
+ */
+export function applyOverrides(
+  dataset: LeagueDataset,
+  overrides: LeagueOverrides | undefined,
+): LeagueDataset {
+  if (!overrides || (overrides.cap == null && !Object.keys(overrides.playerRounds ?? {}).length)) {
+    return dataset;
+  }
+  const rounds = overrides.playerRounds ?? {};
+  return {
+    ...dataset,
+    cap: overrides.cap ?? dataset.cap,
+    players: dataset.players.map((p) =>
+      rounds[p.key] !== undefined
+        ? {
+            ...p,
+            keeper: {
+              ...p.keeper,
+              round: rounds[p.key],
+              flags: [...p.keeper.flags.filter((f) => f !== 'commissioner-override'), 'commissioner-override'],
+            },
+          }
+        : p,
+    ),
+  };
+}
 
 export const KEEPER_ROUNDS = 10;
 
@@ -183,6 +214,8 @@ export function buildAllPicks(dataset: LeagueDataset): PickSlot[] {
     if (pick) {
       pick.currentOwner = trade.to;
       pick.viaTradeFrom = trade.from;
+      pick.tradeNote = trade.tradeNote;
+      pick.tradeDate = trade.date;
     }
   }
   return picks.sort((a, b) => a.overall - b.overall);
@@ -412,10 +445,13 @@ export function buildDraftBoard(
     const keeper = keeperByOverall.get(pick.overall) ?? null;
     return { pick, selection, keeper, onClock: false };
   });
-  for (const cell of cells) {
-    if (!cell.selection && !cell.keeper && !onClockAssigned) {
-      cell.onClock = true;
-      onClockAssigned = true;
+  // Nobody is on the clock until the commissioner starts the draft
+  if (dynamic.draft.startedAt !== null) {
+    for (const cell of cells) {
+      if (!cell.selection && !cell.keeper && !onClockAssigned) {
+        cell.onClock = true;
+        onClockAssigned = true;
+      }
     }
   }
   return cells;

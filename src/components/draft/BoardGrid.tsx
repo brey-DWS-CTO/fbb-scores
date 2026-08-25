@@ -67,7 +67,7 @@ export default function BoardGrid({ board, tv = false }: Props) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#666688',
+              color: 'var(--text-dim)',
               fontWeight: 700,
               fontSize: tv ? 'clamp(10px, 1.4vh, 16px)' : '0.75rem',
             }}
@@ -92,17 +92,19 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
     position: 'relative',
     minWidth: 0,
     minHeight: tv ? 0 : 46,
-    borderRadius: 3,
-    padding: tv ? '1px 5px' : '4px 5px',
+    borderRadius: 5,
+    padding: tv ? '1px 6px' : '4px 6px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     overflow: 'hidden',
-    border: `1px solid ${d ? 'transparent' : '#14142a'}`,
-    background: d ? `${d.color}18` : '#0b0b13',
+    border: `1px solid ${d ? `${d.color}55` : 'var(--cell-border)'}`,
+    background: d
+      ? `linear-gradient(135deg, ${d.color}30 0%, ${d.color}14 100%)`
+      : 'var(--cell-bg)',
     // position accent as an inset bar (avoids border shorthand/longhand mixing)
     boxShadow: d ? `inset 3px 0 0 ${d.color}` : undefined,
-    opacity: d?.isKeeper ? 0.85 : 1,
+    opacity: d?.isKeeper ? 0.9 : 1,
   };
   if (cell.onClock) {
     style.outline = '2px solid var(--neon-teal)';
@@ -110,11 +112,15 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
     style.background = 'rgba(0,255,204,0.06)';
   }
 
+  const tradeTitle = traded
+    ? `${cell.pick.currentOwner} owns ${traded}'s R${cell.pick.round} pick${cell.pick.tradeNote ? ` — ${cell.pick.tradeDate}: ${cell.pick.tradeNote}` : ''}`
+    : undefined;
+
   return (
-    <div className={cell.onClock ? 'pulse-glow' : undefined} style={style}>
+    <div className={cell.onClock ? 'pulse-glow' : undefined} style={style} title={tradeTitle}>
       {traded && (
         <span
-          title={`via ${traded} → ${cell.pick.currentOwner}`}
+          title={tradeTitle}
           style={{
             position: 'absolute',
             top: 0,
@@ -128,22 +134,39 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
         </span>
       )}
       {d ? (
-        <span
-          style={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            fontWeight: 600,
-            color: '#e8e8f0',
-            fontSize: tv ? 'clamp(10px, 1.1vw, 18px)' : '0.72rem',
-            lineHeight: 1.2,
-            wordBreak: 'break-word',
-          }}
-        >
-          {d.isKeeper ? '🔒 ' : ''}
-          {d.name}
-        </span>
+        <>
+          <span
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              fontWeight: 700,
+              color: 'var(--text-hi)',
+              fontSize: tv ? 'clamp(10px, 1.1vw, 18px)' : '0.72rem',
+              lineHeight: 1.2,
+              wordBreak: 'break-word',
+            }}
+          >
+            {d.isKeeper ? '🔒 ' : ''}
+            {d.name}
+          </span>
+          <span
+            style={{
+              color: d.color,
+              fontWeight: 700,
+              fontSize: tv ? 'clamp(8px, 0.75vw, 12px)' : '0.6rem',
+              lineHeight: 1.3,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              opacity: 0.95,
+            }}
+          >
+            {d.positions[0] ?? ''}
+            {d.proTeam ? <span style={{ color: 'var(--text-mid)', fontWeight: 600 }}> · {d.proTeam.toUpperCase()}</span> : null}
+          </span>
+        </>
       ) : cell.onClock ? (
         <span
           style={{
@@ -156,7 +179,7 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
         </span>
       ) : tv ? (
         <>
-          <span style={{ color: '#2e2e52', fontSize: 'clamp(9px, 0.9vw, 14px)', lineHeight: 1.2 }}>
+          <span style={{ color: 'var(--text-ghost)', fontSize: 'clamp(9px, 0.9vw, 14px)', lineHeight: 1.2 }}>
             {pickLabel(cell.pick)}
           </span>
           {traded && (

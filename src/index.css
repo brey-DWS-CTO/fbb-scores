@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Press+Start+2P&family=VT323:wght@400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Silkscreen:wght@400;700&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -11,7 +11,54 @@
   --dark-bg:     #0a0a0f;
   --panel-bg:    #0f0f1a;
   --panel-border:#1a1a33;
+  /* text ramp */
+  --text-max:   #ffffff;
+  --text-hi:    #e0e0e0;
+  --text-body:  #b0b0cc;
+  --text-soft:  #aaaacc;
+  --text-mid:   #8888aa;
+  --text-dim:   #666688;
+  --text-faint: #555577;
+  --text-ghost: #444466;
+  /* surfaces */
+  --cell-bg:     #0b0b13;
+  --cell-border: #14142a;
+  --chip-bg:     #0c0c16;
+  --input-bg:    #07070d;
+  --nav-bg:      rgba(10, 10, 18, 0.96);
 }
+
+/* ─── Light mode ──────────────────────────────────────────────────────── */
+html.theme-light {
+  --neon-red:    #cc1122;
+  --neon-blue:   #0072cc;
+  --neon-teal:   #00806a;
+  --neon-yellow: #a37e00;
+  --neon-purple: #8a00cc;
+  --neon-orange: #c24e00;
+  --dark-bg:     #f2f2f7;
+  --panel-bg:    #ffffff;
+  --panel-border:#d5d5e6;
+  --text-max:   #0a0a1a;
+  --text-hi:    #1c1c30;
+  --text-body:  #3c3c55;
+  --text-soft:  #4a4a66;
+  --text-mid:   #62627e;
+  --text-dim:   #7d7d99;
+  --text-faint: #9494ad;
+  --text-ghost: #adadc2;
+  --cell-bg:     #eaeaf2;
+  --cell-border: #dcdcea;
+  --chip-bg:     #ececf4;
+  --input-bg:    #ffffff;
+  --nav-bg:      rgba(255, 255, 255, 0.96);
+}
+html.theme-light body::before { display: none; } /* no scanlines in daylight */
+html.theme-light .glow-teal,
+html.theme-light .glow-red,
+html.theme-light .glow-blue,
+html.theme-light .glow-yellow,
+html.theme-light .glow-purple { text-shadow: none; }
 
 * { box-sizing: border-box; }
 
@@ -23,10 +70,16 @@ html, body, #root {
 
 body {
   background-color: var(--dark-bg);
-  color: #e0e0e0;
-  font-family: 'VT323', monospace;
-  font-size: 18px;
+  color: var(--text-hi);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
   overflow-x: hidden;
+}
+
+/* Retro mode (font toggle OFF): chunky pixel body text, still legible */
+html:not(.font-modern) body {
+  font-family: 'Silkscreen', 'Inter', monospace;
+  font-size: 13px;
 }
 
 /* CRT scanline overlay */
@@ -144,11 +197,12 @@ body::before {
 ::-webkit-scrollbar-thumb { background: #1a1a33; border-radius: 3px; }
 
 /* ─── Draft-hub additions ─────────────────────────────────────────────── */
-/* Arcade heading that stays pixel in BOTH font modes (use at ≥0.5rem only). */
+/* Arcade heading — Silkscreen: pixel identity, actually readable. */
 .hub-heading {
-  font-family: 'Press Start 2P', monospace;
-  letter-spacing: 0.05em;
-  line-height: 1.6;
+  font-family: 'Silkscreen', 'Press Start 2P', monospace;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
 }
 
 .hub-input {

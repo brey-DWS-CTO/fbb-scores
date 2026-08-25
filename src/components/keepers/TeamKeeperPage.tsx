@@ -1,31 +1,109 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { DatasetPlayer, KeeperSelection, ResolvedKeeper } from '../../lib/keeper/types.js';
 import { pickLabel, resolveTeamKeepers } from '../../lib/keeper/engine.js';
-import { leagueDataset, teamByOwner } from '../../lib/league/data.js';
+import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { apiErrorMessage, saveKeepers } from '../../lib/league/api.js';
-import { useApplyStateResponse, useIdentity, useLeagueState } from '../../hooks/useLeague.js';
+import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import IdentityChip from '../league/IdentityChip.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
 import { CapBar, LockBanner, RoundChip, SourceBadge, fmt1 } from './keeperUi.js';
+import { formatDraftAt } from './KeepersPage.js';
 
 const selKey = (sels: KeeperSelection[]) => sels.map((s) => `${s.playerKey}~${s.playerName}`).join('|');
 
-const th: CSSProperties = {
-  padding: '4px 8px',
-  color: '#666688',
-  fontSize: '0.62rem',
-  letterSpacing: '0.08em',
-  fontWeight: 700,
-  borderBottom: '1px solid var(--panel-border)',
-  textAlign: 'left',
-};
-const td: CSSProperties = {
-  padding: '6px 8px',
-  borderBottom: '1px solid var(--panel-border)',
-  color: '#b0b0cc',
-};
-const right: CSSProperties = { textAlign: 'right' };
+/** One tappable roster row — mobile-first, no horizontal scroll. */
+function RosterRow({
+  p,
+  season,
+  selected,
+  canEdit,
+  reason,
+  onTap,
+}: {
+  p: DatasetPlayer;
+  season: number;
+  selected: boolean;
+  canEdit: boolean;
+  reason: string | null;
+  onTap: () => void;
+}) {
+  const s = p.stats2026 ?? p.api2026;
+  const apiFallback = !p.stats2026 && !!p.api2026;
+  const eff = p.keeper.effectiveAvg;
+  const effDiff = eff != null && (!s || Math.abs(eff - s.avg) > 0.05);
+  const c = p.keeper.contract;
+  const expired = !!c && (c.expired || c.lastKeepableSeason < season);
+  const tappable = canEdit && (selected || reason === null);
+  return (
+    <button
+      className={tappable ? 'tap-btn' : undefined}
+      onClick={() => tappable && onTap()}
+      disabled={!tappable}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        width: '100%',
+        textAlign: 'left',
+        padding: '9px 14px',
+        background: selected ? 'rgba(0,255,204,0.07)' : 'transparent',
+        border: 'none',
+        borderBottom: '1px solid var(--panel-border)',
+        boxShadow: selected ? 'inset 3px 0 0 var(--neon-teal)' : undefined,
+        cursor: tappable ? 'pointer' : 'default',
+        opacity: !canEdit || tappable ? 1 : 0.55,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: selected ? 'var(--neon-teal)' : 'var(--text-hi)' }}>
+          {selected && '✓ '}
+          {p.name}
+        </div>
+        <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span>{p.positions.join('/')}</span>
+          {s && (
+            <span>
+              {s.avg.toFixed(1)}
+              {apiFallback ? '°' : ''} avg · {s.gp}gp
+            </span>
+          )}
+          {effDiff && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ color: 'var(--neon-yellow)', fontWeight: 700 }}>keeps at {fmt1(eff)}</span>
+              <SourceBadge info={p.keeper} compact />
+            </span>
+          )}
+        </div>
+        {canEdit && !selected && reason && (
+          <div style={{ color: 'var(--neon-red)', fontSize: '0.68rem', marginTop: 2 }}>{reason}</div>
+        )}
+      </div>
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+        {p.keeper.round !== null && <RoundChip round={p.keeper.round} />}
+        {c && (
+          <span style={{ fontSize: '0.65rem', color: expired ? 'var(--neon-red)' : 'var(--text-mid)', fontWeight: expired ? 700 : 400 }}>
+            {expired ? 'EXPIRED' : `thru ${c.lastKeepableSeason}`}
+          </span>
+        )}
+      </div>
+      {tappable && (
+        <span
+          style={{
+            flexShrink: 0,
+            width: 28,
+            textAlign: 'center',
+            color: selected ? 'var(--neon-red)' : 'var(--neon-teal)',
+            fontSize: '1.15rem',
+            fontWeight: 700,
+          }}
+        >
+          {selected ? '−' : '＋'}
+        </span>
+      )}
+    </button>
+  );
+}
 
 /** One selected-keeper card with pick cost, contract projection and errors. */
 function KeeperCard({
@@ -50,9 +128,9 @@ function KeeperCard({
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>{name}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-max)' }}>{name}</div>
           {p && (
-            <div style={{ color: '#8888aa', fontSize: '0.75rem' }}>
+            <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem' }}>
               {p.proTeam} · {p.positions.join('/')}
             </div>
           )}
@@ -60,9 +138,8 @@ function KeeperCard({
             <span style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--neon-teal)' }}>
               {fmt1(k.effectiveAvg)}
             </span>
-            <span style={{ color: '#666688', fontSize: '0.7rem' }}>FPPG</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>FPPG</span>
             {p && <SourceBadge info={p.keeper} />}
-            {k.round !== null && <RoundChip round={k.round} long />}
           </div>
         </div>
         {canEdit && (
@@ -87,6 +164,44 @@ function KeeperCard({
         )}
       </div>
 
+      {/* the price tag — the single most important number on the card */}
+      {k.round !== null && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            marginTop: 12,
+            padding: '10px 14px',
+            background: 'rgba(255,230,0,0.07)',
+            border: '1px solid rgba(255,230,0,0.4)',
+            borderRadius: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span className="hub-heading" style={{ fontSize: '0.6rem', color: '#b09b00' }}>
+            COSTS
+          </span>
+          <span
+            className="glow-yellow hub-heading"
+            style={{ fontSize: '1.5rem', color: 'var(--neon-yellow)', lineHeight: 1 }}
+          >
+            RD {k.round}
+          </span>
+          {k.pick && (
+            <span style={{ fontSize: '1rem', color: '#ffe600', fontWeight: 800 }}>
+              pick {pickLabel(k.pick)}
+              {k.pick.viaTradeFrom && (
+                <span style={{ color: 'var(--text-mid)', fontWeight: 500, fontSize: '0.75rem' }}>
+                  {' '}
+                  (from {k.pick.viaTradeFrom})
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
+
       <div
         style={{
           borderTop: '1px solid var(--panel-border)',
@@ -97,15 +212,6 @@ function KeeperCard({
           fontSize: '0.8rem',
         }}
       >
-        {k.pick && (
-          <div style={{ color: '#e0e0e0' }}>
-            <span style={{ color: '#666688', fontSize: '0.68rem', letterSpacing: '0.08em' }}>PICK </span>
-            Costs pick <strong style={{ color: 'var(--neon-yellow)' }}>{pickLabel(k.pick)}</strong>
-            {k.pick.viaTradeFrom && (
-              <span style={{ color: '#8888aa' }}> (acquired from {k.pick.viaTradeFrom})</span>
-            )}
-          </div>
-        )}
         {k.bumped && (
           <div style={{ color: 'var(--neon-red)', fontSize: '0.75rem' }}>
             {k.bumpReason === 'traded'
@@ -114,8 +220,8 @@ function KeeperCard({
           </div>
         )}
         {k.contract && (
-          <div style={{ color: '#b0b0cc' }}>
-            <span style={{ color: '#666688', fontSize: '0.68rem', letterSpacing: '0.08em' }}>CONTRACT </span>
+          <div style={{ color: 'var(--text-body)' }}>
+            <span style={{ color: 'var(--text-dim)', fontSize: '0.68rem', letterSpacing: '0.08em' }}>CONTRACT </span>
             {k.contract.isNew ? (
               <>
                 NEW contract · R{k.contract.originalRound} tier · max through {k.contract.lastKeepableSeason}
@@ -144,7 +250,7 @@ export default function TeamKeeperPage() {
   const owner = params.owner ?? '';
   const team = teamByOwner.get(owner);
 
-  const { state, isLoading } = useLeagueState();
+  const { state, isLoading, meta, dataset } = useLeagueData();
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
 
@@ -156,6 +262,7 @@ export default function TeamKeeperPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
   const [leaguePool, setLeaguePool] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const flashTimer = useRef<number | null>(null);
 
   // Reset local edits when navigating between teams
@@ -185,29 +292,40 @@ export default function TeamKeeperPage() {
   const canEdit = !!identity && (identity.owner === owner || isCommish) && (!locked || isCommish);
 
   // Every derived number comes from the engine, recomputed each render
-  const result = useMemo(() => resolveTeamKeepers(leagueDataset, owner, selections), [owner, selections]);
+  const result = useMemo(() => resolveTeamKeepers(dataset, owner, selections), [owner, selections, dataset]);
 
   const rosterPlayers = useMemo(
     () =>
-      leagueDataset.players
+      dataset.players
         .filter((p) => p.fantasyTeam === owner)
         .sort((a, b) => (b.keeper.effectiveAvg ?? -1) - (a.keeper.effectiveAvg ?? -1)),
-    [owner],
+    [owner, dataset],
   );
   const allPlayers = useMemo(
     () =>
-      [...leagueDataset.players].sort(
+      [...dataset.players].sort(
         (a, b) => (b.keeper.effectiveAvg ?? -1) - (a.keeper.effectiveAvg ?? -1),
       ),
-    [],
+    [dataset],
   );
 
   const addKeeper = (p: DatasetPlayer) => {
-    if (selections.length >= leagueDataset.maxKeepersPerTeam) return;
+    if (selections.length >= dataset.maxKeepersPerTeam) return;
     setDraftSel([...selections, { playerKey: p.key, playerName: p.name }]);
+    if (selections.length + 1 >= dataset.maxKeepersPerTeam) setPickerOpen(false);
   };
   const removeKeeper = (playerKey: string) => {
     setDraftSel(selections.filter((s) => s.playerKey !== playerKey));
+  };
+  /** Tap a roster row: toggle the player in/out of the keeper selections. */
+  const toggleKeeper = (p: DatasetPlayer) => {
+    if (!canEdit) return;
+    if (selections.some((s) => s.playerKey === p.key)) {
+      removeKeeper(p.key);
+      return;
+    }
+    if (disabledReason(p) || selections.length >= dataset.maxKeepersPerTeam) return;
+    addKeeper(p);
   };
 
   const disabledReason = (p: DatasetPlayer): string | null => {
@@ -216,7 +334,7 @@ export default function TeamKeeperPage() {
       return p.fantasyTeam ? `On ${p.fantasyTeam}'s roster` : "Not on a 2026 roster — can't be kept";
     }
     const c = p.keeper.contract;
-    if (c && (c.expired || c.lastKeepableSeason < leagueDataset.season)) {
+    if (c && (c.expired || c.lastKeepableSeason < dataset.season)) {
       return 'Contract EXPIRED — must re-enter the draft';
     }
     if (p.keeper.round === null) return 'No usable stats';
@@ -225,7 +343,7 @@ export default function TeamKeeperPage() {
 
   const comboMeta = (p: DatasetPlayer) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#e0e0e0' }}>
+      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-hi)' }}>
         {fmt1(p.keeper.effectiveAvg)}
       </span>
       {p.keeper.round !== null && <RoundChip round={p.keeper.round} />}
@@ -257,7 +375,7 @@ export default function TeamKeeperPage() {
           <div className="hub-heading glow-red" style={{ fontSize: '0.8rem', color: 'var(--neon-red)' }}>
             NO SUCH TEAM
           </div>
-          <div style={{ color: '#8888aa', margin: '12px 0' }}>
+          <div style={{ color: 'var(--text-mid)', margin: '12px 0' }}>
             "{owner}" isn't in this league.
           </div>
           <Link to="/keepers" style={{ color: 'var(--neon-teal)', fontWeight: 700 }}>
@@ -276,8 +394,8 @@ export default function TeamKeeperPage() {
         : 'var(--neon-red)';
   const anyBump = result.keepers.some((k) => k.bumped);
   const pickColor =
-    result.keepers.length === 0 ? '#8888aa' : anyBump ? 'var(--neon-orange)' : 'var(--neon-blue)';
-  const emptySlots = Math.max(0, leagueDataset.maxKeepersPerTeam - result.keepers.length);
+    result.keepers.length === 0 ? 'var(--text-mid)' : anyBump ? 'var(--neon-orange)' : 'var(--neon-blue)';
+  const emptySlots = Math.max(0, dataset.maxKeepersPerTeam - result.keepers.length);
   const hasApiFallback = rosterPlayers.some((p) => !p.stats2026 && p.api2026);
 
   return (
@@ -293,27 +411,29 @@ export default function TeamKeeperPage() {
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <Link
-            to="/keepers"
-            style={{
-              color: '#8888aa',
-              fontSize: '0.72rem',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              minHeight: 40,
-              paddingRight: 12,
-            }}
-          >
-            ← ALL TEAMS
-          </Link>
+          {isCommish && (
+            <Link
+              to="/admin"
+              style={{
+                color: 'var(--text-mid)',
+                fontSize: '0.72rem',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                minHeight: 40,
+                paddingRight: 12,
+              }}
+            >
+              ← ADMIN
+            </Link>
+          )}
           <h1
             className="hub-heading glow-teal"
             style={{ fontSize: '1rem', color: 'var(--neon-teal)', margin: '6px 0 2px', lineHeight: 1.5 }}
           >
             {owner.toUpperCase()}
           </h1>
-          <div style={{ color: '#8888aa', fontSize: '0.85rem' }}>{team.espnTeamName}</div>
+          <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem' }}>{team.espnTeamName}</div>
         </div>
         <div style={{ flexShrink: 0, paddingTop: 4 }}>
           <IdentityChip />
@@ -348,14 +468,35 @@ export default function TeamKeeperPage() {
         </div>
       )}
       {identity && !canEdit && !locked && (
-        <div style={{ color: '#8888aa', fontSize: '0.75rem', marginBottom: 12 }}>
+        <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem', marginBottom: 12 }}>
           Read-only — only {owner} (or the commissioner) can edit this page.
         </div>
       )}
+      {!canEdit &&
+        meta &&
+        !meta.revealed &&
+        (meta.keeperStatus[owner] ?? 0) > 0 &&
+        (state.keepers[owner] ?? []).length === 0 && (
+          <div
+            className="panel"
+            style={{
+              borderColor: 'var(--neon-purple)',
+              borderRadius: 8,
+              padding: '10px 12px',
+              marginBottom: 12,
+              color: 'var(--neon-purple)',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+            }}
+          >
+            🔒 {owner} has submitted {meta.keeperStatus[owner]} keeper
+            {(meta.keeperStatus[owner] ?? 0) > 1 ? 's' : ''} — hidden until draft day.
+          </div>
+        )}
 
       {/* ── Cap meter ──────────────────────────────────────────── */}
       <section className="panel" style={{ padding: '14px 14px 12px', borderRadius: 10, marginBottom: 14 }}>
-        <div className="hub-heading" style={{ fontSize: '0.62rem', color: '#8888aa', marginBottom: 8 }}>
+        <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)', marginBottom: 8 }}>
           SALARY CAP
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
@@ -371,7 +512,7 @@ export default function TeamKeeperPage() {
           >
             {result.capUsed.toFixed(1)}
           </span>
-          <span style={{ color: '#8888aa', fontSize: '1.05rem', fontWeight: 600 }}>
+          <span style={{ color: 'var(--text-mid)', fontSize: '1.05rem', fontWeight: 600 }}>
             / {result.capLimit} FPPG
           </span>
           {dirty && (
@@ -435,10 +576,10 @@ export default function TeamKeeperPage() {
       {/* ── Selected keepers ───────────────────────────────────── */}
       <section style={{ marginBottom: 14 }}>
         <div className="hub-heading" style={{ fontSize: '0.6rem', color: 'var(--neon-purple)', marginBottom: 8 }}>
-          SELECTED KEEPERS ({result.keepers.length}/{leagueDataset.maxKeepersPerTeam})
+          SELECTED KEEPERS ({result.keepers.length}/{dataset.maxKeepersPerTeam})
         </div>
         {isLoading && result.keepers.length === 0 && (
-          <div style={{ color: '#666688', fontSize: '0.8rem', marginBottom: 8 }}>Loading league state…</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem', marginBottom: 8 }}>Loading league state…</div>
         )}
         <div style={{ display: 'grid', gap: 10 }}>
           {result.keepers.map((k) => (
@@ -450,128 +591,195 @@ export default function TeamKeeperPage() {
             />
           ))}
           {Array.from({ length: emptySlots }).map((_, i) => (
-            <div
+            <button
               key={`empty-${i}`}
+              className={canEdit ? 'tap-btn' : undefined}
+              onClick={() => canEdit && setPickerOpen(true)}
+              disabled={!canEdit}
               style={{
-                border: '2px dashed var(--panel-border)',
+                border: `2px dashed ${canEdit ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
+                background: 'transparent',
                 borderRadius: 10,
-                padding: '16px 14px',
-                color: '#555577',
-                fontSize: '0.8rem',
+                padding: '18px 14px',
+                color: canEdit ? 'var(--neon-teal)' : 'var(--text-faint)',
+                fontSize: '0.85rem',
+                fontWeight: canEdit ? 700 : 400,
                 textAlign: 'center',
+                cursor: canEdit ? 'pointer' : 'default',
+                width: '100%',
               }}
             >
-              Empty keeper slot
-            </div>
+              {canEdit ? '＋ TAP TO ADD A KEEPER' : 'Empty keeper slot'}
+            </button>
           ))}
         </div>
       </section>
 
-      {/* ── Add keeper ─────────────────────────────────────────── */}
-      {canEdit && selections.length < leagueDataset.maxKeepersPerTeam && (
-        <section
-          className="panel"
-          style={{ padding: '12px 14px 6px', borderRadius: 10, marginBottom: 14, overflow: 'visible' }}
-        >
-          <div className="hub-heading" style={{ fontSize: '0.6rem', color: 'var(--neon-teal)', marginBottom: 10 }}>
-            ADD KEEPER
-          </div>
-          <PlayerCombobox
-            players={leaguePool ? allPlayers : rosterPlayers}
-            placeholder={leaguePool ? 'Search every 2026 roster…' : `Search ${owner}'s roster…`}
-            onSelect={addKeeper}
-            renderMeta={comboMeta}
-            disabledReason={disabledReason}
-          />
-          <button
-            className="tap-btn"
-            onClick={() => setLeaguePool((v) => !v)}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '10px 0',
-              minHeight: 36,
-              color: leaguePool ? 'var(--neon-purple)' : '#666688',
-              fontSize: '0.75rem',
-              textDecoration: 'underline',
-            }}
-          >
-            {leaguePool ? '← back to my roster only' : 'search the whole league pool'}
-          </button>
-        </section>
-      )}
-
-      {/* ── Full roster reference ──────────────────────────────── */}
+      {/* ── Full roster (tap a player to keep them) ────────────── */}
       <section className="panel" style={{ padding: '12px 0 4px', borderRadius: 10, marginBottom: 14 }}>
         <div
           className="hub-heading"
-          style={{ fontSize: '0.6rem', color: 'var(--neon-blue)', margin: '0 14px 10px' }}
+          style={{ fontSize: '0.62rem', color: 'var(--neon-blue)', margin: '0 14px 4px' }}
         >
           FULL ROSTER ({rosterPlayers.length})
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-            <thead>
-              <tr>
-                <th style={th}>PLAYER</th>
-                <th style={th}>POS</th>
-                <th style={{ ...th, ...right }}>2026</th>
-                <th style={{ ...th, ...right }}>KEEP AVG</th>
-                <th style={{ ...th, ...right }}>RD</th>
-                <th style={{ ...th, ...right }}>CONTRACT</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rosterPlayers.map((p) => {
-                const s = p.stats2026 ?? p.api2026;
-                const apiFallback = !p.stats2026 && !!p.api2026;
-                const eff = p.keeper.effectiveAvg;
-                const effDiff = eff != null && (!s || Math.abs(eff - s.avg) > 0.05);
-                const c = p.keeper.contract;
-                const expired = !!c && (c.expired || c.lastKeepableSeason < leagueDataset.season);
-                const isSel = selections.some((x) => x.playerKey === p.key);
-                return (
-                  <tr key={p.key} style={{ background: isSel ? 'rgba(0,255,204,0.06)' : undefined }}>
-                    <td style={{ ...td, color: '#e0e0e0', fontWeight: 600 }}>{p.name}</td>
-                    <td style={{ ...td, color: '#8888aa' }}>{p.positions.join('/')}</td>
-                    <td style={{ ...td, ...right }}>
-                      {s ? `${s.avg.toFixed(1)}${apiFallback ? '°' : ''} · ${s.gp}gp` : '—'}
-                    </td>
-                    <td style={{ ...td, ...right }}>
-                      {effDiff ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ color: 'var(--neon-yellow)', fontWeight: 700 }}>{fmt1(eff)}</span>
-                          <SourceBadge info={p.keeper} compact />
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td style={{ ...td, ...right }}>
-                      {p.keeper.round !== null ? <RoundChip round={p.keeper.round} /> : '—'}
-                    </td>
-                    <td style={{ ...td, ...right }}>
-                      {c ? (
-                        expired ? (
-                          <span style={{ color: 'var(--neon-red)', fontWeight: 700 }}>EXPIRED</span>
-                        ) : (
-                          `thru ${c.lastKeepableSeason}`
-                        )
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {canEdit && (
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
+            Tap a player to keep them · tap again to remove
+          </div>
+        )}
+        <div>
+          {rosterPlayers.map((p) => (
+            <RosterRow
+              key={p.key}
+              p={p}
+              season={dataset.season}
+              selected={selections.some((x) => x.playerKey === p.key)}
+              canEdit={canEdit}
+              reason={disabledReason(p)}
+              onTap={() => toggleKeeper(p)}
+            />
+          ))}
         </div>
         {hasApiFallback && (
-          <div style={{ color: '#555577', fontSize: '0.65rem', margin: '8px 14px' }}>
+          <div style={{ color: 'var(--text-faint)', fontSize: '0.65rem', margin: '8px 14px' }}>
             ° season line from the ESPN API (player missing from the league-official sheet)
           </div>
         )}
+      </section>
+
+      {/* ── Add-keeper sheet (search + tap list) ───────────────── */}
+      {pickerOpen && canEdit && (
+        <div
+          onClick={() => setPickerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 150,
+            background: 'rgba(0,0,0,0.75)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            className="panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 560,
+              maxHeight: '78vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '14px 0 calc(10px + env(safe-area-inset-bottom))',
+              borderRadius: '12px 12px 0 0',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px 10px' }}>
+              <div className="hub-heading" style={{ fontSize: '0.7rem', color: 'var(--neon-teal)', flex: 1 }}>
+                ADD KEEPER
+              </div>
+              <button
+                className="tap-btn"
+                onClick={() => setPickerOpen(false)}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 8,
+                  border: '2px solid var(--panel-border)',
+                  background: 'transparent',
+                  color: 'var(--text-mid)',
+                  fontWeight: 700,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: '0 14px' }}>
+              <PlayerCombobox
+                players={leaguePool ? allPlayers : rosterPlayers}
+                placeholder={leaguePool ? 'Search every 2026 roster…' : `Search ${owner}'s roster…`}
+                onSelect={addKeeper}
+                renderMeta={comboMeta}
+                disabledReason={disabledReason}
+              />
+              <button
+                className="tap-btn"
+                onClick={() => setLeaguePool((v) => !v)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '8px 0',
+                  minHeight: 32,
+                  color: leaguePool ? 'var(--neon-purple)' : 'var(--text-dim)',
+                  fontSize: '0.75rem',
+                  textDecoration: 'underline',
+                }}
+              >
+                {leaguePool ? '← back to my roster only' : 'search the whole league pool'}
+              </button>
+            </div>
+            <div style={{ overflowY: 'auto', borderTop: '1px solid var(--panel-border)' }}>
+              {(leaguePool ? allPlayers.slice(0, 80) : rosterPlayers).map((p) => (
+                <RosterRow
+                  key={p.key}
+                  p={p}
+                  season={dataset.season}
+                  selected={selections.some((x) => x.playerKey === p.key)}
+                  canEdit
+                  reason={disabledReason(p)}
+                  onTap={() => toggleKeeper(p)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── League status: who has keepers in (names only) ─────── */}
+      <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
+        <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)', marginBottom: 6 }}>
+          WHO'S IN
+        </div>
+        {meta && !meta.revealed && (
+          <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', marginBottom: 10 }}>
+            🕵️ Everyone's picks stay secret until draft day — {formatDraftAt(meta.draftAt)}.
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+          {OWNERS.map((o) => {
+            const n = meta?.keeperStatus[o] ?? 0;
+            const inYet = n > 0;
+            const row = (
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--panel-border)',
+                  background: inYet ? 'rgba(0,255,204,0.05)' : 'transparent',
+                }}
+              >
+                <span style={{ fontWeight: o === owner ? 800 : 600, color: o === owner ? 'var(--neon-teal)' : 'var(--text-hi)', fontSize: '0.85rem' }}>
+                  {o}
+                </span>
+                <span style={{ color: inYet ? 'var(--neon-teal)' : 'var(--text-faint)', fontSize: '0.78rem', fontWeight: 700 }}>
+                  {inYet ? `✓ ${n} in` : '—'}
+                </span>
+              </span>
+            );
+            return isCommish ? (
+              <Link key={o} to={`/keepers/${encodeURIComponent(o)}`} style={{ textDecoration: 'none' }}>
+                {row}
+              </Link>
+            ) : (
+              <span key={o}>{row}</span>
+            );
+          })}
+        </div>
       </section>
 
       {/* ── Sticky save bar ────────────────────────────────────── */}
@@ -601,7 +809,7 @@ export default function TeamKeeperPage() {
               ) : dirty ? (
                 <span style={{ color: 'var(--neon-yellow)' }}>● Unsaved changes</span>
               ) : (
-                <span style={{ color: '#666688' }}>In sync with the league</span>
+                <span style={{ color: 'var(--text-dim)' }}>In sync with the league</span>
               )}
             </div>
             <button
@@ -615,8 +823,8 @@ export default function TeamKeeperPage() {
                 border: 'none',
                 fontWeight: 800,
                 letterSpacing: '0.05em',
-                background: !dirty || saving ? '#1a1a33' : 'var(--neon-teal)',
-                color: !dirty || saving ? '#666688' : '#001a14',
+                background: !dirty || saving ? 'var(--panel-border)' : 'var(--neon-teal)',
+                color: !dirty || saving ? 'var(--text-dim)' : '#001a14',
                 flexShrink: 0,
               }}
             >

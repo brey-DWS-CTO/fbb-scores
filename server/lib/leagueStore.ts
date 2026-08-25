@@ -8,9 +8,10 @@
  *  - Local JSON file (.data/league-state.json) when DATABASE_URL is absent —
  *    zero-setup local development.
  *
- * PIN seeding: on first init, if no pins exist, a random 4-digit PIN is
- * generated for each owner listed in src/data/source/league-2027-config.json.
- * Commissioner status always comes from that config file, never from storage.
+ * PINs: seeded UNCLAIMED (empty string) for each owner listed in
+ * src/data/source/league-2027-config.json — each owner sets their own PIN on
+ * first sign-in (claimPin). Commissioner status always comes from that config
+ * file, never from storage.
  */
 import fs from 'fs';
 import path from 'path';
@@ -33,6 +34,13 @@ export interface DraftPickState {
   timestamp?: string;
 }
 
+export interface LeagueOverrides {
+  /** Commissioner-set salary cap; null/absent = computed cap (R3 max + R3 min). */
+  cap?: number | null;
+  /** Commissioner per-player keeper-round tweaks: playerKey -> round 1-10. */
+  playerRounds?: Record<string, number>;
+}
+
 export interface LeagueDynamicState {
   season: number; // 2027
   keepers: Record<string, KeeperSelection[]>; // owner -> up to 2
@@ -41,6 +49,7 @@ export interface LeagueDynamicState {
     startedAt: string | null;
   };
   locks: { keepersLocked: boolean };
+  overrides?: LeagueOverrides;
 }
 
 export interface AuditRow {
@@ -76,6 +85,11 @@ const COMMISSIONERS = new Set(
 );
 const SEASON: number = (leagueConfig as { season?: number }).season ?? 2027;
 
+/** Draft day — keepers stay secret (non-commissioner) until this moment. */
+export const DRAFT_AT_ISO: string =
+  (leagueConfig as { draftAt?: string }).draftAt ?? '2026-10-18T14:00:00-07:00';
+export const DRAFT_AT_MS: number = Date.parse(DRAFT_AT_ISO);
+
 /** Case-sensitive exact match against the config's owner names. */
 export function isKnownOwner(owner: string): boolean {
   return OWNERS.includes(owner);
@@ -94,9 +108,8 @@ function defaultState(): LeagueDynamicState {
   };
 }
 
-function randomPin(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
+/** Unclaimed PINs are stored as the empty string. */
+const UNCLAIMED = '';
 
 // ─── Backend interface ───────────────────────────────────────────────────────
 
@@ -155,14 +168,10 @@ class NeonBackend implements StoreBackend {
       VALUES (1, ${JSON.stringify(defaultState())}::jsonb, 0)
       ON CONFLICT (id) DO NOTHING`;
 
-    const countRows = (await this.sql`SELECT count(*)::int AS n FROM pins`) as Array<{ n: number }>;
-    if ((countRows[0]?.n ?? 0) === 0) {
-      for (const owner of OWNERS) {
-        await this.sql`INSERT INTO pins (owner, pin)
-          VALUES (${owner}, ${randomPin()})
-          ON CONFLICT (owner) DO NOTHING`;
-      }
-      console.log(`[leagueStore] Seeded random PINs for ${OWNERS.length} owners in Neon`);
+    for (const owner of OWNERS) {
+      await this.sql`INSERT INTO pins (owner, pin)
+        VALUES (${owner}, ${UNCLAIMED})
+        ON CONFLICT (owner) DO NOTHING`;
     }
   }
 
@@ -276,11 +285,8 @@ class FileBackend implements StoreBackend {
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const doc = this.readDoc();
-    if (Object.keys(doc.pins).length === 0) {
-      for (const owner of OWNERS) doc.pins[owner] = randomPin();
-      console.log(
-        `[leagueStore] Seeded random PINs for ${OWNERS.length} owners in ${this.filePath}`,
-      );
+    for (const owner of OWNERS) {
+      if (!(owner in doc.pins)) doc.pins[owner] = UNCLAIMED;
     }
     this.writeDoc(doc);
   }
@@ -418,8 +424,35 @@ export async function verifyPin(
     return { ok: false, isCommissioner: false };
   }
   const stored = await getBackend().getPin(owner);
-  const ok = stored !== null && stored === pin;
+  const ok = stored !== null && stored !== UNCLAIMED && stored === pin;
   return { ok, isCommissioner: ok && isCommissionerOwner(owner) };
+}
+
+/** Which owners have set a PIN yet (safe to expose publicly). */
+export async function getPinStatus(): Promise<Array<{ owner: string; claimed: boolean }>> {
+  const rows = await getPins();
+  const byOwner = new Map(rows.map((r) => [r.owner, r.pin]));
+  return OWNERS.map((owner) => ({
+    owner,
+    claimed: (byOwner.get(owner) ?? UNCLAIMED) !== UNCLAIMED,
+  }));
+}
+
+/**
+ * First-time PIN claim: succeeds only while the owner's PIN is unclaimed.
+ * After that, changes go through the commissioner (setPin).
+ */
+export async function claimPin(
+  owner: string,
+  pin: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isKnownOwner(owner)) return { ok: false, error: `Unknown owner: ${owner}` };
+  const stored = await getBackend().getPin(owner);
+  if (stored !== null && stored !== UNCLAIMED) {
+    return { ok: false, error: 'A PIN is already set for this team' };
+  }
+  await getBackend().setPin(owner, pin);
+  return { ok: true };
 }
 
 /** All pins, ordered as the owners appear in the league config. */

@@ -46,7 +46,7 @@ export function SourceBadge({ info, compact }: { info: PlayerKeeperInfo; compact
     bg = 'rgba(255,230,0,0.08)';
   } else {
     label = '2026 AVG';
-    color = '#8888aa';
+    color = 'var(--text-mid)';
     bg = 'rgba(136,136,170,0.08)';
   }
   return <span style={{ ...chipBase, border: `1px solid ${color}`, color, background: bg }}>{label}</span>;
@@ -60,7 +60,7 @@ export function CapBar({ used, limit, height = 10 }: { used: number; limit: numb
     <div
       style={{
         height,
-        background: '#07070d',
+        background: 'var(--input-bg)',
         border: '1px solid var(--panel-border)',
         borderRadius: 999,
         overflow: 'hidden',

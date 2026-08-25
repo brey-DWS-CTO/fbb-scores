@@ -13,10 +13,15 @@ import {
   verifyPin,
   getPins,
   setPin,
+  getPinStatus,
+  claimPin,
   appendAudit,
   readAudit,
   isKnownOwner,
+  DRAFT_AT_ISO,
+  DRAFT_AT_MS,
   type KeeperSelection,
+  type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 
 const router = Router();
@@ -62,13 +67,66 @@ function requireCommissioner(_req: Request, res: Response, next: NextFunction): 
   next();
 }
 
+// ─── Keeper secrecy ──────────────────────────────────────────────────────────
+//
+// Until draft day (DRAFT_AT), each owner may see only their OWN keepers; the
+// commissioner sees everything. Enforced here — every response that carries
+// league state passes through redactState() so the raw payload never leaks.
+
+interface Viewer {
+  owner: string | null;
+  isCommissioner: boolean;
+}
+
+/** Best-effort identity from optional x-owner/x-pin headers (never throws). */
+async function optionalViewer(req: Request): Promise<Viewer> {
+  const owner = req.header('x-owner');
+  const pin = req.header('x-pin');
+  if (!owner || !pin) return { owner: null, isCommissioner: false };
+  try {
+    const v = await verifyPin(owner, pin);
+    return v.ok ? { owner, isCommissioner: v.isCommissioner } : { owner: null, isCommissioner: false };
+  } catch {
+    return { owner: null, isCommissioner: false };
+  }
+}
+
+function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
+  const revealed = Date.now() >= DRAFT_AT_MS;
+  const keeperStatus: Record<string, number> = {};
+  for (const [owner, sels] of Object.entries(state.keepers)) {
+    keeperStatus[owner] = sels.length;
+  }
+  return {
+    draftAt: DRAFT_AT_ISO,
+    revealed,
+    keeperStatus,
+    viewer: viewer.owner,
+    isCommissioner: viewer.isCommissioner,
+  };
+}
+
+function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer: Viewer) {
+  const meta = stateMeta(result.state, viewer);
+  let keepers = result.state.keepers;
+  if (!meta.revealed && !viewer.isCommissioner) {
+    keepers =
+      viewer.owner && result.state.keepers[viewer.owner]
+        ? { [viewer.owner]: result.state.keepers[viewer.owner] }
+        : {};
+  }
+  return { ...result, state: { ...result.state, keepers }, meta };
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 /**
- * GET /api/league/state — poll target, no auth, fast.
+ * GET /api/league/state — poll target. Auth headers optional; they control
+ * how much of the keeper map the caller may see (see redactState).
  */
-router.get('/state', async (_req, res) => {
-  res.json(await getState());
+router.get('/state', async (req, res) => {
+  const viewer = await optionalViewer(req);
+  res.json(redactState(await getState(), viewer));
 });
 
 /**
@@ -125,7 +183,7 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
     draft.keepers[target] = clean;
   });
   await appendAudit(authedOwner, 'keepers.set', { target, selections: clean });
-  res.json(result);
+  res.json(redactState(result, { owner: authedOwner, isCommissioner }));
 });
 
 /**
@@ -154,6 +212,9 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
   const authedOwner = res.locals.owner as string;
   const timestamp = new Date().toISOString();
   const result = await mutateState((draft) => {
+    if (draft.draft.startedAt === null) {
+      throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
+    }
     draft.draft.picks[String(overallPick)] = {
       playerKey,
       playerName,
@@ -161,10 +222,9 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       enteredBy: authedOwner,
       timestamp,
     };
-    if (draft.draft.startedAt === null) draft.draft.startedAt = timestamp;
   });
   await appendAudit(authedOwner, 'draft.pick', { overallPick, playerKey, playerName, isKeeper });
-  res.json(result);
+  res.json(redactState(result, { owner: authedOwner, isCommissioner: res.locals.isCommissioner as boolean }));
 });
 
 /**
@@ -180,7 +240,19 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
     delete draft.draft.picks[String(overallPick)];
   });
   await appendAudit(res.locals.owner as string, 'draft.pick_cleared', { overallPick });
-  res.json(result);
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/draft/start — open the draft (commissioner only).
+ * Until this runs, the board is static and no picks can be entered.
+ */
+router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) => {
+  const result = await mutateState((draft) => {
+    if (draft.draft.startedAt === null) draft.draft.startedAt = new Date().toISOString();
+  });
+  await appendAudit(res.locals.owner as string, 'draft.started', null);
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -193,7 +265,7 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
     draft.draft.startedAt = null;
   });
   await appendAudit(res.locals.owner as string, 'draft.reset', null);
-  res.json(result);
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -210,7 +282,84 @@ router.post('/locks', requireAuth, requireCommissioner, async (req, res) => {
     draft.locks.keepersLocked = keepersLocked;
   });
   await appendAudit(res.locals.owner as string, 'locks.set', { keepersLocked });
-  res.json(result);
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/overrides — commissioner tier/cap tweaks.
+ * Body: { cap?: number | null, playerRounds?: Record<string, number | null> }
+ * cap: number sets an override, null clears it (back to computed).
+ * playerRounds entries: 1-10 sets an override for that playerKey, null removes it.
+ */
+router.post('/overrides', requireAuth, requireCommissioner, async (req, res) => {
+  const body = (req.body ?? {}) as { cap?: unknown; playerRounds?: unknown };
+
+  if (body.cap !== undefined && body.cap !== null && (typeof body.cap !== 'number' || body.cap <= 0 || body.cap > 200)) {
+    res.status(400).json({ error: 'cap must be a positive number (or null to clear)' });
+    return;
+  }
+  const roundEntries: Array<[string, number | null]> = [];
+  if (body.playerRounds !== undefined) {
+    if (typeof body.playerRounds !== 'object' || body.playerRounds === null) {
+      res.status(400).json({ error: 'playerRounds must be an object' });
+      return;
+    }
+    for (const [key, val] of Object.entries(body.playerRounds as Record<string, unknown>)) {
+      if (val !== null && (typeof val !== 'number' || !Number.isInteger(val) || val < 1 || val > 10)) {
+        res.status(400).json({ error: `playerRounds.${key} must be an integer 1-10 (or null to clear)` });
+        return;
+      }
+      roundEntries.push([key, val as number | null]);
+    }
+  }
+
+  const result = await mutateState((draft) => {
+    const ov = (draft.overrides ??= {});
+    if (body.cap !== undefined) ov.cap = body.cap as number | null;
+    const rounds = (ov.playerRounds ??= {});
+    for (const [key, val] of roundEntries) {
+      if (val === null) delete rounds[key];
+      else rounds[key] = val;
+    }
+  });
+  await appendAudit(res.locals.owner as string, 'overrides.set', {
+    cap: body.cap,
+    playerRounds: Object.fromEntries(roundEntries),
+  });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * GET /api/league/pin-status — which teams have set a PIN yet (public;
+ * used by the sign-in modal to offer "set your PIN" vs "enter your PIN").
+ */
+router.get('/pin-status', async (_req, res) => {
+  res.json(await getPinStatus());
+});
+
+/**
+ * POST /api/league/claim-pin — first-time PIN setup for an owner.
+ * Body: { owner: string, pin: string (4-8 digits) }. Fails once claimed.
+ */
+router.post('/claim-pin', async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const owner = body.owner;
+  const pin = body.pin;
+  if (typeof owner !== 'string' || !isKnownOwner(owner)) {
+    res.status(404).json({ error: 'Unknown owner' });
+    return;
+  }
+  if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+    res.status(400).json({ error: 'PIN must be 4-8 digits' });
+    return;
+  }
+  const result = await claimPin(owner, pin);
+  if (!result.ok) {
+    res.status(409).json({ error: result.error ?? 'PIN already claimed' });
+    return;
+  }
+  await appendAudit(owner, 'pin.claimed', { owner });
+  res.json({ ok: true });
 });
 
 /**
@@ -221,8 +370,9 @@ router.get('/pins', requireAuth, requireCommissioner, async (_req, res) => {
 });
 
 /**
- * POST /api/league/pins/:owner — set an owner's PIN (commissioner only).
- * Body: { pin: string } — 4-8 characters.
+ * POST /api/league/pins/:owner — set or clear an owner's PIN (commissioner
+ * only). Body: { pin: string } — 4-8 characters, or "" to clear so the owner
+ * sets a fresh one on their next sign-in.
  */
 router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) => {
   const target = req.params.owner;
@@ -231,20 +381,21 @@ router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) =
     return;
   }
   const pin = (req.body as { pin?: unknown } | undefined)?.pin;
-  if (typeof pin !== 'string' || pin.length < 4 || pin.length > 8) {
-    res.status(400).json({ error: 'pin must be a string of 4-8 characters' });
+  if (typeof pin !== 'string' || (pin !== '' && (pin.length < 4 || pin.length > 8))) {
+    res.status(400).json({ error: 'pin must be 4-8 characters, or "" to clear' });
     return;
   }
   await setPin(target, pin);
   // Deliberately do not log the PIN value in the audit trail
-  await appendAudit(res.locals.owner as string, 'pin.set', { target });
+  await appendAudit(res.locals.owner as string, pin === '' ? 'pin.cleared' : 'pin.set', { target });
   res.json({ ok: true });
 });
 
 /**
- * GET /api/league/audit?limit=50 — recent audit rows, newest first (any authed owner).
+ * GET /api/league/audit?limit=50 — recent audit rows, newest first.
+ * Commissioner only: rows contain keeper selections, which are secret pre-draft.
  */
-router.get('/audit', requireAuth, async (req, res) => {
+router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
   const parsed = parseInt(String(req.query.limit ?? '50'), 10);
   const limit = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 200) : 50;
   res.json(await readAudit(limit));

@@ -1,6 +1,6 @@
 {
  "season": 2027,
- "generatedAt": "2026-08-25T02:15:41.365Z",
+ "generatedAt": "2026-08-25T03:20:07.963Z",
  "cap": 77.8,
  "capRule": {
   "round3Max": 40.1,
@@ -11254,6 +11254,84 @@
    "from": "Kyle",
    "to": "Patrick",
    "tradeNote": "Patrick trades J. McDaniels, R. Kalkbrenner + own 5th for P. Siakam + Kyle's 8th"
+  }
+ ],
+ "tradeDetails": [
+  {
+   "date": "2025-11-28",
+   "teams": [
+    "Derek",
+    "Ryan"
+   ],
+   "received": {
+    "Derek": [
+     "Tyrese Maxey",
+     "Ryan's 2027 9th-round pick (9.2)"
+    ],
+    "Ryan": [
+     "LaMelo Ball",
+     "Ausar Thompson",
+     "Derek's 2027 3rd-round pick (3.8)"
+    ]
+   }
+  },
+  {
+   "date": "2025-12-21",
+   "teams": [
+    "Aaron",
+    "Ryan"
+   ],
+   "received": {
+    "Aaron": [
+     "Jaylen Brown",
+     "Ryan's 2027 10th-round pick (10.9)"
+    ],
+    "Ryan": [
+     "Mikal Bridges",
+     "Aaron's 2027 3rd-round pick (3.7)"
+    ]
+   }
+  },
+  {
+   "date": "2025-12-22",
+   "teams": [
+    "Joel",
+    "Kyle"
+   ],
+   "received": {
+    "Joel": [
+     "Nikola Vucevic",
+     "Derrick White",
+     "Jalen Brunson",
+     "Kyle's 2027 9th-round pick (9.5)",
+     "Kyle's 2027 10th-round pick (10.6)"
+    ],
+    "Kyle": [
+     "Jordan Poole",
+     "Jaylon Tyson",
+     "Brandin Podziemski",
+     "Joel's 2027 3rd-round pick (3.1)",
+     "Joel's 2027 6th-round pick (6.10)"
+    ]
+   }
+  },
+  {
+   "date": "2026-01-04",
+   "teams": [
+    "Patrick",
+    "Kyle"
+   ],
+   "received": {
+    "Patrick": [
+     "Pascal Siakam",
+     "Kyle's 2027 8th-round pick (8.6)"
+    ],
+    "Kyle": [
+     "Jaden McDaniels",
+     "Ryan Kalkbrenner",
+     "Patrick's 2027 5th-round pick (5.3)"
+    ]
+   }
   }
  ],
  "draftRounds": 14,

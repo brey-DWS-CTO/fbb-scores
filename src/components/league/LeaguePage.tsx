@@ -1,15 +1,14 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { PickTrade } from '../../lib/keeper/types.js';
-import { leagueDataset } from '../../lib/league/data.js';
+
 import { apiErrorMessage, fetchPins, resetDraft, setLocks, setPin } from '../../lib/league/api.js';
-import { useApplyStateResponse, useIdentity, useLeagueState } from '../../hooks/useLeague.js';
+import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { useSettings } from '../../hooks/useSettings.js';
 import IdentityChip from './IdentityChip.js';
 
 const th: CSSProperties = {
   padding: '4px 8px',
-  color: '#666688',
+  color: 'var(--text-dim)',
   fontSize: '0.62rem',
   letterSpacing: '0.08em',
   fontWeight: 700,
@@ -19,7 +18,7 @@ const th: CSSProperties = {
 const td: CSSProperties = {
   padding: '6px 8px',
   borderBottom: '1px solid var(--panel-border)',
-  color: '#b0b0cc',
+  color: 'var(--text-body)',
 };
 const right: CSSProperties = { textAlign: 'right' };
 
@@ -54,9 +53,9 @@ const formatDate = (iso: string) =>
 
 /** /league — rules reference (tiers, contracts, trades), settings + commissioner tools. */
 export default function LeaguePage() {
-  const { state } = useLeagueState();
+  const { state, dataset } = useLeagueData();
   const { identity, signOut } = useIdentity();
-  const { fontMode, setFontMode } = useSettings();
+  const { fontMode, setFontMode, theme, setTheme } = useSettings();
   const applyState = useApplyStateResponse();
 
   const [pins, setPins] = useState<Array<{ owner: string; pin: string }> | null>(null);
@@ -70,15 +69,15 @@ export default function LeaguePage() {
   const isCommish = identity?.isCommissioner ?? false;
 
   const contractPlayers = useMemo(
-    () => leagueDataset.players.filter((p) => p.keeper.contract != null),
-    [],
+    () => dataset.players.filter((p) => p.keeper.contract != null),
+    [dataset],
   );
   const activeContracts = useMemo(
     () =>
       contractPlayers
         .filter((p) => {
           const c = p.keeper.contract!;
-          return !c.expired && c.lastKeepableSeason >= leagueDataset.season;
+          return !c.expired && c.lastKeepableSeason >= dataset.season;
         })
         .sort((a, b) => {
           // unrostered holders sink to the bottom, otherwise sort by holder then player
@@ -95,21 +94,10 @@ export default function LeaguePage() {
     () =>
       contractPlayers.filter((p) => {
         const c = p.keeper.contract!;
-        return c.expired === true || c.lastKeepableSeason < leagueDataset.season;
+        return c.expired === true || c.lastKeepableSeason < dataset.season;
       }),
     [contractPlayers],
   );
-
-  const trades = useMemo(() => {
-    const map = new Map<string, PickTrade[]>();
-    for (const t of leagueDataset.pickTrades) {
-      const key = t.tradeNote ?? `${t.date} ${t.from}→${t.to} R${t.round}`;
-      const list = map.get(key);
-      if (list) list.push(t);
-      else map.set(key, [t]);
-    }
-    return [...map.entries()].map(([key, picks]) => ({ key, picks }));
-  }, []);
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -142,8 +130,8 @@ export default function LeaguePage() {
     if (!identity) return;
     setPinArm(null);
     void run(`pin-${owner}`, async () => {
-      const newPin = String(Math.floor(1000 + Math.random() * 9000));
-      await setPin(identity, owner, newPin);
+      // Clear to unclaimed — the owner sets a fresh PIN on their next sign-in
+      await setPin(identity, owner, '');
       setPins(await fetchPins(identity));
     });
   };
@@ -166,19 +154,19 @@ export default function LeaguePage() {
       </h1>
 
       {/* ── a. Keeper tiers ────────────────────────────────────── */}
-      <Section title={`${leagueDataset.season} KEEPER TIERS`} color="var(--neon-teal)">
+      <Section title={`${dataset.season} KEEPER TIERS`} color="var(--neon-teal)">
         <div style={{ textAlign: 'center', marginBottom: 14 }}>
-          <div className="hub-heading" style={{ fontSize: '0.62rem', color: '#8888aa' }}>
+          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
             SALARY CAP
           </div>
           <div
             className="glow-teal"
             style={{ fontSize: '2.6rem', fontWeight: 800, color: 'var(--neon-teal)', lineHeight: 1.2 }}
           >
-            {leagueDataset.cap}
+            {dataset.cap}
           </div>
-          <div style={{ color: '#8888aa', fontSize: '0.75rem' }}>
-            R3 max {leagueDataset.capRule.round3Max} + R3 min {leagueDataset.capRule.round3Min}
+          <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem' }}>
+            R3 max {dataset.capRule.round3Max} + R3 min {dataset.capRule.round3Min}
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -191,10 +179,10 @@ export default function LeaguePage() {
               </tr>
             </thead>
             <tbody>
-              {leagueDataset.tiers.map((t) => (
+              {dataset.tiers.map((t) => (
                 <tr key={t.round}>
                   <td style={{ ...td, color: 'var(--neon-blue)', fontWeight: 700 }}>R{t.round}</td>
-                  <td style={{ ...td, ...right, color: '#e0e0e0' }}>
+                  <td style={{ ...td, ...right, color: 'var(--text-hi)' }}>
                     {t.max.toFixed(1)} – {t.min.toFixed(1)}
                   </td>
                   <td style={{ ...td, ...right }}>{t.maxYears}</td>
@@ -222,8 +210,8 @@ export default function LeaguePage() {
                 const c = p.keeper.contract!;
                 return (
                   <tr key={p.key}>
-                    <td style={{ ...td, color: '#e0e0e0', fontWeight: 600 }}>{p.name}</td>
-                    <td style={{ ...td, color: p.fantasyTeam ? '#b0b0cc' : '#666688' }}>
+                    <td style={{ ...td, color: 'var(--text-hi)', fontWeight: 600 }}>{p.name}</td>
+                    <td style={{ ...td, color: p.fantasyTeam ? 'var(--text-body)' : 'var(--text-dim)' }}>
                       {p.fantasyTeam ?? 'unrostered'}
                     </td>
                     <td style={{ ...td, ...right }}>R{c.originalRound}</td>
@@ -251,7 +239,7 @@ export default function LeaguePage() {
             </div>
             <div style={{ display: 'grid', gap: 3 }}>
               {expiredContracts.map((p) => (
-                <div key={p.key} style={{ color: '#666688', fontSize: '0.85rem' }}>
+                <div key={p.key} style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
                   <span style={{ textDecoration: 'line-through' }}>{p.name}</span>{' '}
                   <span style={{ fontSize: '0.7rem' }}>
                     (R{p.keeper.contract!.originalRound} · {p.fantasyTeam ?? 'unrostered'})
@@ -264,31 +252,52 @@ export default function LeaguePage() {
       </Section>
 
       {/* ── c. Draft pick trades ───────────────────────────────── */}
-      <Section title="DRAFT PICK TRADES" color="var(--neon-orange)">
-        {trades.length === 0 ? (
-          <div style={{ color: '#555577' }}>No pick trades this season.</div>
+      <Section title="TRADES" color="var(--neon-orange)">
+        {(dataset.tradeDetails ?? []).length === 0 ? (
+          <div style={{ color: 'var(--text-faint)' }}>No trades this season.</div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
-            {trades.map(({ key, picks }) => (
+            {(dataset.tradeDetails ?? []).map((t) => (
               <div
-                key={key}
+                key={`${t.date}-${t.teams.join('-')}`}
                 style={{ border: '1px solid var(--panel-border)', borderRadius: 8, padding: '10px 12px' }}
               >
-                <div style={{ color: '#666688', fontSize: '0.68rem', letterSpacing: '0.06em', marginBottom: 4 }}>
-                  {formatDate(picks[0].date)}
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+                  <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-orange)' }}>
+                    {t.teams[0].toUpperCase()} ⇄ {t.teams[1].toUpperCase()}
+                  </span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: '0.68rem', marginLeft: 'auto' }}>
+                    {formatDate(t.date)}
+                  </span>
                 </div>
-                {picks[0].tradeNote && (
-                  <div style={{ color: '#b0b0cc', fontSize: '0.8rem', marginBottom: 8 }}>
-                    {picks[0].tradeNote}
-                  </div>
-                )}
-                <div style={{ display: 'grid', gap: 3 }}>
-                  {picks.map((t, i) => (
-                    <div key={i} style={{ fontSize: '0.82rem', color: '#e0e0e0' }}>
-                      <span style={{ fontWeight: 700 }}>{t.from}</span>
-                      <span style={{ color: '#8888aa' }}>'s R{t.round}</span>
-                      <span style={{ color: 'var(--neon-orange)', fontWeight: 700 }}> → </span>
-                      <span style={{ fontWeight: 700 }}>{t.to}</span>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {t.teams.map((teamName) => (
+                    <div key={teamName}>
+                      <div style={{ color: 'var(--neon-teal)', fontWeight: 800, fontSize: '0.8rem', marginBottom: 2 }}>
+                        {teamName} got:
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {(t.received[teamName] ?? []).map((item) => {
+                          const isPick = item.toLowerCase().includes('pick');
+                          return (
+                            <span
+                              key={item}
+                              style={{
+                                border: `1px solid ${isPick ? 'rgba(255,230,0,0.4)' : 'var(--panel-border)'}`,
+                                background: isPick ? 'rgba(255,230,0,0.07)' : 'var(--chip-bg)',
+                                color: isPick ? 'var(--neon-yellow)' : 'var(--text-hi)',
+                                borderRadius: 999,
+                                padding: '3px 10px',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {isPick ? '🎯 ' : ''}
+                              {item}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -300,7 +309,7 @@ export default function LeaguePage() {
 
       {/* ── d. Settings ────────────────────────────────────────── */}
       <Section title="SETTINGS" color="var(--neon-yellow)">
-        <div style={{ marginBottom: 8, color: '#8888aa', fontSize: '0.78rem' }}>
+        <div style={{ marginBottom: 8, color: 'var(--text-mid)', fontSize: '0.78rem' }}>
           Font mode: retro CRT vs readable
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -317,12 +326,39 @@ export default function LeaguePage() {
                   borderRadius: 8,
                   border: `2px solid ${active ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
                   background: active ? 'rgba(0,255,204,0.1)' : 'transparent',
-                  color: active ? 'var(--neon-teal)' : '#8888aa',
+                  color: active ? 'var(--neon-teal)' : 'var(--text-mid)',
                   fontWeight: 800,
                   letterSpacing: '0.08em',
                 }}
               >
                 {m === 'retro' ? 'RETRO' : 'MODERN'}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ margin: '14px 0 8px', color: 'var(--text-mid)', fontSize: '0.78rem' }}>
+          Theme
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(['dark', 'light'] as const).map((t) => {
+            const active = theme === t;
+            return (
+              <button
+                key={t}
+                className="tap-btn"
+                onClick={() => setTheme(t)}
+                style={{
+                  flex: 1,
+                  minHeight: 44,
+                  borderRadius: 8,
+                  border: `2px solid ${active ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
+                  background: active ? 'rgba(0,255,204,0.1)' : 'transparent',
+                  color: active ? 'var(--neon-teal)' : 'var(--text-mid)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                {t === 'dark' ? '🌙 DARK' : '☀️ LIGHT'}
               </button>
             );
           })}
@@ -349,7 +385,7 @@ export default function LeaguePage() {
                 background: 'transparent',
                 border: '2px solid var(--panel-border)',
                 borderRadius: 8,
-                color: '#8888aa',
+                color: 'var(--text-mid)',
                 fontSize: '0.8rem',
                 fontWeight: 700,
               }}
@@ -369,7 +405,7 @@ export default function LeaguePage() {
               <div style={{ fontWeight: 700, color: locked ? 'var(--neon-red)' : 'var(--neon-teal)' }}>
                 Keepers are {locked ? 'LOCKED 🔒' : 'OPEN 🔓'}
               </div>
-              <div style={{ color: '#666688', fontSize: '0.7rem' }}>
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
                 {locked ? 'Only you can still edit keepers.' : 'Owners can edit + save their keepers.'}
               </div>
             </div>
@@ -417,7 +453,7 @@ export default function LeaguePage() {
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#8888aa',
+                      color: 'var(--text-mid)',
                       fontSize: '0.75rem',
                       textDecoration: 'underline',
                       minHeight: 32,
@@ -429,33 +465,33 @@ export default function LeaguePage() {
                 <div style={{ display: 'grid', gap: 6 }}>
                   {(pins ?? []).map(({ owner: o, pin }) => (
                     <div key={o} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ flex: 1, fontWeight: 600, color: '#e0e0e0' }}>{o}</span>
+                      <span style={{ flex: 1, fontWeight: 600, color: 'var(--text-hi)' }}>{o}</span>
                       <span
                         style={{
                           fontFamily: 'monospace',
-                          letterSpacing: '0.2em',
-                          color: 'var(--neon-teal)',
-                          fontSize: '0.95rem',
+                          letterSpacing: pin ? '0.2em' : undefined,
+                          color: pin ? 'var(--neon-teal)' : 'var(--neon-yellow)',
+                          fontSize: pin ? '0.95rem' : '0.72rem',
                         }}
                       >
-                        {pin}
+                        {pin || 'unclaimed'}
                       </span>
                       <button
                         className="tap-btn"
                         onClick={() => (pinArm === o ? resetOwnerPin(o) : setPinArm(o))}
-                        disabled={busy !== null}
+                        disabled={busy !== null || !pin}
                         style={{
                           minHeight: 40,
                           padding: '0 12px',
                           borderRadius: 8,
                           border: `2px solid ${pinArm === o ? 'var(--neon-red)' : 'var(--panel-border)'}`,
                           background: 'transparent',
-                          color: pinArm === o ? 'var(--neon-red)' : '#8888aa',
+                          color: !pin ? 'var(--text-ghost)' : pinArm === o ? 'var(--neon-red)' : 'var(--text-mid)',
                           fontSize: '0.72rem',
                           fontWeight: 700,
                         }}
                       >
-                        {busy === `pin-${o}` ? '…' : pinArm === o ? 'SURE?' : 'reset'}
+                        {busy === `pin-${o}` ? '…' : pinArm === o ? 'SURE?' : 'clear'}
                       </button>
                     </div>
                   ))}
@@ -491,7 +527,7 @@ export default function LeaguePage() {
                       borderRadius: 8,
                       border: 'none',
                       background: 'var(--neon-red)',
-                      color: '#fff',
+                      color: 'var(--text-max)',
                       fontWeight: 800,
                       letterSpacing: '0.05em',
                     }}
@@ -503,7 +539,7 @@ export default function LeaguePage() {
                     onClick={() => setResetArmed(false)}
                     style={btnOutline('var(--panel-border)')}
                   >
-                    <span style={{ color: '#8888aa' }}>CANCEL</span>
+                    <span style={{ color: 'var(--text-mid)' }}>CANCEL</span>
                   </button>
                 </div>
               </div>

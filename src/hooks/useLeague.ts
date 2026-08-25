@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchLeagueState, verifyPin, type Credentials, type StateResponse } from '../lib/league/api.js';
+import { applyOverrides } from '../lib/keeper/engine.js';
+import { leagueDataset } from '../lib/league/data.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
 
 const EMPTY_STATE: LeagueDynamicState = {
@@ -10,11 +12,16 @@ const EMPTY_STATE: LeagueDynamicState = {
   locks: { keepersLocked: false },
 };
 
-/** Poll the shared league state. `fast` = 3s (TV/draft mode), default 5s. */
+/**
+ * Poll the shared league state. `fast` = 3s (TV/draft mode), default 5s.
+ * Sends the signed-in identity so the server can un-redact what this viewer
+ * is allowed to see (own keepers; everything for the commissioner).
+ */
 export function useLeagueState(fast = false) {
+  const { identity } = useIdentity();
   const query = useQuery<StateResponse>({
-    queryKey: ['league-state'],
-    queryFn: fetchLeagueState,
+    queryKey: ['league-state', identity?.owner ?? 'anon'],
+    queryFn: () => fetchLeagueState(identity),
     refetchInterval: fast ? 3000 : 5000,
     refetchOnWindowFocus: true,
     staleTime: 1000,
@@ -23,17 +30,30 @@ export function useLeagueState(fast = false) {
     ...query,
     state: query.data?.state ?? EMPTY_STATE,
     version: query.data?.version ?? 0,
+    meta: query.data?.meta ?? null,
   };
+}
+
+/**
+ * League state + the static dataset with commissioner overrides applied.
+ * Use this (not the raw leagueDataset import) anywhere rules are computed.
+ */
+export function useLeagueData(fast = false) {
+  const q = useLeagueState(fast);
+  const overrides = q.state.overrides;
+  const dataset = useMemo(() => applyOverrides(leagueDataset, overrides), [overrides]);
+  return { ...q, dataset };
 }
 
 /** Push a fresh state response (from a mutation) straight into the cache. */
 export function useApplyStateResponse() {
   const qc = useQueryClient();
+  const { identity } = useIdentity();
   return useCallback(
     (res: StateResponse) => {
-      qc.setQueryData(['league-state'], res);
+      qc.setQueryData(['league-state', identity?.owner ?? 'anon'], res);
     },
-    [qc],
+    [qc, identity?.owner],
   );
 }
 

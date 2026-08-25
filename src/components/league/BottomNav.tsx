@@ -1,13 +1,18 @@
 import { NavLink } from 'react-router-dom';
+import { useIdentity } from '../../hooks/useLeague.js';
 
 const TABS = [
-  { to: '/', label: 'SCORES', icon: '🏀', end: true },
-  { to: '/keepers', label: 'KEEPERS', icon: '🔒', end: false },
-  { to: '/draft', label: 'DRAFT', icon: '🎯', end: false },
-  { to: '/league', label: 'LEAGUE', icon: '📖', end: false },
+  { to: '/keepers', label: 'KEEPERS', icon: '🔒' },
+  { to: '/draft', label: 'DRAFT', icon: '🎯' },
+  { to: '/league', label: 'LEAGUE', icon: '📖' },
 ];
 
 export default function BottomNav() {
+  const { identity } = useIdentity();
+  const tabs = identity?.isCommissioner
+    ? [...TABS, { to: '/admin', label: 'ADMIN', icon: '👑' }]
+    : TABS;
+
   return (
     <nav
       style={{
@@ -17,17 +22,16 @@ export default function BottomNav() {
         right: 0,
         zIndex: 100,
         display: 'flex',
-        background: 'rgba(10, 10, 18, 0.96)',
+        background: 'var(--nav-bg)',
         borderTop: '2px solid var(--panel-border)',
         backdropFilter: 'blur(8px)',
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      {TABS.map((t) => (
+      {tabs.map((t) => (
         <NavLink
           key={t.to}
           to={t.to}
-          end={t.end}
           style={({ isActive }) => ({
             flex: 1,
             display: 'flex',
@@ -36,7 +40,7 @@ export default function BottomNav() {
             gap: 2,
             padding: '8px 0 10px',
             textDecoration: 'none',
-            color: isActive ? 'var(--neon-teal)' : '#8888aa',
+            color: isActive ? 'var(--neon-teal)' : 'var(--text-mid)',
             borderTop: isActive ? '2px solid var(--neon-teal)' : '2px solid transparent',
             marginTop: -2,
             transition: 'color 0.15s',

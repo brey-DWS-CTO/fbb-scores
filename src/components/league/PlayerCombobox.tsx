@@ -74,7 +74,7 @@ export default function PlayerCombobox({
             }}
           >
             {results.length === 0 && (
-              <div style={{ padding: 14, color: '#8888aa' }}>No players match “{query}”</div>
+              <div style={{ padding: 14, color: 'var(--text-mid)' }}>No players match “{query}”</div>
             )}
             {results.map((p) => {
               const reason = disabledReason?.(p) ?? null;
@@ -99,14 +99,14 @@ export default function PlayerCombobox({
                     background: 'transparent',
                     border: 'none',
                     borderBottom: '1px solid var(--panel-border)',
-                    color: reason ? '#555577' : '#e0e0e0',
+                    color: reason ? 'var(--text-faint)' : 'var(--text-hi)',
                     cursor: reason ? 'not-allowed' : 'pointer',
                     textAlign: 'left',
                   }}
                 >
                   <span style={{ minWidth: 0 }}>
                     <span style={{ fontWeight: 600 }}>{p.name}</span>{' '}
-                    <span style={{ color: '#8888aa', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--text-mid)', fontSize: '0.75rem' }}>
                       {p.proTeam} · {p.positions.join('/')}
                     </span>
                     {reason && (
