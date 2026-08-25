@@ -103,7 +103,7 @@ const Sparkline: FC<SparklineProps> = ({
         <span
           className="pixel-text"
           style={{
-            fontSize: '0.22rem',
+            fontSize: '0.58rem',
             color: trendFlat ? '#555577' : trendUp ? 'var(--neon-teal)' : 'var(--neon-red)',
           }}
         >

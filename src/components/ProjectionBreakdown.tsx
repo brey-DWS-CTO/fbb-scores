@@ -73,7 +73,7 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
         }}
       >
         <div className="flex items-center gap-2">
-          <span className="pixel-text" style={{ fontSize: '0.4rem', color: sideColor }}>
+          <span className="pixel-text" style={{ fontSize: '0.58rem', color: sideColor }}>
             {side === 'home' ? 'HOME' : 'AWAY'}
           </span>
           <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.3rem', color: '#e0e0ff' }}>
@@ -112,7 +112,7 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
             {unused.length > 0 && (
               <tr>
                 <td colSpan={99} className="px-2 py-2">
-                  <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#444466' }}>
+                  <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#444466' }}>
                     NOT PROJECTED ({unused.length})
                   </span>
                 </td>
@@ -134,7 +134,7 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
               <td colSpan={3} className="px-2 py-2">
                 <span
                   className="pixel-text glow-teal"
-                  style={{ fontSize: '0.4rem', color: 'var(--neon-teal)' }}
+                  style={{ fontSize: '0.58rem', color: 'var(--neon-teal)' }}
                 >
                   PROJECTED TOTAL
                 </span>
@@ -198,7 +198,7 @@ const SortHeader: FC<SortHeaderProps> = ({ label, sortKey, current, dir, onClick
       <span
         className="pixel-text"
         style={{
-          fontSize: '0.35rem',
+          fontSize: '0.52rem',
           color: isActive ? '#e0e0ff' : color,
           textShadow: isActive ? `0 0 4px ${color}` : 'none',
         }}
@@ -268,7 +268,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                 <span
                   className="pixel-text"
                   style={{
-                    fontSize: '0.25rem',
+                    fontSize: '0.58rem',
                     color: 'var(--neon-purple)',
                     border: '1px solid var(--neon-purple)',
                     padding: '0 3px',
@@ -282,7 +282,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                 <span
                   className="pixel-text"
                   style={{
-                    fontSize: '0.25rem',
+                    fontSize: '0.58rem',
                     color: 'var(--neon-red)',
                     border: '1px solid var(--neon-red)',
                     padding: '0 3px',
@@ -296,7 +296,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                 <span
                   className="pixel-text"
                   style={{
-                    fontSize: '0.25rem',
+                    fontSize: '0.58rem',
                     color: 'var(--neon-yellow)',
                     border: '1px solid var(--neon-yellow)',
                     padding: '0 3px',
@@ -310,7 +310,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                 <span
                   className="pixel-text"
                   style={{
-                    fontSize: '0.25rem',
+                    fontSize: '0.58rem',
                     color: 'var(--neon-red)',
                     border: '1px solid var(--neon-red)',
                     padding: '0 3px',
@@ -324,7 +324,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                 <span
                   className="pixel-text"
                   style={{
-                    fontSize: '0.25rem',
+                    fontSize: '0.58rem',
                     color: 'var(--neon-teal)',
                     border: '1px solid var(--neon-teal)',
                     padding: '0 3px',

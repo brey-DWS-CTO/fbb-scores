@@ -39,14 +39,14 @@ const SettingsPanel: FC<SettingsPanelProps> = ({ onClose }) => {
         }}
       >
         <div className="flex items-center justify-between mb-6">
-          <span className="pixel-text glow-teal" style={{ fontSize: '0.5rem', color: 'var(--neon-teal)' }}>
+          <span className="pixel-text glow-teal" style={{ fontSize: '0.58rem', color: 'var(--neon-teal)' }}>
             SETTINGS
           </span>
           <button
             onClick={onClose}
             className="pixel-text"
             style={{
-              fontSize: '0.4rem',
+              fontSize: '0.58rem',
               color: '#777799',
               background: 'none',
               border: '1px solid #333355',
@@ -60,7 +60,7 @@ const SettingsPanel: FC<SettingsPanelProps> = ({ onClose }) => {
 
         {/* Font mode */}
         <div className="mb-4">
-          <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799', letterSpacing: '0.1em' }}>
+          <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#777799', letterSpacing: '0.1em' }}>
             DISPLAY FONT
           </span>
           <div className="flex flex-col gap-2 mt-2">
@@ -109,7 +109,7 @@ const SettingsPanel: FC<SettingsPanelProps> = ({ onClose }) => {
 
         {/* Future: Light mode toggle placeholder */}
         <div style={{ borderTop: '1px solid #1a1a33', paddingTop: '12px' }}>
-          <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466' }}>
+          <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#444466' }}>
             MORE SETTINGS COMING SOON...
           </span>
         </div>

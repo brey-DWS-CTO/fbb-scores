@@ -30,7 +30,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
         <span
           className="pixel-text"
           style={{
-            fontSize: '0.45rem',
+            fontSize: '0.6rem',
             color: side === 'home' ? 'var(--neon-blue)' : 'var(--neon-orange)',
             opacity: 0.7,
           }}
@@ -74,7 +74,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
           <span
             className="pixel-text truncate"
             style={{
-              fontSize: '0.4rem',
+              fontSize: '0.58rem',
               color: '#777799',
             }}
           >
@@ -102,7 +102,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
         <div className="flex flex-col items-center">
           <span
             className="pixel-text"
-            style={{ fontSize: '0.3rem', color: '#555577', marginBottom: '2px' }}
+            style={{ fontSize: '0.58rem', color: '#555577', marginBottom: '2px' }}
           >
             TOTAL
           </span>
@@ -121,7 +121,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
         <div className="flex flex-col items-center">
           <span
             className="pixel-text"
-            style={{ fontSize: '0.3rem', color: '#555577', marginBottom: '2px' }}
+            style={{ fontSize: '0.58rem', color: '#555577', marginBottom: '2px' }}
           >
             AVG/GM
           </span>
@@ -190,7 +190,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
         <span
           className="pixel-text glow-yellow"
           style={{
-            fontSize: '0.4rem',
+            fontSize: '0.58rem',
             color: 'var(--neon-yellow)',
           }}
         >
@@ -211,7 +211,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
             <span
               className="pixel-text"
               style={{
-                fontSize: '0.35rem',
+                fontSize: '0.52rem',
                 color: '#777799',
               }}
             >
@@ -234,7 +234,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
               <span
                 className="pixel-text blink"
                 style={{
-                  fontSize: '0.4rem',
+                  fontSize: '0.58rem',
                   color: 'var(--neon-orange)',
                   textShadow: '0 0 8px var(--neon-orange), 0 0 16px var(--neon-red)',
                   marginLeft: '4px',
@@ -247,7 +247,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
         ) : (
           <span
             className="pixel-text blink mt-1 inline-block"
-            style={{ fontSize: '0.4rem', color: '#555577' }}
+            style={{ fontSize: '0.58rem', color: '#555577' }}
           >
             NO DATA
           </span>
@@ -259,7 +259,7 @@ const TeamPanel: FC<TeamPanelProps> = ({ team, isWinner, side, isPlayoffs: _isPl
         <span
           className="pixel-text pulse-glow mt-1 px-3 py-1"
           style={{
-            fontSize: '0.4rem',
+            fontSize: '0.58rem',
             color: 'var(--neon-teal)',
             border: '1px solid var(--neon-teal)',
             background: '#00ffcc0a',

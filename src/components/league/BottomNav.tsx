@@ -43,7 +43,7 @@ export default function BottomNav() {
           })}
         >
           <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{t.icon}</span>
-          <span className="hub-heading" style={{ fontSize: '0.5rem' }}>
+          <span className="hub-heading" style={{ fontSize: '0.62rem' }}>
             {t.label}
           </span>
         </NavLink>

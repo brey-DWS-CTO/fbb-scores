@@ -69,7 +69,7 @@ const MatchupDetailPage: FC = () => {
         <Link
           to="/"
           className="pixel-text px-5 py-2.5"
-          style={{ fontSize: '0.5rem', color: 'var(--neon-teal)', border: '1px solid var(--neon-teal)', textDecoration: 'none' }}
+          style={{ fontSize: '0.58rem', color: 'var(--neon-teal)', border: '1px solid var(--neon-teal)', textDecoration: 'none' }}
         >
           BACK TO SCOREBOARD
         </Link>
@@ -82,7 +82,7 @@ const MatchupDetailPage: FC = () => {
       <Link
         to="/"
         className="pixel-text inline-block mb-4 px-4 py-2.5"
-        style={{ fontSize: '0.5rem', color: 'var(--neon-teal)', border: '1px solid #333355', textDecoration: 'none' }}
+        style={{ fontSize: '0.58rem', color: 'var(--neon-teal)', border: '1px solid #333355', textDecoration: 'none' }}
       >
         &lt; BACK TO SCOREBOARD
       </Link>
@@ -120,7 +120,7 @@ const MatchupDetailPage: FC = () => {
       {activeTab === 'today' && (
         dailyLoading ? (
           <div className="flex items-center justify-center py-12">
-            <span className="pixel-text blink glow-teal" style={{ fontSize: '0.5rem', color: 'var(--neon-teal)' }}>
+            <span className="pixel-text blink glow-teal" style={{ fontSize: '0.58rem', color: 'var(--neon-teal)' }}>
               LOADING TODAY...
             </span>
           </div>
@@ -229,7 +229,7 @@ const StickyCompactHeader: FC<StickyCompactHeaderProps> = ({ data, visible }) =>
         </div>
 
         {/* VS */}
-        <span className="pixel-text" style={{ fontSize: '0.4rem', color: 'var(--neon-red)' }}>VS</span>
+        <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-red)' }}>VS</span>
 
         {/* Away team */}
         <div className="flex items-center gap-2 flex-1 justify-end">
@@ -268,7 +268,7 @@ const TabButton: FC<TabButtonProps> = ({ label, isActive, onClick }) => (
     onClick={onClick}
     className="pixel-text px-5 py-2.5"
     style={{
-      fontSize: '0.45rem',
+      fontSize: '0.6rem',
       color: isActive ? '#0a0a14' : 'var(--neon-teal)',
       background: isActive ? 'var(--neon-teal)' : 'transparent',
       border: `1px solid ${isActive ? 'var(--neon-teal)' : '#333355'}`,
@@ -305,7 +305,7 @@ const WinProbabilityBar: FC<WinProbabilityBarProps> = ({ homeProjected, awayProj
       }}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799', letterSpacing: '0.15em' }}>
+        <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#777799', letterSpacing: '0.15em' }}>
           WIN PROBABILITY
         </span>
       </div>

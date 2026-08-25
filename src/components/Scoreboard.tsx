@@ -109,7 +109,7 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
               onClick={() => setSortByScore((prev) => !prev)}
               className="pixel-text cursor-pointer px-5 py-2.5"
               style={{
-                fontSize: '0.45rem',
+                fontSize: '0.6rem',
                 color: sortByScore ? 'var(--neon-teal)' : '#777799',
                 background: sortByScore ? '#00ffcc0a' : 'transparent',
                 border: `2px solid ${sortByScore ? 'var(--neon-teal)' : '#333355'}`,
@@ -164,7 +164,7 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
                   <span
                     className="pixel-text px-3 py-1"
                     style={{
-                      fontSize: '0.4rem',
+                      fontSize: '0.58rem',
                       color: accentColor,
                       border: `1px solid ${accentColor}`,
                       background: '#0a0a0f',
@@ -211,7 +211,7 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
                           </span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
-                          <span className="pixel-text glow-red" style={{ fontSize: '0.5rem', color: 'var(--neon-red)' }}>VS</span>
+                          <span className="pixel-text glow-red" style={{ fontSize: '0.6rem', color: 'var(--neon-red)' }}>VS</span>
                           <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: 'var(--neon-purple)' }}>
                             {margin.toFixed(1)} PT GAP
                           </span>
@@ -241,7 +241,7 @@ const Scoreboard: FC<ScoreboardProps> = ({ data, selectedPeriod: _selectedPeriod
 
                       {/* Win probability bar */}
                       <div className="w-full max-w-md flex flex-col items-center gap-1">
-                        <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466' }}>
+                        <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#444466' }}>
                           WIN PROBABILITY
                         </span>
                         <div className="flex items-center gap-1 w-full">
@@ -369,7 +369,7 @@ const ViewToggleBtn: FC<ViewToggleBtnProps> = ({ label, active, onClick }) => (
     onClick={onClick}
     className="pixel-text cursor-pointer px-4 py-2.5"
     style={{
-      fontSize: '0.4rem',
+      fontSize: '0.58rem',
       color: active ? 'var(--neon-yellow)' : '#555577',
       background: active ? '#ffe60012' : 'transparent',
       border: 'none',

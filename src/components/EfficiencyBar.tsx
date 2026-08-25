@@ -28,7 +28,7 @@ const EfficiencyBar: FC<EfficiencyBarProps> = ({ efficiency, label }) => {
       {label && (
         <span
           className="pixel-text"
-          style={{ fontSize: '0.3rem', color: '#777799', letterSpacing: '0.1em' }}
+          style={{ fontSize: '0.58rem', color: '#777799', letterSpacing: '0.1em' }}
         >
           {label}
         </span>
@@ -69,7 +69,7 @@ const EfficiencyBar: FC<EfficiencyBarProps> = ({ efficiency, label }) => {
         {/* Percentage label */}
         <span
           className={`pixel-text ${glowClass}`}
-          style={{ fontSize: '0.35rem', color: barColor, minWidth: '3rem', textAlign: 'right' }}
+          style={{ fontSize: '0.52rem', color: barColor, minWidth: '3rem', textAlign: 'right' }}
         >
           {efficiencyPct.toFixed(0)}%
         </span>

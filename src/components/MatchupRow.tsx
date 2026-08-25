@@ -57,7 +57,7 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
           <span
             className="pixel-text px-3 py-1"
             style={{
-              fontSize: '0.4rem',
+              fontSize: '0.58rem',
               color: accentColor,
               border: `1px solid ${accentColor}`,
               background: '#0a0a0f',
@@ -109,7 +109,7 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
             {/* Projected scores */}
             {home.projectedScore > 0 && away.projectedScore > 0 && (
               <div className="flex flex-col items-center gap-1 mt-1">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466' }}>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#444466' }}>
                   PROJECTED
                 </span>
                 <div className="flex items-center gap-2">
@@ -125,7 +125,7 @@ const MatchupRow: FC<MatchupRowProps> = ({ matchup, index, isPlayoffs }) => {
             )}
             {/* Win Probability Bar */}
             <div className="flex flex-col items-center gap-1 mt-2" style={{ width: '100%', minWidth: '140px' }}>
-              <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#444466' }}>
+              <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#444466' }}>
                 WIN PROB
               </span>
               <div className="flex items-center gap-1" style={{ width: '100%' }}>

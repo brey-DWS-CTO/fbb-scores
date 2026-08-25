@@ -17,7 +17,7 @@ const TeamTrendCard: FC<TeamTrendCardProps> = ({ teamId, teamName }) => {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 px-3 py-2" style={{ background: '#0a0a14', border: '1px solid #1a1a2e' }}>
-        <span className="pixel-text blink" style={{ fontSize: '0.25rem', color: '#555577' }}>
+        <span className="pixel-text blink" style={{ fontSize: '0.58rem', color: '#555577' }}>
           LOADING TREND...
         </span>
       </div>
@@ -43,7 +43,7 @@ const TeamTrendCard: FC<TeamTrendCardProps> = ({ teamId, teamName }) => {
       }}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="pixel-text" style={{ fontSize: '0.25rem', color: '#555577' }}>
+        <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#555577' }}>
           {teamName} TREND
         </span>
         <span

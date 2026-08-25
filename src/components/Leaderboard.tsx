@@ -67,33 +67,33 @@ const Leaderboard: FC<LeaderboardProps> = ({ matchups }) => {
         <thead>
           <tr style={{ borderBottom: '2px solid #222244' }}>
             <th className="text-center px-2 py-3" style={{ width: '40px' }}>
-              <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#555577' }}>#</span>
+              <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#555577' }}>#</span>
             </th>
             <th className="text-left px-2 py-3">
-              <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>TEAM</span>
+              <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#777799' }}>TEAM</span>
             </th>
             <th className="text-right px-2 py-3" onClick={() => handleSort('pts')}>
-              <span className="pixel-text" style={{ fontSize: '0.35rem', ...colStyle('pts') }}>
+              <span className="pixel-text" style={{ fontSize: '0.52rem', ...colStyle('pts') }}>
                 PTS{arrow('pts')}
               </span>
             </th>
             <th className="text-right px-2 py-3" onClick={() => handleSort('ppg')}>
-              <span className="pixel-text" style={{ fontSize: '0.35rem', ...colStyle('ppg') }}>
+              <span className="pixel-text" style={{ fontSize: '0.52rem', ...colStyle('ppg') }}>
                 PPG{arrow('ppg')}
               </span>
             </th>
             <th className="text-right px-2 py-3" onClick={() => handleSort('gp')}>
-              <span className="pixel-text" style={{ fontSize: '0.35rem', ...colStyle('gp') }}>
+              <span className="pixel-text" style={{ fontSize: '0.52rem', ...colStyle('gp') }}>
                 GP{arrow('gp')}
               </span>
             </th>
             <th className="text-right px-2 py-3" onClick={() => handleSort('proj')}>
-              <span className="pixel-text" style={{ fontSize: '0.35rem', ...colStyle('proj') }}>
+              <span className="pixel-text" style={{ fontSize: '0.52rem', ...colStyle('proj') }}>
                 PROJ{arrow('proj')}
               </span>
             </th>
             <th className="text-right px-2 py-3 hidden sm:table-cell" onClick={() => handleSort('pctProj')}>
-              <span className="pixel-text" style={{ fontSize: '0.35rem', ...colStyle('pctProj') }}>
+              <span className="pixel-text" style={{ fontSize: '0.52rem', ...colStyle('pctProj') }}>
                 % PROJ{arrow('pctProj')}
               </span>
             </th>
@@ -153,7 +153,7 @@ const Leaderboard: FC<LeaderboardProps> = ({ matchups }) => {
                         style={{
                           background: '#0d0d1e',
                           border: '1px solid #1a1a2e',
-                          fontSize: '0.3rem',
+                          fontSize: '0.58rem',
                           color: '#555577',
                         }}
                       >
@@ -174,7 +174,7 @@ const Leaderboard: FC<LeaderboardProps> = ({ matchups }) => {
                       </span>
                       <span
                         className="pixel-text truncate"
-                        style={{ fontSize: '0.25rem', color: '#555577' }}
+                        style={{ fontSize: '0.58rem', color: '#555577' }}
                       >
                         {team.ownerName}
                       </span>

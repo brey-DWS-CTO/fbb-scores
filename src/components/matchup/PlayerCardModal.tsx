@@ -193,7 +193,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
               </span>
               <span
                 className="pixel-text"
-                style={{ fontSize: '0.32rem', color: '#777799' }}
+                style={{ fontSize: '0.58rem', color: '#777799' }}
               >
                 {player.nbaTeamAbbrev}
               </span>
@@ -212,7 +212,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
           >
             <span
               className="pixel-text"
-              style={{ fontSize: '0.3rem', color: '#777799', letterSpacing: '0.1em' }}
+              style={{ fontSize: '0.58rem', color: '#777799', letterSpacing: '0.1em' }}
             >
               SEASON AVG
             </span>
@@ -229,7 +229,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
             </span>
             <span
               className="pixel-text"
-              style={{ fontSize: '0.3rem', color: '#777799', letterSpacing: '0.1em' }}
+              style={{ fontSize: '0.58rem', color: '#777799', letterSpacing: '0.1em' }}
             >
               FPTS/G
             </span>
@@ -240,7 +240,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
         <div className="px-4 pt-3 pb-2">
           <span
             className="pixel-text"
-            style={{ fontSize: '0.3rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
+            style={{ fontSize: '0.58rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
           >
             SEASON STATS (PER GAME)
           </span>
@@ -259,7 +259,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
               >
                 <span
                   className="pixel-text"
-                  style={{ fontSize: '0.25rem', color: '#666688' }}
+                  style={{ fontSize: '0.58rem', color: '#666688' }}
                 >
                   {s.label}
                 </span>
@@ -282,7 +282,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
         <div className="px-4 pt-2 pb-2">
           <span
             className="pixel-text"
-            style={{ fontSize: '0.3rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
+            style={{ fontSize: '0.58rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
           >
             RECENT FORM
           </span>
@@ -303,7 +303,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
               >
                 <span
                   className="pixel-text"
-                  style={{ fontSize: '0.25rem', color: '#666688' }}
+                  style={{ fontSize: '0.58rem', color: '#666688' }}
                 >
                   {card.label}
                 </span>
@@ -320,7 +320,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
                 {card.value > 0 && card.dir !== 'neutral' && (
                   <span
                     className="pixel-text"
-                    style={{ fontSize: '0.22rem', color: trendColor(card.dir) }}
+                    style={{ fontSize: '0.58rem', color: trendColor(card.dir) }}
                   >
                     {trendArrow(card.dir)} {card.dir === 'up' ? 'ABOVE' : card.dir === 'near' ? 'NEAR' : 'BELOW'} AVG
                   </span>
@@ -334,7 +334,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
         <div className="px-4 pt-2 pb-2">
           <span
             className="pixel-text"
-            style={{ fontSize: '0.3rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
+            style={{ fontSize: '0.58rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
           >
             MATCHUP PERFORMANCE
           </span>
@@ -348,7 +348,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
                 flex: 1,
               }}
             >
-              <span className="pixel-text" style={{ fontSize: '0.25rem', color: '#666688' }}>
+              <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#666688' }}>
                 TOTAL FPTS
               </span>
               <span
@@ -371,7 +371,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
                 flex: 1,
               }}
             >
-              <span className="pixel-text" style={{ fontSize: '0.25rem', color: '#666688' }}>
+              <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#666688' }}>
                 GAMES PLAYED
               </span>
               <span
@@ -391,13 +391,13 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
         <div className="px-4 pt-2 pb-4">
           <span
             className="pixel-text"
-            style={{ fontSize: '0.3rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
+            style={{ fontSize: '0.58rem', color: 'var(--neon-purple)', letterSpacing: '0.15em' }}
           >
             FPTS TREND
           </span>
           <div className="flex items-center gap-4 mt-2 flex-wrap">
             {trendLoading ? (
-              <span className="pixel-text blink" style={{ fontSize: '0.25rem', color: '#555577' }}>
+              <span className="pixel-text blink" style={{ fontSize: '0.58rem', color: '#555577' }}>
                 LOADING TREND DATA...
               </span>
             ) : fptsData.length >= 2 ? (
@@ -420,7 +420,7 @@ const PlayerCardModal: FC<PlayerCardModalProps> = ({ player, onClose }) => {
                 )}
               </>
             ) : (
-              <span className="pixel-text" style={{ fontSize: '0.25rem', color: '#555577' }}>
+              <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#555577' }}>
                 NOT ENOUGH DATA FOR TREND
               </span>
             )}

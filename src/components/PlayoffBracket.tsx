@@ -51,7 +51,7 @@ const PlayoffBracket: FC<PlayoffBracketProps> = ({ matchups, playoff }) => {
             <span
               className="pixel-text"
               style={{
-                fontSize: '0.3rem',
+                fontSize: '0.58rem',
                 color: 'var(--neon-red)',
                 letterSpacing: '0.15em',
               }}
@@ -113,7 +113,7 @@ const PlayoffBracket: FC<PlayoffBracketProps> = ({ matchups, playoff }) => {
             <span
               className="pixel-text"
               style={{
-                fontSize: '0.4rem',
+                fontSize: '0.58rem',
                 color: '#555577',
                 letterSpacing: '0.1em',
               }}
@@ -187,7 +187,7 @@ const NextRoundIndicator: FC<NextRoundIndicatorProps> = ({ playoff, anyInProgres
           boxShadow: '0 0 16px #ffe60022',
         }}
       >
-        <span className="pixel-text glow-yellow" style={{ fontSize: '0.45rem', color: 'var(--neon-yellow)', letterSpacing: '0.15em' }}>
+        <span className="pixel-text glow-yellow" style={{ fontSize: '0.6rem', color: 'var(--neon-yellow)', letterSpacing: '0.15em' }}>
           &#9733; FINAL ROUND &#9733;
         </span>
         {anyInProgress && (
@@ -228,7 +228,7 @@ const NextRoundIndicator: FC<NextRoundIndicatorProps> = ({ playoff, anyInProgres
         border: '1px solid #1a1a2e',
       }}
     >
-      <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#444466' }}>
+      <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#444466' }}>
         NEXT:
       </span>
       <span
@@ -294,7 +294,7 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum, accentCo
             borderBottom: `1px solid ${isConsolation ? '#55557722' : '#ffe60022'}`,
           }}
         >
-          <span className="pixel-text" style={{ fontSize: '0.3rem', color: accent, opacity: 0.7 }}>
+          <span className="pixel-text" style={{ fontSize: '0.58rem', color: accent, opacity: 0.7 }}>
             {isConsolation ? 'CONSOLATION' : 'MATCHUP'} {matchupNum}
             {matchup.isCompleted && ' — FINAL'}
           </span>
@@ -305,15 +305,15 @@ const BracketMatchup: FC<BracketMatchupProps> = ({ matchup, matchupNum, accentCo
           className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 pt-2 pb-1"
           style={{ borderBottom: '1px solid #1a1a33' }}
         >
-          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.3rem', color: '#444466', width: '1.5rem', textAlign: 'center' }}>#</span>
-          <span className="flex-1 pixel-text" style={{ fontSize: '0.35rem', color: '#555577', letterSpacing: '0.1em' }}>TEAM</span>
-          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)', textShadow: '0 0 6px #4488ff44', letterSpacing: '0.1em' }}>GP</span>
-          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)', textShadow: '0 0 6px #ffe60044', minWidth: '2.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>AVG</span>
-          <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)', textShadow: '0 0 6px #00ffcc44', minWidth: '3.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>
+          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.58rem', color: '#444466', width: '1.5rem', textAlign: 'center' }}>#</span>
+          <span className="flex-1 pixel-text" style={{ fontSize: '0.52rem', color: '#555577', letterSpacing: '0.1em' }}>TEAM</span>
+          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.52rem', color: 'var(--neon-blue)', textShadow: '0 0 6px #4488ff44', letterSpacing: '0.1em' }}>GP</span>
+          <span className="pixel-text" style={{ fontSize: '0.52rem', color: 'var(--neon-yellow)', textShadow: '0 0 6px #ffe60044', minWidth: '2.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>AVG</span>
+          <span className="pixel-text" style={{ fontSize: '0.52rem', color: 'var(--neon-teal)', textShadow: '0 0 6px #00ffcc44', minWidth: '3.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>
             <span className="sm:hidden">PTS</span>
             <span className="hidden sm:inline">TOTAL</span>
           </span>
-          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.35rem', color: 'var(--neon-purple)', textShadow: '0 0 6px #8844ff44', minWidth: '3.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>PROJ</span>
+          <span className="pixel-text hidden sm:inline" style={{ fontSize: '0.52rem', color: 'var(--neon-purple)', textShadow: '0 0 6px #8844ff44', minWidth: '3.5rem', textAlign: 'right', letterSpacing: '0.1em' }}>PROJ</span>
         </div>
 
         <BracketTeamRow
@@ -443,7 +443,7 @@ const BracketTeamRow: FC<BracketTeamRowProps> = ({
       <span
         className="pixel-text hidden sm:inline"
         style={{
-          fontSize: '0.4rem',
+          fontSize: '0.58rem',
           color: isWinning ? 'var(--neon-teal)' : '#555577',
           width: '1.5rem',
           textAlign: 'center',

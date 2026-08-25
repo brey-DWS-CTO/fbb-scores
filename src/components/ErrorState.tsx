@@ -63,7 +63,7 @@ const ErrorState: FC<ErrorStateProps> = ({ message, onRetry }) => {
           <span
             className="pixel-text"
             style={{
-              fontSize: '0.4rem',
+              fontSize: '0.58rem',
               color: 'var(--neon-yellow)',
               display: 'block',
               marginBottom: '8px',

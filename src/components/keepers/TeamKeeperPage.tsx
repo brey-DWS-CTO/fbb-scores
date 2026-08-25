@@ -293,7 +293,18 @@ export default function TeamKeeperPage() {
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <Link to="/keepers" style={{ color: '#8888aa', fontSize: '0.72rem', textDecoration: 'none' }}>
+          <Link
+            to="/keepers"
+            style={{
+              color: '#8888aa',
+              fontSize: '0.72rem',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: 40,
+              paddingRight: 12,
+            }}
+          >
             ← ALL TEAMS
           </Link>
           <h1
@@ -344,7 +355,7 @@ export default function TeamKeeperPage() {
 
       {/* ── Cap meter ──────────────────────────────────────────── */}
       <section className="panel" style={{ padding: '14px 14px 12px', borderRadius: 10, marginBottom: 14 }}>
-        <div className="hub-heading" style={{ fontSize: '0.55rem', color: '#8888aa', marginBottom: 8 }}>
+        <div className="hub-heading" style={{ fontSize: '0.62rem', color: '#8888aa', marginBottom: 8 }}>
           SALARY CAP
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
@@ -392,10 +403,12 @@ export default function TeamKeeperPage() {
           }}
         >
           <div
-            className={`hub-heading${result.keepers.length > 0 && !result.capOk ? ' blink' : ''}`}
+            className={result.keepers.length > 0 && !result.capOk ? 'blink' : undefined}
             style={{
-              fontSize: '0.55rem',
-              lineHeight: 1.9,
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              fontStyle: 'italic',
+              lineHeight: 1.5,
               textAlign: 'center',
               color: statusColor,
               textShadow: `0 0 8px ${statusColor}`,
@@ -404,10 +417,11 @@ export default function TeamKeeperPage() {
             {result.statusLine}
           </div>
           <div
-            className="hub-heading"
             style={{
-              fontSize: '0.55rem',
-              lineHeight: 1.9,
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              fontStyle: 'italic',
+              lineHeight: 1.5,
               textAlign: 'center',
               color: pickColor,
               textShadow: `0 0 8px ${pickColor}`,

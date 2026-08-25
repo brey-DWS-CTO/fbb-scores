@@ -169,7 +169,7 @@ const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, is
               disabled={isRefreshing}
               className="pixel-text cursor-pointer px-3 py-1"
               style={{
-                fontSize: '0.45rem',
+                fontSize: '0.6rem',
                 color: isRefreshing ? '#444466' : 'var(--neon-teal)',
                 background: isRefreshing ? 'transparent' : '#00ffcc0a',
                 border: `1px solid ${isRefreshing ? '#333355' : 'var(--neon-teal)'}`,
@@ -184,7 +184,7 @@ const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, is
                 onClick={onOpenSettings}
                 className="pixel-text cursor-pointer px-2 py-1"
                 style={{
-                  fontSize: '0.45rem',
+                  fontSize: '0.6rem',
                   color: '#777799',
                   background: 'transparent',
                   border: '1px solid #333355',

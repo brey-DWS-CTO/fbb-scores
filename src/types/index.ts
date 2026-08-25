@@ -310,23 +310,7 @@ export interface MatchupDetail {
   scoringSettings: ScoringSettings;
 }
 
-// ─── Player Snapshot types (for trends) ─────────────────────────────────────
-
-export interface PlayerSnapshot {
-  id?: string;
-  league_id: string;
-  season_id: number;
-  scoring_period_id: number;
-  player_id: number;
-  team_id: number;
-  player_name: string;
-  fpts: number;
-  stats: PlayerGameStats;
-  rolling_avg_7: number;
-  rolling_avg_15: number;
-  rolling_avg_30: number;
-  captured_at: string;
-}
+// ─── Trend types ─────────────────────────────────────────────────────────────
 
 export interface PlayerTrend {
   playerId: number;
@@ -455,18 +439,3 @@ export interface DailyMatchup {
   away: DailyTeam;
 }
 
-// ─── Supabase snapshot types ──────────────────────────────────────────────────
-
-export interface MatchupSnapshot {
-  id?: string;
-  league_id: string;
-  season_id: number;
-  scoring_period_id: number;
-  matchup_id: number;
-  home_team_id: number;
-  away_team_id: number;
-  home_score: number;
-  away_score: number;
-  data: LeagueScoreboard;
-  captured_at: string;
-}

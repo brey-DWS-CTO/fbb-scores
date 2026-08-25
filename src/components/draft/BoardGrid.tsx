@@ -45,7 +45,7 @@ export default function BoardGrid({ board, tv = false }: Props) {
           key={o}
           className="hub-heading"
           style={{
-            fontSize: tv ? 'clamp(0.55rem, 0.9vw, 0.8rem)' : '0.55rem',
+            fontSize: tv ? 'clamp(0.55rem, 0.9vw, 0.8rem)' : '0.6rem',
             color: 'var(--neon-teal)',
             textAlign: 'center',
             alignSelf: 'center',

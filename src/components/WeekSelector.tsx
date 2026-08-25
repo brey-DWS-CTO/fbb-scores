@@ -67,7 +67,7 @@ const WeekSelector: FC<WeekSelectorProps> = ({ leagueInfo, selectedPeriod, onSel
           onClick={() => scroll('left')}
           className="pixel-text cursor-pointer shrink-0 px-3 py-2"
           style={{
-            fontSize: '0.4rem',
+            fontSize: '0.58rem',
             color: 'var(--neon-teal)',
             background: 'transparent',
             border: '1px solid #333355',
@@ -117,7 +117,7 @@ const WeekSelector: FC<WeekSelectorProps> = ({ leagueInfo, selectedPeriod, onSel
                 onClick={() => onSelectPeriod(period)}
                 className="pixel-text cursor-pointer shrink-0 px-3 py-2 whitespace-nowrap"
                 style={{
-                  fontSize: '0.4rem',
+                  fontSize: '0.58rem',
                   color,
                   background: bg,
                   border: `1px solid ${borderColor}`,
@@ -151,7 +151,7 @@ const WeekSelector: FC<WeekSelectorProps> = ({ leagueInfo, selectedPeriod, onSel
           onClick={() => scroll('right')}
           className="pixel-text cursor-pointer shrink-0 px-3 py-2"
           style={{
-            fontSize: '0.4rem',
+            fontSize: '0.58rem',
             color: 'var(--neon-teal)',
             background: 'transparent',
             border: '1px solid #333355',

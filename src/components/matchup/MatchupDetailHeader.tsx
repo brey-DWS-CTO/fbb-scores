@@ -30,7 +30,7 @@ const MatchupDetailHeader: FC<MatchupDetailHeaderProps> = ({ data }) => {
             {Math.abs(data.home.currentScore - data.away.currentScore).toFixed(1)} PTS GAP
           </span>
           {data.isCompleted && (
-            <span className="pixel-text" style={{ fontSize: '0.4rem', color: 'var(--neon-yellow)' }}>FINAL</span>
+            <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-yellow)' }}>FINAL</span>
           )}
         </div>
 
@@ -69,7 +69,7 @@ const TeamScore: FC<TeamScoreProps> = ({ team, opponent, glowColor }) => {
         <img src={team.logoUrl} alt="" className="w-12 h-12 object-contain mb-1" style={{ filter: `drop-shadow(0 0 4px ${glowColor})` }} />
       )}
       <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.4rem', color: '#e0e0ff' }}>{team.name}</span>
-      <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>{team.ownerName}</span>
+      <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#777799' }}>{team.ownerName}</span>
       <span
         className="score-display"
         style={{

@@ -203,7 +203,7 @@ export default function DraftPage() {
       >
         {onClock ? (
           <>
-            <div className="hub-heading blink" style={{ fontSize: '0.55rem', color: 'var(--neon-yellow)' }}>
+            <div className="hub-heading blink" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)' }}>
               ON THE CLOCK
             </div>
             <div
@@ -255,7 +255,7 @@ export default function DraftPage() {
       {/* recent picks ticker */}
       {recent.length > 0 && (
         <div className="panel" style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
-          <div className="hub-heading" style={{ fontSize: '0.55rem', color: '#8888aa', marginBottom: 6 }}>
+          <div className="hub-heading" style={{ fontSize: '0.62rem', color: '#8888aa', marginBottom: 6 }}>
             RECENT PICKS
           </div>
           {recent.map((rp) => (
@@ -281,7 +281,7 @@ export default function DraftPage() {
             style={{
               flex: 1,
               padding: '9px 0',
-              fontSize: '0.55rem',
+              fontSize: '0.62rem',
               background: view === v ? 'rgba(0,255,204,0.1)' : 'var(--panel-bg)',
               color: view === v ? 'var(--neon-teal)' : '#8888aa',
               border: `2px solid ${view === v ? 'var(--neon-teal)' : 'var(--panel-border)'}`,

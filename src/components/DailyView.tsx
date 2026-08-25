@@ -36,7 +36,7 @@ const DailyView: FC<DailyViewProps> = ({ data, playerMap }) => {
       <div className="text-center mb-4">
         <span
           className="pixel-text glow-yellow"
-          style={{ fontSize: '0.5rem', color: 'var(--neon-yellow)' }}
+          style={{ fontSize: '0.58rem', color: 'var(--neon-yellow)' }}
         >
           {formattedDate.toUpperCase()}
         </span>
@@ -148,7 +148,7 @@ const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side, onPlayerClick, 
           background: side === 'home' ? '#001a4410' : '#33001110',
         }}
       >
-        <span className="pixel-text" style={{ fontSize: '0.4rem', color: sideColor }}>
+        <span className="pixel-text" style={{ fontSize: '0.58rem', color: sideColor }}>
           {side === 'home' ? 'HOME' : 'AWAY'}
         </span>
         <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.3rem', color: '#e0e0ff' }}>
@@ -165,38 +165,38 @@ const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side, onPlayerClick, 
           <thead>
             <tr style={{ borderBottom: '2px solid #222244' }}>
               <th className="text-left px-1.5 py-2" style={{ width: '28px' }}>
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#777799' }}>SLOT</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#777799' }}>SLOT</span>
               </th>
               <th className="text-left px-1.5 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#777799' }}>PLAYER</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#777799' }}>PLAYER</span>
               </th>
               <th className="text-right px-1.5 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: 'var(--neon-teal)' }}>FPTS</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-teal)' }}>FPTS</span>
               </th>
               <th className="text-right px-1.5 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>PTS</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>PTS</span>
               </th>
               <th className="text-right px-1.5 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>REB</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>REB</span>
               </th>
               <th className="text-right px-1.5 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>AST</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>AST</span>
               </th>
               {/* Desktop-only columns */}
               <th className="text-right px-1.5 py-2 hidden md:table-cell">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>STL</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>STL</span>
               </th>
               <th className="text-right px-1.5 py-2 hidden md:table-cell">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>BLK</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>BLK</span>
               </th>
               <th className="text-right px-1.5 py-2 hidden md:table-cell">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>3PM</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>3PM</span>
               </th>
               <th className="text-right px-1.5 py-2 hidden md:table-cell">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>FG</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>FG</span>
               </th>
               <th className="text-right px-1.5 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>MIN</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#aaaacc' }}>MIN</span>
               </th>
             </tr>
           </thead>
@@ -341,13 +341,13 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
                 </span>
               )}
               {player.injuryStatus === 'OUT' && (
-                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>OUT</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>OUT</span>
               )}
               {player.injuryStatus === 'DAY_TO_DAY' && (
-                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-yellow)', border: '1px solid var(--neon-yellow)', padding: '0 2px', lineHeight: 1.4 }}>DTD</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-yellow)', border: '1px solid var(--neon-yellow)', padding: '0 2px', lineHeight: 1.4 }}>DTD</span>
               )}
               {player.injuryStatus === 'SUSPENSION' && (
-                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>SUSP</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>SUSP</span>
               )}
             </div>
           </div>

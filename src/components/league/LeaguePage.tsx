@@ -168,7 +168,7 @@ export default function LeaguePage() {
       {/* ── a. Keeper tiers ────────────────────────────────────── */}
       <Section title={`${leagueDataset.season} KEEPER TIERS`} color="var(--neon-teal)">
         <div style={{ textAlign: 'center', marginBottom: 14 }}>
-          <div className="hub-heading" style={{ fontSize: '0.55rem', color: '#8888aa' }}>
+          <div className="hub-heading" style={{ fontSize: '0.62rem', color: '#8888aa' }}>
             SALARY CAP
           </div>
           <div
@@ -518,7 +518,16 @@ export default function LeaguePage() {
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
             <Link
               to="/draft/tv"
-              style={{ color: 'var(--neon-blue)', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 700 }}
+              style={{
+                color: 'var(--neon-blue)',
+                fontSize: '0.85rem',
+                textDecoration: 'none',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                minHeight: 40,
+                paddingRight: 12,
+              }}
             >
               📺 TV mode
             </Link>

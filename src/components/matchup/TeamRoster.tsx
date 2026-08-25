@@ -76,7 +76,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
           background: side === 'home' ? '#001a4410' : '#33001110',
         }}
       >
-        <span className="pixel-text" style={{ fontSize: '0.4rem', color: sideColor }}>{side === 'home' ? 'HOME' : 'AWAY'}</span>
+        <span className="pixel-text" style={{ fontSize: '0.58rem', color: sideColor }}>{side === 'home' ? 'HOME' : 'AWAY'}</span>
         <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.3rem', color: '#e0e0ff' }}>{team.name}</span>
       </div>
 
@@ -88,7 +88,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
       {/* Started vs Benched summary */}
       <div className="flex gap-3 px-3 mb-3">
         <div className="flex-1 py-2 px-3" style={{ background: '#0f0f1a', border: '1px solid #1a1a33' }}>
-          <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#00ff88' }}>STARTED</span>
+          <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#00ff88' }}>STARTED</span>
           <div className="flex items-baseline gap-2">
             <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.4rem', color: 'var(--neon-teal)' }}>
               {starterFpts.toFixed(1)}
@@ -99,7 +99,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
           </div>
         </div>
         <div className="flex-1 py-2 px-3" style={{ background: '#0f0f1a', border: '1px solid #1a1a33' }}>
-          <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#555577' }}>BENCHED</span>
+          <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#555577' }}>BENCHED</span>
           <div className="flex items-baseline gap-2">
             <span style={{ fontFamily: "'VT323', monospace", fontSize: '1.4rem', color: '#888899' }}>
               {benchFpts.toFixed(1)}
@@ -117,10 +117,10 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
           <thead>
             <tr style={{ borderBottom: '2px solid #222244' }}>
               <th className="text-left px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>PLAYER</span>
+                <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#777799' }}>PLAYER</span>
               </th>
               <th className="text-center px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>GP</span>
+                <span className="pixel-text" style={{ fontSize: '0.52rem', color: '#777799' }}>GP</span>
               </th>
               {COLUMNS.map((col) => (
                 <th
@@ -132,7 +132,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
                   <span
                     className="pixel-text"
                     style={{
-                      fontSize: '0.35rem',
+                      fontSize: '0.52rem',
                       color: sortKey === col.key ? '#e0e0ff' : col.color,
                       textShadow: sortKey === col.key ? `0 0 4px ${col.color}` : 'none',
                     }}
@@ -148,7 +148,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
             {/* Started section */}
             <tr>
               <td colSpan={99} className="px-2 pt-2 pb-1">
-                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#00ff88' }}>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#00ff88' }}>
                   STARTED ({sortedStarters.length})
                 </span>
               </td>
@@ -167,7 +167,7 @@ const TeamRoster: FC<TeamRosterProps> = ({ team, side }) => {
               <>
                 <tr>
                   <td colSpan={99} className="px-2 pt-3 pb-1" style={{ borderTop: '1px solid #222244' }}>
-                    <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#555577' }}>
+                    <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#555577' }}>
                       BENCHED ({sortedBenched.length})
                     </span>
                   </td>
@@ -238,17 +238,17 @@ const MatchupPlayerRow: FC<MatchupPlayerRowProps> = ({ player, isEven, dimmed, o
               {player.name}
             </span>
             <div className="flex items-center gap-1">
-              <span className="pixel-text" style={{ fontSize: '0.25rem', color: '#555577' }}>
+              <span className="pixel-text" style={{ fontSize: '0.58rem', color: '#555577' }}>
                 {player.position} - {player.nbaTeamAbbrev}
               </span>
               {player.injuryStatus === 'OUT' && (
-                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>OUT</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>OUT</span>
               )}
               {player.injuryStatus === 'DAY_TO_DAY' && (
-                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-yellow)', border: '1px solid var(--neon-yellow)', padding: '0 2px', lineHeight: 1.4 }}>DTD</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-yellow)', border: '1px solid var(--neon-yellow)', padding: '0 2px', lineHeight: 1.4 }}>DTD</span>
               )}
               {player.injuryStatus === 'SUSPENSION' && (
-                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>SUSP</span>
+                <span className="pixel-text" style={{ fontSize: '0.58rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>SUSP</span>
               )}
             </div>
           </div>
