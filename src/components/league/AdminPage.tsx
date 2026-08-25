@@ -22,7 +22,6 @@ export default function AdminPage() {
   const [target, setTarget] = useState<DatasetPlayer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showAssignments, setShowAssignments] = useState(false);
 
   const overrides = state.overrides ?? {};
   const roundOverrides = overrides.playerRounds ?? {};
@@ -433,57 +432,118 @@ export default function AdminPage() {
         )}
       </section>
 
-      {/* ── Full assignments ───────────────────────────────────── */}
-      <section className="panel" style={{ padding: 14, borderRadius: 10 }}>
-        <button
-          className="tap-btn"
-          onClick={() => setShowAssignments((v) => !v)}
-          style={{
-            width: '100%',
-            minHeight: 44,
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--neon-purple)',
-            textAlign: 'left',
-            padding: 0,
-          }}
-        >
-          <span className="hub-heading" style={{ fontSize: '0.62rem' }}>
-            {showAssignments ? '▼' : '▶'} FULL TIER ASSIGNMENTS
-          </span>
-        </button>
-        {showAssignments &&
-          Array.from({ length: 10 }, (_, i) => i + 1).map((r) => (
-            <div key={r} style={{ marginTop: 12 }}>
-              <div style={{ color: 'var(--neon-blue)', fontWeight: 800, fontSize: '0.8rem', marginBottom: 4 }}>
-                ROUND {r}
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {(assignments.get(r) ?? []).slice(0, r === 10 ? 30 : 99).map((p) => (
-                  <button
-                    key={p.key}
-                    className="tap-btn"
-                    onClick={() => setTarget(p)}
-                    style={{
-                      border: `1px solid ${roundOverrides[p.key] !== undefined ? 'var(--neon-yellow)' : 'var(--panel-border)'}`,
-                      background: 'transparent',
-                      borderRadius: 6,
-                      padding: '4px 8px',
-                      color: roundOverrides[p.key] !== undefined ? 'var(--neon-yellow)' : 'var(--text-body)',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    {p.name} <span style={{ color: 'var(--text-dim)' }}>{p.keeper.effectiveAvg ?? ''}</span>
-                  </button>
-                ))}
-                {r === 10 && (assignments.get(10)?.length ?? 0) > 30 && (
-                  <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem', alignSelf: 'center' }}>
-                    +{(assignments.get(10)?.length ?? 0) - 30} more (all R10)
-                  </span>
-                )}
-              </div>
+      {/* ── 2026 player averages (the tier list) ───────────────── */}
+      <section className="panel" style={{ padding: '14px 0 6px', borderRadius: 10 }}>
+        <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)', margin: '0 14px 4px' }}>
+          2026 PLAYER AVERAGES
+        </div>
+        <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', margin: '0 14px 10px' }}>
+          The list behind the tiers. Tap any player to override their round.{' '}
+          <span
+            style={{
+              border: '1px solid rgba(255,230,0,0.5)',
+              color: 'var(--neon-yellow)',
+              borderRadius: 4,
+              padding: '0 4px',
+              fontSize: '0.62rem',
+              fontWeight: 800,
+            }}
+          >
+            '25
+          </span>{' '}
+          = number comes from their 2025 season (≤25 GP or 0 GP rule).
+        </div>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((r) => (
+          <div key={r}>
+            <div
+              style={{
+                color: 'var(--neon-blue)',
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                letterSpacing: '0.08em',
+                padding: '8px 14px 4px',
+                borderBottom: '1px solid var(--panel-border)',
+              }}
+            >
+              ROUND {r}
+              <span style={{ color: 'var(--text-dim)', fontWeight: 600, marginLeft: 8 }}>
+                {dataset.tiers[r - 1]?.max.toFixed(1)} – {dataset.tiers[r - 1]?.min.toFixed(1)}
+              </span>
             </div>
-          ))}
+            {(assignments.get(r) ?? []).slice(0, r === 10 ? 40 : 99).map((p) => {
+              const overridden = roundOverrides[p.key] !== undefined;
+              const priorYear = p.keeper.usesPriorYear || p.keeper.zeroGp2026;
+              return (
+                <button
+                  key={p.key}
+                  className="tap-btn"
+                  onClick={() => {
+                    setTarget(p);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '7px 14px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid var(--panel-border)',
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        color: overridden ? 'var(--neon-yellow)' : 'var(--text-hi)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {p.name}
+                    </span>
+                    <span style={{ color: 'var(--text-dim)', fontSize: '0.7rem', flexShrink: 0 }}>
+                      {p.positions[0] ?? ''} · {p.proTeam}
+                    </span>
+                    {priorYear && (
+                      <span
+                        title={p.keeper.zeroGp2026 ? "Didn't play in 2026 — 3rd-round rule" : '≤25 GP in 2026 — 2025 average used'}
+                        style={{
+                          border: '1px solid rgba(255,230,0,0.5)',
+                          color: 'var(--neon-yellow)',
+                          borderRadius: 4,
+                          padding: '0 4px',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          flexShrink: 0,
+                        }}
+                      >
+                        '25
+                      </span>
+                    )}
+                    {overridden && (
+                      <span style={{ color: 'var(--neon-yellow)', fontSize: '0.65rem', flexShrink: 0 }}>✎ override</span>
+                    )}
+                  </span>
+                  <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-body)', flexShrink: 0 }}>
+                    {p.keeper.effectiveAvg ?? '—'}
+                  </span>
+                  <RoundChip round={r} />
+                </button>
+              );
+            })}
+            {r === 10 && (assignments.get(10)?.length ?? 0) > 40 && (
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', padding: '6px 14px' }}>
+                +{(assignments.get(10)?.length ?? 0) - 40} more — everyone else is R10 (search above to
+                find them)
+              </div>
+            )}
+          </div>
+        ))}
       </section>
     </div>
   );

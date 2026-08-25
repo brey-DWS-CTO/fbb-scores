@@ -4,6 +4,7 @@ import { useIdentity } from '../../hooks/useLeague.js';
 const TABS = [
   { to: '/keepers', label: 'KEEPERS', icon: '🔒' },
   { to: '/draft', label: 'DRAFT', icon: '🎯' },
+  { to: '/teams', label: 'TEAMS', icon: '👥' },
   { to: '/league', label: 'LEAGUE', icon: '📖' },
 ];
 
