@@ -1,6 +1,6 @@
 {
  "season": 2027,
- "generatedAt": "2026-08-25T01:13:11.348Z",
+ "generatedAt": "2026-08-25T02:15:41.365Z",
  "cap": 77.8,
  "capRule": {
   "round3Max": 40.1,
@@ -149,7 +149,7 @@
    "name": "N. Jokic",
    "fullName": "Nikola Jokic",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -183,7 +183,7 @@
    "name": "L. Doncic",
    "fullName": "Luka Doncic",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "LAL",
    "injuryStatus": "OUT",
@@ -217,7 +217,7 @@
    "name": "S. Gilgeous-Alexander",
    "fullName": "Shai Gilgeous-Alexander",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -262,8 +262,8 @@
    "name": "A. Davis",
    "fullName": "Anthony Davis",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -302,7 +302,7 @@
    "name": "V. Wembanyama",
    "fullName": "Victor Wembanyama",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -336,8 +336,8 @@
    "name": "G. Antetokounmpo",
    "fullName": "Giannis Antetokounmpo",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Mil",
    "injuryStatus": "OUT",
@@ -383,7 +383,7 @@
    "fullName": "Tyrese Maxey",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -417,7 +417,7 @@
    "name": "J. Johnson",
    "fullName": "Jalen Johnson",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Atl",
    "injuryStatus": "ACTIVE",
@@ -451,8 +451,8 @@
    "name": "J. Tatum",
    "fullName": "Jayson Tatum",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Bos",
    "injuryStatus": "OUT",
@@ -492,7 +492,7 @@
    "fullName": "Cade Cunningham",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -526,8 +526,8 @@
    "name": "K. Leonard",
    "fullName": "Kawhi Leonard",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -561,8 +561,8 @@
    "name": "D. Sabonis",
    "fullName": "Domantas Sabonis",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Sac",
    "injuryStatus": "OUT",
@@ -601,9 +601,8 @@
    "name": "A. Edwards",
    "fullName": "Anthony Edwards",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -646,7 +645,7 @@
    "fullName": "Donovan Mitchell",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -680,9 +679,8 @@
    "name": "J. Brown",
    "fullName": "Jaylen Brown",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Bos",
    "injuryStatus": "ACTIVE",
@@ -725,7 +723,7 @@
    "name": "J. Murray",
    "fullName": "Jamal Murray",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -759,7 +757,7 @@
    "name": "J. Embiid",
    "fullName": "Joel Embiid",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -793,7 +791,7 @@
    "name": "A. Sengun",
    "fullName": "Alperen Sengun",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Hou",
    "injuryStatus": "ACTIVE",
@@ -827,7 +825,7 @@
    "name": "D. Lillard",
    "fullName": "Damian Lillard",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Por",
    "injuryStatus": "OUT",
@@ -863,8 +861,8 @@
    "name": "L. Markkanen",
    "fullName": "Lauri Markkanen",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Utah",
    "injuryStatus": "OUT",
@@ -907,7 +905,7 @@
    "fullName": "Tyrese Haliburton",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Ind",
    "injuryStatus": "OUT",
@@ -939,8 +937,8 @@
    "name": "K. Durant",
    "fullName": "Kevin Durant",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Hou",
    "injuryStatus": "OUT",
@@ -974,10 +972,9 @@
    "name": "S. Barnes",
    "fullName": "Scottie Barnes",
    "positions": [
-    "PG",
     "SG",
     "SF",
-    "C"
+    "PF"
    ],
    "proTeam": "Tor",
    "injuryStatus": "ACTIVE",
@@ -1011,7 +1008,7 @@
    "name": "S. Curry",
    "fullName": "Stephen Curry",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -1046,7 +1043,7 @@
    "fullName": "James Harden",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -1088,7 +1085,7 @@
    "name": "T. Young",
    "fullName": "Trae Young",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -1127,7 +1124,7 @@
    "name": "J. Brunson",
    "fullName": "Jalen Brunson",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -1163,7 +1160,7 @@
    "positions": [
     "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -1206,7 +1203,7 @@
    "fullName": "Kyrie Irving",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Dal",
    "injuryStatus": "OUT",
@@ -1238,8 +1235,8 @@
    "name": "L. James",
    "fullName": "LeBron James",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -1273,10 +1270,9 @@
    "name": "D. Avdija",
    "fullName": "Deni Avdija",
    "positions": [
-    "PG",
     "SG",
     "SF",
-    "C"
+    "PF"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -1310,8 +1306,8 @@
    "name": "K. Towns",
    "fullName": "Karl-Anthony Towns",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -1345,7 +1341,7 @@
    "name": "J. Duren",
    "fullName": "Jalen Duren",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -1379,8 +1375,8 @@
    "name": "E. Mobley",
    "fullName": "Evan Mobley",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -1414,8 +1410,8 @@
    "name": "M. Porter Jr.",
    "fullName": "Michael Porter Jr.",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -1449,7 +1445,7 @@
    "name": "P. Siakam",
    "fullName": "Pascal Siakam",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Ind",
    "injuryStatus": "OUT",
@@ -1494,7 +1490,7 @@
    "positions": [
     "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -1528,8 +1524,8 @@
    "name": "P. Banchero",
    "fullName": "Paolo Banchero",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -1571,8 +1567,8 @@
    "name": "B. Adebayo",
    "fullName": "Bam Adebayo",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Mia",
    "injuryStatus": "OUT",
@@ -1606,9 +1602,8 @@
    "name": "T. Murphy III",
    "fullName": "Trey Murphy III",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Nor",
    "injuryStatus": "OUT",
@@ -1643,7 +1638,7 @@
    "fullName": "Kevin Porter Jr.",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mil",
    "injuryStatus": "OUT",
@@ -1678,7 +1673,7 @@
    "fullName": "Devin Booker",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Pho",
    "injuryStatus": "ACTIVE",
@@ -1724,9 +1719,9 @@
    "name": "C. Flagg",
    "fullName": "Cooper Flagg",
    "positions": [
-    "SG",
+    "PG",
     "SF",
-    "C"
+    "PF"
    ],
    "proTeam": "Dal",
    "injuryStatus": "OUT",
@@ -1760,10 +1755,9 @@
    "name": "A. Thompson",
    "fullName": "Amen Thompson",
    "positions": [
-    "PG",
     "SG",
     "SF",
-    "C"
+    "PF"
    ],
    "proTeam": "Hou",
    "injuryStatus": "ACTIVE",
@@ -1805,10 +1799,9 @@
    "name": "J. Butler III",
    "fullName": "Jimmy Butler III",
    "positions": [
-    "PG",
     "SG",
     "SF",
-    "C"
+    "PF"
    ],
    "proTeam": "GS",
    "injuryStatus": "OUT",
@@ -1843,7 +1836,7 @@
    "fullName": "Keyonte George",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Utah",
    "injuryStatus": "OUT",
@@ -1877,7 +1870,7 @@
    "name": "J. Morant",
    "fullName": "Ja Morant",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -1916,7 +1909,7 @@
    "name": "J. Randle",
    "fullName": "Julius Randle",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -1958,7 +1951,7 @@
    "name": "Z. Williamson",
    "fullName": "Zion Williamson",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Nor",
    "injuryStatus": "OUT",
@@ -1992,8 +1985,8 @@
    "name": "C. Holmgren",
    "fullName": "Chet Holmgren",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -2027,7 +2020,7 @@
    "name": "L. Ball",
    "fullName": "LaMelo Ball",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -2062,7 +2055,7 @@
    "fullName": "Dejounte Murray",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Nor",
    "injuryStatus": "OUT",
@@ -2101,8 +2094,8 @@
    "name": "F. Wagner",
    "fullName": "Franz Wagner",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Orl",
    "injuryStatus": "OUT",
@@ -2136,7 +2129,7 @@
    "name": "W. Kessler",
    "fullName": "Walker Kessler",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Utah",
    "injuryStatus": "OUT",
@@ -2176,7 +2169,7 @@
    "fullName": "Tyler Herro",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mia",
    "injuryStatus": "OUT",
@@ -2210,7 +2203,7 @@
    "name": "B. Ingram",
    "fullName": "Brandon Ingram",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Tor",
    "injuryStatus": "OUT",
@@ -2244,7 +2237,7 @@
    "name": "A. Sarr",
    "fullName": "Alex Sarr",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -2278,7 +2271,7 @@
    "name": "D. Fox",
    "fullName": "De'Aaron Fox",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -2313,7 +2306,7 @@
    "fullName": "Derrick White",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Bos",
    "injuryStatus": "ACTIVE",
@@ -2356,9 +2349,8 @@
    "name": "D. Bane",
    "fullName": "Desmond Bane",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -2392,7 +2384,7 @@
    "name": "N. Vucevic",
    "fullName": "Nikola Vucevic",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Bos",
    "injuryStatus": "ACTIVE",
@@ -2426,7 +2418,7 @@
    "name": "D. Clingan",
    "fullName": "Donovan Clingan",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -2460,8 +2452,7 @@
    "name": "N. Alexander-Walker",
    "fullName": "Nickeil Alexander-Walker",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Atl",
    "injuryStatus": "ACTIVE",
@@ -2495,8 +2486,8 @@
    "name": "J. Jackson Jr.",
    "fullName": "Jaren Jackson Jr.",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Utah",
    "injuryStatus": "OUT",
@@ -2530,7 +2521,7 @@
    "name": "J. Allen",
    "fullName": "Jarrett Allen",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -2564,7 +2555,7 @@
    "name": "O. Okongwu",
    "fullName": "Onyeka Okongwu",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Atl",
    "injuryStatus": "ACTIVE",
@@ -2608,7 +2599,7 @@
    "fullName": "Immanuel Quickley",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Tor",
    "injuryStatus": "OUT",
@@ -2643,7 +2634,7 @@
    "fullName": "Ryan Rollins",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mil",
    "injuryStatus": "OUT",
@@ -2677,9 +2668,8 @@
    "name": "N. Powell",
    "fullName": "Norman Powell",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Mia",
    "injuryStatus": "ACTIVE",
@@ -2713,9 +2703,8 @@
    "name": "B. Miller",
    "fullName": "Brandon Miller",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Cha",
    "injuryStatus": "OUT",
@@ -2750,7 +2739,7 @@
    "fullName": "Stephon Castle",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -2784,8 +2773,8 @@
    "name": "P. George",
    "fullName": "Paul George",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -2819,7 +2808,7 @@
    "name": "R. Gobert",
    "fullName": "Rudy Gobert",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -2853,7 +2842,7 @@
    "name": "D. Garland",
    "fullName": "Darius Garland",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -2888,7 +2877,7 @@
    "fullName": "Dyson Daniels",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Atl",
    "injuryStatus": "ACTIVE",
@@ -2931,9 +2920,9 @@
    "name": "J. Williams",
    "fullName": "Jalen Williams",
    "positions": [
-    "SG",
     "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "OKC",
    "injuryStatus": "OUT",
@@ -2967,8 +2956,7 @@
    "name": "K. Knueppel",
    "fullName": "Kon Knueppel",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -3002,7 +2990,7 @@
    "name": "I. Zubac",
    "fullName": "Ivica Zubac",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Ind",
    "injuryStatus": "OUT",
@@ -3036,10 +3024,9 @@
    "name": "R. Barrett",
    "fullName": "RJ Barrett",
    "positions": [
-    "PG",
     "SG",
     "SF",
-    "C"
+    "PF"
    ],
    "proTeam": "Tor",
    "injuryStatus": "ACTIVE",
@@ -3073,7 +3060,7 @@
    "name": "C. Johnson",
    "fullName": "Chaney Johnson",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "ACTIVE",
@@ -3109,7 +3096,7 @@
    "name": "P. Pritchard",
    "fullName": "Payton Pritchard",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Bos",
    "injuryStatus": "ACTIVE",
@@ -3143,8 +3130,7 @@
    "name": "V. Edgecombe",
    "fullName": "VJ Edgecombe",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -3179,7 +3165,7 @@
    "fullName": "Andrew Nembhard",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Ind",
    "injuryStatus": "OUT",
@@ -3213,7 +3199,7 @@
    "name": "J. Nurkic",
    "fullName": "Jusuf Nurkic",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Utah",
    "injuryStatus": "OUT",
@@ -3247,8 +3233,8 @@
    "name": "D. DeRozan",
    "fullName": "DeMar DeRozan",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Sac",
    "injuryStatus": "OUT",
@@ -3282,9 +3268,8 @@
    "name": "M. Bridges",
    "fullName": "Mikal Bridges",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -3318,8 +3303,8 @@
    "name": "K. Porzingis",
    "fullName": "Kristaps Porzingis",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -3353,9 +3338,8 @@
    "name": "S. Sharpe",
    "fullName": "Shaedon Sharpe",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -3389,7 +3373,7 @@
    "name": "R. Westbrook",
    "fullName": "Russell Westbrook",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Sac",
    "injuryStatus": "OUT",
@@ -3423,8 +3407,8 @@
    "name": "O. Anunoby",
    "fullName": "OG Anunoby",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -3458,9 +3442,8 @@
    "name": "J. Hart",
    "fullName": "Josh Hart",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -3494,8 +3477,8 @@
    "name": "A. Wiggins",
    "fullName": "Andrew Wiggins",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Mia",
    "injuryStatus": "ACTIVE",
@@ -3529,8 +3512,8 @@
    "name": "S. Bey",
    "fullName": "Saddiq Bey",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Nor",
    "injuryStatus": "ACTIVE",
@@ -3565,7 +3548,7 @@
    "fullName": "CJ McCollum",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Atl",
    "injuryStatus": "ACTIVE",
@@ -3599,7 +3582,7 @@
    "name": "F. VanVleet",
    "fullName": "Fred VanVleet",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Hou",
    "injuryStatus": "OUT",
@@ -3632,7 +3615,7 @@
    "fullName": "Jrue Holiday",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -3666,8 +3649,8 @@
    "name": "M. Bridges",
    "fullName": "Miles Bridges",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -3701,9 +3684,8 @@
    "name": "B. Beal",
    "fullName": "Bradley Beal",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "LAC",
    "injuryStatus": "OUT",
@@ -3739,8 +3721,8 @@
    "name": "J. Smith Jr.",
    "fullName": "Jabari Smith Jr.",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Hou",
    "injuryStatus": "ACTIVE",
@@ -3774,8 +3756,8 @@
    "name": "M. Buzelis",
    "fullName": "Matas Buzelis",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -3809,7 +3791,7 @@
    "name": "K. Chandler",
    "fullName": "Kennedy Chandler",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -3844,7 +3826,7 @@
    "fullName": "Grayson Allen",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Pho",
    "injuryStatus": "ACTIVE",
@@ -3878,7 +3860,7 @@
    "name": "A. Gordon",
    "fullName": "Aaron Gordon",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Den",
    "injuryStatus": "OUT",
@@ -3912,9 +3894,8 @@
    "name": "D. Brooks",
    "fullName": "Dillon Brooks",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Pho",
    "injuryStatus": "ACTIVE",
@@ -3948,9 +3929,9 @@
    "name": "S. Aldama",
    "fullName": "Santi Aldama",
    "positions": [
-    "SG",
     "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -3984,7 +3965,7 @@
    "name": "N. Claxton",
    "fullName": "Nic Claxton",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -4019,7 +4000,7 @@
    "fullName": "Jalen Suggs",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -4053,7 +4034,7 @@
    "name": "I. Hartenstein",
    "fullName": "Isaiah Hartenstein",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -4087,9 +4068,8 @@
    "name": "K. George",
    "fullName": "Kyshawn George",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -4123,9 +4103,8 @@
    "name": "J. Jaquez Jr.",
    "fullName": "Jaime Jaquez Jr.",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Mia",
    "injuryStatus": "ACTIVE",
@@ -4159,7 +4138,7 @@
    "name": "J. Reese",
    "fullName": "Julian Reese",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "ACTIVE",
@@ -4191,7 +4170,7 @@
    "name": "J. McDaniels",
    "fullName": "Jaden McDaniels",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -4225,7 +4204,7 @@
    "name": "T. Jones",
    "fullName": "Tre Jones",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Chi",
    "injuryStatus": "ACTIVE",
@@ -4259,7 +4238,7 @@
    "name": "D. Ayton",
    "fullName": "Deandre Ayton",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -4294,7 +4273,7 @@
    "fullName": "Anthony Black",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -4328,9 +4307,8 @@
    "name": "B. Mathurin",
    "fullName": "Bennedict Mathurin",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -4373,7 +4351,7 @@
    "name": "N. Queta",
    "fullName": "Neemias Queta",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Bos",
    "injuryStatus": "ACTIVE",
@@ -4405,8 +4383,8 @@
    "name": "P. Washington",
    "fullName": "P.J. Washington",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Dal",
    "injuryStatus": "OUT",
@@ -4440,7 +4418,7 @@
    "name": "K. Ware",
    "fullName": "Kel'el Ware",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Mia",
    "injuryStatus": "ACTIVE",
@@ -4483,8 +4461,8 @@
    "name": "N. Reid",
    "fullName": "Naz Reid",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -4518,9 +4496,8 @@
    "name": "Z. LaVine",
    "fullName": "Zach LaVine",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Sac",
    "injuryStatus": "OUT",
@@ -4554,8 +4531,8 @@
    "name": "N. Marshall",
    "fullName": "Naji Marshall",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Dal",
    "injuryStatus": "OUT",
@@ -4589,7 +4566,7 @@
    "name": "D. Lively II",
    "fullName": "Dereck Lively II",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Dal",
    "injuryStatus": "OUT",
@@ -4625,7 +4602,7 @@
    "name": "M. Williams",
    "fullName": "Mark Williams",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Pho",
    "injuryStatus": "OUT",
@@ -4657,8 +4634,7 @@
    "name": "A. Dosunmu",
    "fullName": "Ayo Dosunmu",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -4690,7 +4666,7 @@
    "name": "J. Grant",
    "fullName": "Jerami Grant",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -4722,8 +4698,8 @@
    "name": "P. Watson",
    "fullName": "Peyton Watson",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Den",
    "injuryStatus": "OUT",
@@ -4755,8 +4731,7 @@
    "name": "A. Williams",
    "fullName": "Alondes Williams",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "ACTIVE",
@@ -4788,8 +4763,8 @@
    "name": "K. Murray",
    "fullName": "Keegan Murray",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Sac",
    "injuryStatus": "OUT",
@@ -4829,7 +4804,7 @@
    "fullName": "Brandin Podziemski",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -4861,7 +4836,7 @@
    "name": "D. Queen",
    "fullName": "Derik Queen",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Nor",
    "injuryStatus": "ACTIVE",
@@ -4893,8 +4868,8 @@
    "name": "A. Thompson",
    "fullName": "Ausar Thompson",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -4926,7 +4901,7 @@
    "name": "C. Gillespie",
    "fullName": "Collin Gillespie",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Pho",
    "injuryStatus": "ACTIVE",
@@ -4958,8 +4933,7 @@
    "name": "J. Green",
    "fullName": "Jalen Green",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Pho",
    "injuryStatus": "ACTIVE",
@@ -4992,7 +4966,7 @@
    "fullName": "Reed Sheppard",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Hou",
    "injuryStatus": "ACTIVE",
@@ -5024,7 +4998,7 @@
    "name": "J. Poeltl",
    "fullName": "Jakob Poeltl",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Tor",
    "injuryStatus": "ACTIVE",
@@ -5056,9 +5030,8 @@
    "name": "K. Oubre Jr.",
    "fullName": "Kelly Oubre Jr.",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -5090,7 +5063,7 @@
    "name": "C. Paul",
    "fullName": "Chris Paul",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "FA",
    "injuryStatus": "ACTIVE",
@@ -5126,8 +5099,8 @@
    "name": "T. Harris",
    "fullName": "Tobias Harris",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -5159,7 +5132,7 @@
    "name": "B. Portis",
    "fullName": "Bobby Portis",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Mil",
    "injuryStatus": "OUT",
@@ -5191,7 +5164,7 @@
    "name": "W. Carter Jr.",
    "fullName": "Wendell Carter Jr.",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -5223,7 +5196,7 @@
    "name": "M. Raynaud",
    "fullName": "Maxime Raynaud",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Sac",
    "injuryStatus": "ACTIVE",
@@ -5255,7 +5228,7 @@
    "name": "A. Mitchell",
    "fullName": "Ajay Mitchell",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "OKC",
    "injuryStatus": "OUT",
@@ -5287,9 +5260,8 @@
    "name": "C. Coward",
    "fullName": "Cedric Coward",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -5322,7 +5294,7 @@
    "fullName": "Coby White",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -5354,8 +5326,8 @@
    "name": "J. Collins",
    "fullName": "John Collins",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -5387,7 +5359,7 @@
    "name": "I. Collier",
    "fullName": "Isaiah Collier",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Utah",
    "injuryStatus": "OUT",
@@ -5420,7 +5392,7 @@
    "fullName": "Donte DiVincenzo",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Min",
    "injuryStatus": "OUT",
@@ -5452,8 +5424,8 @@
    "name": "K. Filipowski",
    "fullName": "Kyle Filipowski",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Utah",
    "injuryStatus": "OUT",
@@ -5485,9 +5457,8 @@
    "name": "D. Vassell",
    "fullName": "Devin Vassell",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -5519,8 +5490,8 @@
    "name": "T. Camara",
    "fullName": "Toumani Camara",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -5552,7 +5523,7 @@
    "name": "M. Turner",
    "fullName": "Myles Turner",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Mil",
    "injuryStatus": "OUT",
@@ -5593,9 +5564,8 @@
    "name": "J. Tyson",
    "fullName": "Jaylon Tyson",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -5627,8 +5597,7 @@
    "name": "M. Beasley",
    "fullName": "Malik Beasley",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "FA",
    "injuryStatus": "ACTIVE",
@@ -5660,8 +5629,8 @@
    "name": "M. Diabate",
    "fullName": "Moussa Diabate",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -5694,7 +5663,7 @@
    "fullName": "Collin Sexton",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Chi",
    "injuryStatus": "ACTIVE",
@@ -5727,7 +5696,7 @@
    "fullName": "Jeremiah Fears",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Nor",
    "injuryStatus": "ACTIVE",
@@ -5759,9 +5728,8 @@
    "name": "B. Coulibaly",
    "fullName": "Bilal Coulibaly",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -5793,7 +5761,7 @@
    "name": "Z. Edey",
    "fullName": "Zach Edey",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -5833,7 +5801,7 @@
    "fullName": "Cam Spencer",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -5865,7 +5833,7 @@
    "name": "D. Gafford",
    "fullName": "Daniel Gafford",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Dal",
    "injuryStatus": "ACTIVE",
@@ -5897,9 +5865,8 @@
    "name": "C. Braun",
    "fullName": "Christian Braun",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -5931,8 +5898,8 @@
    "name": "A. Bailey",
    "fullName": "Ace Bailey",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -5964,8 +5931,8 @@
    "name": "K. Johnson",
    "fullName": "Keldon Johnson",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -5997,8 +5964,7 @@
    "name": "Q. Grimes",
    "fullName": "Quentin Grimes",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -6030,8 +5996,8 @@
    "name": "P. Achiuwa",
    "fullName": "Precious Achiuwa",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Sac",
    "injuryStatus": "ACTIVE",
@@ -6063,7 +6029,7 @@
    "name": "D. Mitchell",
    "fullName": "Davion Mitchell",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Mia",
    "injuryStatus": "ACTIVE",
@@ -6095,8 +6061,8 @@
    "name": "C. Johnson",
    "fullName": "Cameron Johnson",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -6128,7 +6094,7 @@
    "name": "T. Jerome",
    "fullName": "Ty Jerome",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -6167,8 +6133,8 @@
    "name": "K. Kuzma",
    "fullName": "Kyle Kuzma",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Mil",
    "injuryStatus": "OUT",
@@ -6200,7 +6166,7 @@
    "name": "S. Mamukelashvili",
    "fullName": "Sandro Mamukelashvili",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Tor",
    "injuryStatus": "ACTIVE",
@@ -6233,7 +6199,7 @@
    "fullName": "Dylan Harper",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -6265,7 +6231,7 @@
    "name": "J. Champagnie",
    "fullName": "Julian Champagnie",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -6297,8 +6263,8 @@
    "name": "M. Bagley III",
    "fullName": "Marvin Bagley III",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Dal",
    "injuryStatus": "OUT",
@@ -6331,7 +6297,7 @@
    "fullName": "Malcolm Brogdon",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -6363,7 +6329,7 @@
    "name": "A. Nesmith",
    "fullName": "Aaron Nesmith",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Ind",
    "injuryStatus": "OUT",
@@ -6395,7 +6361,7 @@
    "name": "B. Williams",
    "fullName": "Brandon Williams",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Dal",
    "injuryStatus": "OUT",
@@ -6427,8 +6393,8 @@
    "name": "J. Smith",
    "fullName": "Jalen Smith",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -6461,7 +6427,7 @@
    "fullName": "Scotty Pippen Jr.",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -6497,7 +6463,7 @@
    "name": "S. Henderson",
    "fullName": "Scoot Henderson",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -6529,7 +6495,7 @@
    "name": "B. Sensabaugh",
    "fullName": "Brice Sensabaugh",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -6561,7 +6527,7 @@
    "name": "T. McConnell",
    "fullName": "T.J. McConnell",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Ind",
    "injuryStatus": "OUT",
@@ -6593,7 +6559,7 @@
    "name": "J. Landale",
    "fullName": "Jock Landale",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Atl",
    "injuryStatus": "OUT",
@@ -6625,7 +6591,7 @@
    "name": "L. Lovering",
    "fullName": "Lawson Lovering",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Mem",
    "injuryStatus": "ACTIVE",
@@ -6657,8 +6623,7 @@
    "name": "S. Merrill",
    "fullName": "Sam Merrill",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -6690,9 +6655,8 @@
    "name": "M. Moody",
    "fullName": "Moses Moody",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "GS",
    "injuryStatus": "OUT",
@@ -6724,8 +6688,8 @@
    "name": "T. Eason",
    "fullName": "Tari Eason",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Hou",
    "injuryStatus": "ACTIVE",
@@ -6757,8 +6721,8 @@
    "name": "D. Green",
    "fullName": "Draymond Green",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -6790,7 +6754,7 @@
    "name": "J. Huff",
    "fullName": "Jay Huff",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Ind",
    "injuryStatus": "ACTIVE",
@@ -6823,7 +6787,7 @@
    "fullName": "Anfernee Simons",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -6855,7 +6819,7 @@
    "name": "R. O'Neale",
    "fullName": "Royce O'Neale",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Pho",
    "injuryStatus": "ACTIVE",
@@ -6888,7 +6852,7 @@
    "fullName": "De'Anthony Melton",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -6920,7 +6884,7 @@
    "name": "M. Robinson",
    "fullName": "Mitchell Robinson",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -6952,7 +6916,7 @@
    "name": "R. Williams III",
    "fullName": "Robert Williams III",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -6984,7 +6948,7 @@
    "name": "D. Sharpe",
    "fullName": "Day'Ron Sharpe",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -7016,8 +6980,8 @@
    "name": "I. Stewart",
    "fullName": "Isaiah Stewart",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -7049,7 +7013,7 @@
    "name": "G. Jackson",
    "fullName": "GG Jackson",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -7082,7 +7046,7 @@
    "fullName": "Spencer Dinwiddie",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "FA",
    "injuryStatus": "ACTIVE",
@@ -7114,7 +7078,7 @@
    "name": "J. Kuminga",
    "fullName": "Jonathan Kuminga",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Atl",
    "injuryStatus": "ACTIVE",
@@ -7146,7 +7110,7 @@
    "name": "M. McBride",
    "fullName": "Miles McBride",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -7178,7 +7142,7 @@
    "name": "J. Walker",
    "fullName": "Jarace Walker",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Ind",
    "injuryStatus": "OUT",
@@ -7210,7 +7174,7 @@
    "name": "D. Robinson",
    "fullName": "Duncan Robinson",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -7242,8 +7206,7 @@
    "name": "P. Larsson",
    "fullName": "Pelle Larsson",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mia",
    "injuryStatus": "ACTIVE",
@@ -7275,8 +7238,8 @@
    "name": "A. Horford",
    "fullName": "Al Horford",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -7308,7 +7271,7 @@
    "name": "K. Hayes",
    "fullName": "Killian Hayes",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Sac",
    "injuryStatus": "ACTIVE",
@@ -7344,7 +7307,7 @@
    "name": "C. Murray-Boyles",
    "fullName": "Collin Murray-Boyles",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Tor",
    "injuryStatus": "ACTIVE",
@@ -7376,9 +7339,8 @@
    "name": "T. Hardaway Jr.",
    "fullName": "Tim Hardaway Jr.",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -7410,7 +7372,7 @@
    "name": "J. Slawson",
    "fullName": "Jalen Slawson",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Ind",
    "injuryStatus": "ACTIVE",
@@ -7442,7 +7404,7 @@
    "name": "D. Jones Jr.",
    "fullName": "Derrick Jones Jr.",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -7474,8 +7436,8 @@
    "name": "D. Hunter",
    "fullName": "De'Andre Hunter",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Sac",
    "injuryStatus": "OUT",
@@ -7507,8 +7469,7 @@
    "name": "C. Wallace",
    "fullName": "Cason Wallace",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -7540,8 +7501,7 @@
    "name": "M. Christie",
    "fullName": "Max Christie",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Dal",
    "injuryStatus": "ACTIVE",
@@ -7573,9 +7533,8 @@
    "name": "K. Huerter",
    "fullName": "Kevin Huerter",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -7608,7 +7567,7 @@
    "fullName": "Jordan Goodwin",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Pho",
    "injuryStatus": "OUT",
@@ -7640,7 +7599,7 @@
    "name": "D. Cardwell",
    "fullName": "Dylan Cardwell",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Sac",
    "injuryStatus": "ACTIVE",
@@ -7672,7 +7631,7 @@
    "name": "N. Clowney",
    "fullName": "Noah Clowney",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -7704,7 +7663,7 @@
    "name": "D. Schroder",
    "fullName": "Dennis Schroder",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Cle",
    "injuryStatus": "OUT",
@@ -7736,7 +7695,7 @@
    "name": "J. Champagnie",
    "fullName": "Justin Champagnie",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "ACTIVE",
@@ -7770,7 +7729,7 @@
    "positions": [
     "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Sac",
    "injuryStatus": "OUT",
@@ -7802,7 +7761,7 @@
    "name": "O. Toppin",
    "fullName": "Obi Toppin",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Ind",
    "injuryStatus": "ACTIVE",
@@ -7838,9 +7797,8 @@
    "name": "M. Strus",
    "fullName": "Max Strus",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -7876,7 +7834,7 @@
    "name": "R. Kalkbrenner",
    "fullName": "Ryan Kalkbrenner",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -7908,8 +7866,7 @@
    "name": "J. Wells",
    "fullName": "Jaylen Wells",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -7941,7 +7898,7 @@
    "name": "L. Kornet",
    "fullName": "Luke Kornet",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -7974,7 +7931,7 @@
    "fullName": "Bub Carrington",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "ACTIVE",
@@ -8006,7 +7963,7 @@
    "name": "A. Drummond",
    "fullName": "Andre Drummond",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -8038,8 +7995,8 @@
    "name": "R. Hachimura",
    "fullName": "Rui Hachimura",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -8071,7 +8028,7 @@
    "name": "J. Small",
    "fullName": "Javon Small",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Mem",
    "injuryStatus": "ACTIVE",
@@ -8103,8 +8060,8 @@
    "name": "H. Jones",
    "fullName": "Herbert Jones",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Nor",
    "injuryStatus": "ACTIVE",
@@ -8137,7 +8094,7 @@
    "fullName": "Jordan Poole",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Nor",
    "injuryStatus": "ACTIVE",
@@ -8178,7 +8135,7 @@
    "name": "B. Hinson",
    "fullName": "Blake Hinson",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -8210,7 +8167,7 @@
    "name": "M. Potter",
    "fullName": "Micah Potter",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Ind",
    "injuryStatus": "ACTIVE",
@@ -8242,7 +8199,7 @@
    "name": "E. Demin",
    "fullName": "Egor Demin",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -8274,7 +8231,7 @@
    "name": "K. Dunn",
    "fullName": "Kris Dunn",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -8306,8 +8263,8 @@
    "name": "P. Reed",
    "fullName": "Paul Reed",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -8340,7 +8297,7 @@
    "fullName": "Marcus Smart",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -8372,7 +8329,7 @@
    "name": "O. Tshiebwe",
    "fullName": "Oscar Tshiebwe",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -8404,7 +8361,7 @@
    "name": "T. da Silva",
    "fullName": "Tristan da Silva",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -8436,7 +8393,7 @@
    "name": "S. Adams",
    "fullName": "Steven Adams",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Hou",
    "injuryStatus": "OUT",
@@ -8468,8 +8425,7 @@
    "name": "I. Joe",
    "fullName": "Isaiah Joe",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -8501,7 +8457,7 @@
    "name": "G. Santos",
    "fullName": "Gui Santos",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -8533,8 +8489,7 @@
    "name": "T. Johnson",
    "fullName": "Tre Johnson",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -8566,7 +8521,7 @@
    "name": "J. Miller",
    "fullName": "Jordan Miller",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -8598,7 +8553,7 @@
    "name": "J. Williams",
    "fullName": "Jaylin Williams",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -8630,7 +8585,7 @@
    "name": "O. Ighodaro",
    "fullName": "Oso Ighodaro",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Pho",
    "injuryStatus": "ACTIVE",
@@ -8662,8 +8617,8 @@
    "name": "D. Barlow",
    "fullName": "Dominick Barlow",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Phi",
    "injuryStatus": "ACTIVE",
@@ -8695,7 +8650,7 @@
    "name": "Z. Risacher",
    "fullName": "Zaccharie Risacher",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Atl",
    "injuryStatus": "ACTIVE",
@@ -8727,7 +8682,7 @@
    "name": "J. LaRavia",
    "fullName": "Jake LaRavia",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -8759,7 +8714,7 @@
    "name": "B. Lopez",
    "fullName": "Brook Lopez",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -8791,7 +8746,7 @@
    "name": "O. Prosper",
    "fullName": "Olivier-Maxence Prosper",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Mem",
    "injuryStatus": "ACTIVE",
@@ -8823,7 +8778,7 @@
    "name": "D. Wolf",
    "fullName": "Danny Wolf",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -8855,7 +8810,7 @@
    "name": "S. Hauser",
    "fullName": "Sam Hauser",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Bos",
    "injuryStatus": "ACTIVE",
@@ -8887,8 +8842,7 @@
    "name": "D. Plowden",
    "fullName": "Daeqwon Plowden",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Sac",
    "injuryStatus": "ACTIVE",
@@ -8920,7 +8874,7 @@
    "name": "H. Barnes",
    "fullName": "Harrison Barnes",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "SA",
    "injuryStatus": "ACTIVE",
@@ -8952,7 +8906,7 @@
    "name": "Z. Williams",
    "fullName": "Ziaire Williams",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -8984,9 +8938,8 @@
    "name": "K. Thompson",
    "fullName": "Klay Thompson",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Dal",
    "injuryStatus": "ACTIVE",
@@ -9018,7 +8971,7 @@
    "name": "K. Middleton",
    "fullName": "Khris Middleton",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Dal",
    "injuryStatus": "ACTIVE",
@@ -9050,8 +9003,7 @@
    "name": "A. Green",
    "fullName": "AJ Green",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mil",
    "injuryStatus": "ACTIVE",
@@ -9083,7 +9035,7 @@
    "name": "Y. Missi",
    "fullName": "Yves Missi",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Nor",
    "injuryStatus": "OUT",
@@ -9115,7 +9067,7 @@
    "name": "D. Jenkins",
    "fullName": "Daniss Jenkins",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -9147,7 +9099,7 @@
    "name": "J. Valanciunas",
    "fullName": "Jonas Valanciunas",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -9179,7 +9131,7 @@
    "name": "L. Black",
    "fullName": "Leaky Black",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "ACTIVE",
@@ -9211,7 +9163,7 @@
    "name": "J. Hayes",
    "fullName": "Jaxson Hayes",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -9243,8 +9195,8 @@
    "name": "K. Anderson",
    "fullName": "Kyle Anderson",
    "positions": [
-    "SG",
-    "SF"
+    "SF",
+    "PF"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -9276,9 +9228,8 @@
    "name": "I. Okoro",
    "fullName": "Isaac Okoro",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -9310,8 +9261,7 @@
    "name": "G. Payton II",
    "fullName": "Gary Payton II",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "GS",
    "injuryStatus": "ACTIVE",
@@ -9343,9 +9293,8 @@
    "name": "J. Konchar",
    "fullName": "John Konchar",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -9377,9 +9326,8 @@
    "name": "B. Brown",
    "fullName": "Bruce Brown",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -9412,7 +9360,7 @@
    "fullName": "DeJon Jarreau",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Mem",
    "injuryStatus": "ACTIVE",
@@ -9444,7 +9392,7 @@
    "name": "G. Bitadze",
    "fullName": "Goga Bitadze",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -9476,8 +9424,7 @@
    "name": "A. Wiggins",
    "fullName": "Aaron Wiggins",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -9509,8 +9456,8 @@
    "name": "I. Jackson",
    "fullName": "Isaiah Jackson",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "LAC",
    "injuryStatus": "ACTIVE",
@@ -9543,7 +9490,7 @@
    "fullName": "Vince Williams Jr.",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "FA",
    "injuryStatus": "OUT",
@@ -9575,9 +9522,8 @@
    "name": "C. Thomas",
    "fullName": "Cam Thomas",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "FA",
    "injuryStatus": "ACTIVE",
@@ -9609,7 +9555,7 @@
    "name": "T. Prince",
    "fullName": "Taurean Prince",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Mil",
    "injuryStatus": "ACTIVE",
@@ -9641,9 +9587,8 @@
    "name": "W. Riley",
    "fullName": "Will Riley",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "ACTIVE",
@@ -9675,8 +9620,7 @@
    "name": "L. Kennard",
    "fullName": "Luke Kennard",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",
@@ -9708,8 +9652,7 @@
    "name": "N. Clifford",
    "fullName": "Nique Clifford",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Sac",
    "injuryStatus": "ACTIVE",
@@ -9742,7 +9685,7 @@
    "fullName": "D'Angelo Russell",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -9774,7 +9717,7 @@
    "name": "D. Carter",
    "fullName": "Devin Carter",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Sac",
    "injuryStatus": "ACTIVE",
@@ -9806,8 +9749,7 @@
    "name": "S. Mykhailiuk",
    "fullName": "Svi Mykhailiuk",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -9839,7 +9781,7 @@
    "name": "J. Shead",
    "fullName": "Jamal Shead",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Tor",
    "injuryStatus": "ACTIVE",
@@ -9871,9 +9813,8 @@
    "name": "J. Watkins",
    "fullName": "Jamir Watkins",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "ACTIVE",
@@ -9905,8 +9846,7 @@
    "name": "C. Williams",
    "fullName": "Cody Williams",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -9938,7 +9878,7 @@
    "name": "J. Alvarado",
    "fullName": "Jose Alvarado",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -9970,7 +9910,7 @@
    "name": "L. Garza",
    "fullName": "Luka Garza",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Bos",
    "injuryStatus": "ACTIVE",
@@ -10003,7 +9943,7 @@
    "fullName": "Quenton Jackson",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Ind",
    "injuryStatus": "ACTIVE",
@@ -10035,7 +9975,7 @@
    "name": "R. Holland II",
    "fullName": "Ronald Holland II",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -10067,9 +10007,8 @@
    "name": "L. Dort",
    "fullName": "Luguentz Dort",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -10101,8 +10040,7 @@
    "name": "C. Love",
    "fullName": "Caleb Love",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -10134,8 +10072,8 @@
    "name": "K. Love",
    "fullName": "Kevin Love",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Utah",
    "injuryStatus": "ACTIVE",
@@ -10167,9 +10105,8 @@
    "name": "T. Mann",
    "fullName": "Terance Mann",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -10201,9 +10138,8 @@
    "name": "K. Caldwell-Pope",
    "fullName": "Kentavious Caldwell-Pope",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -10235,7 +10171,7 @@
    "name": "V. Krejci",
    "fullName": "Vit Krejci",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -10267,7 +10203,7 @@
    "name": "B. Hyland",
    "fullName": "Bones Hyland",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Min",
    "injuryStatus": "ACTIVE",
@@ -10299,7 +10235,7 @@
    "name": "R. Nembhard",
    "fullName": "Ryan Nembhard",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Dal",
    "injuryStatus": "ACTIVE",
@@ -10331,7 +10267,7 @@
    "name": "Q. Post",
    "fullName": "Quinten Post",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "GS",
    "injuryStatus": "OUT",
@@ -10363,7 +10299,7 @@
    "name": "D. Wade",
    "fullName": "Dean Wade",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Cle",
    "injuryStatus": "ACTIVE",
@@ -10395,7 +10331,7 @@
    "name": "T. Hendricks",
    "fullName": "Taylor Hendricks",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Mem",
    "injuryStatus": "OUT",
@@ -10427,7 +10363,7 @@
    "name": "J. Minott",
    "fullName": "Josh Minott",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "OUT",
@@ -10459,8 +10395,8 @@
    "name": "T. Vukcevic",
    "fullName": "Tristan Vukcevic",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Wsh",
    "injuryStatus": "OUT",
@@ -10492,8 +10428,7 @@
    "name": "L. Shamet",
    "fullName": "Landry Shamet",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -10526,7 +10461,7 @@
    "fullName": "Jaden Ivey",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "FA",
    "injuryStatus": "OUT",
@@ -10558,7 +10493,7 @@
    "name": "L. Miller",
    "fullName": "Leonard Miller",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Chi",
    "injuryStatus": "ACTIVE",
@@ -10590,8 +10525,8 @@
    "name": "Z. Collins",
    "fullName": "Zach Collins",
    "positions": [
-    "SF",
-    "PF"
+    "PF",
+    "C"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -10627,9 +10562,8 @@
    "name": "C. LeVert",
    "fullName": "Caris LeVert",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Det",
    "injuryStatus": "ACTIVE",
@@ -10661,7 +10595,7 @@
    "name": "G. Williams",
    "fullName": "Grant Williams",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -10693,9 +10627,8 @@
    "name": "M. Thybulle",
    "fullName": "Matisse Thybulle",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Por",
    "injuryStatus": "ACTIVE",
@@ -10728,7 +10661,7 @@
    "fullName": "Cameron Payne",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "FA",
    "injuryStatus": "OUT",
@@ -10764,8 +10697,7 @@
    "name": "J. McCain",
    "fullName": "Jared McCain",
    "positions": [
-    "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "OKC",
    "injuryStatus": "ACTIVE",
@@ -10797,7 +10729,7 @@
    "name": "N. Jovic",
    "fullName": "Nikola Jovic",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Mia",
    "injuryStatus": "OUT",
@@ -10829,9 +10761,8 @@
    "name": "J. Clarkson",
    "fullName": "Jordan Clarkson",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -10863,7 +10794,7 @@
    "name": "C. Capela",
    "fullName": "Clint Capela",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Hou",
    "injuryStatus": "ACTIVE",
@@ -10895,7 +10826,7 @@
    "name": "N. Richards",
    "fullName": "Nick Richards",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -10927,7 +10858,7 @@
    "name": "M. Wagner",
    "fullName": "Moritz Wagner",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "Orl",
    "injuryStatus": "ACTIVE",
@@ -10959,7 +10890,7 @@
    "name": "G. Yabusele",
    "fullName": "Guerschon Yabusele",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Chi",
    "injuryStatus": "OUT",
@@ -10991,9 +10922,8 @@
    "name": "G. Dick",
    "fullName": "Gradey Dick",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Tor",
    "injuryStatus": "ACTIVE",
@@ -11025,7 +10955,7 @@
    "name": "D. Roddy",
    "fullName": "David Roddy",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -11061,9 +10991,8 @@
    "name": "O. Agbaji",
    "fullName": "Ochai Agbaji",
    "positions": [
-    "PG",
     "SG",
-    "C"
+    "SF"
    ],
    "proTeam": "Bkn",
    "injuryStatus": "ACTIVE",
@@ -11096,7 +11025,7 @@
    "fullName": "Tre Mann",
    "positions": [
     "PG",
-    "C"
+    "SG"
    ],
    "proTeam": "Cha",
    "injuryStatus": "ACTIVE",
@@ -11128,7 +11057,7 @@
    "name": "J. Sochan",
    "fullName": "Jeremy Sochan",
    "positions": [
-    "SF"
+    "PF"
    ],
    "proTeam": "NY",
    "injuryStatus": "ACTIVE",
@@ -11160,7 +11089,7 @@
    "name": "T. Jones",
    "fullName": "Tyus Jones",
    "positions": [
-    "C"
+    "PG"
    ],
    "proTeam": "Den",
    "injuryStatus": "ACTIVE",
@@ -11192,7 +11121,7 @@
    "name": "D. Whitehead",
    "fullName": "Dariq Whitehead",
    "positions": [
-    "SG"
+    "SF"
    ],
    "proTeam": "Mem",
    "injuryStatus": "ACTIVE",
@@ -11228,7 +11157,7 @@
    "name": "D. Timme",
    "fullName": "Drew Timme",
    "positions": [
-    "PF"
+    "C"
    ],
    "proTeam": "LAL",
    "injuryStatus": "ACTIVE",

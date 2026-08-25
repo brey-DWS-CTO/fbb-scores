@@ -16,9 +16,7 @@
  */
 import type {
   BoardCell,
-  ContractSeed,
   DatasetPlayer,
-  DraftPickState,
   KeeperSelection,
   LeagueDataset,
   LeagueDynamicState,

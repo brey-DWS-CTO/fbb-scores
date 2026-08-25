@@ -87,7 +87,23 @@
       "Bash(curl -s http://localhost:3001/api/espn/debug-schedule)",
       "Bash(kill %1)",
       "Bash(kill %2)",
-      "Bash(taskkill //F //IM node.exe)"
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(vercel:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(git:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(cat:*)",
+      "Bash(sleep:*)",
+      "Bash(powershell:*)",
+      "Bash(export:*)",
+      "Bash(for:*)",
+      "Bash(kill:*)",
+      "WebFetch"
     ]
   }
 }

@@ -31,3 +31,6 @@ dist-ssr
 .claude/projects/
 .claude/worktrees/
 .data/
+
+.vercel
+.env*

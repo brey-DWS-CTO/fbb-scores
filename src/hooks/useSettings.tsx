@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type FC, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type FC, type ReactNode } from 'react';
 
 export type FontMode = 'retro' | 'modern';
 
@@ -26,7 +26,7 @@ function saveSettings(settings: Settings) {
   } catch { /* ignore */ }
 }
 
-const defaults: Settings = { fontMode: 'retro' };
+const defaults: Settings = { fontMode: 'modern' };
 
 const SettingsContext = createContext<SettingsContextValue>({
   ...defaults,
@@ -46,10 +46,10 @@ export const SettingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }, []);
 
-  // Apply initial font mode on mount
-  if (settings.fontMode === 'modern') {
-    document.documentElement.classList.add('font-modern');
-  }
+  // Keep the document class in sync (covers initial load + external changes)
+  useEffect(() => {
+    document.documentElement.classList.toggle('font-modern', settings.fontMode === 'modern');
+  }, [settings.fontMode]);
 
   return (
     <SettingsContext.Provider value={{ ...settings, setFontMode }}>

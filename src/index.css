@@ -143,6 +143,26 @@ body::before {
 ::-webkit-scrollbar-track { background: var(--dark-bg); }
 ::-webkit-scrollbar-thumb { background: #1a1a33; border-radius: 3px; }
 
+/* ─── Draft-hub additions ─────────────────────────────────────────────── */
+/* Arcade heading that stays pixel in BOTH font modes (use at ≥0.5rem only). */
+.hub-heading {
+  font-family: 'Press Start 2P', monospace;
+  letter-spacing: 0.05em;
+  line-height: 1.6;
+}
+
+.hub-input {
+  background: #07070d;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  color: #fff;
+  outline: none;
+}
+.hub-input:focus { border-color: var(--neon-teal); }
+
+.tap-btn { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+.tap-btn:active { transform: scale(0.97); }
+
 /* ─── Modern Font Mode ────────────────────────────────────────────────── */
 html.font-modern body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;

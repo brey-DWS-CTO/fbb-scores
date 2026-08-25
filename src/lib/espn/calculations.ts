@@ -276,15 +276,15 @@ export interface TeamProjectionResult {
  * 2. Count how many game slots are left after started players are accounted for
  * 3. Fill remaining slots with the best bench players' future game projections
  *
- * @param currentScore    Team's total matchup score so far
- * @param gamesPlayed     Games played so far in the matchup
+ * @param _currentScore   Team's total matchup score so far (unused — kept for call compatibility)
+ * @param _gamesPlayed    Games played so far in the matchup (unused — kept for call compatibility)
  * @param maxGames        Max games allowed for the matchup period
  * @param players         Projection input for each player on the roster
  * @param playerNames     Optional map of playerId → { name, position, nbaTeamAbbrev } for breakdown
  */
 export function computeTeamProjection(
-  currentScore: number,
-  gamesPlayed: number,
+  _currentScore: number,
+  _gamesPlayed: number,
   maxGames: number,
   players: PlayerProjectionInput[],
   playerNames?: Map<number, { name: string; position: string; nbaTeamAbbrev: string }>,

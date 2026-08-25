@@ -4,7 +4,9 @@ import { fileURLToPath } from 'url';
 import app from './app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = parseInt(process.env.PORT || '3001', 10);
+// API_PORT wins over PORT so dev-preview harnesses that inject PORT (for Vite)
+// don't collide the API server onto Vite's port.
+const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3001', 10);
 
 // In production, serve the Vite build
 if (process.env.NODE_ENV === 'production') {
