@@ -24,13 +24,91 @@ export interface Credentials {
 
 const authHeaders = (c: Credentials) => ({ 'x-owner': c.owner, 'x-pin': c.pin });
 
-/** Pass credentials so the server can un-redact your own (or, as commissioner,
- * everyone's) keepers before draft day. */
-export async function fetchLeagueState(credentials?: Credentials | null): Promise<StateResponse> {
+/* ── Commissioner TEST MODE (sandbox) ────────────────────────────────────────
+ * While active, keeper/draft reads and writes stay entirely in localStorage —
+ * nothing touches the server — so the commissioner can fill in anyone's
+ * keepers and run a fake draft. Pins/overrides remain live. */
+const SANDBOX_KEY = 'fbb-sandbox';
+
+interface SandboxDoc {
+  state: LeagueDynamicState;
+  version: number;
+  meta: StateMeta;
+}
+
+function readSandbox(): SandboxDoc | null {
+  try {
+    const raw = localStorage.getItem(SANDBOX_KEY);
+    return raw ? (JSON.parse(raw) as SandboxDoc) : null;
+  } catch {
+    return null;
+  }
+}
+
+function sandboxResponse(doc: SandboxDoc): StateResponse {
+  const keeperStatus: Record<string, number> = {};
+  for (const [o, sels] of Object.entries(doc.state.keepers)) keeperStatus[o] = sels.length;
+  // In the sandbox the commissioner sees everything, secrecy off
+  return {
+    state: doc.state,
+    version: doc.version,
+    meta: { ...doc.meta, revealed: true, isCommissioner: true, keeperStatus },
+  };
+}
+
+function mutateSandbox(doc: SandboxDoc, fn: (state: LeagueDynamicState) => void): StateResponse {
+  fn(doc.state);
+  doc.version += 1;
+  try {
+    localStorage.setItem(SANDBOX_KEY, JSON.stringify(doc));
+  } catch {
+    /* ignore */
+  }
+  return sandboxResponse(doc);
+}
+
+export function sandboxActive(): boolean {
+  return readSandbox() !== null;
+}
+
+/** Enter test mode, seeded from the current live state. */
+export async function enterSandbox(c: Credentials): Promise<void> {
+  const live = await fetchLiveState(c);
+  const doc: SandboxDoc = {
+    state: structuredClone(live.state),
+    version: 1,
+    meta: live.meta ?? {
+      draftAt: '2026-10-18T14:00:00-07:00',
+      revealed: true,
+      keeperStatus: {},
+      viewer: c.owner,
+      isCommissioner: true,
+    },
+  };
+  localStorage.setItem(SANDBOX_KEY, JSON.stringify(doc));
+}
+
+export function exitSandbox(): void {
+  try {
+    localStorage.removeItem(SANDBOX_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function fetchLiveState(credentials?: Credentials | null): Promise<StateResponse> {
   const { data } = await axios.get<StateResponse>('/api/league/state', {
     headers: credentials ? authHeaders(credentials) : undefined,
   });
   return data;
+}
+
+/** Pass credentials so the server can un-redact your own (or, as commissioner,
+ * everyone's) keepers before draft day. In test mode, returns the sandbox. */
+export async function fetchLeagueState(credentials?: Credentials | null): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) return sandboxResponse(sandbox);
+  return fetchLiveState(credentials);
 }
 
 export async function fetchPinStatus(): Promise<Array<{ owner: string; claimed: boolean }>> {
@@ -56,6 +134,12 @@ export async function saveKeepers(
   owner: string,
   selections: KeeperSelection[],
 ): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.keepers[owner] = selections;
+    });
+  }
   const { data } = await axios.put(
     `/api/league/keepers/${encodeURIComponent(owner)}`,
     { selections },
@@ -68,11 +152,29 @@ export async function submitDraftPick(
   c: Credentials,
   pick: { overallPick: number; playerKey: string; playerName: string; isKeeper?: boolean },
 ): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.draft.picks[String(pick.overallPick)] = {
+        playerKey: pick.playerKey,
+        playerName: pick.playerName,
+        isKeeper: pick.isKeeper === true,
+        enteredBy: c.owner,
+        timestamp: new Date().toISOString(),
+      };
+    });
+  }
   const { data } = await axios.post('/api/league/draft/pick', pick, { headers: authHeaders(c) });
   return data;
 }
 
 export async function clearDraftPick(c: Credentials, overallPick: number): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      delete s.draft.picks[String(overallPick)];
+    });
+  }
   const { data } = await axios.delete(`/api/league/draft/pick/${overallPick}`, {
     headers: authHeaders(c),
   });
@@ -80,16 +182,35 @@ export async function clearDraftPick(c: Credentials, overallPick: number): Promi
 }
 
 export async function startDraft(c: Credentials): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      if (s.draft.startedAt === null) s.draft.startedAt = new Date().toISOString();
+    });
+  }
   const { data } = await axios.post('/api/league/draft/start', {}, { headers: authHeaders(c) });
   return data;
 }
 
 export async function resetDraft(c: Credentials): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.draft.picks = {};
+      s.draft.startedAt = null;
+    });
+  }
   const { data } = await axios.post('/api/league/draft/reset', {}, { headers: authHeaders(c) });
   return data;
 }
 
 export async function setLocks(c: Credentials, keepersLocked: boolean): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.locks.keepersLocked = keepersLocked;
+    });
+  }
   const { data } = await axios.post('/api/league/locks', { keepersLocked }, { headers: authHeaders(c) });
   return data;
 }

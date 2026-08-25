@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DatasetPlayer } from '../../lib/keeper/types.js';
 import { OWNERS, leagueDataset } from '../../lib/league/data.js';
-import { apiErrorMessage, setOverrides } from '../../lib/league/api.js';
+import { apiErrorMessage, enterSandbox, exitSandbox, sandboxActive, setOverrides } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import PlayerCombobox from './PlayerCombobox.js';
 import CommissionerPanel from './CommissionerPanel.js';
@@ -112,6 +112,73 @@ export default function AdminPage() {
       )}
 
       <CommissionerPanel />
+
+      {/* ── Test mode ──────────────────────────────────────────── */}
+      <section
+        className="panel"
+        style={{
+          padding: 14,
+          borderRadius: 10,
+          marginBottom: 14,
+          borderColor: sandboxActive() ? 'var(--neon-yellow)' : 'var(--panel-border)',
+        }}
+      >
+        <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)', marginBottom: 6 }}>
+          🧪 TEST MODE
+        </div>
+        <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem', marginBottom: 10 }}>
+          A sandbox copy of the league, only on this device: fill in anyone's keepers, start the
+          draft, make picks — nothing saves to real profiles. Secrecy is off so the whole board
+          populates.
+        </div>
+        {sandboxActive() ? (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ color: 'var(--neon-yellow)', fontWeight: 800, fontSize: '0.85rem' }}>
+              ● ACTIVE — you're in the sandbox
+            </span>
+            <button
+              className="tap-btn"
+              onClick={() => {
+                exitSandbox();
+                window.location.reload();
+              }}
+              style={{
+                minHeight: 44,
+                padding: '0 16px',
+                borderRadius: 8,
+                border: '2px solid var(--neon-red)',
+                background: 'transparent',
+                color: 'var(--neon-red)',
+                fontWeight: 800,
+              }}
+            >
+              EXIT & DISCARD
+            </button>
+          </div>
+        ) : (
+          <button
+            className="tap-btn"
+            disabled={busy}
+            onClick={() =>
+              run(async () => {
+                await enterSandbox(identity);
+                window.location.assign('/draft');
+              })
+            }
+            style={{
+              minHeight: 44,
+              padding: '0 16px',
+              borderRadius: 8,
+              border: '2px solid var(--neon-yellow)',
+              background: 'rgba(255,230,0,0.08)',
+              color: 'var(--neon-yellow)',
+              fontWeight: 800,
+            }}
+          >
+            ENTER TEST MODE
+          </button>
+        )}
+      </section>
 
       {/* ── Team worksheets (commissioner view/edit) ───────────── */}
       <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>

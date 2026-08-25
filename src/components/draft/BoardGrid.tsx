@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
@@ -11,11 +11,77 @@ interface Props {
   tv?: boolean;
 }
 
+interface TradeTip {
+  cell: BoardCell;
+  x: number;
+  y: number;
+}
+
+/** Styled hover/tap popover explaining where a traded pick came from. */
+function TradeTooltip({ tip }: { tip: TradeTip }) {
+  const pick = tip.cell.pick;
+  const detail = (leagueDataset.tradeDetails ?? []).find(
+    (t) =>
+      t.date === pick.tradeDate &&
+      t.teams.includes(pick.currentOwner) &&
+      t.teams.includes(pick.viaTradeFrom ?? ''),
+  );
+  const width = 300;
+  const left = Math.min(Math.max(8, tip.x - width / 2), window.innerWidth - width - 8);
+  const top = Math.min(tip.y + 14, window.innerHeight - 220);
+  return (
+    <div
+      className="panel"
+      style={{
+        position: 'fixed',
+        left,
+        top,
+        width,
+        zIndex: 300,
+        borderRadius: 10,
+        borderColor: 'var(--neon-yellow)',
+        padding: '10px 12px',
+        pointerEvents: 'none',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+        <span style={{ color: 'var(--neon-yellow)', fontWeight: 800, fontSize: '0.78rem' }}>
+          ▲ TRADED PICK {pickLabel(pick)}
+        </span>
+        <span style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>{pick.tradeDate}</span>
+      </div>
+      <div style={{ color: 'var(--text-hi)', fontSize: '0.8rem', marginBottom: detail ? 8 : 0 }}>
+        <strong>{pick.currentOwner}</strong> owns <strong>{pick.viaTradeFrom}</strong>'s R
+        {pick.round} pick
+      </div>
+      {detail ? (
+        <div style={{ display: 'grid', gap: 5 }}>
+          {detail.teams.map((teamName) => (
+            <div key={teamName} style={{ fontSize: '0.72rem', lineHeight: 1.4 }}>
+              <span style={{ color: 'var(--neon-teal)', fontWeight: 800 }}>{teamName} got: </span>
+              <span style={{ color: 'var(--text-body)' }}>
+                {(detail.received[teamName] ?? []).join(', ')}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        pick.tradeNote && (
+          <div style={{ color: 'var(--text-body)', fontSize: '0.72rem' }}>{pick.tradeNote}</div>
+        )
+      )}
+    </div>
+  );
+}
+
 /**
  * The classic wall board: 10 team columns (draft order) x 14 round rows,
  * with an owner header row and a round-number rail.
  */
 export default function BoardGrid({ board, tv = false }: Props) {
+  const [tip, setTip] = useState<TradeTip | null>(null);
+
   const cellMap = useMemo(() => {
     const m = new Map<string, BoardCell>();
     for (const c of board) m.set(`${c.pick.round}:${c.pick.originalOwner}`, c);
@@ -78,15 +144,35 @@ export default function BoardGrid({ board, tv = false }: Props) {
             <span style={{ color: 'var(--text-faint)' }}>{r % 2 === 1 ? '→' : '←'}</span>
           </div>
           {OWNERS.map((o) => (
-            <GridCell key={o} cell={cellMap.get(`${r}:${o}`)} tv={tv} />
+            <GridCell
+              key={o}
+              cell={cellMap.get(`${r}:${o}`)}
+              tv={tv}
+              onTradeShow={(cell, x, y) => setTip({ cell, x, y })}
+              onTradeHide={() => setTip(null)}
+              tipShownFor={tip?.cell.pick.overall ?? null}
+            />
           ))}
         </Fragment>
       ))}
+      {tip && <TradeTooltip tip={tip} />}
     </div>
   );
 }
 
-function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
+function GridCell({
+  cell,
+  tv,
+  onTradeShow,
+  onTradeHide,
+  tipShownFor,
+}: {
+  cell?: BoardCell;
+  tv: boolean;
+  onTradeShow: (cell: BoardCell, x: number, y: number) => void;
+  onTradeHide: () => void;
+  tipShownFor: number | null;
+}) {
   if (!cell) return <div />;
   const d = cellDisplay(cell);
   const traded = cell.pick.viaTradeFrom;
@@ -114,16 +200,27 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
     style.background = 'rgba(0,255,204,0.06)';
   }
 
-  const tradeTitle = traded
-    ? `${cell.pick.currentOwner} owns ${traded}'s R${cell.pick.round} pick${cell.pick.tradeNote ? ` — ${cell.pick.tradeDate}: ${cell.pick.tradeNote}` : ''}`
-    : undefined;
+  const tradeHandlers = traded
+    ? {
+        onMouseEnter: (e: React.MouseEvent) => onTradeShow(cell, e.clientX, e.clientY),
+        onMouseLeave: () => onTradeHide(),
+        onClick: (e: React.MouseEvent) => {
+          // tap toggle for touch screens
+          if (tipShownFor === cell.pick.overall) onTradeHide();
+          else onTradeShow(cell, e.clientX, e.clientY);
+        },
+      }
+    : {};
 
   return (
-    <div className={cell.onClock ? 'pulse-glow' : undefined} style={style} title={tradeTitle}>
+    <div
+      className={cell.onClock ? 'pulse-glow' : undefined}
+      style={{ ...style, cursor: traded ? 'help' : undefined }}
+      {...tradeHandlers}
+    >
       {/* corner markers: keeper lock + trade flag, small, upper right */}
       {(d?.isKeeper || traded) && (
         <span
-          title={tradeTitle}
           style={{
             position: 'absolute',
             top: 1,

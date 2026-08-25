@@ -3,6 +3,7 @@ import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
 import { useLeagueData } from '../../hooks/useLeague.js';
 import { formatDraftAt } from '../keepers/KeepersPage.js';
+import { CountdownDisplay, useCountdown } from '../../hooks/useCountdown.js';
 import BoardGrid from './BoardGrid.js';
 import { recentPicks } from './boardUtils.js';
 
@@ -11,6 +12,7 @@ export default function DraftTvPage() {
   const { state, meta, dataUpdatedAt, dataset } = useLeagueData(true);
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
   const started = state.draft.startedAt !== null;
+  const countdown = useCountdown(started ? null : (meta?.draftAt ?? null));
   const onClock = board.find((c) => c.onClock) ?? null;
   const last = useMemo(() => recentPicks(board, 1)[0] ?? null, [board]);
 
@@ -45,21 +47,19 @@ export default function DraftTvPage() {
           borderBottom: '2px solid var(--panel-border)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <img src="/logo.png" alt="The Nerds" style={{ height: '10vh', width: 'auto' }} />
-          <div
-            className="hub-heading glow-teal"
-            style={{
-              color: 'var(--neon-teal)',
-              fontSize: 'clamp(0.6rem, 1.6vh, 1rem)',
-              lineHeight: 1.5,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            2027
-            <br />
-            DRAFT
-          </div>
+        <div
+          className="hub-heading glow-teal"
+          style={{
+            color: 'var(--neon-teal)',
+            fontSize: 'clamp(0.6rem, 1.8vh, 1.1rem)',
+            lineHeight: 1.5,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          THE NERDS
+          <br />
+          2027 DRAFT
         </div>
 
         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
@@ -75,21 +75,26 @@ export default function DraftTvPage() {
               >
                 DRAFT DAY
               </div>
-              <div
-                className="hub-heading glow-teal"
-                style={{
-                  color: 'var(--text-max)',
-                  fontSize: 'clamp(1rem, 3.4vh, 2.4rem)',
-                  lineHeight: 1.25,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {meta ? formatDraftAt(meta.draftAt).toUpperCase() : 'OCT 18 · 2:00 PM'}
-              </div>
+              {countdown && !countdown.past ? (
+                <CountdownDisplay countdown={countdown} size="clamp(1.2rem, 4vh, 2.6rem)" />
+              ) : (
+                <div
+                  className="hub-heading glow-teal"
+                  style={{
+                    color: 'var(--text-max)',
+                    fontSize: 'clamp(1rem, 3.4vh, 2.4rem)',
+                    lineHeight: 1.25,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {meta ? formatDraftAt(meta.draftAt).toUpperCase() : 'OCT 18 · 2:00 PM'}
+                </div>
+              )}
               <div style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.65rem, 1.5vh, 0.9rem)' }}>
-                Board goes live when the commissioner starts the draft
+                {meta ? formatDraftAt(meta.draftAt) : ''} · board goes live when the commissioner
+                starts the draft
               </div>
             </>
           ) : onClock ? (
