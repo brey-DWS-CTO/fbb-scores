@@ -1,20 +1,10 @@
-import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import espnRoutes from './routes/espn.js';
+import app from './app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
-
-// Allow all origins in development
-app.use(cors());
-app.use(express.json());
-
-// Mount API routes
-app.use('/api', espnRoutes);
 
 // In production, serve the Vite build
 if (process.env.NODE_ENV === 'production') {

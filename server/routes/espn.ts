@@ -2,7 +2,6 @@ import { Router, type Request } from 'express';
 import axios from 'axios';
 import { EspnClient } from '../../src/lib/espn/client.js';
 import { normalizeLeagueResponse, normalizeMatchupDetail, normalizeDailyView } from '../../src/lib/espn/adapter.js';
-import { saveMatchupSnapshot, getLatestSnapshot, savePlayerSnapshots, getPlayerTrend, getTeamTrend } from '../../src/lib/supabase/snapshots.js';
 import type { EspnMatchupRaw, EspnRosterEntry, GameStatus, NbaGameInfo } from '../../src/types/index.js';
 import { NBA_TEAM_ABBREV } from '../../src/lib/espn/calculations.js';
 
@@ -116,25 +115,10 @@ router.get('/espn/scoreboard', async (req, res) => {
 
     const scoreboard = normalizeLeagueResponse(raw, matchupPeriod, nbaScoreboard, nbaSchedule, injuryReturnDates);
 
-    // Save snapshot to Supabase (fire-and-forget)
-    saveMatchupSnapshot(scoreboard).catch((e) =>
-      console.error('[Supabase] Snapshot save failed:', e),
-    );
-
     res.json(scoreboard);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[ESPN proxy] Error fetching scoreboard:', message);
-
-    // Try returning cached data from Supabase as fallback
-    try {
-      const cached = await getLatestSnapshot(ESPN_LEAGUE_ID, seasonId);
-      if (cached) {
-        console.log('[ESPN proxy] Returning cached scoreboard from Supabase');
-        res.json(cached);
-        return;
-      }
-    } catch { /* ignore cache errors */ }
 
     const hint = message.includes('auth') || message.includes('401') || message.includes('302')
       ? ' — Try adding ESPN_EXTRA_COOKIES to your .env (see README for instructions)'
@@ -350,11 +334,6 @@ router.get('/espn/matchup/:matchupId', async (req, res) => {
       return;
     }
 
-    // Save player snapshots to Supabase (fire-and-forget)
-    savePlayerSnapshots(ESPN_LEAGUE_ID, seasonId, matchupDetail).catch((e) =>
-      console.error('[Supabase] Player snapshot save failed:', e),
-    );
-
     res.json(matchupDetail);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -419,68 +398,32 @@ router.get('/espn/debug-stats', (req, res, next) => {
 
 /**
  * GET /api/espn/trends/player/:playerId
- * Returns historical trend data for a single player.
+ * Historical snapshot storage was removed along with Supabase. The route
+ * remains and returns an empty, frontend-compatible trend (see
+ * src/hooks/usePlayerTrend.ts) so the UI degrades gracefully.
  */
-router.get('/espn/trends/player/:playerId', async (req, res) => {
-  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID } = process.env;
-  if (!ESPN_LEAGUE_ID) {
-    res.status(500).json({ error: 'Missing ESPN_LEAGUE_ID' });
-    return;
-  }
-
+router.get('/espn/trends/player/:playerId', (req, res) => {
   const playerId = parseInt(req.params.playerId, 10);
   if (isNaN(playerId)) {
     res.status(400).json({ error: 'Invalid player ID' });
     return;
   }
-
-  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
-
-  try {
-    const trend = await getPlayerTrend(ESPN_LEAGUE_ID, seasonId, playerId);
-    if (!trend) {
-      res.status(404).json({ error: 'No trend data found for this player' });
-      return;
-    }
-    res.json(trend);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[ESPN proxy] Error fetching player trend:', message);
-    res.status(500).json({ error: message });
-  }
+  res.json({ playerId, playerName: '', dataPoints: [], note: 'trends storage disabled' });
 });
 
 /**
  * GET /api/espn/trends/team/:teamId
- * Returns historical trend data for a fantasy team.
+ * Historical snapshot storage was removed along with Supabase. The route
+ * remains and returns an empty, frontend-compatible trend (see
+ * src/hooks/usePlayerTrend.ts) so the UI degrades gracefully.
  */
-router.get('/espn/trends/team/:teamId', async (req, res) => {
-  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID } = process.env;
-  if (!ESPN_LEAGUE_ID) {
-    res.status(500).json({ error: 'Missing ESPN_LEAGUE_ID' });
-    return;
-  }
-
+router.get('/espn/trends/team/:teamId', (req, res) => {
   const teamId = parseInt(req.params.teamId, 10);
   if (isNaN(teamId)) {
     res.status(400).json({ error: 'Invalid team ID' });
     return;
   }
-
-  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
-
-  try {
-    const trend = await getTeamTrend(ESPN_LEAGUE_ID, seasonId, teamId);
-    if (!trend) {
-      res.status(404).json({ error: 'No trend data found for this team' });
-      return;
-    }
-    res.json(trend);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[ESPN proxy] Error fetching team trend:', message);
-    res.status(500).json({ error: message });
-  }
+  res.json({ teamId, teamName: '', dataPoints: [], note: 'trends storage disabled' });
 });
 
 // ─── NBA Schedule Helpers ────────────────────────────────────────────────────
