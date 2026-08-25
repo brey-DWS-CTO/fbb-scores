@@ -237,6 +237,23 @@ function GridCell({
       )}
       {d ? (
         <>
+          {traded && (
+            <span
+              style={{
+                color: 'var(--neon-yellow)',
+                fontWeight: 800,
+                fontSize: tv ? 'clamp(7px, 0.7vw, 10px)' : '0.55rem',
+                letterSpacing: '0.05em',
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                paddingRight: 12,
+              }}
+            >
+              {cell.pick.currentOwner.toUpperCase()}'S PICK
+            </span>
+          )}
           <span
             style={{
               display: '-webkit-box',
@@ -279,28 +296,35 @@ function GridCell({
         >
           {pickLabel(cell.pick)} ⏱
         </span>
-      ) : tv ? (
+      ) : (
         <>
-          <span style={{ color: 'var(--text-ghost)', fontSize: 'clamp(9px, 0.9vw, 14px)', lineHeight: 1.2 }}>
+          <span
+            style={{
+              color: 'var(--text-ghost)',
+              fontSize: tv ? 'clamp(9px, 0.9vw, 14px)' : '0.68rem',
+              lineHeight: 1.2,
+            }}
+          >
             {pickLabel(cell.pick)}
           </span>
           {traded && (
             <span
               style={{
                 color: 'var(--neon-yellow)',
-                opacity: 0.65,
-                fontSize: 'clamp(8px, 0.8vw, 12px)',
-                lineHeight: 1.2,
+                opacity: 0.8,
+                fontWeight: 700,
+                fontSize: tv ? 'clamp(8px, 0.8vw, 12px)' : '0.62rem',
+                lineHeight: 1.25,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
               }}
             >
-              {cell.pick.currentOwner}
+              → {cell.pick.currentOwner}'s
             </span>
           )}
         </>
-      ) : null}
+      )}
     </div>
   );
 }

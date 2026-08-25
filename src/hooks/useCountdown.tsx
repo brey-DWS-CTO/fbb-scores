@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 export interface Countdown {
   past: boolean;
@@ -29,6 +29,25 @@ export function useCountdown(targetIso: string | null | undefined): Countdown | 
     minutes: Math.floor((totalSeconds % 3600) / 60),
     seconds: totalSeconds % 60,
   };
+}
+
+/**
+ * Self-contained ticking countdown: only THIS component re-renders each
+ * second, so pages hosting it stay stable (keeps devtools inspection usable).
+ * Renders `fallback` when the target has passed (or is unknown).
+ */
+export function DraftCountdown({
+  targetIso,
+  size,
+  fallback = null,
+}: {
+  targetIso: string | null | undefined;
+  size?: string;
+  fallback?: ReactNode;
+}) {
+  const countdown = useCountdown(targetIso);
+  if (!countdown || countdown.past) return <>{fallback}</>;
+  return <CountdownDisplay countdown={countdown} size={size} />;
 }
 
 export function CountdownDisplay({

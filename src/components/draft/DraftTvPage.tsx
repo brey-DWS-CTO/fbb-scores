@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
 import { useLeagueData } from '../../hooks/useLeague.js';
+import { sandboxActive } from '../../lib/league/api.js';
 import { formatDraftAt } from '../keepers/KeepersPage.js';
-import { CountdownDisplay, useCountdown } from '../../hooks/useCountdown.js';
+import { DraftCountdown } from '../../hooks/useCountdown.js';
 import BoardGrid from './BoardGrid.js';
 import { recentPicks } from './boardUtils.js';
 
@@ -12,7 +13,6 @@ export default function DraftTvPage() {
   const { state, meta, dataUpdatedAt, dataset } = useLeagueData(true);
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
   const started = state.draft.startedAt !== null;
-  const countdown = useCountdown(started ? null : (meta?.draftAt ?? null));
   const onClock = board.find((c) => c.onClock) ?? null;
   const last = useMemo(() => recentPicks(board, 1)[0] ?? null, [board]);
 
@@ -75,23 +75,25 @@ export default function DraftTvPage() {
               >
                 DRAFT DAY
               </div>
-              {countdown && !countdown.past ? (
-                <CountdownDisplay countdown={countdown} size="clamp(1.2rem, 4vh, 2.6rem)" />
-              ) : (
-                <div
-                  className="hub-heading glow-teal"
-                  style={{
-                    color: 'var(--text-max)',
-                    fontSize: 'clamp(1rem, 3.4vh, 2.4rem)',
-                    lineHeight: 1.25,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {meta ? formatDraftAt(meta.draftAt).toUpperCase() : 'OCT 18 · 2:00 PM'}
-                </div>
-              )}
+              <DraftCountdown
+                targetIso={meta?.draftAt}
+                size="clamp(1.2rem, 4vh, 2.6rem)"
+                fallback={
+                  <div
+                    className="hub-heading glow-teal"
+                    style={{
+                      color: 'var(--text-max)',
+                      fontSize: 'clamp(1rem, 3.4vh, 2.4rem)',
+                      lineHeight: 1.25,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {meta ? formatDraftAt(meta.draftAt).toUpperCase() : 'OCT 18 · 2:00 PM'}
+                  </div>
+                }
+              />
               <div style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.65rem, 1.5vh, 0.9rem)' }}>
                 {meta ? formatDraftAt(meta.draftAt) : ''} · board goes live when the commissioner
                 starts the draft
@@ -140,6 +142,18 @@ export default function DraftTvPage() {
         </div>
 
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          {sandboxActive() && (
+            <div
+              style={{
+                color: 'var(--neon-yellow)',
+                fontWeight: 800,
+                fontSize: 'clamp(0.65rem, 1.6vh, 0.95rem)',
+                letterSpacing: '0.05em',
+              }}
+            >
+              🧪 TEST MODE
+            </div>
+          )}
           {last && (
             <div style={{ color: 'var(--text-soft)', fontSize: 'clamp(0.7rem, 1.7vh, 1rem)' }}>
               LAST: <span style={{ color: 'var(--text-max)', fontWeight: 700 }}>{last.playerName}</span> ·{' '}

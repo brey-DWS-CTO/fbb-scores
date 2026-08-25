@@ -6,7 +6,7 @@ import { teamByOwner } from '../../lib/league/data.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { apiErrorMessage, startDraft } from '../../lib/league/api.js';
 import { formatDraftAt } from '../keepers/KeepersPage.js';
-import { CountdownDisplay, useCountdown } from '../../hooks/useCountdown.js';
+import { DraftCountdown } from '../../hooks/useCountdown.js';
 import IdentityChip from '../league/IdentityChip.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
@@ -161,7 +161,6 @@ export default function DraftPage() {
   const [startError, setStartError] = useState<string | null>(null);
 
   const started = state.draft.startedAt !== null;
-  const countdown = useCountdown(started ? null : meta?.draftAt);
 
   const doStartDraft = async () => {
     if (!identity) return;
@@ -260,11 +259,9 @@ export default function DraftPage() {
                 🗓️ <strong>{formatDraftAt(meta.draftAt)}</strong>
               </div>
             )}
-            {countdown && !countdown.past && (
-              <div style={{ margin: '12px 0 4px' }}>
-                <CountdownDisplay countdown={countdown} size="1.9rem" />
-              </div>
-            )}
+            <div style={{ margin: '12px 0 4px' }}>
+              <DraftCountdown targetIso={meta?.draftAt} size="1.9rem" />
+            </div>
             <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
               The board unlocks when the commissioner starts the draft.
             </div>
