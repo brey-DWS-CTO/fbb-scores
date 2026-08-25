@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Press+Start+2P&family=VT323:wght@400&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -142,3 +142,24 @@ body::before {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--dark-bg); }
 ::-webkit-scrollbar-thumb { background: #1a1a33; border-radius: 3px; }
+
+/* ─── Modern Font Mode ────────────────────────────────────────────────── */
+html.font-modern body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+}
+html.font-modern .pixel-text {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  /* Scale up since pixel font sizes are tiny */
+  font-size: calc(1em * 2.2);
+}
+html.font-modern .score-display {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+}
+/* Override all inline VT323 font-family */
+html.font-modern [style*="VT323"] {
+  font-family: 'Inter', system-ui, sans-serif !important;
+}

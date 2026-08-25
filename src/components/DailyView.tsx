@@ -161,29 +161,42 @@ const DailyTeamRoster: FC<DailyTeamRosterProps> = ({ team, side, onPlayerClick, 
 
       {/* Player table */}
       <div className="overflow-x-auto">
-        <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: '420px' }}>
+        <table className="w-full" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #222244' }}>
-              <th className="text-left px-2 py-2" style={{ width: '8%' }}>
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>SLOT</span>
+              <th className="text-left px-1.5 py-2" style={{ width: '28px' }}>
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#777799' }}>SLOT</span>
               </th>
-              <th className="text-left px-2 py-2" style={{ width: '36%' }}>
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>PLAYER</span>
+              <th className="text-left px-1.5 py-2">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#777799' }}>PLAYER</span>
               </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)' }}>FPTS</span>
+              <th className="text-right px-1.5 py-2">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: 'var(--neon-teal)' }}>FPTS</span>
               </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#aaaacc' }}>PTS</span>
+              <th className="text-right px-1.5 py-2">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>PTS</span>
               </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#aaaacc' }}>REB</span>
+              <th className="text-right px-1.5 py-2">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>REB</span>
               </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#aaaacc' }}>AST</span>
+              <th className="text-right px-1.5 py-2">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>AST</span>
               </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#aaaacc' }}>MIN</span>
+              {/* Desktop-only columns */}
+              <th className="text-right px-1.5 py-2 hidden md:table-cell">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>STL</span>
+              </th>
+              <th className="text-right px-1.5 py-2 hidden md:table-cell">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>BLK</span>
+              </th>
+              <th className="text-right px-1.5 py-2 hidden md:table-cell">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>3PM</span>
+              </th>
+              <th className="text-right px-1.5 py-2 hidden md:table-cell">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>FG</span>
+              </th>
+              <th className="text-right px-1.5 py-2">
+                <span className="pixel-text" style={{ fontSize: '0.3rem', color: '#aaaacc' }}>MIN</span>
               </th>
             </tr>
           </thead>
@@ -219,6 +232,7 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
   const gameStatus = player.gameInfo?.status;
   const isLive = gameStatus === 'live';
   const isFinal = gameStatus === 'final';
+  const hasPlayed = player.todayStats.min > 0;
 
   // Row highlight for live games
   const rowBg = isLive
@@ -228,6 +242,8 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
   // Status indicator dot color
   const dotColor = isLive ? '#ffe600' : isFinal ? '#666688' : player.isStarted ? '#00ff88' : '#444466';
   const dotGlow = isLive ? '0 0 6px #ffe600' : player.isStarted ? '0 0 4px #00ff88' : 'none';
+
+  const statColor = hasPlayed ? '#aaaacc' : '#444466';
 
   return (
     <tr
@@ -248,11 +264,11 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
       }}
     >
       {/* Slot */}
-      <td className="px-2 py-2">
+      <td className="px-1.5 py-1.5">
         <span
           style={{
             fontFamily: "'VT323', monospace",
-            fontSize: '0.85rem',
+            fontSize: '0.8rem',
             color: isBenched ? '#555577' : 'var(--neon-purple)',
           }}
         >
@@ -261,14 +277,14 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
       </td>
 
       {/* Player info */}
-      <td className="px-2 py-2">
-        <div className="flex items-center gap-2">
+      <td className="px-1.5 py-1.5">
+        <div className="flex items-center gap-1.5">
           {/* Status indicator dot */}
           <span
             style={{
               display: 'inline-block',
-              width: '6px',
-              height: '6px',
+              width: '5px',
+              height: '5px',
               borderRadius: '50%',
               background: dotColor,
               boxShadow: dotGlow,
@@ -280,7 +296,7 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
             <img
               src={player.imageUrl}
               alt=""
-              className="w-6 h-5 object-cover"
+              className="w-5 h-4 object-cover hidden sm:block"
               style={{ borderRadius: '2px', flexShrink: 0 }}
               loading="lazy"
             />
@@ -289,7 +305,7 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
             <span
               style={{
                 fontFamily: "'VT323', monospace",
-                fontSize: '0.9rem',
+                fontSize: '0.85rem',
                 color: '#e0e0ff',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -299,49 +315,51 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
               {player.name}
             </span>
             {/* Game info line: show live score/clock, final, or upcoming time */}
-            {player.gameInfo ? (
-              <span
-                style={{
-                  fontFamily: "'VT323', monospace",
-                  fontSize: '0.7rem',
-                  color: isLive ? 'var(--neon-yellow)' : isFinal ? '#666688' : '#555577',
-                  textShadow: isLive ? '0 0 4px #ffe60044' : 'none',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {isLive && '▶ '}
-                {player.gameInfo.isHome ? 'vs' : '@'} {player.gameInfo.opponent}
-                {player.gameInfo.scoreDisplay && ` · ${player.gameInfo.scoreDisplay}`}
-                {player.gameInfo.statusDetail && ` · ${player.gameInfo.statusDetail}`}
-              </span>
-            ) : (
-              <span
-                style={{ fontFamily: "'VT323', monospace", fontSize: '0.7rem', color: '#555577' }}
-              >
-                {player.position} - {player.nbaTeamAbbrev}
-              </span>
-            )}
-            {player.injuryStatus === 'OUT' && (
-              <span className="pixel-text" style={{ fontSize: '0.25rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4, marginLeft: '4px' }}>OUT</span>
-            )}
-            {player.injuryStatus === 'DAY_TO_DAY' && (
-              <span className="pixel-text" style={{ fontSize: '0.25rem', color: 'var(--neon-yellow)', border: '1px solid var(--neon-yellow)', padding: '0 2px', lineHeight: 1.4, marginLeft: '4px' }}>DTD</span>
-            )}
-            {player.injuryStatus === 'SUSPENSION' && (
-              <span className="pixel-text" style={{ fontSize: '0.25rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4, marginLeft: '4px' }}>SUSP</span>
-            )}
+            <div className="flex items-center gap-1">
+              {player.gameInfo ? (
+                <span
+                  style={{
+                    fontFamily: "'VT323', monospace",
+                    fontSize: '0.65rem',
+                    color: isLive ? 'var(--neon-yellow)' : isFinal ? '#666688' : '#555577',
+                    textShadow: isLive ? '0 0 4px #ffe60044' : 'none',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {isLive && '▶ '}
+                  {player.gameInfo.isHome ? 'vs' : '@'} {player.gameInfo.opponent}
+                  {player.gameInfo.scoreDisplay && ` · ${player.gameInfo.scoreDisplay}`}
+                  {player.gameInfo.statusDetail && ` · ${player.gameInfo.statusDetail}`}
+                </span>
+              ) : (
+                <span
+                  style={{ fontFamily: "'VT323', monospace", fontSize: '0.65rem', color: '#555577' }}
+                >
+                  {player.position} - {player.nbaTeamAbbrev}
+                </span>
+              )}
+              {player.injuryStatus === 'OUT' && (
+                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>OUT</span>
+              )}
+              {player.injuryStatus === 'DAY_TO_DAY' && (
+                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-yellow)', border: '1px solid var(--neon-yellow)', padding: '0 2px', lineHeight: 1.4 }}>DTD</span>
+              )}
+              {player.injuryStatus === 'SUSPENSION' && (
+                <span className="pixel-text" style={{ fontSize: '0.22rem', color: 'var(--neon-red)', border: '1px solid var(--neon-red)', padding: '0 2px', lineHeight: 1.4 }}>SUSP</span>
+              )}
+            </div>
           </div>
         </div>
       </td>
 
       {/* FPTS */}
-      <td className="text-right px-2 py-2">
+      <td className="text-right px-1.5 py-1.5">
         <span
           style={{
             fontFamily: "'VT323', monospace",
-            fontSize: '1rem',
+            fontSize: '0.95rem',
             color: player.todayFpts > 0 ? 'var(--neon-teal)' : '#555577',
             textShadow: player.todayFpts >= 30 ? '0 0 6px #00ffcc' : 'none',
           }}
@@ -351,30 +369,58 @@ const DailyPlayerRow: FC<DailyPlayerRowProps> = ({ player, isEven, onClick, clic
       </td>
 
       {/* PTS */}
-      <td className="text-right px-2 py-2">
-        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: '#aaaacc' }}>
-          {player.todayStats.pts}
+      <td className="text-right px-1.5 py-1.5">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: statColor }}>
+          {hasPlayed ? player.todayStats.pts : '-'}
         </span>
       </td>
 
       {/* REB */}
-      <td className="text-right px-2 py-2">
-        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: '#aaaacc' }}>
-          {player.todayStats.reb}
+      <td className="text-right px-1.5 py-1.5">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: statColor }}>
+          {hasPlayed ? player.todayStats.reb : '-'}
         </span>
       </td>
 
       {/* AST */}
-      <td className="text-right px-2 py-2">
-        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: '#aaaacc' }}>
-          {player.todayStats.ast}
+      <td className="text-right px-1.5 py-1.5">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: statColor }}>
+          {hasPlayed ? player.todayStats.ast : '-'}
+        </span>
+      </td>
+
+      {/* STL (desktop only) */}
+      <td className="text-right px-1.5 py-1.5 hidden md:table-cell">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: statColor }}>
+          {hasPlayed ? player.todayStats.stl : '-'}
+        </span>
+      </td>
+
+      {/* BLK (desktop only) */}
+      <td className="text-right px-1.5 py-1.5 hidden md:table-cell">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: statColor }}>
+          {hasPlayed ? player.todayStats.blk : '-'}
+        </span>
+      </td>
+
+      {/* 3PM (desktop only) */}
+      <td className="text-right px-1.5 py-1.5 hidden md:table-cell">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: statColor }}>
+          {hasPlayed ? player.todayStats.threepm : '-'}
+        </span>
+      </td>
+
+      {/* FG (desktop only) */}
+      <td className="text-right px-1.5 py-1.5 hidden md:table-cell">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: statColor }}>
+          {hasPlayed ? `${player.todayStats.fgm}/${player.todayStats.fga}` : '-'}
         </span>
       </td>
 
       {/* MIN */}
-      <td className="text-right px-2 py-2">
-        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: '#555577' }}>
-          {player.todayStats.min > 0 ? Math.round(player.todayStats.min) : '-'}
+      <td className="text-right px-1.5 py-1.5">
+        <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.85rem', color: '#555577' }}>
+          {hasPlayed ? Math.round(player.todayStats.min) : '-'}
         </span>
       </td>
     </tr>

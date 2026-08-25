@@ -143,24 +143,37 @@ const MatchupDetailPage: FC = () => {
       )}
 
       {activeTab === 'projections' && matchup && (
-        <div className="flex flex-col lg:flex-row gap-4">
-          {matchup.home.projectionBreakdown && (
-            <ProjectionBreakdown
-              breakdown={matchup.home.projectionBreakdown}
-              teamName={matchup.home.name}
-              side="home"
-              playerMap={playerMap}
+        <>
+          {/* Win Probability Bar */}
+          {matchup.home.projectionBreakdown && matchup.away.projectionBreakdown && (
+            <WinProbabilityBar
+              homeProjected={matchup.home.projectionBreakdown.projectedTotal}
+              awayProjected={matchup.away.projectionBreakdown.projectedTotal}
+              homeName={matchup.home.name}
+              awayName={matchup.away.name}
+              homeWinPct={matchup.winProbability.homeWinPct}
+              awayWinPct={matchup.winProbability.awayWinPct}
             />
           )}
-          {matchup.away.projectionBreakdown && (
-            <ProjectionBreakdown
-              breakdown={matchup.away.projectionBreakdown}
-              teamName={matchup.away.name}
-              side="away"
-              playerMap={playerMap}
-            />
-          )}
-        </div>
+          <div className="flex flex-col lg:flex-row gap-4">
+            {matchup.home.projectionBreakdown && (
+              <ProjectionBreakdown
+                breakdown={matchup.home.projectionBreakdown}
+                teamName={matchup.home.name}
+                side="home"
+                playerMap={playerMap}
+              />
+            )}
+            {matchup.away.projectionBreakdown && (
+              <ProjectionBreakdown
+                breakdown={matchup.away.projectionBreakdown}
+                teamName={matchup.away.name}
+                side="away"
+                playerMap={playerMap}
+              />
+            )}
+          </div>
+        </>
       )}
     </section>
   );
@@ -267,5 +280,101 @@ const TabButton: FC<TabButtonProps> = ({ label, isActive, onClick }) => (
     {label}
   </button>
 );
+
+// ─── Win Probability Bar ───────────────────────────────────────────────────
+
+interface WinProbabilityBarProps {
+  homeProjected: number;
+  awayProjected: number;
+  homeName: string;
+  awayName: string;
+  homeWinPct: number;
+  awayWinPct: number;
+}
+
+const WinProbabilityBar: FC<WinProbabilityBarProps> = ({ homeProjected, awayProjected, homeName, awayName, homeWinPct, awayWinPct }) => {
+  const homeLeading = homeProjected >= awayProjected;
+
+  return (
+    <div
+      className="mb-4 px-3 py-3"
+      style={{
+        background: '#0a0a14',
+        border: '1px solid #222244',
+        borderRadius: '4px',
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799', letterSpacing: '0.15em' }}>
+          WIN PROBABILITY
+        </span>
+      </div>
+      {/* Score comparison */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: homeLeading ? 'var(--neon-blue)' : '#777799' }}>
+            {homeName}
+          </span>
+          <span
+            style={{
+              fontFamily: "'VT323', monospace",
+              fontSize: '1.3rem',
+              color: homeLeading ? 'var(--neon-teal)' : '#555577',
+              textShadow: homeLeading ? '0 0 6px #00ffcc' : 'none',
+            }}
+          >
+            {homeProjected.toFixed(1)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            style={{
+              fontFamily: "'VT323', monospace",
+              fontSize: '1.3rem',
+              color: !homeLeading ? 'var(--neon-teal)' : '#555577',
+              textShadow: !homeLeading ? '0 0 6px #00ffcc' : 'none',
+            }}
+          >
+            {awayProjected.toFixed(1)}
+          </span>
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '1rem', color: !homeLeading ? 'var(--neon-orange)' : '#777799' }}>
+            {awayName}
+          </span>
+        </div>
+      </div>
+      {/* Probability bar */}
+      <div className="flex" style={{ height: '24px', borderRadius: '3px', overflow: 'hidden', border: '1px solid #333355' }}>
+        <div
+          style={{
+            width: `${homeWinPct}%`,
+            background: 'linear-gradient(90deg, #1a3a6a, #2266cc)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'width 0.5s ease',
+          }}
+        >
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: '#e0e0ff' }}>
+            {homeWinPct}%
+          </span>
+        </div>
+        <div
+          style={{
+            width: `${awayWinPct}%`,
+            background: 'linear-gradient(90deg, #cc6622, #6a3a1a)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'width 0.5s ease',
+          }}
+        >
+          <span style={{ fontFamily: "'VT323', monospace", fontSize: '0.9rem', color: '#e0e0ff' }}>
+            {awayWinPct}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default MatchupDetailPage;

@@ -114,4 +114,31 @@ export class EspnClient {
 
     return data;
   }
+
+  /**
+   * Fetch daily box score data for a specific scoring period.
+   * Uses the x-fantasy-filter header to request per-scoring-period stat breakdowns,
+   * which ESPN otherwise omits from the standard mMatchup response.
+   */
+  async fetchDailyBoxScore(scoringPeriodId: number): Promise<EspnLeagueResponse> {
+    const { data } = await this.http.get<EspnLeagueResponse>('', {
+      params: {
+        view: ['mMatchup', 'mMatchupScore', 'mRoster', 'mTeam', 'mSettings', 'mStatus'],
+        scoringPeriodId,
+        _: Date.now(),
+      },
+      headers: {
+        'x-fantasy-filter': JSON.stringify({
+          players: {
+            filterStatsForCurrentScoringPeriod: { value: true },
+          },
+        }),
+      },
+      paramsSerializer: {
+        indexes: null,
+      },
+    });
+
+    return data;
+  }
 }

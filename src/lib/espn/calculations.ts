@@ -130,21 +130,26 @@ export function computeWinProbability(
     return { homeWinPct: 50, awayWinPct: 50 };
   }
 
-  // Standard deviation: account for remaining games AND in-progress game volatility
-  // For in-progress games, use the projected bonus as a proxy for remaining variance
+  // Standard deviation: fantasy basketball has high game-to-game variance.
+  // A player averaging 25 FPTS/game has std dev ~12-15 per game (~50% CV).
+  // Team-level variance compounds across multiple players and games.
+  //
+  // For mid-matchup: use avgPpg * sqrt(remaining) * 0.50 to reflect real per-game volatility
+  // For future matchups: use projectedTotal * 0.15 (full-period uncertainty)
+  // For live games: use projected bonus * 0.4 (in-progress game uncertainty)
   const homeLiveVariance = homeHasLiveBonus && homeRemaining === 0
-    ? (homeProjectedTotal - homeScore) * 0.3  // ~30% uncertainty on live game extrapolation
+    ? (homeProjectedTotal - homeScore) * 0.4
     : homeAvgPpg > 0
-      ? homeAvgPpg * Math.sqrt(homeRemaining) * 0.15
+      ? homeAvgPpg * Math.sqrt(homeRemaining) * 0.50
       : homeProjectedTotal > 0
-        ? homeProjectedTotal * 0.10  // ~10% uncertainty on full projection (future matchup)
+        ? homeProjectedTotal * 0.15
         : 0;
   const awayLiveVariance = awayHasLiveBonus && awayRemaining === 0
-    ? (awayProjectedTotal - awayScore) * 0.3
+    ? (awayProjectedTotal - awayScore) * 0.4
     : awayAvgPpg > 0
-      ? awayAvgPpg * Math.sqrt(awayRemaining) * 0.15
+      ? awayAvgPpg * Math.sqrt(awayRemaining) * 0.50
       : awayProjectedTotal > 0
-        ? awayProjectedTotal * 0.10  // ~10% uncertainty on full projection (future matchup)
+        ? awayProjectedTotal * 0.15
         : 0;
   const combinedStdDev = Math.sqrt(homeLiveVariance * homeLiveVariance + awayLiveVariance * awayLiveVariance);
 
@@ -284,22 +289,19 @@ export function computeTeamProjection(
   players: PlayerProjectionInput[],
   playerNames?: Map<number, { name: string; position: string; nbaTeamAbbrev: string }>,
 ): TeamProjectionResult {
-  const slotsRemaining = maxGames - gamesPlayed;
+  // Full-period optimal lineup projection:
+  // Pool ALL player-game slots for the entire matchup period (using totalPeriodGames),
+  // sort by projected per-game value, pick the best `maxGames` slots.
+  // This gives a true 60/60 optimal projection.
 
-  // Build a pool of all available game-slots across ALL roster players.
-  // Each slot = one player-game at that player's projected per-game value.
-  // Then pick the best `slotsRemaining` slots — this is the optimal lineup projection.
   interface GameSlot {
     playerId: number;
     baseline: number;
-    isLive: boolean; // live game: partial credit for remaining minutes
-    liveFpts: number; // if live, the projected remaining FPTS
+    included: boolean; // whether this slot is in the top N
   }
 
   const gameSlots: GameSlot[] = [];
-  // Track per-player info for the breakdown
   const playerBaselines = new Map<number, number>();
-  const playerTotalGames = new Map<number, number>();
 
   for (const player of players) {
     if (player.isOnIR) continue;
@@ -310,46 +312,34 @@ export function computeTeamProjection(
     if (baseline <= 0) continue;
     playerBaselines.set(player.playerId, baseline);
 
-    // Today's game
-    if (player.gameStatus === 'live') {
-      const remainingFraction = Math.max(0, player.minutesRemaining / 48);
-      const liveFpts = baseline * remainingFraction;
-      gameSlots.push({ playerId: player.playerId, baseline, isLive: true, liveFpts });
-    } else if (player.gameStatus === 'upcoming') {
-      gameSlots.push({ playerId: player.playerId, baseline, isLive: false, liveFpts: 0 });
+    // Create one slot for each game this player's team plays during the entire matchup period
+    const totalGames = player.totalPeriodGames;
+    for (let i = 0; i < totalGames; i++) {
+      gameSlots.push({ playerId: player.playerId, baseline, included: false });
     }
-
-    // Future games after today
-    for (let i = 0; i < player.remainingGamesAfterToday; i++) {
-      gameSlots.push({ playerId: player.playerId, baseline, isLive: false, liveFpts: 0 });
-    }
-
-    // Track total available games per player
-    let totalGames = player.remainingGamesAfterToday;
-    if (player.gameStatus === 'upcoming' || player.gameStatus === 'live') totalGames++;
-    playerTotalGames.set(player.playerId, totalGames);
   }
 
-  // Sort all game-slots by projected value descending (live slots use their partial value)
-  gameSlots.sort((a, b) => {
-    const aVal = a.isLive ? a.liveFpts : a.baseline;
-    const bVal = b.isLive ? b.liveFpts : b.baseline;
-    return bVal - aVal;
-  });
+  // Sort all game-slots by projected value descending
+  gameSlots.sort((a, b) => b.baseline - a.baseline);
 
-  // Pick the best slots up to slotsRemaining
-  let projectedAdditional = 0;
-  let gameSlotsFilled = gamesPlayed;
+  // Pick the best slots up to maxGames
+  let projectedTotal = 0;
+  let gameSlotsFilled = 0;
   const playerProjectedGames = new Map<number, number>();
   const playerProjectedFpts = new Map<number, number>();
+  const playerExcludedGames = new Map<number, number>();
 
   for (const slot of gameSlots) {
-    if (gameSlotsFilled >= maxGames) break;
-    const fpts = slot.isLive ? slot.liveFpts : slot.baseline;
-    projectedAdditional += fpts;
-    gameSlotsFilled++;
-    playerProjectedGames.set(slot.playerId, (playerProjectedGames.get(slot.playerId) ?? 0) + 1);
-    playerProjectedFpts.set(slot.playerId, (playerProjectedFpts.get(slot.playerId) ?? 0) + fpts);
+    if (gameSlotsFilled >= maxGames) {
+      // This slot is excluded from the optimal lineup
+      playerExcludedGames.set(slot.playerId, (playerExcludedGames.get(slot.playerId) ?? 0) + 1);
+    } else {
+      slot.included = true;
+      projectedTotal += slot.baseline;
+      gameSlotsFilled++;
+      playerProjectedGames.set(slot.playerId, (playerProjectedGames.get(slot.playerId) ?? 0) + 1);
+      playerProjectedFpts.set(slot.playerId, (playerProjectedFpts.get(slot.playerId) ?? 0) + slot.baseline);
+    }
   }
 
   // Build breakdown for display
@@ -359,6 +349,7 @@ export function computeTeamProjection(
     const baseline = playerBaselines.get(player.playerId) ?? (player.overrideProjection ?? (player.rollingAvg15 || player.matchupAvgPerGame));
     const projGames = playerProjectedGames.get(player.playerId) ?? 0;
     const projFpts = playerProjectedFpts.get(player.playerId) ?? 0;
+    const excludedGames = playerExcludedGames.get(player.playerId) ?? 0;
     const isOut = player.injuryStatus === 'OUT' || player.injuryStatus === 'SUSPENSION';
 
     breakdownPlayers.push({
@@ -368,9 +359,10 @@ export function computeTeamProjection(
       nbaTeamAbbrev: info?.nbaTeamAbbrev ?? getNbaTeamAbbrev(player.proTeamId),
       isStarter: player.isActive,
       rollingAvg15: round1(baseline),
-      // Show total period games for the team (how many games their NBA team plays in the matchup)
       remainingGames: isOut ? 0 : player.totalPeriodGames,
       projectedFpts: round1(projFpts),
+      projectedGames: projGames,
+      excludedGames,
       isSmartFilled: !player.isActive && projGames > 0,
       imageUrl: `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${player.playerId}.png&w=96&h=70&cb=1`,
       injuryStatus: player.injuryStatus,
@@ -384,7 +376,7 @@ export function computeTeamProjection(
     return b.projectedFpts - a.projectedFpts;
   });
 
-  const projectedScore = round1(currentScore + projectedAdditional);
+  const projectedScore = round1(projectedTotal);
 
   return {
     projectedScore,
@@ -409,8 +401,8 @@ export function extractPlayerStats(stats: Record<string, number>): PlayerGameSta
     ftm: stats['15'] ?? 0,
     fta: stats['16'] ?? 0,
     threepm: stats['17'] ?? 0,
-    to: stats['19'] ?? 0,
-    pf: stats['27'] ?? 0,
+    to: stats['11'] ?? 0,
+    pf: 0,
     min: stats['40'] ?? 0,
     gp: stats['42'] ?? 0,
   };

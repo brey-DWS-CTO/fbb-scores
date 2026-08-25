@@ -332,8 +332,9 @@ function buildProjectionInputs(
   const inputs: PlayerProjectionInput[] = [];
   const names = new Map<number, { name: string; position: string; nbaTeamAbbrev: string }>();
 
-  // Today's date string for filtering future games
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Today's date string for filtering future games (use local time, not UTC)
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   for (const entry of entries) {
     const playerId = entry.playerPoolEntry.id;
@@ -629,8 +630,9 @@ export function normalizeMatchupDetail(
       // Get season stats (splitTypeId 0) for true season FPTS/G
       const playerId = entry.playerPoolEntry.id;
       const rosterStats = playerRosterStats.get(playerId) ?? playerStats;
+      const currentSeasonId = raw.seasonId;
       const seasonStats = (rosterStats as EspnStatEntry[]).find(
-        (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
+        (s) => s.statSplitTypeId === 0 && s.statSourceId === 0 && s.seasonId === currentSeasonId,
       );
       let seasonFptsPerGame = 0;
       let seasonPerGameStats = extractPlayerStats({});
@@ -655,8 +657,8 @@ export function normalizeMatchupDetail(
             ftm: round1((raw['15'] ?? 0) / seasonGp),
             fta: round1((raw['16'] ?? 0) / seasonGp),
             threepm: round1((raw['17'] ?? 0) / seasonGp),
-            to: round1((raw['19'] ?? 0) / seasonGp),
-            pf: round1((raw['27'] ?? 0) / seasonGp),
+            to: round1((raw['11'] ?? 0) / seasonGp),
+            pf: 0,
             min: round1((raw['40'] ?? 0) / seasonGp),
             gp: seasonGp,
           };
@@ -791,12 +793,40 @@ export function normalizeDailyView(
       const playerId = entry.playerPoolEntry.id;
       const todayFpts = entry.playerPoolEntry.appliedStatTotal ?? 0;
 
-      // Get today's stats from current scoring period (statSplitTypeId 0, statSourceId 0)
-      const playerStats = player.stats ?? [];
-      const todayStat = playerStats.find(
-        (s) => s.statSplitTypeId === 0 && s.statSourceId === 0,
+      // Get today's stats from the current scoring period.
+      // ESPN may put stats in player.stats (inner) or playerPoolEntry.stats (outer).
+      // Try multiple sources: (1) playerPoolEntry.stats matching today's scoring period,
+      // (2) player.stats with statSplitTypeId 0, (3) any stat entry with actual stats.
+      const innerStats = player.stats ?? [];
+      const outerStats = (entry.playerPoolEntry.stats ?? []) as Array<{
+        statSplitTypeId: number; statSourceId: number; scoringPeriodId?: number;
+        stats?: Record<string, number>;
+      }>;
+
+      // Try outer stats first — look for actual stats (sourceId 0) matching today's scoring period
+      let rawStats: Record<string, number> = {};
+      const outerToday = outerStats.find(
+        (s) => s.statSourceId === 0 && s.scoringPeriodId === raw.scoringPeriodId && s.stats,
       );
-      const rawStats = todayStat?.stats ?? {};
+      if (outerToday?.stats) {
+        rawStats = outerToday.stats;
+      } else {
+        // Try inner stats — first matching today's scoring period, then split type 0
+        const innerToday = innerStats.find(
+          (s) => s.statSourceId === 0 && s.scoringPeriodId === raw.scoringPeriodId && s.stats,
+        );
+        if (innerToday?.stats) {
+          rawStats = innerToday.stats;
+        } else {
+          // Fallback: any actual stat entry with data (prefer split type 0)
+          const fallback = innerStats.find(
+            (s) => s.statSplitTypeId === 0 && s.statSourceId === 0 && s.stats,
+          ) ?? innerStats.find(
+            (s) => s.statSourceId === 0 && s.stats,
+          );
+          if (fallback?.stats) rawStats = fallback.stats;
+        }
+      }
 
       // Get matchup period total fpts from matchup roster if available
       const matchupEntries = side.rosterForMatchupPeriod?.entries ?? [];
@@ -820,6 +850,9 @@ export function normalizeDailyView(
           stl: rawStats['2'] ?? 0,
           blk: rawStats['1'] ?? 0,
           min: rawStats['40'] ?? 0,
+          threepm: rawStats['17'] ?? 0,
+          fgm: rawStats['13'] ?? 0,
+          fga: rawStats['14'] ?? 0,
         },
         injuryStatus: player.injuryStatus,
       };
@@ -854,9 +887,9 @@ export function normalizeDailyView(
     };
   }
 
-  // Build today's date string
+  // Build today's date string (use local time, not UTC)
   const today = new Date();
-  const dateStr = today.toISOString().split('T')[0];
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   return {
     matchupId: matchup.id,

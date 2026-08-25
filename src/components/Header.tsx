@@ -7,11 +7,12 @@ interface HeaderProps {
   fetchedAt: string;
   onRefresh: () => void;
   isRefreshing: boolean;
+  onOpenSettings?: () => void;
 }
 
 const REFRESH_INTERVAL_S = 30;
 
-const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, isRefreshing }) => {
+const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, isRefreshing, onOpenSettings }) => {
   const updatedTime = new Date(fetchedAt).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -178,6 +179,22 @@ const Header: FC<HeaderProps> = ({ leagueName, playoff, fetchedAt, onRefresh, is
             >
               {isRefreshing ? 'REFRESHING...' : 'REFRESH'}
             </button>
+            {onOpenSettings && (
+              <button
+                onClick={onOpenSettings}
+                className="pixel-text cursor-pointer px-2 py-1"
+                style={{
+                  fontSize: '0.45rem',
+                  color: '#777799',
+                  background: 'transparent',
+                  border: '1px solid #333355',
+                  transition: 'all 0.2s ease',
+                }}
+                title="Settings"
+              >
+                &#x2699;
+              </button>
+            )}
           </div>
         </div>
       </div>

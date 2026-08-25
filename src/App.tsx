@@ -6,11 +6,13 @@ import WeekSelector from './components/WeekSelector.js'
 import LoadingState from './components/LoadingState.js'
 import ErrorState from './components/ErrorState.js'
 import MatchupDetailPage from './components/MatchupDetailPage.js'
+import SettingsPanel from './components/SettingsPanel.js'
 import { useScoreboard } from './hooks/useScoreboard.js'
 import { useLeagueInfo } from './hooks/useLeagueInfo.js'
 
 function App() {
   const [selectedPeriod, setSelectedPeriod] = useState<number | undefined>(undefined)
+  const [showSettings, setShowSettings] = useState(false)
   const { data: leagueInfo } = useLeagueInfo()
   const effectivePeriod = selectedPeriod ?? leagueInfo?.currentMatchupPeriod
   const { data, isLoading, isError, error, refetch, isFetching } = useScoreboard(effectivePeriod)
@@ -32,6 +34,7 @@ function App() {
             fetchedAt={data.fetchedAt}
             onRefresh={() => refetch()}
             isRefreshing={isFetching}
+            onOpenSettings={() => setShowSettings(true)}
           />
           {leagueInfo && effectivePeriod != null && (
             <WeekSelector
@@ -46,6 +49,7 @@ function App() {
           </Routes>
         </>
       )}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

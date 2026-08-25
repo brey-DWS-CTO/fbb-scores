@@ -64,11 +64,20 @@ router.get('/espn/scoreboard', async (req, res) => {
     const todayScoringPeriod = raw.scoringPeriodId;
 
     // ESPN's matchupPeriods maps matchup period → array of WEEK numbers (not scoring period IDs).
-    // Each week = 7 scoring periods. Expand weeks into actual scoring period IDs.
+    // Each week = 7 scoring periods. ESPN fantasy weeks start on MONDAY, but SP 1 may
+    // fall on any day of the week. We need to find the Monday-aligned start of week 1.
     const DAYS_PER_WEEK = 7;
+
+    // Derive SP 1's date from today's date and today's scoring period
+    const sp1Date = new Date();
+    sp1Date.setDate(sp1Date.getDate() - (todayScoringPeriod - 1));
+    const dayOfWeek = sp1Date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const daysUntilMonday = dayOfWeek === 1 ? 0 : ((8 - dayOfWeek) % 7);
+    const weekOneStartSP = 1 + daysUntilMonday;
+
     const matchupScoringPeriods: number[] = [];
     for (const week of matchupWeeks) {
-      const weekStart = (week - 1) * DAYS_PER_WEEK + 1;
+      const weekStart = weekOneStartSP + (week - 1) * DAYS_PER_WEEK;
       for (let d = 0; d < DAYS_PER_WEEK; d++) {
         matchupScoringPeriods.push(weekStart + d);
       }
@@ -254,9 +263,30 @@ router.get('/espn/daily/:matchupId', async (req, res) => {
 
     const scoringPeriodId = await client.getCurrentScoringPeriod();
     const [raw, nbaGames] = await Promise.all([
-      client.fetchMatchupDetail(scoringPeriodId),
+      client.fetchDailyBoxScore(scoringPeriodId),
       fetchNbaScoreboard(),
     ]);
+    // Debug: log stat entry structure for first player with points
+    if (process.env.NODE_ENV !== 'production') {
+      const debugMatchup = raw.schedule.find((m: EspnMatchupRaw) => m.id === matchupId);
+      if (debugMatchup) {
+        const debugEntries = debugMatchup.home.rosterForCurrentScoringPeriod?.entries ?? [];
+        const withPoints = debugEntries.find((e: EspnRosterEntry) => (e.playerPoolEntry.appliedStatTotal ?? 0) > 5);
+        if (withPoints) {
+          const p = withPoints.playerPoolEntry;
+          console.log(`[Daily Debug] Player: ${p.player.fullName}, FPTS: ${p.appliedStatTotal}`);
+          console.log(`[Daily Debug] player.stats entries:`, (p.player.stats ?? []).map((s: any) => ({
+            splitType: s.statSplitTypeId, source: s.statSourceId, period: s.scoringPeriodId,
+            hasStats: !!s.stats, statKeys: s.stats ? Object.keys(s.stats).slice(0, 5).join(',') : 'none',
+          })));
+          console.log(`[Daily Debug] poolEntry.stats entries:`, (p.stats ?? []).map((s: any) => ({
+            splitType: s.statSplitTypeId, source: s.statSourceId, period: s.scoringPeriodId,
+            hasStats: !!s.stats, statKeys: s.stats ? Object.keys(s.stats).slice(0, 5).join(',') : 'none',
+          })));
+        }
+      }
+    }
+
     const daily = normalizeDailyView(raw, matchupId);
 
     if (!daily) {
@@ -456,18 +486,23 @@ router.get('/espn/trends/team/:teamId', async (req, res) => {
 // ─── NBA Schedule Helpers ────────────────────────────────────────────────────
 
 /**
- * Given the scoring periods in a matchup and today's scoring period,
- * return the dates for remaining days (including today and future) as YYYY-MM-DD strings.
- *
- * ESPN scoring periods increment by 1 per day, so we can convert them
- * to dates by offsetting from today's date + scoring period.
- *
- * We include today (>=) so the NBA schedule has game counts for ALL remaining days.
- * The adapter handles deduplication with the live nbaScoreboard data for today.
+ * Format a Date as YYYY-MM-DD using LOCAL time (not UTC).
+ * Using toISOString() would return UTC dates which can be off by a day
+ * in negative-UTC-offset timezones (e.g. US Pacific/Mountain/Central/Eastern).
  */
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /**
  * Convert ALL scoring periods in the matchup to calendar dates.
  * This gives the full schedule for the matchup period (past + future).
+ *
+ * ESPN scoring periods increment by 1 per day, so we can convert them
+ * to dates by offsetting from today's local date + scoring period.
  */
 function getAllMatchupDates(
   matchupScoringPeriods: number[],
@@ -480,7 +515,7 @@ function getAllMatchupDates(
     const daysFromToday = sp - todayScoringPeriod;
     const date = new Date(today);
     date.setDate(date.getDate() + daysFromToday);
-    return date.toISOString().split('T')[0];
+    return formatLocalDate(date);
   });
 }
 

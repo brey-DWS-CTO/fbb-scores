@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { FC } from 'react';
 import type { ProjectionBreakdown as ProjectionBreakdownType, PlayerProjectionBreakdown, MatchupPlayer } from '../types/index.js';
 import PlayerCardModal from './matchup/PlayerCardModal.js';
+
+type SortKey = 'name' | 'team' | 'avg' | 'games' | 'proj';
+type SortDir = 'asc' | 'desc';
 
 interface ProjectionBreakdownProps {
   breakdown: ProjectionBreakdownType;
@@ -11,11 +14,48 @@ interface ProjectionBreakdownProps {
   playerMap?: Map<number, MatchupPlayer>;
 }
 
+function sortPlayers(players: PlayerProjectionBreakdown[], key: SortKey, dir: SortDir): PlayerProjectionBreakdown[] {
+  const sorted = [...players].sort((a, b) => {
+    let cmp = 0;
+    switch (key) {
+      case 'name': cmp = a.name.localeCompare(b.name); break;
+      case 'team': cmp = a.nbaTeamAbbrev.localeCompare(b.nbaTeamAbbrev); break;
+      case 'avg': cmp = a.rollingAvg15 - b.rollingAvg15; break;
+      case 'games': cmp = a.projectedGames - b.projectedGames; break;
+      case 'proj': cmp = a.projectedFpts - b.projectedFpts; break;
+    }
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  return sorted;
+}
+
 const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName, side, playerMap }) => {
   const [selectedPlayer, setSelectedPlayer] = useState<MatchupPlayer | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('proj');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
   const sideColor = side === 'home' ? 'var(--neon-blue)' : 'var(--neon-orange)';
-  const starters = breakdown.players.filter((p) => p.isStarter || p.isSmartFilled);
-  const unused = breakdown.players.filter((p) => !p.isStarter && !p.isSmartFilled);
+
+  const allStarters = useMemo(
+    () => breakdown.players.filter((p) => p.isStarter || p.isSmartFilled),
+    [breakdown.players],
+  );
+  const allUnused = useMemo(
+    () => breakdown.players.filter((p) => !p.isStarter && !p.isSmartFilled),
+    [breakdown.players],
+  );
+
+  const starters = useMemo(() => sortPlayers(allStarters, sortKey, sortDir), [allStarters, sortKey, sortDir]);
+  const unused = useMemo(() => sortPlayers(allUnused, sortKey, sortDir), [allUnused, sortKey, sortDir]);
+
+  const handleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'name' || key === 'team' ? 'asc' : 'desc');
+    }
+  };
 
   const handlePlayerClick = (player: PlayerProjectionBreakdown) => {
     const full = playerMap?.get(player.playerId);
@@ -58,21 +98,11 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
         <table className="w-full" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #222244' }}>
-              <th className="text-left px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>PLAYER</span>
-              </th>
-              <th className="text-center px-2 py-2 hidden sm:table-cell">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: '#777799' }}>TEAM</span>
-              </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-yellow)' }}>L15</span>
-              </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-blue)' }}>GM</span>
-              </th>
-              <th className="text-right px-2 py-2">
-                <span className="pixel-text" style={{ fontSize: '0.35rem', color: 'var(--neon-teal)' }}>PROJ</span>
-              </th>
+              <SortHeader label="PLAYER" sortKey="name" current={sortKey} dir={sortDir} onClick={handleSort} color="#777799" align="left" />
+              <SortHeader label="TEAM" sortKey="team" current={sortKey} dir={sortDir} onClick={handleSort} color="#777799" align="center" className="hidden sm:table-cell" />
+              <SortHeader label="L15" sortKey="avg" current={sortKey} dir={sortDir} onClick={handleSort} color="var(--neon-yellow)" />
+              <SortHeader label="GM" sortKey="games" current={sortKey} dir={sortDir} onClick={handleSort} color="var(--neon-blue)" />
+              <SortHeader label="PROJ" sortKey="proj" current={sortKey} dir={sortDir} onClick={handleSort} color="var(--neon-teal)" />
             </tr>
           </thead>
           <tbody>
@@ -142,6 +172,43 @@ const ProjectionBreakdown: FC<ProjectionBreakdownProps> = ({ breakdown, teamName
   );
 };
 
+// ─── Sortable Header ────────────────────────────────────────────────────────
+
+interface SortHeaderProps {
+  label: string;
+  sortKey: SortKey;
+  current: SortKey;
+  dir: SortDir;
+  onClick: (key: SortKey) => void;
+  color: string;
+  align?: 'left' | 'center' | 'right';
+  className?: string;
+}
+
+const SortHeader: FC<SortHeaderProps> = ({ label, sortKey, current, dir, onClick, color, align = 'right', className = '' }) => {
+  const isActive = sortKey === current;
+  const arrow = isActive ? (dir === 'asc' ? ' ▲' : ' ▼') : '';
+
+  return (
+    <th
+      className={`text-${align} px-2 py-2 ${className}`}
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => onClick(sortKey)}
+    >
+      <span
+        className="pixel-text"
+        style={{
+          fontSize: '0.35rem',
+          color: isActive ? '#e0e0ff' : color,
+          textShadow: isActive ? `0 0 4px ${color}` : 'none',
+        }}
+      >
+        {label}{arrow}
+      </span>
+    </th>
+  );
+};
+
 // ─── Projection Player Row ──────────────────────────────────────────────────
 
 interface ProjectionPlayerRowProps {
@@ -208,7 +275,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                     lineHeight: 1.4,
                   }}
                 >
-                  FILL
+                  BENCH
                 </span>
               )}
               {player.injuryStatus === 'OUT' && (
@@ -264,7 +331,7 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
                     lineHeight: 1.4,
                   }}
                 >
-                  RET
+                  RETURNING
                 </span>
               )}
             </div>
@@ -292,16 +359,25 @@ const ProjectionPlayerRow: FC<ProjectionPlayerRowProps> = ({ player, isEven, dim
         </span>
       </td>
 
-      {/* Remaining Games */}
+      {/* Games: included/total */}
       <td className="text-right px-2 py-1.5">
         <span
           style={{
             fontFamily: "'VT323', monospace",
             fontSize: '0.95rem',
-            color: player.remainingGames > 0 ? 'var(--neon-blue)' : '#555577',
+            color: player.projectedGames > 0 ? 'var(--neon-blue)' : '#555577',
           }}
         >
-          {player.remainingGames}
+          {player.projectedGames > 0 ? (
+            <>
+              {player.projectedGames}
+              {player.excludedGames > 0 && (
+                <span style={{ color: '#555577', fontSize: '0.8rem' }}>/{player.remainingGames}</span>
+              )}
+            </>
+          ) : player.remainingGames > 0 ? (
+            <span style={{ color: '#333355' }}>0/{player.remainingGames}</span>
+          ) : '-'}
         </span>
       </td>
 

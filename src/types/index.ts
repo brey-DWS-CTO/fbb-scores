@@ -31,6 +31,10 @@ export interface PlayerProjectionBreakdown {
   remainingGames: number;
   /** Total projected FPTS contribution from this player */
   projectedFpts: number;
+  /** Number of games included in the optimal projection for this player */
+  projectedGames: number;
+  /** Number of games excluded from optimal projection (didn't make the cut) */
+  excludedGames: number;
   /** Whether this bench player was "smart filled" into the projection */
   isSmartFilled: boolean;
   /** Player headshot URL */
@@ -414,6 +418,9 @@ export interface DailyPlayer {
     stl: number;
     blk: number;
     min: number;
+    threepm: number;
+    fgm: number;
+    fga: number;
   };
   /** Live NBA game info (populated from ESPN public scoreboard API) */
   gameInfo?: NbaGameInfo;
