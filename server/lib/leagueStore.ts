@@ -110,6 +110,9 @@ function defaultState(): LeagueDynamicState {
 
 /** Unclaimed PINs are stored as the empty string. */
 const UNCLAIMED = '';
+/** Commissioner-assigned temporary PINs are stored prefixed; signing in with
+ * one succeeds but flags mustChangePin so the client forces a new PIN. */
+const TEMP_PREFIX = 'T:';
 
 // ─── Backend interface ───────────────────────────────────────────────────────
 
@@ -419,13 +422,18 @@ export async function mutateState(
 export async function verifyPin(
   owner: string,
   pin: string,
-): Promise<{ ok: boolean; isCommissioner: boolean }> {
-  if (typeof owner !== 'string' || typeof pin !== 'string' || !isKnownOwner(owner)) {
-    return { ok: false, isCommissioner: false };
+): Promise<{ ok: boolean; isCommissioner: boolean; mustChangePin: boolean }> {
+  if (typeof owner !== 'string' || typeof pin !== 'string' || pin === '' || !isKnownOwner(owner)) {
+    return { ok: false, isCommissioner: false, mustChangePin: false };
   }
   const stored = await getBackend().getPin(owner);
-  const ok = stored !== null && stored !== UNCLAIMED && stored === pin;
-  return { ok, isCommissioner: ok && isCommissionerOwner(owner) };
+  if (stored === null || stored === UNCLAIMED) {
+    return { ok: false, isCommissioner: false, mustChangePin: false };
+  }
+  const okNormal = stored === pin;
+  const okTemp = stored === TEMP_PREFIX + pin;
+  const ok = okNormal || okTemp;
+  return { ok, isCommissioner: ok && isCommissionerOwner(owner), mustChangePin: okTemp };
 }
 
 /** Which owners have set a PIN yet (safe to expose publicly). */
@@ -456,16 +464,20 @@ export async function claimPin(
 }
 
 /** All pins, ordered as the owners appear in the league config. */
-export async function getPins(): Promise<Array<{ owner: string; pin: string }>> {
+export async function getPins(): Promise<Array<{ owner: string; pin: string; temp: boolean }>> {
   const rows = await getBackend().getPins();
   const order = new Map(OWNERS.map((o, i) => [o, i]));
-  return rows.sort(
-    (a, b) => (order.get(a.owner) ?? Infinity) - (order.get(b.owner) ?? Infinity),
-  );
+  return rows
+    .map((r) => ({
+      owner: r.owner,
+      pin: r.pin.startsWith(TEMP_PREFIX) ? r.pin.slice(TEMP_PREFIX.length) : r.pin,
+      temp: r.pin.startsWith(TEMP_PREFIX),
+    }))
+    .sort((a, b) => (order.get(a.owner) ?? Infinity) - (order.get(b.owner) ?? Infinity));
 }
 
-export async function setPin(owner: string, pin: string): Promise<void> {
-  return getBackend().setPin(owner, pin);
+export async function setPin(owner: string, pin: string, temp = false): Promise<void> {
+  return getBackend().setPin(owner, temp && pin !== UNCLAIMED ? TEMP_PREFIX + pin : pin);
 }
 
 /** Append an audit row. Never throws — audit failures must not fail mutations. */

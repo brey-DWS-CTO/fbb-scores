@@ -120,13 +120,24 @@ export async function claimPin(owner: string, pin: string): Promise<void> {
   await axios.post('/api/league/claim-pin', { owner, pin });
 }
 
-export async function verifyPin(c: Credentials): Promise<{ ok: boolean; isCommissioner: boolean }> {
+export async function verifyPin(
+  c: Credentials,
+): Promise<{ ok: boolean; isCommissioner: boolean; mustChangePin: boolean }> {
   try {
     const { data } = await axios.post('/api/league/verify', {}, { headers: authHeaders(c) });
-    return { ok: data.ok === true, isCommissioner: data.isCommissioner === true };
+    return {
+      ok: data.ok === true,
+      isCommissioner: data.isCommissioner === true,
+      mustChangePin: data.mustChangePin === true,
+    };
   } catch {
-    return { ok: false, isCommissioner: false };
+    return { ok: false, isCommissioner: false, mustChangePin: false };
   }
+}
+
+/** Replace your own PIN (used for the forced change on a temporary PIN). */
+export async function changePin(c: Credentials, newPin: string): Promise<void> {
+  await axios.post('/api/league/change-pin', { pin: newPin }, { headers: authHeaders(c) });
 }
 
 export async function saveKeepers(
@@ -223,7 +234,9 @@ export async function setOverrides(
   return data;
 }
 
-export async function fetchPins(c: Credentials): Promise<Array<{ owner: string; pin: string }>> {
+export async function fetchPins(
+  c: Credentials,
+): Promise<Array<{ owner: string; pin: string; temp?: boolean }>> {
   const { data } = await axios.get('/api/league/pins', { headers: authHeaders(c) });
   return data;
 }

@@ -20,7 +20,9 @@ export default function CommissionerPanel() {
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
 
-  const [pins, setPins] = useState<Array<{ owner: string; pin: string }> | null>(null);
+  const [pins, setPins] = useState<Array<{ owner: string; pin: string; temp?: boolean }> | null>(
+    null,
+  );
   const [pinsOpen, setPinsOpen] = useState(false);
   const [pinArm, setPinArm] = useState<string | null>(null);
   const [resetArmed, setResetArmed] = useState(false);
@@ -139,9 +141,14 @@ export default function CommissionerPanel() {
               </button>
             </div>
             <div style={{ display: 'grid', gap: 6 }}>
-              {(pins ?? []).map(({ owner: o, pin }) => (
+              {(pins ?? []).map(({ owner: o, pin, temp }) => (
                 <div key={o} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ flex: 1, fontWeight: 600, color: 'var(--text-hi)' }}>{o}</span>
+                  {temp && (
+                    <span style={{ color: 'var(--neon-yellow)', fontSize: '0.62rem', fontWeight: 800 }}>
+                      TEMP
+                    </span>
+                  )}
                   <span
                     style={{
                       fontFamily: 'monospace',

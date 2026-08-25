@@ -52,6 +52,7 @@ async function requireAuth(req: Request, res: Response, next: NextFunction): Pro
     }
     res.locals.owner = owner;
     res.locals.isCommissioner = result.isCommissioner;
+    res.locals.mustChangePin = result.mustChangePin;
     next();
   } catch (err) {
     next(err);
@@ -133,7 +134,29 @@ router.get('/state', async (req, res) => {
  * POST /api/league/verify — validate an owner/PIN pair.
  */
 router.post('/verify', requireAuth, (_req, res) => {
-  res.json({ ok: true, owner: res.locals.owner, isCommissioner: res.locals.isCommissioner });
+  res.json({
+    ok: true,
+    owner: res.locals.owner,
+    isCommissioner: res.locals.isCommissioner,
+    mustChangePin: res.locals.mustChangePin === true,
+  });
+});
+
+/**
+ * POST /api/league/change-pin — the authed owner replaces their own PIN
+ * (works with a temporary PIN too — that's the forced first-login change).
+ * Body: { pin: string } — the NEW pin, 4-8 digits.
+ */
+router.post('/change-pin', requireAuth, async (req, res) => {
+  const pin = (req.body as { pin?: unknown } | undefined)?.pin;
+  if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+    res.status(400).json({ error: 'PIN must be 4-8 digits' });
+    return;
+  }
+  const owner = res.locals.owner as string;
+  await setPin(owner, pin, false);
+  await appendAudit(owner, 'pin.changed', { owner });
+  res.json({ ok: true });
 });
 
 /**
@@ -380,14 +403,19 @@ router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) =
     res.status(404).json({ error: `Unknown owner: ${target}` });
     return;
   }
-  const pin = (req.body as { pin?: unknown } | undefined)?.pin;
+  const body = (req.body ?? {}) as { pin?: unknown; temp?: unknown };
+  const pin = body.pin;
   if (typeof pin !== 'string' || (pin !== '' && (pin.length < 4 || pin.length > 8))) {
     res.status(400).json({ error: 'pin must be 4-8 characters, or "" to clear' });
     return;
   }
-  await setPin(target, pin);
+  // temp: true assigns a temporary PIN the owner must replace on first login
+  await setPin(target, pin, body.temp === true);
   // Deliberately do not log the PIN value in the audit trail
-  await appendAudit(res.locals.owner as string, pin === '' ? 'pin.cleared' : 'pin.set', { target });
+  await appendAudit(res.locals.owner as string, pin === '' ? 'pin.cleared' : 'pin.set', {
+    target,
+    temp: body.temp === true,
+  });
   res.json({ ok: true });
 });
 

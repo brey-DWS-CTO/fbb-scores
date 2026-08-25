@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { useIdentity } from '../../hooks/useLeague.js';
-import { claimPin, fetchPinStatus, apiErrorMessage } from '../../lib/league/api.js';
+import { changePin, claimPin, fetchPinStatus, apiErrorMessage } from '../../lib/league/api.js';
 
 const inputStyle: React.CSSProperties = {
   flex: 1,
@@ -28,6 +28,9 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
   const [pin2, setPin2] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set when a temporary (commissioner-assigned) PIN was accepted: the owner
+  // must now choose their own PIN before they're signed in.
+  const [tempPin, setTempPin] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPinStatus()
@@ -36,23 +39,37 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
   }, []);
 
   const isFirstTime = owner !== null && claimed !== null && claimed[owner] === false;
+  const changing = tempPin !== null;
+  const needsRepeat = isFirstTime || changing;
 
   const submit = async () => {
     if (!owner || pin.length < 4) return;
     setBusy(true);
     setError(null);
     try {
+      if (needsRepeat && pin !== pin2) {
+        setError("PINs don't match — type the same one twice.");
+        setBusy(false);
+        return;
+      }
+      if (changing) {
+        // Forced change: replace the temp PIN, then sign in with the new one
+        await changePin({ owner, pin: tempPin! }, pin);
+        const res = await signIn(owner, pin);
+        if (res.ok) onDone();
+        else setError(res.error ?? 'Sign-in failed');
+        return;
+      }
       if (isFirstTime) {
-        if (pin !== pin2) {
-          setError("PINs don't match — type the same one twice.");
-          setBusy(false);
-          return;
-        }
         await claimPin(owner, pin);
       }
       const res = await signIn(owner, pin);
       if (res.ok) onDone();
-      else setError(res.error ?? 'Sign-in failed');
+      else if (res.mustChangePin) {
+        setTempPin(pin);
+        setPin('');
+        setPin2('');
+      } else setError(res.error ?? 'Sign-in failed');
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
@@ -60,7 +77,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
     }
   };
 
-  const ready = owner && pin.length >= 4 && (!isFirstTime || pin2.length >= 4);
+  const ready = owner && pin.length >= 4 && (!needsRepeat || pin2.length >= 4);
 
   return (
     <div>
@@ -75,6 +92,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
               onClick={() => {
                 setOwner(o);
                 setError(null);
+                setTempPin(null);
               }}
               style={{
                 padding: '10px 8px',
@@ -110,24 +128,28 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
         })}
       </div>
 
-      {isFirstTime && (
+      {changing ? (
+        <div style={{ color: 'var(--neon-teal)', marginTop: 12, fontSize: '0.8rem', fontWeight: 700 }}>
+          ✓ Temporary PIN accepted — now pick your OWN 4-8 digit PIN. You'll use it from here on.
+        </div>
+      ) : isFirstTime ? (
         <div style={{ color: 'var(--neon-yellow)', marginTop: 12, fontSize: '0.8rem', fontWeight: 700 }}>
           First time in — pick a 4-8 digit PIN. You'll use it every time, so remember it.
         </div>
-      )}
+      ) : null}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
         <input
           type="tel"
           inputMode="numeric"
-          placeholder={isFirstTime ? 'New PIN' : 'PIN'}
+          placeholder={needsRepeat ? 'New PIN' : 'PIN'}
           value={pin}
           maxLength={8}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           style={inputStyle}
         />
-        {isFirstTime && (
+        {needsRepeat && (
           <input
             type="tel"
             inputMode="numeric"
@@ -152,7 +174,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
             cursor: 'pointer',
           }}
         >
-          {busy ? '...' : isFirstTime ? 'SET & GO' : "LET'S GO"}
+          {busy ? '...' : needsRepeat ? 'SET & GO' : "LET'S GO"}
         </button>
       </div>
       {error && (
