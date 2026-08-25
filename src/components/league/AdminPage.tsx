@@ -5,6 +5,8 @@ import { OWNERS, leagueDataset } from '../../lib/league/data.js';
 import { apiErrorMessage, setOverrides } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import PlayerCombobox from './PlayerCombobox.js';
+import CommissionerPanel from './CommissionerPanel.js';
+import IdentityChip from './IdentityChip.js';
 import { RoundChip } from '../keepers/keeperUi.js';
 
 const baseRound = new Map(leagueDataset.players.map((p) => [p.key, p.keeper.round]));
@@ -93,18 +95,23 @@ export default function AdminPage() {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 12px 24px' }}>
-      <h1
-        className="hub-heading glow-yellow"
-        style={{ fontSize: '0.85rem', color: 'var(--neon-yellow)', margin: '0 0 4px', lineHeight: 1.6 }}
-      >
-        👑 COMMISSIONER ADMIN
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+        <h1
+          className="hub-heading glow-yellow"
+          style={{ fontSize: '0.85rem', color: 'var(--neon-yellow)', margin: 0, lineHeight: 1.6 }}
+        >
+          👑 COMMISSIONER ADMIN
+        </h1>
+        <IdentityChip />
+      </div>
       <div style={{ color: 'var(--text-mid)', fontSize: '0.78rem', marginBottom: 14 }}>
         Tier + cap tweaks live here. Changes apply league-wide instantly and are audit-logged.
       </div>
       {error && (
         <div style={{ color: 'var(--neon-red)', fontSize: '0.82rem', marginBottom: 12 }}>⚠ {error}</div>
       )}
+
+      <CommissionerPanel />
 
       {/* ── Team worksheets (commissioner view/edit) ───────────── */}
       <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>

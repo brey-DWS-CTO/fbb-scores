@@ -45,18 +45,21 @@ export default function DraftTvPage() {
           borderBottom: '2px solid var(--panel-border)',
         }}
       >
-        <div
-          className="hub-heading glow-teal"
-          style={{
-            color: 'var(--neon-teal)',
-            fontSize: 'clamp(0.6rem, 1.8vh, 1.1rem)',
-            lineHeight: 1.5,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          THE NERDS
-          <br />
-          2027 DRAFT
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <img src="/logo.png" alt="The Nerds" style={{ height: '10vh', width: 'auto' }} />
+          <div
+            className="hub-heading glow-teal"
+            style={{
+              color: 'var(--neon-teal)',
+              fontSize: 'clamp(0.6rem, 1.6vh, 1rem)',
+              lineHeight: 1.5,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            2027
+            <br />
+            DRAFT
+          </div>
         </div>
 
         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>

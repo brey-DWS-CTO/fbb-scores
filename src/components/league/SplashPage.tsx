@@ -22,23 +22,16 @@ export default function SplashPage() {
       }}
     >
       <div style={{ width: '100%', maxWidth: 480 }}>
-        <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <div style={{ fontSize: '2.6rem', lineHeight: 1 }}>🏀</div>
-          <h1
-            className="hub-heading glow-teal"
-            style={{
-              fontSize: 'clamp(1.3rem, 7vw, 2rem)',
-              color: 'var(--neon-teal)',
-              margin: '12px 0 6px',
-              lineHeight: 1.3,
-            }}
-          >
-            THE NERDS
-          </h1>
-          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)' }}>
-            FANTASY BASKETBALL · SEASON {leagueDataset.season}
+        <div style={{ textAlign: 'center', marginBottom: 22 }}>
+          <img
+            src="/logo.png"
+            alt="The Nerds — fbb scores"
+            style={{ width: 'min(320px, 78vw)', height: 'auto', display: 'block', margin: '0 auto' }}
+          />
+          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)', marginTop: 8 }}>
+            SEASON {leagueDataset.season}
           </div>
-          <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem', marginTop: 10 }}>
+          <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem', marginTop: 8 }}>
             Keepers · Draft board · League HQ
           </div>
         </div>

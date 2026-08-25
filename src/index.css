@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Silkscreen:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -76,12 +76,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Retro mode (font toggle OFF): chunky pixel body text, still legible */
-html:not(.font-modern) body {
-  font-family: 'Silkscreen', 'Inter', monospace;
-  font-size: 13px;
-}
-
 /* CRT scanline overlay */
 body::before {
   content: '';
@@ -102,8 +96,6 @@ body::before {
   min-height: 100%;
   width: 100%;
 }
-
-.pixel-text { font-family: 'Press Start 2P', monospace; letter-spacing: 0.05em; }
 
 .glow-teal   { text-shadow: 0 0 8px #00ffcc, 0 0 20px #00ffcc44; }
 .glow-red    { text-shadow: 0 0 8px #ff2222, 0 0 20px #ff222244; }
@@ -143,13 +135,6 @@ body::before {
   inset: 0;
   background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 60%);
   pointer-events: none;
-}
-
-.score-display {
-  font-family: 'VT323', monospace;
-  font-size: 4rem;
-  line-height: 1;
-  letter-spacing: 0.12em;
 }
 
 /* Slot machine score roll animations */
@@ -197,43 +182,23 @@ body::before {
 ::-webkit-scrollbar-thumb { background: #1a1a33; border-radius: 3px; }
 
 /* ─── Draft-hub additions ─────────────────────────────────────────────── */
-/* Arcade heading — Silkscreen: pixel identity, actually readable. */
+/* Section label / heading: heavy Inter with wide tracking — no pixel fonts. */
 .hub-heading {
-  font-family: 'Silkscreen', 'Press Start 2P', monospace;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   line-height: 1.5;
 }
 
 .hub-input {
-  background: #07070d;
+  background: var(--input-bg);
   border: 2px solid var(--panel-border);
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-max);
   outline: none;
 }
 .hub-input:focus { border-color: var(--neon-teal); }
 
 .tap-btn { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
 .tap-btn:active { transform: scale(0.97); }
-
-/* ─── Modern Font Mode ────────────────────────────────────────────────── */
-html.font-modern body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  font-size: 15px;
-}
-html.font-modern .pixel-text {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  /* Scale up since pixel font sizes are tiny */
-  font-size: calc(1em * 2.2);
-}
-html.font-modern .score-display {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 700;
-}
-/* Override all inline VT323 font-family */
-html.font-modern [style*="VT323"] {
-  font-family: 'Inter', system-ui, sans-serif !important;
-}

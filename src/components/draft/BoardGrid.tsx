@@ -65,14 +65,17 @@ export default function BoardGrid({ board, tv = false }: Props) {
           <div
             style={{
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--text-dim)',
-              fontWeight: 700,
-              fontSize: tv ? 'clamp(10px, 1.4vh, 16px)' : '0.75rem',
+              fontWeight: 800,
+              fontSize: tv ? 'clamp(9px, 1.2vh, 14px)' : '0.68rem',
+              lineHeight: 1.2,
             }}
           >
-            {r}
+            <span>R{r}</span>
+            <span style={{ color: 'var(--text-faint)' }}>{r % 2 === 1 ? '→' : '←'}</span>
           </div>
           {OWNERS.map((o) => (
             <GridCell key={o} cell={cellMap.get(`${r}:${o}`)} tv={tv} />
@@ -98,13 +101,12 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
     flexDirection: 'column',
     justifyContent: 'center',
     overflow: 'hidden',
-    border: `1px solid ${d ? `${d.color}55` : 'var(--cell-border)'}`,
+    border: `1px solid ${d ? `${d.color}77` : 'var(--cell-border)'}`,
     background: d
-      ? `linear-gradient(135deg, ${d.color}30 0%, ${d.color}14 100%)`
+      ? `linear-gradient(160deg, ${d.color}46 0%, ${d.color}22 100%)`
       : 'var(--cell-bg)',
     // position accent as an inset bar (avoids border shorthand/longhand mixing)
     boxShadow: d ? `inset 3px 0 0 ${d.color}` : undefined,
-    opacity: d?.isKeeper ? 0.9 : 1,
   };
   if (cell.onClock) {
     style.outline = '2px solid var(--neon-teal)';
@@ -118,19 +120,22 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
 
   return (
     <div className={cell.onClock ? 'pulse-glow' : undefined} style={style} title={tradeTitle}>
-      {traded && (
+      {/* corner markers: keeper lock + trade flag, small, upper right */}
+      {(d?.isKeeper || traded) && (
         <span
           title={tradeTitle}
           style={{
             position: 'absolute',
-            top: 0,
-            right: 2,
-            color: 'var(--neon-yellow)',
-            fontSize: tv ? 'clamp(7px, 0.7vw, 11px)' : 8,
+            top: 1,
+            right: 3,
+            display: 'inline-flex',
+            gap: 2,
+            fontSize: tv ? 'clamp(7px, 0.75vw, 11px)' : 9,
             lineHeight: 1.4,
           }}
         >
-          ▲
+          {traded && <span style={{ color: 'var(--neon-yellow)' }}>▲</span>}
+          {d?.isKeeper && <span style={{ opacity: 0.9 }}>🔒</span>}
         </span>
       )}
       {d ? (
@@ -144,27 +149,27 @@ function GridCell({ cell, tv }: { cell?: BoardCell; tv: boolean }) {
               fontWeight: 700,
               color: 'var(--text-hi)',
               fontSize: tv ? 'clamp(10px, 1.1vw, 18px)' : '0.72rem',
-              lineHeight: 1.2,
+              lineHeight: 1.15,
               wordBreak: 'break-word',
+              paddingRight: d.isKeeper || traded ? 12 : 0,
             }}
           >
-            {d.isKeeper ? '🔒 ' : ''}
             {d.name}
           </span>
           <span
             style={{
               color: d.color,
-              fontWeight: 700,
+              fontWeight: 800,
               fontSize: tv ? 'clamp(8px, 0.75vw, 12px)' : '0.6rem',
-              lineHeight: 1.3,
+              lineHeight: 1.35,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              opacity: 0.95,
+              letterSpacing: '0.03em',
             }}
           >
             {d.positions[0] ?? ''}
-            {d.proTeam ? <span style={{ color: 'var(--text-mid)', fontWeight: 600 }}> · {d.proTeam.toUpperCase()}</span> : null}
+            {d.proTeam ? <span style={{ color: 'var(--text-soft)', fontWeight: 600 }}> · {d.proTeam.toUpperCase()}</span> : null}
           </span>
         </>
       ) : cell.onClock ? (

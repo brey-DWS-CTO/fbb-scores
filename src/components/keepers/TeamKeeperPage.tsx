@@ -179,24 +179,17 @@ function KeeperCard({
             flexWrap: 'wrap',
           }}
         >
-          <span className="hub-heading" style={{ fontSize: '0.6rem', color: '#b09b00' }}>
+          <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)', opacity: 0.75 }}>
             COSTS
           </span>
           <span
-            className="glow-yellow hub-heading"
-            style={{ fontSize: '1.5rem', color: 'var(--neon-yellow)', lineHeight: 1 }}
+            style={{ fontSize: '1.45rem', color: 'var(--neon-yellow)', fontWeight: 800, lineHeight: 1, letterSpacing: '0.02em' }}
           >
-            RD {k.round}
+            {k.pick ? `PICK ${pickLabel(k.pick)}` : `A ROUND ${k.round} PICK`}
           </span>
-          {k.pick && (
-            <span style={{ fontSize: '1rem', color: '#ffe600', fontWeight: 800 }}>
-              pick {pickLabel(k.pick)}
-              {k.pick.viaTradeFrom && (
-                <span style={{ color: 'var(--text-mid)', fontWeight: 500, fontSize: '0.75rem' }}>
-                  {' '}
-                  (from {k.pick.viaTradeFrom})
-                </span>
-              )}
+          {k.pick?.viaTradeFrom && (
+            <span style={{ color: 'var(--text-mid)', fontWeight: 500, fontSize: '0.75rem' }}>
+              (from {k.pick.viaTradeFrom})
             </span>
           )}
         </div>
@@ -552,7 +545,7 @@ export default function TeamKeeperPage() {
               lineHeight: 1.5,
               textAlign: 'center',
               color: statusColor,
-              textShadow: `0 0 8px ${statusColor}`,
+
             }}
           >
             {result.statusLine}
@@ -565,7 +558,7 @@ export default function TeamKeeperPage() {
               lineHeight: 1.5,
               textAlign: 'center',
               color: pickColor,
-              textShadow: `0 0 8px ${pickColor}`,
+
             }}
           >
             {result.pickStatusLine}
@@ -590,28 +583,84 @@ export default function TeamKeeperPage() {
               onRemove={() => removeKeeper(k.selection.playerKey)}
             />
           ))}
-          {Array.from({ length: emptySlots }).map((_, i) => (
-            <button
-              key={`empty-${i}`}
-              className={canEdit ? 'tap-btn' : undefined}
-              onClick={() => canEdit && setPickerOpen(true)}
-              disabled={!canEdit}
-              style={{
-                border: `2px dashed ${canEdit ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
-                background: 'transparent',
-                borderRadius: 10,
-                padding: '18px 14px',
-                color: canEdit ? 'var(--neon-teal)' : 'var(--text-faint)',
-                fontSize: '0.85rem',
-                fontWeight: canEdit ? 700 : 400,
-                textAlign: 'center',
-                cursor: canEdit ? 'pointer' : 'default',
-                width: '100%',
-              }}
-            >
-              {canEdit ? '＋ TAP TO ADD A KEEPER' : 'Empty keeper slot'}
-            </button>
-          ))}
+          {Array.from({ length: emptySlots }).map((_, i) =>
+            i === 0 && pickerOpen && canEdit ? (
+              <div
+                key="inline-picker"
+                className="panel"
+                style={{ padding: '12px 14px 6px', borderRadius: 10, overflow: 'visible' }}
+              >
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <PlayerCombobox
+                      autoFocus
+                      players={leaguePool ? allPlayers : rosterPlayers}
+                      placeholder={leaguePool ? 'Search every 2026 roster…' : `Search ${owner}'s roster…`}
+                      onSelect={(p) => {
+                        addKeeper(p);
+                        setPickerOpen(false);
+                      }}
+                      renderMeta={comboMeta}
+                      disabledReason={disabledReason}
+                    />
+                  </div>
+                  <button
+                    className="tap-btn"
+                    onClick={() => setPickerOpen(false)}
+                    aria-label="Cancel"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      flexShrink: 0,
+                      borderRadius: 8,
+                      border: '2px solid var(--panel-border)',
+                      background: 'transparent',
+                      color: 'var(--text-mid)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <button
+                  className="tap-btn"
+                  onClick={() => setLeaguePool((v) => !v)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 0',
+                    minHeight: 32,
+                    color: leaguePool ? 'var(--neon-purple)' : 'var(--text-dim)',
+                    fontSize: '0.75rem',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  {leaguePool ? '← back to my roster only' : 'search the whole league pool'}
+                </button>
+              </div>
+            ) : (
+              <button
+                key={`empty-${i}`}
+                className={canEdit ? 'tap-btn' : undefined}
+                onClick={() => canEdit && setPickerOpen(true)}
+                disabled={!canEdit}
+                style={{
+                  border: `2px dashed ${canEdit ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
+                  background: 'transparent',
+                  borderRadius: 10,
+                  padding: '18px 14px',
+                  color: canEdit ? 'var(--neon-teal)' : 'var(--text-faint)',
+                  fontSize: '0.85rem',
+                  fontWeight: canEdit ? 700 : 400,
+                  textAlign: 'center',
+                  cursor: canEdit ? 'pointer' : 'default',
+                  width: '100%',
+                }}
+              >
+                {canEdit ? '＋ TAP TO ADD A KEEPER' : 'Empty keeper slot'}
+              </button>
+            ),
+          )}
         </div>
       </section>
 
@@ -647,94 +696,6 @@ export default function TeamKeeperPage() {
           </div>
         )}
       </section>
-
-      {/* ── Add-keeper sheet (search + tap list) ───────────────── */}
-      {pickerOpen && canEdit && (
-        <div
-          onClick={() => setPickerOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 150,
-            background: 'rgba(0,0,0,0.75)',
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'center',
-          }}
-        >
-          <div
-            className="panel"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: 560,
-              maxHeight: '78vh',
-              display: 'flex',
-              flexDirection: 'column',
-              padding: '14px 0 calc(10px + env(safe-area-inset-bottom))',
-              borderRadius: '12px 12px 0 0',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px 10px' }}>
-              <div className="hub-heading" style={{ fontSize: '0.7rem', color: 'var(--neon-teal)', flex: 1 }}>
-                ADD KEEPER
-              </div>
-              <button
-                className="tap-btn"
-                onClick={() => setPickerOpen(false)}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 8,
-                  border: '2px solid var(--panel-border)',
-                  background: 'transparent',
-                  color: 'var(--text-mid)',
-                  fontWeight: 700,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            <div style={{ padding: '0 14px' }}>
-              <PlayerCombobox
-                players={leaguePool ? allPlayers : rosterPlayers}
-                placeholder={leaguePool ? 'Search every 2026 roster…' : `Search ${owner}'s roster…`}
-                onSelect={addKeeper}
-                renderMeta={comboMeta}
-                disabledReason={disabledReason}
-              />
-              <button
-                className="tap-btn"
-                onClick={() => setLeaguePool((v) => !v)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: '8px 0',
-                  minHeight: 32,
-                  color: leaguePool ? 'var(--neon-purple)' : 'var(--text-dim)',
-                  fontSize: '0.75rem',
-                  textDecoration: 'underline',
-                }}
-              >
-                {leaguePool ? '← back to my roster only' : 'search the whole league pool'}
-              </button>
-            </div>
-            <div style={{ overflowY: 'auto', borderTop: '1px solid var(--panel-border)' }}>
-              {(leaguePool ? allPlayers.slice(0, 80) : rosterPlayers).map((p) => (
-                <RosterRow
-                  key={p.key}
-                  p={p}
-                  season={dataset.season}
-                  selected={selections.some((x) => x.playerKey === p.key)}
-                  canEdit
-                  reason={disabledReason(p)}
-                  onTap={() => toggleKeeper(p)}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── League status: who has keepers in (names only) ─────── */}
       <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>

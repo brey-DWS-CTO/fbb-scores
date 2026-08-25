@@ -1,9 +1,9 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 
-import { apiErrorMessage, fetchPins, resetDraft, setLocks, setPin } from '../../lib/league/api.js';
-import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
-import { useSettings } from '../../hooks/useSettings.js';
+
+
+import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+
 import IdentityChip from './IdentityChip.js';
 
 const th: CSSProperties = {
@@ -21,17 +21,6 @@ const td: CSSProperties = {
   color: 'var(--text-body)',
 };
 const right: CSSProperties = { textAlign: 'right' };
-
-const btnOutline = (color: string): CSSProperties => ({
-  minHeight: 44,
-  padding: '0 16px',
-  borderRadius: 8,
-  border: `2px solid ${color}`,
-  background: 'transparent',
-  color,
-  fontWeight: 800,
-  letterSpacing: '0.05em',
-});
 
 function Section({ title, color, children }: { title: string; color: string; children: ReactNode }) {
   return (
@@ -51,22 +40,10 @@ const formatDate = (iso: string) =>
     year: 'numeric',
   });
 
-/** /league — rules reference (tiers, contracts, trades), settings + commissioner tools. */
+/** /league — rules reference (tiers, contracts, trades) + identity. */
 export default function LeaguePage() {
-  const { state, dataset } = useLeagueData();
+  const { dataset } = useLeagueData();
   const { identity, signOut } = useIdentity();
-  const { fontMode, setFontMode, theme, setTheme } = useSettings();
-  const applyState = useApplyStateResponse();
-
-  const [pins, setPins] = useState<Array<{ owner: string; pin: string }> | null>(null);
-  const [pinsOpen, setPinsOpen] = useState(false);
-  const [pinArm, setPinArm] = useState<string | null>(null);
-  const [resetArmed, setResetArmed] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [commishError, setCommishError] = useState<string | null>(null);
-
-  const locked = state.locks.keepersLocked;
-  const isCommish = identity?.isCommissioner ?? false;
 
   const contractPlayers = useMemo(
     () => dataset.players.filter((p) => p.keeper.contract != null),
@@ -99,59 +76,17 @@ export default function LeaguePage() {
     [contractPlayers],
   );
 
-  const run = async (key: string, fn: () => Promise<void>) => {
-    setBusy(key);
-    setCommishError(null);
-    try {
-      await fn();
-    } catch (e) {
-      setCommishError(apiErrorMessage(e));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const toggleLock = () => {
-    if (!identity) return;
-    void run('lock', async () => {
-      applyState(await setLocks(identity, !locked));
-    });
-  };
-
-  const openPins = () => {
-    if (!identity) return;
-    void run('pins', async () => {
-      setPins(await fetchPins(identity));
-      setPinsOpen(true);
-    });
-  };
-
-  const resetOwnerPin = (owner: string) => {
-    if (!identity) return;
-    setPinArm(null);
-    void run(`pin-${owner}`, async () => {
-      // Clear to unclaimed — the owner sets a fresh PIN on their next sign-in
-      await setPin(identity, owner, '');
-      setPins(await fetchPins(identity));
-    });
-  };
-
-  const doResetDraft = () => {
-    if (!identity) return;
-    setResetArmed(false);
-    void run('reset', async () => {
-      applyState(await resetDraft(identity));
-    });
-  };
-
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 12px 24px' }}>
-      <h1
-        className="hub-heading glow-purple"
-        style={{ fontSize: '0.85rem', color: 'var(--neon-purple)', margin: '0 0 14px', lineHeight: 1.6 }}
-      >
-        LEAGUE HQ
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+        <h1
+          className="hub-heading glow-purple"
+          style={{ fontSize: '0.85rem', color: 'var(--neon-purple)', margin: 0, lineHeight: 1.6 }}
+        >
+          LEAGUE HQ
+        </h1>
+        <IdentityChip />
+      </div>
 
       {/* ── a. Keeper tiers ────────────────────────────────────── */}
       <Section title={`${dataset.season} KEEPER TIERS`} color="var(--neon-teal)">
@@ -307,71 +242,14 @@ export default function LeaguePage() {
         )}
       </Section>
 
-      {/* ── d. Settings ────────────────────────────────────────── */}
-      <Section title="SETTINGS" color="var(--neon-yellow)">
-        <div style={{ marginBottom: 8, color: 'var(--text-mid)', fontSize: '0.78rem' }}>
-          Font mode: retro CRT vs readable
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(['retro', 'modern'] as const).map((m) => {
-            const active = fontMode === m;
-            return (
-              <button
-                key={m}
-                className="tap-btn"
-                onClick={() => setFontMode(m)}
-                style={{
-                  flex: 1,
-                  minHeight: 44,
-                  borderRadius: 8,
-                  border: `2px solid ${active ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
-                  background: active ? 'rgba(0,255,204,0.1)' : 'transparent',
-                  color: active ? 'var(--neon-teal)' : 'var(--text-mid)',
-                  fontWeight: 800,
-                  letterSpacing: '0.08em',
-                }}
-              >
-                {m === 'retro' ? 'RETRO' : 'MODERN'}
-              </button>
-            );
-          })}
-        </div>
-        <div style={{ margin: '14px 0 8px', color: 'var(--text-mid)', fontSize: '0.78rem' }}>
-          Theme
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(['dark', 'light'] as const).map((t) => {
-            const active = theme === t;
-            return (
-              <button
-                key={t}
-                className="tap-btn"
-                onClick={() => setTheme(t)}
-                style={{
-                  flex: 1,
-                  minHeight: 44,
-                  borderRadius: 8,
-                  border: `2px solid ${active ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
-                  background: active ? 'rgba(0,255,204,0.1)' : 'transparent',
-                  color: active ? 'var(--neon-teal)' : 'var(--text-mid)',
-                  fontWeight: 800,
-                  letterSpacing: '0.08em',
-                }}
-              >
-                {t === 'dark' ? '🌙 DARK' : '☀️ LIGHT'}
-              </button>
-            );
-          })}
-        </div>
+      {/* ── d. Account ─────────────────────────────────────────── */}
+      <Section title="ACCOUNT" color="var(--neon-yellow)">
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 10,
-            marginTop: 14,
-            paddingTop: 12,
-            borderTop: '1px dashed var(--panel-border)',
           }}
         >
           <IdentityChip />
@@ -396,180 +274,6 @@ export default function LeaguePage() {
         </div>
       </Section>
 
-      {/* ── e. Commissioner panel ──────────────────────────────── */}
-      {isCommish && identity && (
-        <Section title="COMMISSIONER PANEL" color="var(--neon-purple)">
-          {/* Lock toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, color: locked ? 'var(--neon-red)' : 'var(--neon-teal)' }}>
-                Keepers are {locked ? 'LOCKED 🔒' : 'OPEN 🔓'}
-              </div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
-                {locked ? 'Only you can still edit keepers.' : 'Owners can edit + save their keepers.'}
-              </div>
-            </div>
-            <button
-              className="tap-btn"
-              onClick={toggleLock}
-              disabled={busy !== null}
-              style={{ ...btnOutline(locked ? 'var(--neon-teal)' : 'var(--neon-red)'), flexShrink: 0 }}
-            >
-              {busy === 'lock' ? '…' : locked ? 'UNLOCK' : 'LOCK'}
-            </button>
-          </div>
-
-          {/* PINs */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
-            {!pinsOpen ? (
-              <button
-                className="tap-btn"
-                onClick={openPins}
-                disabled={busy !== null}
-                style={btnOutline('var(--neon-yellow)')}
-              >
-                {busy === 'pins' ? 'LOADING…' : 'VIEW PINS'}
-              </button>
-            ) : (
-              <>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <span style={{ color: 'var(--neon-yellow)', fontSize: '0.72rem' }}>
-                    ⚠ Don't screen-share with these on screen.
-                  </span>
-                  <button
-                    className="tap-btn"
-                    onClick={() => {
-                      setPinsOpen(false);
-                      setPinArm(null);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--text-mid)',
-                      fontSize: '0.75rem',
-                      textDecoration: 'underline',
-                      minHeight: 32,
-                    }}
-                  >
-                    hide
-                  </button>
-                </div>
-                <div style={{ display: 'grid', gap: 6 }}>
-                  {(pins ?? []).map(({ owner: o, pin }) => (
-                    <div key={o} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ flex: 1, fontWeight: 600, color: 'var(--text-hi)' }}>{o}</span>
-                      <span
-                        style={{
-                          fontFamily: 'monospace',
-                          letterSpacing: pin ? '0.2em' : undefined,
-                          color: pin ? 'var(--neon-teal)' : 'var(--neon-yellow)',
-                          fontSize: pin ? '0.95rem' : '0.72rem',
-                        }}
-                      >
-                        {pin || 'unclaimed'}
-                      </span>
-                      <button
-                        className="tap-btn"
-                        onClick={() => (pinArm === o ? resetOwnerPin(o) : setPinArm(o))}
-                        disabled={busy !== null || !pin}
-                        style={{
-                          minHeight: 40,
-                          padding: '0 12px',
-                          borderRadius: 8,
-                          border: `2px solid ${pinArm === o ? 'var(--neon-red)' : 'var(--panel-border)'}`,
-                          background: 'transparent',
-                          color: !pin ? 'var(--text-ghost)' : pinArm === o ? 'var(--neon-red)' : 'var(--text-mid)',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {busy === `pin-${o}` ? '…' : pinArm === o ? 'SURE?' : 'clear'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Reset draft */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
-            {!resetArmed ? (
-              <button
-                className="tap-btn"
-                onClick={() => setResetArmed(true)}
-                disabled={busy !== null}
-                style={btnOutline('var(--neon-red)')}
-              >
-                RESET DRAFT
-              </button>
-            ) : (
-              <div>
-                <div style={{ color: 'var(--neon-red)', fontSize: '0.8rem', marginBottom: 8 }}>
-                  This wipes every recorded draft pick. No undo. For real?
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    className="tap-btn"
-                    onClick={doResetDraft}
-                    disabled={busy !== null}
-                    style={{
-                      minHeight: 44,
-                      padding: '0 16px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: 'var(--neon-red)',
-                      color: 'var(--text-max)',
-                      fontWeight: 800,
-                      letterSpacing: '0.05em',
-                    }}
-                  >
-                    {busy === 'reset' ? 'RESETTING…' : 'YES — WIPE IT'}
-                  </button>
-                  <button
-                    className="tap-btn"
-                    onClick={() => setResetArmed(false)}
-                    style={btnOutline('var(--panel-border)')}
-                  >
-                    <span style={{ color: 'var(--text-mid)' }}>CANCEL</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {commishError && (
-            <div style={{ color: 'var(--neon-red)', marginTop: 10, fontSize: '0.78rem' }}>{commishError}</div>
-          )}
-
-          {/* TV mode */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
-            <Link
-              to="/draft/tv"
-              style={{
-                color: 'var(--neon-blue)',
-                fontSize: '0.85rem',
-                textDecoration: 'none',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                minHeight: 40,
-                paddingRight: 12,
-              }}
-            >
-              📺 TV mode
-            </Link>
-          </div>
-        </Section>
-      )}
     </div>
   );
 }

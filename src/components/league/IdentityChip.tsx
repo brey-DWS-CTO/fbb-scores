@@ -1,14 +1,36 @@
 import { useState } from 'react';
 import { useIdentity } from '../../hooks/useLeague.js';
+import { useSettings } from '../../hooks/useSettings.js';
 import TeamPickerModal from './TeamPickerModal.js';
 
-/** Small "signed in as" chip; tap to sign in / switch teams. */
+/** "Signed in as" chip + theme toggle — lives top-right on every page. */
 export default function IdentityChip() {
   const { identity } = useIdentity();
+  const { theme, setTheme } = useSettings();
   const [open, setOpen] = useState(false);
 
   return (
-    <>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <button
+        className="tap-btn"
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        aria-label="Toggle light/dark theme"
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 999,
+          border: '2px solid var(--panel-border)',
+          background: 'transparent',
+          fontSize: '1rem',
+          lineHeight: 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
       <button
         className="tap-btn"
         onClick={() => setOpen(true)}
@@ -35,6 +57,6 @@ export default function IdentityChip() {
         )}
       </button>
       {open && <TeamPickerModal onClose={() => setOpen(false)} />}
-    </>
+    </span>
   );
 }
