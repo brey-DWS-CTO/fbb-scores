@@ -101,7 +101,14 @@ async function main() {
   for (const entry of players26.slice(0, 15)) {
     const pl = entry.player ?? entry;
     const seasonStat = (pl.stats ?? []).find(
-      (s: any) => s.statSourceId === 0 && s.statSplitTypeId === 0 && s.seasonId === 2026,
+      (s: {
+        statSourceId?: number;
+        statSplitTypeId?: number;
+        seasonId?: number;
+        appliedAverage?: number;
+        appliedTotal?: number;
+        stats?: Record<string, number>;
+      }) => s.statSourceId === 0 && s.statSplitTypeId === 0 && s.seasonId === 2026,
     );
     console.log(
       `${pl.fullName} | avg=${seasonStat?.appliedAverage?.toFixed(1)} | total=${seasonStat?.appliedTotal?.toFixed(1)} | gp=${seasonStat?.stats?.['42'] ?? '?'}`,

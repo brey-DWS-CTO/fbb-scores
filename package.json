@@ -7,6 +7,7 @@
     "dev": "concurrently \"npm run server\" \"vite\"",
     "dev:client": "vite",
     "server": "tsx watch server/index.ts",
+    "test": "node --require ./tests/tsx-windows-shim.cjs --import tsx --test --test-concurrency=1 tests/*.test.ts",
     "build": "tsc -b && vite build",
     "start": "node --import tsx server/index.ts",
     "lint": "eslint .",

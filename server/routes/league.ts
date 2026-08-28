@@ -7,6 +7,14 @@
  * Commissioner status comes from src/data/source/league-2027-config.json.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import rawDataset from '../../src/data/league-2027.json' with { type: 'json' };
+import {
+  applyOverrides,
+  availablePlayers,
+  buildDraftBoard,
+  resolveTeamKeepers,
+} from '../../src/lib/keeper/engine.js';
+import type { LeagueDataset } from '../../src/lib/keeper/types.js';
 import {
   getState,
   mutateState,
@@ -19,12 +27,15 @@ import {
   readAudit,
   isKnownOwner,
   DRAFT_AT_ISO,
-  DRAFT_AT_MS,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 
 const router = Router();
+const leagueDataset = rawDataset as unknown as LeagueDataset;
+
+const routeParam = (value: string | string[] | undefined): string =>
+  Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
 
 /** Error carrying an HTTP status, mapped to a JSON body by the error handler. */
 class HttpError extends Error {
@@ -93,7 +104,7 @@ async function optionalViewer(req: Request): Promise<Viewer> {
 }
 
 function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
-  const revealed = Date.now() >= DRAFT_AT_MS;
+  const revealed = state.keepersRevealed === true;
   const keeperStatus: Record<string, number> = {};
   for (const [owner, sels] of Object.entries(state.keepers)) {
     keeperStatus[owner] = sels.length;
@@ -164,7 +175,7 @@ router.post('/change-pin', requireAuth, async (req, res) => {
  * The authed owner must match :owner, or be the commissioner.
  */
 router.put('/keepers/:owner', requireAuth, async (req, res) => {
-  const target = req.params.owner;
+  const target = routeParam(req.params.owner);
   const authedOwner = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
 
@@ -182,11 +193,12 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
     res.status(400).json({ error: 'Body must include a selections array' });
     return;
   }
-  if (selections.length > 2) {
-    res.status(400).json({ error: 'A team may keep at most 2 players' });
+  if (selections.length > leagueDataset.maxKeepersPerTeam) {
+    res.status(400).json({ error: `A team may keep at most ${leagueDataset.maxKeepersPerTeam} players` });
     return;
   }
   const clean: KeeperSelection[] = [];
+  const seen = new Set<string>();
   for (const s of selections as Array<Record<string, unknown>>) {
     if (
       !s ||
@@ -196,17 +208,57 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
       res.status(400).json({ error: 'Each selection needs a playerKey and playerName' });
       return;
     }
-    clean.push({ playerKey: s.playerKey, playerName: s.playerName });
+    if (seen.has(s.playerKey)) {
+      res.status(400).json({ error: 'A player can only be selected once' });
+      return;
+    }
+    const player = leagueDataset.players.find((candidate) => candidate.key === s.playerKey);
+    if (!player) {
+      res.status(400).json({ error: `Unknown player: ${s.playerKey}` });
+      return;
+    }
+    seen.add(s.playerKey);
+    clean.push({ playerKey: player.key, playerName: player.name });
   }
 
   const result = await mutateState((draft) => {
     if (draft.locks.keepersLocked && !isCommissioner) {
       throw new HttpError(423, 'Keepers are locked');
     }
+    const dataset = applyOverrides(leagueDataset, draft.overrides);
+    const validation = resolveTeamKeepers(dataset, target, clean);
+    if (!validation.capOk) {
+      throw new HttpError(
+        400,
+        `Keeper cap exceeded: ${validation.capUsed.toFixed(1)} / ${validation.capLimit.toFixed(1)} FPPG`,
+      );
+    }
+    if (!validation.valid) {
+      throw new HttpError(400, validation.errors[0] ?? 'Invalid keeper selection');
+    }
     draft.keepers[target] = clean;
   });
   await appendAudit(authedOwner, 'keepers.set', { target, selections: clean });
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
+});
+
+/** POST /api/league/keeper-visibility — reveal or hide all keeper names. */
+router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, res) => {
+  const revealed = (req.body as { revealed?: unknown } | undefined)?.revealed;
+  if (typeof revealed !== 'boolean') {
+    res.status(400).json({ error: 'revealed must be a boolean' });
+    return;
+  }
+  const result = await mutateState((draft) => {
+    if (!revealed && draft.draft.startedAt !== null) {
+      throw new HttpError(409, 'Keeper names cannot be hidden after the draft starts');
+    }
+    draft.keepersRevealed = revealed;
+  });
+  await appendAudit(res.locals.owner as string, revealed ? 'keepers.revealed' : 'keepers.hidden', {
+    revealed,
+  });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -218,7 +270,6 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
   const overallPick = body.overallPick;
   const playerKey = body.playerKey;
   const playerName = body.playerName;
-  const isKeeper = body.isKeeper === true;
 
   if (typeof overallPick !== 'number' || !Number.isInteger(overallPick) || overallPick < 1) {
     res.status(400).json({ error: 'overallPick must be a positive integer' });
@@ -233,28 +284,51 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
   }
 
   const authedOwner = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner as boolean;
+  const player = leagueDataset.players.find((candidate) => candidate.key === playerKey);
+  if (!player) {
+    res.status(400).json({ error: `Unknown player: ${playerKey}` });
+    return;
+  }
   const timestamp = new Date().toISOString();
   const result = await mutateState((draft) => {
     if (draft.draft.startedAt === null) {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
+    const dataset = applyOverrides(leagueDataset, draft.overrides);
+    const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
+    if (!onClock) throw new HttpError(409, 'The draft is complete');
+    if (onClock.pick.overall !== overallPick) {
+      throw new HttpError(409, `Pick #${onClock.pick.overall} is on the clock`);
+    }
+    if (!isCommissioner && onClock.pick.currentOwner !== authedOwner) {
+      throw new HttpError(403, `Only ${onClock.pick.currentOwner} can enter this pick`);
+    }
+    if (!availablePlayers(dataset, draft).some((candidate) => candidate.key === player.key)) {
+      throw new HttpError(409, `${player.name} is already off the board`);
+    }
     draft.draft.picks[String(overallPick)] = {
-      playerKey,
-      playerName,
-      isKeeper,
+      playerKey: player.key,
+      playerName: player.name,
+      isKeeper: false,
       enteredBy: authedOwner,
       timestamp,
     };
   });
-  await appendAudit(authedOwner, 'draft.pick', { overallPick, playerKey, playerName, isKeeper });
-  res.json(redactState(result, { owner: authedOwner, isCommissioner: res.locals.isCommissioner as boolean }));
+  await appendAudit(authedOwner, 'draft.pick', {
+    overallPick,
+    playerKey: player.key,
+    playerName: player.name,
+    isKeeper: false,
+  });
+  res.json(redactState(result, { owner: authedOwner, isCommissioner }));
 });
 
 /**
  * DELETE /api/league/draft/pick/:overallPick — clear a pick (commissioner only).
  */
 router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, async (req, res) => {
-  const overallPick = parseInt(req.params.overallPick, 10);
+  const overallPick = parseInt(routeParam(req.params.overallPick), 10);
   if (isNaN(overallPick) || overallPick < 1) {
     res.status(400).json({ error: 'Invalid overallPick' });
     return;
@@ -272,6 +346,16 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
  */
 router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) => {
   const result = await mutateState((draft) => {
+    if (draft.keepersRevealed !== true) {
+      throw new HttpError(409, 'Reveal keeper names before starting the draft');
+    }
+    const dataset = applyOverrides(leagueDataset, draft.overrides);
+    for (const team of dataset.teams) {
+      const validation = resolveTeamKeepers(dataset, team.owner, draft.keepers[team.owner] ?? []);
+      if (!validation.valid) {
+        throw new HttpError(409, `${team.owner}'s keeper choices must be fixed before the draft starts`);
+      }
+    }
     if (draft.draft.startedAt === null) draft.draft.startedAt = new Date().toISOString();
   });
   await appendAudit(res.locals.owner as string, 'draft.started', null);
@@ -398,7 +482,7 @@ router.get('/pins', requireAuth, requireCommissioner, async (_req, res) => {
  * sets a fresh one on their next sign-in.
  */
 router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) => {
-  const target = req.params.owner;
+  const target = routeParam(req.params.owner);
   if (!isKnownOwner(target)) {
     res.status(404).json({ error: `Unknown owner: ${target}` });
     return;
@@ -432,6 +516,7 @@ router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
 // ─── Error handler ───────────────────────────────────────────────────────────
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  void _next;
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });
     return;

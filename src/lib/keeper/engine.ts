@@ -415,6 +415,34 @@ export function resolveTeamKeepers(
   };
 }
 
+/**
+ * Explain why a player cannot join the current keeper set. This previews the
+ * full rules engine so pick ownership, contracts, roster rights, and the cap
+ * stay in sync with final validation.
+ */
+export function keeperCandidateError(
+  dataset: LeagueDataset,
+  owner: string,
+  selections: KeeperSelection[],
+  player: DatasetPlayer,
+): string | null {
+  if (selections.some((selection) => selection.playerKey === player.key)) {
+    return 'Already selected';
+  }
+  if (selections.length >= dataset.maxKeepersPerTeam) {
+    return `Max ${dataset.maxKeepersPerTeam} keepers`;
+  }
+
+  const preview = resolveTeamKeepers(dataset, owner, [
+    ...selections,
+    { playerKey: player.key, playerName: player.name },
+  ]);
+  if (!preview.capOk) {
+    return `Over cap by ${(preview.capUsed - preview.capLimit).toFixed(1)} FPPG (${preview.capUsed.toFixed(1)}/${preview.capLimit.toFixed(1)})`;
+  }
+  return preview.errors[0] ?? null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Draft board assembly                                                */
 /* ------------------------------------------------------------------ */
@@ -434,6 +462,7 @@ export function buildDraftBoard(
     const sels = dynamic.keepers[team.owner] ?? [];
     if (sels.length === 0) continue;
     const result = resolveTeamKeepers(dataset, team.owner, sels);
+    if (!result.valid) continue;
     for (const k of result.keepers) {
       if (k.pick && k.errors.length === 0) keeperByOverall.set(k.pick.overall, k);
     }
@@ -463,8 +492,11 @@ export function availablePlayers(
   dynamic: LeagueDynamicState,
 ): DatasetPlayer[] {
   const taken = new Set<string>();
-  for (const sels of Object.values(dynamic.keepers)) {
-    for (const s of sels) taken.add(s.playerKey);
+  for (const team of dataset.teams) {
+    const selections = dynamic.keepers[team.owner] ?? [];
+    const result = resolveTeamKeepers(dataset, team.owner, selections);
+    if (!result.valid) continue;
+    for (const keeper of result.keepers) taken.add(keeper.selection.playerKey);
   }
   for (const p of Object.values(dynamic.draft.picks)) {
     if (p.playerKey) taken.add(p.playerKey);

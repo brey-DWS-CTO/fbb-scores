@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
 import { leagueDataset, OWNERS } from '../../lib/league/data.js';
-import { cellDisplay } from './boardUtils.js';
+import { cellDisplay, positionTheme } from './boardUtils.js';
 
 interface Props {
   board: BoardCell[];
@@ -175,6 +175,7 @@ function GridCell({
 }) {
   if (!cell) return <div />;
   const d = cellDisplay(cell);
+  const theme = positionTheme(d?.positions);
   const traded = cell.pick.viaTradeFrom;
 
   const style: CSSProperties = {
@@ -187,9 +188,9 @@ function GridCell({
     flexDirection: 'column',
     justifyContent: 'center',
     overflow: 'hidden',
-    border: `1px solid ${d ? `${d.color}77` : 'var(--cell-border)'}`,
+    border: `1px solid ${d ? theme.border : 'var(--cell-border)'}`,
     background: d
-      ? `linear-gradient(160deg, ${d.color}46 0%, ${d.color}22 100%)`
+      ? `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`
       : 'var(--cell-bg)',
     // position accent as an inset bar (avoids border shorthand/longhand mixing)
     boxShadow: d ? `inset 3px 0 0 ${d.color}` : undefined,
@@ -261,7 +262,7 @@ function GridCell({
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
               fontWeight: 700,
-              color: 'var(--text-hi)',
+              color: d ? '#ffffff' : 'var(--text-hi)',
               fontSize: tv ? 'clamp(10px, 1.1vw, 18px)' : '0.72rem',
               lineHeight: 1.15,
               wordBreak: 'break-word',

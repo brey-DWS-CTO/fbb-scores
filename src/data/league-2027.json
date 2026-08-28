@@ -1,6 +1,6 @@
 {
  "season": 2027,
- "generatedAt": "2026-08-25T03:20:07.963Z",
+ "generatedAt": "2026-08-26T04:09:07.390Z",
  "cap": 77.8,
  "capRule": {
   "round3Max": 40.1,
@@ -11201,17 +11201,17 @@
   },
   {
    "date": "2025-12-21",
-   "round": 3,
+   "round": 4,
    "from": "Aaron",
    "to": "Ryan",
-   "tradeNote": "Aaron trades Mikal Bridges + own 3rd for Jaylen Brown + Ryan's 10th"
+   "tradeNote": "Aaron trades Mikal Bridges + own 4th for Jaylen Brown + Ryan's 10th"
   },
   {
    "date": "2025-12-21",
    "round": 10,
    "from": "Ryan",
    "to": "Aaron",
-   "tradeNote": "Aaron trades Mikal Bridges + own 3rd for Jaylen Brown + Ryan's 10th"
+   "tradeNote": "Aaron trades Mikal Bridges + own 4th for Jaylen Brown + Ryan's 10th"
   },
   {
    "date": "2025-12-22",
@@ -11288,7 +11288,7 @@
     ],
     "Ryan": [
      "Mikal Bridges",
-     "Aaron's 2027 3rd-round pick (3.7)"
+     "Aaron's 2027 4th-round pick (4.4)"
     ]
    }
   },

@@ -3,7 +3,7 @@ import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
 import { useLeagueData } from '../../hooks/useLeague.js';
 import { sandboxActive } from '../../lib/league/api.js';
-import { formatDraftAt } from '../keepers/KeepersPage.js';
+import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import BoardGrid from './BoardGrid.js';
 import { recentPicks } from './boardUtils.js';

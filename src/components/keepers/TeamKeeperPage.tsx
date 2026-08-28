@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { DatasetPlayer, KeeperSelection, ResolvedKeeper } from '../../lib/keeper/types.js';
-import { pickLabel, resolveTeamKeepers } from '../../lib/keeper/engine.js';
+import { keeperCandidateError, pickLabel, resolveTeamKeepers } from '../../lib/keeper/engine.js';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { apiErrorMessage, saveKeepers } from '../../lib/league/api.js';
+import { fmt1 } from '../../lib/league/format.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import IdentityChip from '../league/IdentityChip.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
-import { CapBar, LockBanner, RoundChip, SourceBadge, fmt1 } from './keeperUi.js';
-import { formatDraftAt } from './KeepersPage.js';
+import { CapBar, LockBanner, RoundChip, SourceBadge } from './keeperUi.js';
 
 const selKey = (sels: KeeperSelection[]) => sels.map((s) => `${s.playerKey}~${s.playerName}`).join('|');
 
@@ -40,6 +40,7 @@ function RosterRow({
       className={tappable ? 'tap-btn' : undefined}
       onClick={() => tappable && onTap()}
       disabled={!tappable}
+      aria-pressed={selected}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -52,7 +53,7 @@ function RosterRow({
         borderBottom: '1px solid var(--panel-border)',
         boxShadow: selected ? 'inset 3px 0 0 var(--neon-teal)' : undefined,
         cursor: tappable ? 'pointer' : 'default',
-        opacity: !canEdit || tappable ? 1 : 0.55,
+        opacity: reason && !selected ? 0.45 : 1,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -75,7 +76,7 @@ function RosterRow({
             </span>
           )}
         </div>
-        {canEdit && !selected && reason && (
+        {!selected && reason && (
           <div style={{ color: 'var(--neon-red)', fontSize: '0.68rem', marginTop: 2 }}>{reason}</div>
         )}
       </div>
@@ -283,6 +284,11 @@ export default function TeamKeeperPage() {
   const locked = state.locks.keepersLocked;
   const isCommish = identity?.isCommissioner ?? false;
   const canEdit = !!identity && (identity.owner === owner || isCommish) && (!locked || isCommish);
+  const hiddenSelectionCount =
+    !canEdit && meta && !meta.revealed && serverSelections.length === 0
+      ? (meta.keeperStatus[owner] ?? 0)
+      : 0;
+  const selectionsHidden = hiddenSelectionCount > 0;
 
   // Every derived number comes from the engine, recomputed each render
   const result = useMemo(() => resolveTeamKeepers(dataset, owner, selections), [owner, selections, dataset]);
@@ -303,7 +309,7 @@ export default function TeamKeeperPage() {
   );
 
   const addKeeper = (p: DatasetPlayer) => {
-    if (selections.length >= dataset.maxKeepersPerTeam) return;
+    if (keeperCandidateError(dataset, owner, selections, p)) return;
     setDraftSel([...selections, { playerKey: p.key, playerName: p.name }]);
     if (selections.length + 1 >= dataset.maxKeepersPerTeam) setPickerOpen(false);
   };
@@ -322,16 +328,7 @@ export default function TeamKeeperPage() {
   };
 
   const disabledReason = (p: DatasetPlayer): string | null => {
-    if (selections.some((s) => s.playerKey === p.key)) return 'Already picked';
-    if (p.fantasyTeam !== owner) {
-      return p.fantasyTeam ? `On ${p.fantasyTeam}'s roster` : "Not on a 2026 roster — can't be kept";
-    }
-    const c = p.keeper.contract;
-    if (c && (c.expired || c.lastKeepableSeason < dataset.season)) {
-      return 'Contract EXPIRED — must re-enter the draft';
-    }
-    if (p.keeper.round === null) return 'No usable stats';
-    return null;
+    return keeperCandidateError(dataset, owner, selections, p);
   };
 
   const comboMeta = (p: DatasetPlayer) => (
@@ -455,21 +452,20 @@ export default function TeamKeeperPage() {
           }}
         >
           <span style={{ color: 'var(--neon-yellow)', fontSize: '0.85rem' }}>
-            Read-only — sign in to edit these keepers.
+            Read-only. Sign in to edit your team.
           </span>
           <IdentityChip />
         </div>
       )}
       {identity && !canEdit && !locked && (
         <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem', marginBottom: 12 }}>
-          Read-only — only {owner} (or the commissioner) can edit this page.
+          Browsing {owner}'s keeper options. Their saved choices stay private until the commissioner reveals them.
         </div>
       )}
       {!canEdit &&
         meta &&
         !meta.revealed &&
-        (meta.keeperStatus[owner] ?? 0) > 0 &&
-        (state.keepers[owner] ?? []).length === 0 && (
+        hiddenSelectionCount > 0 && (
           <div
             className="panel"
             style={{
@@ -482,8 +478,8 @@ export default function TeamKeeperPage() {
               fontWeight: 700,
             }}
           >
-            🔒 {owner} has submitted {meta.keeperStatus[owner]} keeper
-            {(meta.keeperStatus[owner] ?? 0) > 1 ? 's' : ''} — hidden until draft day.
+            🔒 {owner} has submitted {hiddenSelectionCount} keeper
+            {hiddenSelectionCount > 1 ? 's' : ''}. Names stay hidden until the commissioner reveals them.
           </div>
         )}
 
@@ -494,16 +490,16 @@ export default function TeamKeeperPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
           <span
-            className={result.capOk ? 'glow-teal' : 'glow-red'}
+            className={selectionsHidden ? undefined : result.capOk ? 'glow-teal' : 'glow-red'}
             style={{
               fontSize: '2.6rem',
               lineHeight: 1,
               fontWeight: 800,
               letterSpacing: '0.04em',
-              color: result.capOk ? 'var(--neon-teal)' : 'var(--neon-red)',
+              color: selectionsHidden ? 'var(--text-mid)' : result.capOk ? 'var(--neon-teal)' : 'var(--neon-red)',
             }}
           >
-            {result.capUsed.toFixed(1)}
+            {selectionsHidden ? '—' : result.capUsed.toFixed(1)}
           </span>
           <span style={{ color: 'var(--text-mid)', fontSize: '1.05rem', fontWeight: 600 }}>
             / {result.capLimit} FPPG
@@ -526,7 +522,7 @@ export default function TeamKeeperPage() {
             </span>
           )}
         </div>
-        <CapBar used={result.capUsed} limit={result.capLimit} height={12} />
+        <CapBar used={selectionsHidden ? 0 : result.capUsed} limit={result.capLimit} height={12} />
         <div
           style={{
             borderTop: '1px dashed var(--panel-border)',
@@ -548,7 +544,7 @@ export default function TeamKeeperPage() {
 
             }}
           >
-            {result.statusLine}
+            {selectionsHidden ? 'Saved keeper total is private.' : result.statusLine}
           </div>
           <div
             style={{
@@ -561,7 +557,7 @@ export default function TeamKeeperPage() {
 
             }}
           >
-            {result.pickStatusLine}
+            {selectionsHidden ? 'Browse the roster below to see every legal option.' : result.pickStatusLine}
           </div>
         </div>
       </section>
@@ -569,12 +565,31 @@ export default function TeamKeeperPage() {
       {/* ── Selected keepers ───────────────────────────────────── */}
       <section style={{ marginBottom: 14 }}>
         <div className="hub-heading" style={{ fontSize: '0.6rem', color: 'var(--neon-purple)', marginBottom: 8 }}>
-          SELECTED KEEPERS ({result.keepers.length}/{dataset.maxKeepersPerTeam})
+          {selectionsHidden
+            ? `KEEPER PICKS (${hiddenSelectionCount} HIDDEN)`
+            : `SELECTED KEEPERS (${result.keepers.length}/${dataset.maxKeepersPerTeam})`}
         </div>
         {isLoading && result.keepers.length === 0 && (
           <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem', marginBottom: 8 }}>Loading league state…</div>
         )}
         <div style={{ display: 'grid', gap: 10 }}>
+          {selectionsHidden &&
+            Array.from({ length: hiddenSelectionCount }).map((_, index) => (
+              <div
+                key={`hidden-${index}`}
+                className="panel"
+                style={{
+                  padding: '18px 14px',
+                  borderRadius: 10,
+                  borderColor: 'var(--neon-purple)',
+                  color: 'var(--neon-purple)',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                }}
+              >
+                🔒 Keeper {index + 1} is hidden
+              </div>
+            ))}
           {result.keepers.map((k) => (
             <KeeperCard
               key={k.selection.playerKey}
@@ -583,7 +598,7 @@ export default function TeamKeeperPage() {
               onRemove={() => removeKeeper(k.selection.playerKey)}
             />
           ))}
-          {Array.from({ length: emptySlots }).map((_, i) =>
+          {!selectionsHidden && Array.from({ length: emptySlots }).map((_, i) =>
             i === 0 && pickerOpen && canEdit ? (
               <div
                 key="inline-picker"
@@ -674,7 +689,12 @@ export default function TeamKeeperPage() {
         </div>
         {canEdit && (
           <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
-            Tap a player to keep them · tap again to remove
+            Tap a player to keep them. Choices that break the cap or another rule are greyed out.
+          </div>
+        )}
+        {!canEdit && (
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
+            Their final 2026 roster, with keeper value, price, and contract status. This does not show saved picks.
           </div>
         )}
         <div>
@@ -704,7 +724,7 @@ export default function TeamKeeperPage() {
         </div>
         {meta && !meta.revealed && (
           <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', marginBottom: 10 }}>
-            🕵️ Everyone's picks stay secret until draft day — {formatDraftAt(meta.draftAt)}.
+            🕵️ Saved keeper names stay private until the commissioner reveals them.
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
@@ -732,12 +752,15 @@ export default function TeamKeeperPage() {
                 </span>
               </span>
             );
-            return isCommish ? (
-              <Link key={o} to={`/keepers/${encodeURIComponent(o)}`} style={{ textDecoration: 'none' }}>
+            return (
+              <Link
+                key={o}
+                to={`/keepers/${encodeURIComponent(o)}`}
+                aria-label={`View ${o}'s keeper options`}
+                style={{ textDecoration: 'none' }}
+              >
                 {row}
               </Link>
-            ) : (
-              <span key={o}>{row}</span>
             );
           })}
         </div>
@@ -768,7 +791,9 @@ export default function TeamKeeperPage() {
               ) : flash ? (
                 <span style={{ color: 'var(--neon-teal)' }}>✓ Keepers saved</span>
               ) : dirty ? (
-                <span style={{ color: 'var(--neon-yellow)' }}>● Unsaved changes</span>
+                <span style={{ color: result.valid ? 'var(--neon-yellow)' : 'var(--neon-red)' }}>
+                  {result.valid ? '● Unsaved changes' : 'Fix the blocked keeper choice'}
+                </span>
               ) : (
                 <span style={{ color: 'var(--text-dim)' }}>In sync with the league</span>
               )}
@@ -776,7 +801,7 @@ export default function TeamKeeperPage() {
             <button
               className="tap-btn"
               onClick={doSave}
-              disabled={!dirty || saving}
+              disabled={!dirty || saving || !result.valid}
               style={{
                 minHeight: 44,
                 padding: '0 18px',
@@ -784,8 +809,8 @@ export default function TeamKeeperPage() {
                 border: 'none',
                 fontWeight: 800,
                 letterSpacing: '0.05em',
-                background: !dirty || saving ? 'var(--panel-border)' : 'var(--neon-teal)',
-                color: !dirty || saving ? 'var(--text-dim)' : '#001a14',
+                background: !dirty || saving || !result.valid ? 'var(--panel-border)' : 'var(--neon-teal)',
+                color: !dirty || saving || !result.valid ? 'var(--text-dim)' : '#001a14',
                 flexShrink: 0,
               }}
             >

@@ -1,9 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { PlayerKeeperInfo } from '../../lib/keeper/types.js';
 
-/** "—" for null, one decimal otherwise. */
-export const fmt1 = (n: number | null | undefined): string => (n == null ? '—' : n.toFixed(1));
-
 const chipBase: CSSProperties = {
   display: 'inline-block',
   padding: '2px 6px',

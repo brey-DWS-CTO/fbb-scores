@@ -65,7 +65,7 @@ export default function LeaguePage() {
             (a.fantasyTeam ?? '').localeCompare(b.fantasyTeam ?? '') || a.name.localeCompare(b.name)
           );
         }),
-    [contractPlayers],
+    [contractPlayers, dataset.season],
   );
   const expiredContracts = useMemo(
     () =>
@@ -73,7 +73,7 @@ export default function LeaguePage() {
         const c = p.keeper.contract!;
         return c.expired === true || c.lastKeepableSeason < dataset.season;
       }),
-    [contractPlayers],
+    [contractPlayers, dataset.season],
   );
 
   return (

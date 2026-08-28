@@ -159,6 +159,24 @@ export async function saveKeepers(
   return data;
 }
 
+export async function setKeeperVisibility(
+  c: Credentials,
+  revealed: boolean,
+): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.keepersRevealed = revealed;
+    });
+  }
+  const { data } = await axios.post(
+    '/api/league/keeper-visibility',
+    { revealed },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
 export async function submitDraftPick(
   c: Credentials,
   pick: { overallPick: number; playerKey: string; playerName: string; isKeeper?: boolean },

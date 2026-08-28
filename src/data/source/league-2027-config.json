@@ -55,7 +55,7 @@
       "teams": ["Aaron", "Ryan"],
       "received": {
         "Aaron": ["Jaylen Brown", "Ryan's 2027 10th-round pick (10.9)"],
-        "Ryan": ["Mikal Bridges", "Aaron's 2027 3rd-round pick (3.7)"]
+        "Ryan": ["Mikal Bridges", "Aaron's 2027 4th-round pick (4.4)"]
       }
     },
     {
@@ -78,8 +78,8 @@
   "pickTrades": [
     { "date": "2025-11-28", "round": 3,  "from": "Derek",   "to": "Ryan",    "tradeNote": "Derek trades LaMelo Ball, Ausar Thompson + own 3rd for Tyrese Maxey + Ryan's 9th" },
     { "date": "2025-11-28", "round": 9,  "from": "Ryan",    "to": "Derek",   "tradeNote": "Derek trades LaMelo Ball, Ausar Thompson + own 3rd for Tyrese Maxey + Ryan's 9th" },
-    { "date": "2025-12-21", "round": 3,  "from": "Aaron",   "to": "Ryan",    "tradeNote": "Aaron trades Mikal Bridges + own 3rd for Jaylen Brown + Ryan's 10th" },
-    { "date": "2025-12-21", "round": 10, "from": "Ryan",    "to": "Aaron",   "tradeNote": "Aaron trades Mikal Bridges + own 3rd for Jaylen Brown + Ryan's 10th" },
+    { "date": "2025-12-21", "round": 4,  "from": "Aaron",   "to": "Ryan",    "tradeNote": "Aaron trades Mikal Bridges + own 4th for Jaylen Brown + Ryan's 10th" },
+    { "date": "2025-12-21", "round": 10, "from": "Ryan",    "to": "Aaron",   "tradeNote": "Aaron trades Mikal Bridges + own 4th for Jaylen Brown + Ryan's 10th" },
     { "date": "2025-12-22", "round": 3,  "from": "Joel",    "to": "Kyle",    "tradeNote": "Joel trades Poole, Tyson, Podziemski + own 3rd + own 6th for Vucevic, White, Brunson + Kyle's 9th + 10th" },
     { "date": "2025-12-22", "round": 6,  "from": "Joel",    "to": "Kyle",    "tradeNote": "Joel trades Poole, Tyson, Podziemski + own 3rd + own 6th for Vucevic, White, Brunson + Kyle's 9th + 10th" },
     { "date": "2025-12-22", "round": 9,  "from": "Kyle",    "to": "Joel",    "tradeNote": "Joel trades Poole, Tyson, Podziemski + own 3rd + own 6th for Vucevic, White, Brunson + Kyle's 9th + 10th" },

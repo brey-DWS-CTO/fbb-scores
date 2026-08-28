@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { positionColor, cellDisplay } from '../draft/boardUtils.js';
-import { formatDraftAt } from '../keepers/KeepersPage.js';
 import IdentityChip from './IdentityChip.js';
 
 /** /teams — everyone's 2027 roster as it forms from keepers + draft picks. */
@@ -81,21 +81,41 @@ export default function TeamsPage() {
 
       {/* roster panel */}
       <section className="panel" style={{ padding: '12px 0 6px', borderRadius: 10, marginBottom: 14 }}>
-        <div style={{ padding: '0 14px 8px' }}>
-          <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-max)' }}>{owner}</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>{team?.espnTeamName}</div>
+        <div style={{ padding: '0 14px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-max)' }}>{owner}</div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>{team?.espnTeamName}</div>
+          </div>
+          <Link
+            to={`/keepers/${encodeURIComponent(owner)}`}
+            className="tap-btn"
+            style={{
+              flexShrink: 0,
+              minHeight: 40,
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '0 12px',
+              borderRadius: 8,
+              border: '2px solid var(--neon-purple)',
+              color: 'var(--neon-purple)',
+              textDecoration: 'none',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+            }}
+          >
+            KEEPER OPTIONS
+          </Link>
         </div>
 
         {hiddenKeepers > 0 && (
           <div style={{ margin: '0 14px 10px', color: 'var(--neon-purple)', fontSize: '0.8rem', fontWeight: 700 }}>
-            🔒 {hiddenKeepers} keeper{hiddenKeepers > 1 ? 's' : ''} in — hidden until draft day
-            {meta ? ` (${formatDraftAt(meta.draftAt)})` : ''}
+            🔒 {hiddenKeepers} keeper{hiddenKeepers > 1 ? 's' : ''} in. Names stay hidden until the commissioner reveals them.
           </div>
         )}
 
         {filled.length === 0 && hiddenKeepers === 0 && (
           <div style={{ margin: '0 14px 10px', color: 'var(--text-faint)', fontSize: '0.82rem' }}>
-            No players yet — keepers and draft picks land here.
+            No {dataset.season} players yet. Open Keeper Options to browse this team's final roster.
           </div>
         )}
 

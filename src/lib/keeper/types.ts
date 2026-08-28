@@ -118,6 +118,8 @@ export interface LeagueOverrides {
 export interface LeagueDynamicState {
   season: number;
   keepers: Record<string, KeeperSelection[]>;
+  /** Commissioner-controlled public visibility. Missing in old state means hidden. */
+  keepersRevealed?: boolean;
   draft: { picks: Record<string, DraftPickState>; startedAt: string | null };
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;

@@ -7,6 +7,9 @@ import { NBA_TEAM_ABBREV } from '../../src/lib/espn/calculations.js';
 
 const router = Router();
 
+const routeParam = (value: string | string[] | undefined): string =>
+  Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
+
 /**
  * Build the full cookie string for ESPN requests.
  *
@@ -230,7 +233,7 @@ router.get('/espn/daily/:matchupId', async (req, res) => {
     return;
   }
 
-  const matchupId = parseInt(req.params.matchupId, 10);
+  const matchupId = parseInt(routeParam(req.params.matchupId), 10);
   if (isNaN(matchupId)) {
     res.status(400).json({ error: 'Invalid matchup ID' });
     return;
@@ -259,11 +262,11 @@ router.get('/espn/daily/:matchupId', async (req, res) => {
         if (withPoints) {
           const p = withPoints.playerPoolEntry;
           console.log(`[Daily Debug] Player: ${p.player.fullName}, FPTS: ${p.appliedStatTotal}`);
-          console.log(`[Daily Debug] player.stats entries:`, (p.player.stats ?? []).map((s: any) => ({
+          console.log(`[Daily Debug] player.stats entries:`, (p.player.stats ?? []).map((s) => ({
             splitType: s.statSplitTypeId, source: s.statSourceId, period: s.scoringPeriodId,
             hasStats: !!s.stats, statKeys: s.stats ? Object.keys(s.stats).slice(0, 5).join(',') : 'none',
           })));
-          console.log(`[Daily Debug] poolEntry.stats entries:`, (p.stats ?? []).map((s: any) => ({
+          console.log(`[Daily Debug] poolEntry.stats entries:`, (p.stats ?? []).map((s) => ({
             splitType: s.statSplitTypeId, source: s.statSourceId, period: s.scoringPeriodId,
             hasStats: !!s.stats, statKeys: s.stats ? Object.keys(s.stats).slice(0, 5).join(',') : 'none',
           })));
@@ -309,7 +312,7 @@ router.get('/espn/matchup/:matchupId', async (req, res) => {
     return;
   }
 
-  const matchupId = parseInt(req.params.matchupId, 10);
+  const matchupId = parseInt(routeParam(req.params.matchupId), 10);
   if (isNaN(matchupId)) {
     res.status(400).json({ error: 'Invalid matchup ID' });
     return;
@@ -403,7 +406,7 @@ router.get('/espn/debug-stats', (req, res, next) => {
  * src/hooks/usePlayerTrend.ts) so the UI degrades gracefully.
  */
 router.get('/espn/trends/player/:playerId', (req, res) => {
-  const playerId = parseInt(req.params.playerId, 10);
+  const playerId = parseInt(routeParam(req.params.playerId), 10);
   if (isNaN(playerId)) {
     res.status(400).json({ error: 'Invalid player ID' });
     return;
@@ -418,7 +421,7 @@ router.get('/espn/trends/player/:playerId', (req, res) => {
  * src/hooks/usePlayerTrend.ts) so the UI degrades gracefully.
  */
 router.get('/espn/trends/team/:teamId', (req, res) => {
-  const teamId = parseInt(req.params.teamId, 10);
+  const teamId = parseInt(routeParam(req.params.teamId), 10);
   if (isNaN(teamId)) {
     res.status(400).json({ error: 'Invalid team ID' });
     return;
@@ -558,7 +561,7 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
 
       const statusName = comp.status?.type?.name ?? '';
       const shortDetail = comp.status?.type?.shortDetail ?? '';
-      const displayClock = comp.displayClock ?? '';
+      const displayClock = comp.status?.displayClock ?? '';
       const period = comp.status?.period ?? 0;
 
       // Clock is in seconds remaining in current period

@@ -5,13 +5,19 @@ import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/e
 import { teamByOwner } from '../../lib/league/data.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { apiErrorMessage, startDraft } from '../../lib/league/api.js';
-import { formatDraftAt } from '../keepers/KeepersPage.js';
+import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import IdentityChip from '../league/IdentityChip.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
-import { cellDisplay, positionColor, recentPicks } from './boardUtils.js';
+import {
+  cellDisplay,
+  POSITION_ORDER,
+  positionColor,
+  positionTheme,
+  recentPicks,
+} from './boardUtils.js';
 
 function PosChip({ positions }: { positions: string[] }) {
   if (positions.length === 0) return null;
@@ -43,11 +49,24 @@ function PickRow({
   onTap: (cell: BoardCell) => void;
 }) {
   const d = cellDisplay(cell);
+  const theme = positionTheme(d?.positions);
   const [showTrade, setShowTrade] = useState(false);
   return (
     <div
       className={cell.onClock ? 'pulse-glow' : undefined}
       onClick={tappable ? () => onTap(cell) : undefined}
+      onKeyDown={
+        tappable
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onTap(cell);
+              }
+            }
+          : undefined
+      }
+      role={tappable ? 'button' : undefined}
+      tabIndex={tappable ? 0 : undefined}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -58,7 +77,7 @@ function PickRow({
         background: cell.onClock
           ? 'rgba(0,255,204,0.06)'
           : d
-            ? `${d.color}${d.isKeeper ? '0e' : '18'}`
+            ? `linear-gradient(100deg, ${theme.deepBackground} 0%, ${theme.background} 100%)`
             : 'transparent',
         outline: cell.onClock ? '2px solid var(--neon-teal)' : undefined,
         outlineOffset: cell.onClock ? -2 : undefined,
@@ -110,8 +129,8 @@ function PickRow({
           </div>
         )}
         {cell.keeper && d ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', opacity: 0.8 }}>
-            <span style={{ fontWeight: 700 }}>🔒 {d.name}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ color: '#fff', fontWeight: 700 }}>🔒 {d.name}</span>
             <span
               style={{
                 color: d.color,
@@ -128,7 +147,7 @@ function PickRow({
           </div>
         ) : d ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700 }}>{d.name}</span>
+            <span style={{ color: '#fff', fontWeight: 700 }}>{d.name}</span>
             <PosChip positions={d.positions} />
             {d.enteredBy && (
               <span style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>by {d.enteredBy}</span>
@@ -198,6 +217,7 @@ export default function DraftPage() {
       setShowSignIn(true);
       return;
     }
+    if (!cell.onClock || (!identity.isCommissioner && identity.owner !== cell.pick.currentOwner)) return;
     setPickTarget(cell);
   };
 
@@ -205,7 +225,8 @@ export default function DraftPage() {
     if (!started) return false;
     if (cell.keeper) return false;
     if (cell.selection) return identity?.isCommissioner === true;
-    return true; // empty: tap picks (or opens sign-in when signed out)
+    if (!cell.onClock) return false;
+    return !identity || identity.isCommissioner || identity.owner === cell.pick.currentOwner;
   };
 
   return (
@@ -372,16 +393,7 @@ export default function DraftPage() {
             textAlign: 'center',
           }}
         >
-          🗓️ DRAFT DAY:{' '}
-          {new Date(meta.draftAt).toLocaleString(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
-          {' · '}keeper picks hit the board then
-          {meta.isCommissioner ? ' (you see them now, commish)' : ''}
+          Keeper names are still hidden. The commissioner must reveal them before starting the draft.
         </div>
       )}
 
@@ -405,6 +417,43 @@ export default function DraftPage() {
       )}
 
       {/* view toggle */}
+      <div
+        aria-label="Position color key"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          margin: '0 2px 10px',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+        }}
+      >
+        <span className="hub-heading" style={{ color: 'var(--text-dim)', fontSize: '0.55rem', marginRight: 2 }}>
+          POSITION
+        </span>
+        {POSITION_ORDER.map((position) => {
+          const theme = positionTheme([position]);
+          return (
+            <span
+              key={position}
+              style={{
+                minWidth: 38,
+                padding: '4px 8px',
+                border: `1px solid ${theme.border}`,
+                borderRadius: 999,
+                background: theme.deepBackground,
+                color: theme.color,
+                fontSize: '0.65rem',
+                fontWeight: 800,
+                textAlign: 'center',
+              }}
+            >
+              {position}
+            </span>
+          );
+        })}
+      </div>
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {(['list', 'grid'] as const).map((v) => (
           <button

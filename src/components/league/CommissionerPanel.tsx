@@ -1,6 +1,13 @@
 import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { apiErrorMessage, fetchPins, resetDraft, setLocks, setPin } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  fetchPins,
+  resetDraft,
+  setKeeperVisibility,
+  setLocks,
+  setPin,
+} from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 
 const btnOutline = (color: string): CSSProperties => ({
@@ -16,7 +23,7 @@ const btnOutline = (color: string): CSSProperties => ({
 
 /** Lock keepers, PIN management, draft reset, TV link — commissioner only. */
 export default function CommissionerPanel() {
-  const { state } = useLeagueData();
+  const { state, meta } = useLeagueData();
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
 
@@ -26,10 +33,12 @@ export default function CommissionerPanel() {
   const [pinsOpen, setPinsOpen] = useState(false);
   const [pinArm, setPinArm] = useState<string | null>(null);
   const [resetArmed, setResetArmed] = useState(false);
+  const [revealArmed, setRevealArmed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [commishError, setCommishError] = useState<string | null>(null);
 
   const locked = state.locks.keepersLocked;
+  const revealed = meta?.revealed ?? (state.keepersRevealed === true);
   if (!identity?.isCommissioner) return null;
 
   const run = async (key: string, fn: () => Promise<void>) => {
@@ -54,6 +63,13 @@ export default function CommissionerPanel() {
       setPins(await fetchPins(identity));
       setPinsOpen(true);
     });
+
+  const setReveal = (next: boolean) => {
+    setRevealArmed(false);
+    void run('reveal', async () => {
+      applyState(await setKeeperVisibility(identity, next));
+    });
+  };
 
   const resetOwnerPin = (owner: string) => {
     setPinArm(null);
@@ -95,6 +111,71 @@ export default function CommissionerPanel() {
         >
           {busy === 'lock' ? '…' : locked ? 'UNLOCK' : 'LOCK'}
         </button>
+      </div>
+
+      {/* Keeper visibility */}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: revealed ? 'var(--neon-teal)' : 'var(--neon-purple)' }}>
+              Keeper names are {revealed ? 'PUBLIC' : 'HIDDEN'}
+            </div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
+              Counts and roster options stay public. Saved names stay private until you reveal them.
+            </div>
+          </div>
+          {revealed ? (
+            <button
+              className="tap-btn"
+              onClick={() => setReveal(false)}
+              disabled={busy !== null || state.draft.startedAt !== null}
+              style={{ ...btnOutline('var(--neon-purple)'), flexShrink: 0 }}
+            >
+              {busy === 'reveal' ? '…' : 'HIDE'}
+            </button>
+          ) : (
+            <button
+              className="tap-btn"
+              onClick={() => setRevealArmed(true)}
+              disabled={busy !== null}
+              style={{ ...btnOutline('var(--neon-teal)'), flexShrink: 0 }}
+            >
+              REVEAL
+            </button>
+          )}
+        </div>
+        {revealArmed && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ color: 'var(--neon-yellow)', fontSize: '0.78rem', marginBottom: 8 }}>
+              This shows every saved keeper name to the league at once. Ready?
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="tap-btn"
+                onClick={() => setReveal(true)}
+                disabled={busy !== null}
+                style={{
+                  minHeight: 44,
+                  padding: '0 16px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'var(--neon-teal)',
+                  color: '#001a14',
+                  fontWeight: 800,
+                }}
+              >
+                YES, REVEAL ALL
+              </button>
+              <button
+                className="tap-btn"
+                onClick={() => setRevealArmed(false)}
+                style={btnOutline('var(--panel-border)')}
+              >
+                <span style={{ color: 'var(--text-mid)' }}>CANCEL</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* PINs */}

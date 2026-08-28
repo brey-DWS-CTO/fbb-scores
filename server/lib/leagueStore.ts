@@ -44,6 +44,8 @@ export interface LeagueOverrides {
 export interface LeagueDynamicState {
   season: number; // 2027
   keepers: Record<string, KeeperSelection[]>; // owner -> up to 2
+  /** Commissioner-controlled public visibility. Missing in old rows means hidden. */
+  keepersRevealed?: boolean;
   draft: {
     picks: Record<string, DraftPickState>; // key = String(overallPick)
     startedAt: string | null;
@@ -88,7 +90,6 @@ const SEASON: number = (leagueConfig as { season?: number }).season ?? 2027;
 /** Draft day — keepers stay secret (non-commissioner) until this moment. */
 export const DRAFT_AT_ISO: string =
   (leagueConfig as { draftAt?: string }).draftAt ?? '2026-10-18T14:00:00-07:00';
-export const DRAFT_AT_MS: number = Date.parse(DRAFT_AT_ISO);
 
 /** Case-sensitive exact match against the config's owner names. */
 export function isKnownOwner(owner: string): boolean {
@@ -103,6 +104,7 @@ function defaultState(): LeagueDynamicState {
   return {
     season: SEASON,
     keepers: {},
+    keepersRevealed: false,
     draft: { picks: {}, startedAt: null },
     locks: { keepersLocked: false },
   };
@@ -118,9 +120,7 @@ const TEMP_PREFIX = 'T:';
 
 interface StoreBackend {
   getState(): Promise<StateResult>;
-  mutateState(
-    fn: (draft: LeagueDynamicState) => LeagueDynamicState | void,
-  ): Promise<MutateResult>;
+  mutateState(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
   getPin(owner: string): Promise<string | null>;
   getPins(): Promise<Array<{ owner: string; pin: string }>>;
   setPin(owner: string, pin: string): Promise<void>;
@@ -195,7 +195,7 @@ class NeonBackend implements StoreBackend {
   }
 
   async mutateState(
-    fn: (draft: LeagueDynamicState) => LeagueDynamicState | void,
+    fn: (draft: LeagueDynamicState) => void,
   ): Promise<MutateResult> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version FROM league_state WHERE id = 1`) as Array<{
@@ -205,13 +205,12 @@ class NeonBackend implements StoreBackend {
     const row = rows[0];
     if (!row) throw new Error('league_state row missing');
     const draft = structuredClone(row.data);
-    const result = fn(draft);
-    const next = result === undefined ? draft : result;
+    fn(draft);
     const updated = (await this.sql`UPDATE league_state
-      SET data = ${JSON.stringify(next)}::jsonb, version = version + 1, updated_at = now()
+      SET data = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
       WHERE id = 1
       RETURNING version`) as Array<{ version: number }>;
-    return { state: next, version: updated[0]?.version ?? row.version + 1 };
+    return { state: draft, version: updated[0]?.version ?? row.version + 1 };
   }
 
   async getPin(owner: string): Promise<string | null> {
@@ -327,13 +326,13 @@ class FileBackend implements StoreBackend {
   }
 
   async mutateState(
-    fn: (draft: LeagueDynamicState) => LeagueDynamicState | void,
+    fn: (draft: LeagueDynamicState) => void,
   ): Promise<MutateResult> {
     await this.ensureInit();
     const doc = this.readDoc();
     const draft = structuredClone(doc.state);
-    const result = fn(draft);
-    doc.state = result === undefined ? draft : result;
+    fn(draft);
+    doc.state = draft;
     doc.version += 1;
     doc.updatedAt = new Date().toISOString();
     this.writeDoc(doc);
@@ -410,7 +409,7 @@ export async function getState(): Promise<StateResult> {
 }
 
 export async function mutateState(
-  fn: (draft: LeagueDynamicState) => LeagueDynamicState | void,
+  fn: (draft: LeagueDynamicState) => void,
 ): Promise<MutateResult> {
   return getBackend().mutateState(fn);
 }

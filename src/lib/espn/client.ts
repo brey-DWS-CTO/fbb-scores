@@ -7,8 +7,8 @@ const ESPN_BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba';
 interface EspnClientConfig {
   leagueId: string;
   seasonId: number;
-  espnS2: string;
-  swid: string;
+  espnS2?: string;
+  swid?: string;
   /** Optional: full cookie string override (e.g. copied from browser DevTools Network tab) */
   cookieOverride?: string;
 }
@@ -18,7 +18,7 @@ export class EspnClient {
 
   constructor(config: EspnClientConfig) {
     const cookieString = config.cookieOverride
-      ?? `espn_s2=${config.espnS2}; SWID=${config.swid}`;
+      ?? `espn_s2=${config.espnS2 ?? ''}; SWID=${config.swid ?? ''}`;
 
     this.http = axios.create({
       baseURL: `${ESPN_BASE}/seasons/${config.seasonId}/segments/0/leagues/${config.leagueId}`,

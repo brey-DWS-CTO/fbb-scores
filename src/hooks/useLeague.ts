@@ -8,6 +8,7 @@ import type { LeagueDynamicState } from '../lib/keeper/types.js';
 const EMPTY_STATE: LeagueDynamicState = {
   season: 2027,
   keepers: {},
+  keepersRevealed: false,
   draft: { picks: {}, startedAt: null },
   locks: { keepersLocked: false },
 };

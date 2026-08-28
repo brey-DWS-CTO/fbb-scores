@@ -1,6 +1,6 @@
 # HANDOFF — The Nerds Draft Hub
 
-_State as of 2026-08-24. For anyone (human or AI) picking this up._
+_State as of 2026-08-27. For anyone (human or AI) picking this up._
 
 ## What this is
 
@@ -27,7 +27,7 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 
 1. **2026 averages are league-official, from screenshots** (`screenshot-stats-2026.json`) — the ESPN API's season splits include post-fantasy-season games and MUST NOT be used for tiers. Next year: build the season-freeze feature (snapshot averages when the fantasy season ends).
 2. **Tier algorithm** (validated 100% vs the 2026 worksheet): >25 GP players ranked by FPPG, decile = round; ≤25 GP → prior-year avg value-slotted; 0 GP → flat R3; cap = R3max+R3min (**77.8**).
-3. **Keeper secrecy until draft day** — enforced by server-side redaction in `GET /state` (own keepers always; everything for commissioner; counts for everyone). Never expose full keepers in any new endpoint pre-reveal.
+3. **Keeper secrecy until commissioner reveal** — enforced by server-side redaction in `GET /state` (own keepers always; everything for commissioner; counts for everyone). The commissioner controls `state.keepersRevealed` from Admin. Never expose full keepers in any new endpoint pre-reveal.
 4. **Draft static until START** — `draft.startedAt` set only by `POST /draft/start` (commissioner). On-clock = first cell neither drafted nor keeper-locked.
 5. Commissioner **overrides** (cap, per-player rounds) live in dynamic state; apply via `applyOverrides` — always consume the dataset through `useLeagueData()`.
 
@@ -45,8 +45,72 @@ Commissioner-only sandbox (Admin → 🧪): clones live state into localStorage;
 - `tsconfig.app.json` excludes `src/lib/espn` (legacy, server-only). `erasableSyntaxOnly` + `noUnusedLocals` are on.
 - ESPN cookies (`ESPN_COOKIE_STRING` etc.) in Vercel env expire eventually; `ESPN_SEASON_ID` needs bumping to 2027 when the NBA season starts.
 - Tie-at-boundary players (Reaves/Banchero 37.7; Pritchard/Edgecombe 30.5): rank governs, matching league precedent — commissioner can override per player.
-- `formatDraftAt` lives in `KeepersPage.tsx` (imported by draft pages).
+- Shared draft/date number formatting lives in `src/lib/league/format.ts`.
+
+## Verification baseline
+
+The current keeper/draft hardening batch has automated coverage in `tests/keeper-engine.test.ts` and `tests/league-api.test.ts`. Run all three before shipping:
+
+```text
+npm test
+npm run lint
+npm run build
+```
+
+As of 2026-08-27: 10 tests pass, lint passes, and the production build passes. A local isolated browser check also passed for sign-in, Admin, test mode, the two-step draft start, player search/position filters, pick confirmation, and advancing the clock. The build still reports one non-blocking JavaScript chunk-size warning.
 
 ## Future features (user's list)
 
-Missed-games tracking · live searchable rulebook (constitution is at `scratchpad` origin — re-extract from the docx) · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files).
+### 1. Build and lock the 2026–27 draft player pool
+
+This comes first. The draft now reads `src/data/league-2027.json`, which the build script makes from committed ESPN dumps plus the 2025 and 2026 keeper sheets. That file is a repeatable keeper dataset, but it is not a current 2026–27 player list. It can miss rookies and new signings, and team or position data can go stale.
+
+Before draft day:
+
+1. Pull ESPN's 2027 `kona_player_info` pool after ESPN opens the new league year. Use ESPN player IDs as stable keys.
+2. Merge that pool with contract and keeper history. Never drop a held player just because ESPN omits him from one response.
+3. Give the commissioner a refresh preview that lists added, removed, team-changed, and position-changed players before it writes anything.
+4. Save the accepted pool snapshot with a fetched time and source season. Keep the prior accepted snapshot and the committed dataset as fallbacks.
+5. Lock the accepted pool when the draft starts so an ESPN change cannot alter the board mid-draft.
+
+Do not pull or show stats in the draft picker. Stats remain part of the keeper math only.
+
+Production cannot persist an accepted pool by writing a normal file from a Vercel Function. Store immutable accepted snapshots in Neon, keep the committed JSON as the fallback seed, and save the chosen snapshot ID into draft state when the draft starts.
+
+### 2. Add the admin-only 2026-27 schedule grid
+
+Reference workbook: `Nerds League Keeper Worksheet 2027 v1.xlsx`, especially `Schedule Grid!A1:AK32`. Reference source: <https://basketballmonster.com/ScheduleGrid.aspx>. The official 2026-27 NBA schedule is live, but only 80 games per team have fixed opponents and dates until the NBA Cup fills the other two.
+
+Build this as a separate accepted schedule snapshot in Neon, not as part of the keeper dataset. Use NBA team IDs internally. The commissioner flow should fetch or paste a candidate grid, map dates into league periods, show a diff, validate all 30 teams, and accept an immutable snapshot with source and fetch times.
+
+Store explicit period dates and phase metadata. Do not infer the All-Star rule from missing dates:
+
+- Regular season: league weeks 1-16.
+- Play-In: league weeks 17-18.
+- Playoffs: two two-week rounds, league weeks 19-22.
+- The first Play-In period spans two NBA calendar weeks across the All-Star break and must carry `combinesAllStarBreak: true`.
+- Derived schedule output must include each Play-In week, total Play-In games, each playoff week, each playoff round, total playoff games, and combined Play-In plus playoff games by NBA team.
+- Later projections inherit those counts through each player's NBA team ID and can sum them for a fantasy roster.
+
+The workbook's bottom summary omits Play-In 1 and total Play-In games; the app must correct that. Its game-cap formula also hardcodes 100 league games, a 30-game normal cap, and a 133-game threshold. Make any retained values named league settings.
+
+### 3. Build the rulebook as versioned league data
+
+Reference: `The Nerds Constitution 2026 v13 with updates for 2027.docx`. Despite its filename, it still displays Revision 13 dated 2025-10-05, contains no tracked changes or comments, and still has stale 2025-26 front matter and history. Do not import it as a clean 2027 authority without review.
+
+Use two linked layers:
+
+1. A versioned, searchable rulebook with stable section IDs, draft/published state, effective season, revision notes, cross-references, and immutable published versions.
+2. Typed settings for rules the app enforces, linked back to rule sections. Publishing must flag prose/settings mismatches.
+
+Polls should link to affected sections, snapshot eligible voters, enforce one vote per team, keep an audit trail, and create an amendment draft rather than silently rewriting published rules. Signatures must bind an authenticated member, time, acknowledgement text, and version hash to one immutable published version. PDF export must render from that frozen version and include signature status and amendment history.
+
+High-score and league-history tables should come from structured records, not hand-edited prose. The current high-score list says it is incomplete and misorders Aaron's 1243.0 below Eric's 1241.6. Champion history also stops at 2024-25.
+
+Rule questions that need a commissioner decision before enforcement include the regular-season/All-Star week wording, conflicting eliminated-team trade rules, stale missed-game payout text, first-round same-tier keeper handling, drop/reacquisition contract behavior, the Kyle Rule's 30.0 average source, poll quorum/abstentions, All-Star cap rounding, and raw versus adjusted high-score records.
+
+The constitution's draft clock is manual: a member calls “CLOCK,” then the drafter gets 30 seconds. Do not add an automatic pick timer or auto-skip based only on elapsed time.
+
+### Later
+
+Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files).
