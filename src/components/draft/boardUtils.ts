@@ -72,11 +72,12 @@ export function cellDisplay(cell: BoardCell): CellDisplay | null {
   }
   if (cell.selection) {
     const player = playerForKey(cell.selection.playerKey);
+    const positions = cell.selection.positions ?? player?.positions ?? [];
     return {
       name: cell.selection.playerName ?? player?.name ?? 'Unknown',
-      positions: player?.positions ?? [],
-      proTeam: player?.proTeam ?? null,
-      color: positionColor(player?.positions),
+      positions,
+      proTeam: cell.selection.proTeam ?? player?.proTeam ?? null,
+      color: positionColor(positions),
       isKeeper: cell.selection.isKeeper === true,
       keeperRound: null,
       enteredBy: cell.selection.enteredBy ?? null,

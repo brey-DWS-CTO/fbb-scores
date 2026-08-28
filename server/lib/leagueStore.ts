@@ -18,6 +18,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { neon } from '@neondatabase/serverless';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
+import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,8 @@ export interface KeeperSelection {
 export interface DraftPickState {
   playerKey?: string;
   playerName?: string;
+  proTeam?: string;
+  positions?: string[];
   isKeeper?: boolean;
   enteredBy?: string;
   timestamp?: string;
@@ -49,6 +52,12 @@ export interface LeagueDynamicState {
   draft: {
     picks: Record<string, DraftPickState>; // key = String(overallPick)
     startedAt: string | null;
+    playerPoolSnapshotId?: string | null;
+  };
+  playerPool?: {
+    activeSnapshotId: string | null;
+    acceptedAt?: string;
+    acceptedBy?: string;
   };
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
@@ -71,6 +80,15 @@ export interface StateResult {
 export interface MutateResult {
   state: LeagueDynamicState;
   version: number;
+}
+
+export class PlayerPoolAcceptError extends Error {
+  reason: 'draft-started' | 'stale-base' | 'snapshot-conflict';
+
+  constructor(reason: PlayerPoolAcceptError['reason'], message: string) {
+    super(message);
+    this.reason = reason;
+  }
 }
 
 // ─── League config (static import — bundled on Vercel) ───────────────────────
@@ -126,6 +144,14 @@ interface StoreBackend {
   setPin(owner: string, pin: string): Promise<void>;
   appendAudit(owner: string | null, action: string, detail: unknown): Promise<void>;
   readAudit(limit: number): Promise<AuditRow[]>;
+  getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null>;
+  acceptPlayerPoolSnapshot(
+    snapshot: PlayerPoolSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult>;
 }
 
 // ─── Neon Postgres backend ───────────────────────────────────────────────────
@@ -167,6 +193,18 @@ class NeonBackend implements StoreBackend {
       action text not null,
       detail jsonb
     )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS player_pool_snapshots (
+      id text primary key,
+      season int not null,
+      source_season int not null,
+      source text not null,
+      fetched_at timestamptz not null,
+      created_at timestamptz not null,
+      created_by text not null,
+      base_snapshot_id text,
+      fingerprint text not null unique,
+      players jsonb not null
+    )`;
     await this.sql`INSERT INTO league_state (id, data, version)
       VALUES (1, ${JSON.stringify(defaultState())}::jsonb, 0)
       ON CONFLICT (id) DO NOTHING`;
@@ -198,19 +236,22 @@ class NeonBackend implements StoreBackend {
     fn: (draft: LeagueDynamicState) => void,
   ): Promise<MutateResult> {
     await this.ensureInit();
-    const rows = (await this.sql`SELECT data, version FROM league_state WHERE id = 1`) as Array<{
-      data: LeagueDynamicState;
-      version: number;
-    }>;
-    const row = rows[0];
-    if (!row) throw new Error('league_state row missing');
-    const draft = structuredClone(row.data);
-    fn(draft);
-    const updated = (await this.sql`UPDATE league_state
-      SET data = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
-      WHERE id = 1
-      RETURNING version`) as Array<{ version: number }>;
-    return { state: draft, version: updated[0]?.version ?? row.version + 1 };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const rows = (await this.sql`SELECT data, version FROM league_state WHERE id = 1`) as Array<{
+        data: LeagueDynamicState;
+        version: number;
+      }>;
+      const row = rows[0];
+      if (!row) throw new Error('league_state row missing');
+      const draft = structuredClone(row.data);
+      fn(draft);
+      const updated = (await this.sql`UPDATE league_state
+        SET data = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
+        WHERE id = 1 AND version = ${row.version}
+        RETURNING version`) as Array<{ version: number }>;
+      if (updated[0]) return { state: draft, version: updated[0].version };
+    }
+    throw new Error('League state changed too often; retry the request');
   }
 
   async getPin(owner: string): Promise<string | null> {
@@ -255,6 +296,91 @@ class NeonBackend implements StoreBackend {
       detail: r.detail,
     }));
   }
+
+  async getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, source_season, source, fetched_at,
+      created_at, created_by, base_snapshot_id, fingerprint, players
+      FROM player_pool_snapshots WHERE id = ${id}`) as Array<{
+      id: string;
+      season: number;
+      source_season: number;
+      source: PlayerPoolSnapshot['source'];
+      fetched_at: string | Date;
+      created_at: string | Date;
+      created_by: string;
+      base_snapshot_id: string | null;
+      fingerprint: string;
+      players: PlayerPoolSnapshot['players'];
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      season: row.season,
+      sourceSeason: row.source_season,
+      source: row.source,
+      fetchedAt: new Date(row.fetched_at).toISOString(),
+      createdAt: new Date(row.created_at).toISOString(),
+      createdBy: row.created_by,
+      baseSnapshotId: row.base_snapshot_id,
+      fingerprint: row.fingerprint,
+      players: row.players,
+    };
+  }
+
+  async acceptPlayerPoolSnapshot(
+    snapshot: PlayerPoolSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult> {
+    await this.ensureInit();
+    const pointer = { activeSnapshotId: snapshot.id, acceptedAt, acceptedBy };
+    const rows = (await this.sql`WITH eligible AS (
+        SELECT id FROM league_state
+        WHERE id = 1
+          AND (data #>> '{draft,startedAt}') IS NULL
+          AND COALESCE(data #>> '{playerPool,activeSnapshotId}', ${fallbackId}) = ${expectedCurrentId}
+      ), inserted AS (
+        INSERT INTO player_pool_snapshots
+          (id, season, source_season, source, fetched_at, created_at, created_by,
+            base_snapshot_id, fingerprint, players)
+        SELECT ${snapshot.id}, ${snapshot.season}, ${snapshot.sourceSeason}, ${snapshot.source},
+          ${snapshot.fetchedAt}, ${snapshot.createdAt}, ${snapshot.createdBy},
+          ${snapshot.baseSnapshotId}, ${snapshot.fingerprint}, ${JSON.stringify(snapshot.players)}::jsonb
+        FROM eligible
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id
+      ), valid_snapshot AS (
+        SELECT id FROM inserted
+        UNION ALL
+        SELECT id FROM player_pool_snapshots
+          WHERE id = ${snapshot.id} AND fingerprint = ${snapshot.fingerprint}
+      )
+      UPDATE league_state
+      SET data = jsonb_set(data, '{playerPool}', ${JSON.stringify(pointer)}::jsonb, true),
+        version = version + 1,
+        updated_at = now()
+      WHERE id = 1
+        AND (data #>> '{draft,startedAt}') IS NULL
+        AND COALESCE(data #>> '{playerPool,activeSnapshotId}', ${fallbackId}) = ${expectedCurrentId}
+        AND EXISTS (SELECT 1 FROM valid_snapshot)
+      RETURNING data, version`) as Array<{ data: LeagueDynamicState; version: number }>;
+    const updated = rows[0];
+    if (updated) return { state: updated.data, version: updated.version };
+
+    const state = await this.getState();
+    if (state.state.draft.startedAt !== null) {
+      throw new PlayerPoolAcceptError('draft-started', 'The player pool cannot change after the draft starts');
+    }
+    const currentId = state.state.playerPool?.activeSnapshotId ?? fallbackId;
+    if (currentId !== expectedCurrentId) {
+      throw new PlayerPoolAcceptError('stale-base', 'The active player pool changed; preview again');
+    }
+    throw new PlayerPoolAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
+  }
 }
 
 // ─── Local JSON file backend ─────────────────────────────────────────────────
@@ -265,6 +391,7 @@ interface FileDoc {
   updatedAt: string;
   pins: Record<string, string>;
   audit: AuditRow[];
+  playerPoolSnapshots: PlayerPoolSnapshot[];
 }
 
 const MAX_FILE_AUDIT_ROWS = 1000;
@@ -272,6 +399,7 @@ const MAX_FILE_AUDIT_ROWS = 1000;
 class FileBackend implements StoreBackend {
   private readonly filePath: string;
   private initPromise: Promise<void> | null = null;
+  private writeQueue: Promise<void> = Promise.resolve();
 
   constructor() {
     const here = path.dirname(fileURLToPath(import.meta.url)); // server/lib
@@ -303,6 +431,7 @@ class FileBackend implements StoreBackend {
         updatedAt: doc.updatedAt ?? new Date().toISOString(),
         pins: doc.pins ?? {},
         audit: Array.isArray(doc.audit) ? doc.audit : [],
+        playerPoolSnapshots: Array.isArray(doc.playerPoolSnapshots) ? doc.playerPoolSnapshots : [],
       };
     } catch {
       return {
@@ -311,12 +440,19 @@ class FileBackend implements StoreBackend {
         updatedAt: new Date().toISOString(),
         pins: {},
         audit: [],
+        playerPoolSnapshots: [],
       };
     }
   }
 
   private writeDoc(doc: FileDoc): void {
     fs.writeFileSync(this.filePath, JSON.stringify(doc, null, 2), 'utf8');
+  }
+
+  private enqueueWrite<T>(action: () => T | Promise<T>): Promise<T> {
+    const run = this.writeQueue.then(action);
+    this.writeQueue = run.then(() => undefined, () => undefined);
+    return run;
   }
 
   async getState(): Promise<StateResult> {
@@ -329,14 +465,16 @@ class FileBackend implements StoreBackend {
     fn: (draft: LeagueDynamicState) => void,
   ): Promise<MutateResult> {
     await this.ensureInit();
-    const doc = this.readDoc();
-    const draft = structuredClone(doc.state);
-    fn(draft);
-    doc.state = draft;
-    doc.version += 1;
-    doc.updatedAt = new Date().toISOString();
-    this.writeDoc(doc);
-    return { state: doc.state, version: doc.version };
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const draft = structuredClone(doc.state);
+      fn(draft);
+      doc.state = draft;
+      doc.version += 1;
+      doc.updatedAt = new Date().toISOString();
+      this.writeDoc(doc);
+      return { state: doc.state, version: doc.version };
+    });
   }
 
   async getPin(owner: string): Promise<string | null> {
@@ -353,32 +491,72 @@ class FileBackend implements StoreBackend {
 
   async setPin(owner: string, pin: string): Promise<void> {
     await this.ensureInit();
-    const doc = this.readDoc();
-    doc.pins[owner] = pin;
-    this.writeDoc(doc);
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.pins[owner] = pin;
+      this.writeDoc(doc);
+    });
   }
 
   async appendAudit(owner: string | null, action: string, detail: unknown): Promise<void> {
     await this.ensureInit();
-    const doc = this.readDoc();
-    const lastId = doc.audit.length > 0 ? doc.audit[doc.audit.length - 1].id : 0;
-    doc.audit.push({
-      id: lastId + 1,
-      ts: new Date().toISOString(),
-      owner,
-      action,
-      detail: detail ?? null,
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const lastId = doc.audit.length > 0 ? doc.audit[doc.audit.length - 1].id : 0;
+      doc.audit.push({
+        id: lastId + 1,
+        ts: new Date().toISOString(),
+        owner,
+        action,
+        detail: detail ?? null,
+      });
+      if (doc.audit.length > MAX_FILE_AUDIT_ROWS) {
+        doc.audit = doc.audit.slice(-MAX_FILE_AUDIT_ROWS);
+      }
+      this.writeDoc(doc);
     });
-    if (doc.audit.length > MAX_FILE_AUDIT_ROWS) {
-      doc.audit = doc.audit.slice(-MAX_FILE_AUDIT_ROWS);
-    }
-    this.writeDoc(doc);
   }
 
   async readAudit(limit: number): Promise<AuditRow[]> {
     await this.ensureInit();
     const doc = this.readDoc();
     return doc.audit.slice(-limit).reverse(); // newest first
+  }
+
+  async getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null> {
+    await this.ensureInit();
+    const doc = this.readDoc();
+    return doc.playerPoolSnapshots.find((snapshot) => snapshot.id === id) ?? null;
+  }
+
+  async acceptPlayerPoolSnapshot(
+    snapshot: PlayerPoolSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (doc.state.draft.startedAt !== null) {
+        throw new PlayerPoolAcceptError('draft-started', 'The player pool cannot change after the draft starts');
+      }
+      const currentId = doc.state.playerPool?.activeSnapshotId ?? fallbackId;
+      if (currentId !== expectedCurrentId) {
+        throw new PlayerPoolAcceptError('stale-base', 'The active player pool changed; preview again');
+      }
+      const existing = doc.playerPoolSnapshots.find((candidate) => candidate.id === snapshot.id);
+      if (existing && existing.fingerprint !== snapshot.fingerprint) {
+        throw new PlayerPoolAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
+      }
+      if (!existing) doc.playerPoolSnapshots.push(structuredClone(snapshot));
+      doc.state.playerPool = { activeSnapshotId: snapshot.id, acceptedAt, acceptedBy };
+      doc.version += 1;
+      doc.updatedAt = acceptedAt;
+      this.writeDoc(doc);
+      return { state: doc.state, version: doc.version };
+    });
   }
 }
 
@@ -495,4 +673,24 @@ export async function appendAudit(
 /** Recent audit rows, newest first. */
 export async function readAudit(limit = 50): Promise<AuditRow[]> {
   return getBackend().readAudit(limit);
+}
+
+export async function getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null> {
+  return getBackend().getPlayerPoolSnapshot(id);
+}
+
+export async function acceptPlayerPoolSnapshot(
+  snapshot: PlayerPoolSnapshot,
+  expectedCurrentId: string,
+  fallbackId: string,
+  acceptedAt: string,
+  acceptedBy: string,
+): Promise<MutateResult> {
+  return getBackend().acceptPlayerPoolSnapshot(
+    snapshot,
+    expectedCurrentId,
+    fallbackId,
+    acceptedAt,
+    acceptedBy,
+  );
 }

@@ -1,4 +1,4 @@
-import type { DatasetPlayer } from '../keeper/types.js';
+import type { DatasetPlayer, LeagueDataset } from '../keeper/types.js';
 
 export type PlayerPoolSourceStatus = 'fetched' | 'retained-missing';
 
@@ -24,10 +24,12 @@ export interface PlayerPoolSnapshot {
   id: string;
   season: number;
   sourceSeason: number;
-  source: 'espn-kona';
+  source: 'espn-kona' | 'committed-dataset';
   fetchedAt: string;
-  acceptedAt: string;
-  acceptedBy: string;
+  createdAt: string;
+  createdBy: string;
+  baseSnapshotId: string | null;
+  fingerprint: string;
   players: PlayerPoolPlayer[];
 }
 
@@ -198,3 +200,65 @@ export function previewPlayerPoolRefresh(
   };
 }
 
+function shortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  return `${parts[0]?.charAt(0)}. ${parts.slice(1).join(' ')}`;
+}
+
+/**
+ * Overlay draft metadata onto keeper data without importing stats or changing
+ * tier, contract, roster-right, or cap fields. Players absent from the accepted
+ * pool disappear unless the refresh retained them first.
+ */
+export function applyPlayerPoolToDataset(
+  base: LeagueDataset,
+  pool: PlayerPoolPlayer[],
+): LeagueDataset {
+  const baseByKey = new Map(base.players.map((player) => [player.key, player]));
+  const baseByEspnId = new Map(
+    base.players
+      .filter((player): player is DatasetPlayer & { espnId: number } => player.espnId !== null)
+      .map((player) => [player.espnId, player]),
+  );
+
+  const players = pool.map((poolPlayer): DatasetPlayer => {
+    const existing = baseByKey.get(poolPlayer.key) ?? baseByEspnId.get(poolPlayer.espnId);
+    if (existing) {
+      return {
+        ...existing,
+        key: poolPlayer.key,
+        espnId: poolPlayer.espnId,
+        fullName: poolPlayer.fullName,
+        positions: poolPlayer.positions,
+        proTeam: poolPlayer.proTeam,
+      };
+    }
+    return {
+      key: poolPlayer.key,
+      espnId: poolPlayer.espnId,
+      name: shortName(poolPlayer.fullName),
+      fullName: poolPlayer.fullName,
+      positions: poolPlayer.positions,
+      proTeam: poolPlayer.proTeam,
+      injuryStatus: null,
+      fantasyTeam: null,
+      stats2026: null,
+      api2026: null,
+      prior: null,
+      keeper: {
+        eligible: false,
+        round: null,
+        rank: null,
+        effectiveAvg: null,
+        avgSource: 'none',
+        usesPriorYear: false,
+        zeroGp2026: false,
+        contract: null,
+        flags: ['player-pool-new'],
+      },
+    };
+  });
+
+  return { ...base, players };
+}

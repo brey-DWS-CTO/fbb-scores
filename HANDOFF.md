@@ -1,6 +1,6 @@
 # HANDOFF — The Nerds Draft Hub
 
-_State as of 2026-08-27. For anyone (human or AI) picking this up._
+_State as of 2026-08-28. For anyone (human or AI) picking this up._
 
 ## What this is
 
@@ -57,7 +57,7 @@ npm run lint
 npm run build
 ```
 
-As of 2026-08-27: 15 tests pass, lint passes, and the production build passes. A local isolated browser check also passed for sign-in, Admin, test mode, the two-step draft start, player search/position filters, pick confirmation, and advancing the clock. The build still reports one non-blocking JavaScript chunk-size warning.
+As of 2026-08-28: 22 tests pass, lint passes, and the production build passes. Local isolated browser checks passed for sign-in, Admin, test mode, the two-step draft start, player search/position filters, pick confirmation, advancing the clock, the player-pool panel, the immutable fallback fetch, and direct `/draft` loading on Windows. The build still reports one non-blocking JavaScript chunk-size warning.
 
 ## Future features (user's list)
 
@@ -77,7 +77,13 @@ Do not pull or show stats in the draft picker. Stats remain part of the keeper m
 
 Production cannot persist an accepted pool by writing a normal file from a Vercel Function. Store immutable accepted snapshots in Neon, keep the committed JSON as the fallback seed, and save the chosen snapshot ID into draft state when the draft starts.
 
-Foundation now present: `src/lib/league/playerPool.ts` seeds draft-only metadata from the committed dataset and builds a no-write refresh preview keyed by ESPN ID. It reports added, removed, renamed, team-changed, and position-changed players; keeps existing app keys stable; and retains protected players that ESPN omits. The next cut is snapshot persistence plus commissioner preview/accept routes. Do not wire a live ESPN refresh straight into the draft UI.
+Foundation now present: `src/lib/league/playerPool.ts` seeds draft-only metadata from the committed dataset and builds a no-write refresh preview keyed by ESPN ID. It reports added, removed, renamed, team-changed, and position-changed players; keeps existing app keys stable; and retains protected players that ESPN omits.
+
+Immutable snapshot storage, commissioner API routes, and the Admin preview/accept panel are present. Neon uses `player_pool_snapshots`; local development mirrors snapshots in `.data/league-state.json`. The server fetches every active `kona_player_info` page, then validates and previews the full 2027 pool without writing. Acceptance requires the preview fingerprint and current base ID, moves only the active pointer, and fails if the draft has started or the base changed. Draft start pins the active snapshot ID. General Neon state mutations use compare-and-swap retries, and the file backend serializes writes to prevent lost updates.
+
+The public player-pool endpoint resolves the active snapshot before the draft and the pinned snapshot after it starts. The draft picker and server pick validation both use that pool, while keeper averages, tiers, contracts, and cap math stay on the committed dataset. The server ignores client-supplied names and stores canonical name, team, and position data from the snapshot. New rookies can be drafted; removed unprotected players cannot. The picker fails closed if the locked pool cannot load.
+
+Before the first live refresh, set production `ESPN_SEASON_ID=2027` and confirm the ESPN cookies still work. The Admin panel will refuse a wrong season, a truncated pool, unknown position codes, duplicate IDs, or a post-start change. The next major cut is the schedule snapshot and admin-only grid below.
 
 ### 2. Add the admin-only 2026-27 schedule grid
 

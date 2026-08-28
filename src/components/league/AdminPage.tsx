@@ -7,6 +7,7 @@ import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/u
 import PlayerCombobox from './PlayerCombobox.js';
 import CommissionerPanel from './CommissionerPanel.js';
 import IdentityChip from './IdentityChip.js';
+import PlayerPoolAdmin from './PlayerPoolAdmin.js';
 import { RoundChip } from '../keepers/keeperUi.js';
 
 const baseRound = new Map(leagueDataset.players.map((p) => [p.key, p.keeper.round]));
@@ -111,6 +112,8 @@ export default function AdminPage() {
       )}
 
       <CommissionerPanel />
+
+      <PlayerPoolAdmin />
 
       {/* ── Test mode ──────────────────────────────────────────── */}
       <section

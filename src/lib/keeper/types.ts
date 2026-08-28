@@ -105,6 +105,8 @@ export interface KeeperSelection {
 export interface DraftPickState {
   playerKey?: string;
   playerName?: string;
+  proTeam?: string;
+  positions?: string[];
   isKeeper?: boolean;
   enteredBy?: string;
   timestamp?: string;
@@ -120,7 +122,18 @@ export interface LeagueDynamicState {
   keepers: Record<string, KeeperSelection[]>;
   /** Commissioner-controlled public visibility. Missing in old state means hidden. */
   keepersRevealed?: boolean;
-  draft: { picks: Record<string, DraftPickState>; startedAt: string | null };
+  draft: {
+    picks: Record<string, DraftPickState>;
+    startedAt: string | null;
+    /** Pool frozen when the commissioner starts the draft. */
+    playerPoolSnapshotId?: string | null;
+  };
+  /** Commissioner-accepted pool used before the draft is frozen. */
+  playerPool?: {
+    activeSnapshotId: string | null;
+    acceptedAt?: string;
+    acceptedBy?: string;
+  };
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
 }

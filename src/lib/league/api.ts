@@ -1,11 +1,20 @@
 import axios from 'axios';
 import type { KeeperSelection, LeagueDynamicState } from '../keeper/types.js';
+import type {
+  EspnPlayerPoolPlayer,
+  PlayerPoolRefreshPreview,
+  PlayerPoolSnapshot,
+} from './playerPool.js';
 
 export interface StateMeta {
   draftAt: string;
   revealed: boolean;
   /** Keeper counts per owner — always visible even while selections are secret. */
   keeperStatus: Record<string, number>;
+  playerPool?: {
+    activeSnapshotId: string;
+    draftSnapshotId: string | null;
+  };
   viewer: string | null;
   isCommissioner: boolean;
 }
@@ -20,6 +29,23 @@ export interface StateResponse {
 export interface Credentials {
   owner: string;
   pin: string;
+}
+
+export interface PlayerPoolCandidateInput {
+  sourceSeason: number;
+  fetchedAt: string;
+  players: EspnPlayerPoolPlayer[];
+}
+
+export interface PlayerPoolPreviewResponse {
+  currentSnapshotId: string;
+  candidateSnapshotId: string;
+  fingerprint: string;
+  preview: PlayerPoolRefreshPreview;
+}
+
+export interface FetchedPlayerPoolPreviewResponse extends PlayerPoolPreviewResponse {
+  candidate: PlayerPoolCandidateInput;
 }
 
 const authHeaders = (c: Credentials) => ({ 'x-owner': c.owner, 'x-pin': c.pin });
@@ -179,7 +205,14 @@ export async function setKeeperVisibility(
 
 export async function submitDraftPick(
   c: Credentials,
-  pick: { overallPick: number; playerKey: string; playerName: string; isKeeper?: boolean },
+  pick: {
+    overallPick: number;
+    playerKey: string;
+    playerName: string;
+    proTeam?: string;
+    positions?: string[];
+    isKeeper?: boolean;
+  },
 ): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
@@ -187,6 +220,8 @@ export async function submitDraftPick(
       s.draft.picks[String(pick.overallPick)] = {
         playerKey: pick.playerKey,
         playerName: pick.playerName,
+        proTeam: pick.proTeam,
+        positions: pick.positions,
         isKeeper: pick.isKeeper === true,
         enteredBy: c.owner,
         timestamp: new Date().toISOString(),
@@ -214,7 +249,11 @@ export async function startDraft(c: Credentials): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
-      if (s.draft.startedAt === null) s.draft.startedAt = new Date().toISOString();
+      if (s.draft.startedAt === null) {
+        s.draft.playerPoolSnapshotId =
+          s.playerPool?.activeSnapshotId ?? `dataset-${s.season}`;
+        s.draft.startedAt = new Date().toISOString();
+      }
     });
   }
   const { data } = await axios.post('/api/league/draft/start', {}, { headers: authHeaders(c) });
@@ -227,6 +266,7 @@ export async function resetDraft(c: Credentials): Promise<StateResponse> {
     return mutateSandbox(sandbox, (s) => {
       s.draft.picks = {};
       s.draft.startedAt = null;
+      s.draft.playerPoolSnapshotId = null;
     });
   }
   const { data } = await axios.post('/api/league/draft/reset', {}, { headers: authHeaders(c) });
@@ -249,6 +289,51 @@ export async function setOverrides(
   overrides: { cap?: number | null; playerRounds?: Record<string, number | null> },
 ): Promise<StateResponse> {
   const { data } = await axios.post('/api/league/overrides', overrides, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function fetchPlayerPool(
+  c?: Credentials | null,
+): Promise<{ snapshot: PlayerPoolSnapshot; fallback: boolean; draftSnapshotId: string | null }> {
+  const { data } = await axios.get('/api/league/player-pool', {
+    headers: c ? authHeaders(c) : undefined,
+  });
+  return data;
+}
+
+export async function fetchEspnPlayerPoolPreview(
+  c: Credentials,
+): Promise<FetchedPlayerPoolPreviewResponse> {
+  const { data } = await axios.post('/api/league/player-pool/fetch-preview', {}, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function previewPlayerPool(
+  c: Credentials,
+  candidate: PlayerPoolCandidateInput,
+): Promise<PlayerPoolPreviewResponse> {
+  const { data } = await axios.post('/api/league/player-pool/preview', candidate, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function acceptPlayerPool(
+  c: Credentials,
+  candidate: PlayerPoolCandidateInput,
+  preview: Pick<PlayerPoolPreviewResponse, 'currentSnapshotId' | 'fingerprint'>,
+): Promise<StateResponse & { snapshot: PlayerPoolSnapshot }> {
+  const { data } = await axios.post(
+    '/api/league/player-pool/accept',
+    {
+      ...candidate,
+      expectedCurrentSnapshotId: preview.currentSnapshotId,
+      fingerprint: preview.fingerprint,
+    },
+    { headers: authHeaders(c) },
+  );
   return data;
 }
 

@@ -137,6 +137,8 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
         overallPick: cell.pick.overall,
         playerKey: chosen.key,
         playerName: chosen.name,
+        proTeam: chosen.proTeam,
+        positions: chosen.positions,
       });
       applyState(res);
       onClose();

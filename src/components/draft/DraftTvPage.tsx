@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
-import { useLeagueData } from '../../hooks/useLeague.js';
+import { useDraftData } from '../../hooks/useLeague.js';
 import { sandboxActive } from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
@@ -10,7 +10,7 @@ import { recentPicks } from './boardUtils.js';
 
 /** Full-screen wall board for the draft-night TV. Read-only, 3s poll. */
 export default function DraftTvPage() {
-  const { state, meta, dataUpdatedAt, dataset } = useLeagueData(true);
+  const { state, meta, dataUpdatedAt, dataset } = useDraftData(true);
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
   const started = state.draft.startedAt !== null;
   const onClock = board.find((c) => c.onClock) ?? null;

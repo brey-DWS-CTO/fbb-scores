@@ -24,12 +24,23 @@ import {
   getPinStatus,
   claimPin,
   appendAudit,
+  acceptPlayerPoolSnapshot,
   readAudit,
   isKnownOwner,
   DRAFT_AT_ISO,
+  PlayerPoolAcceptError,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
+import {
+  FALLBACK_PLAYER_POOL,
+  fetchEspnPlayerPoolCandidate,
+  makePlayerPoolSnapshot,
+  parsePlayerPoolCandidate,
+  preparePlayerPoolCandidate,
+  resolveDraftDataset,
+  resolveDraftPlayerPool,
+} from '../lib/playerPoolService.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -113,6 +124,10 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
     draftAt: DRAFT_AT_ISO,
     revealed,
     keeperStatus,
+    playerPool: {
+      activeSnapshotId: state.playerPool?.activeSnapshotId ?? FALLBACK_PLAYER_POOL.id,
+      draftSnapshotId: state.draft.playerPoolSnapshotId ?? null,
+    },
     viewer: viewer.owner,
     isCommissioner: viewer.isCommissioner,
   };
@@ -139,6 +154,120 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
 router.get('/state', async (req, res) => {
   const viewer = await optionalViewer(req);
   res.json(redactState(await getState(), viewer));
+});
+
+/** GET /api/league/player-pool — active or draft-pinned pool. */
+router.get('/player-pool', async (_req, res) => {
+  const { state } = await getState();
+  const snapshot = await resolveDraftPlayerPool(state);
+  res.json({
+    snapshot,
+    fallback: snapshot.id === FALLBACK_PLAYER_POOL.id,
+    draftSnapshotId: state.draft.playerPoolSnapshotId ?? null,
+  });
+});
+
+/** Fetch every ESPN player page and preview it without writing. */
+router.post('/player-pool/fetch-preview', requireAuth, requireCommissioner, async (_req, res) => {
+  const candidate = await fetchEspnPlayerPoolCandidate();
+  const { state } = await getState();
+  const prepared = await preparePlayerPoolCandidate(state, candidate);
+  res.json({
+    candidate,
+    currentSnapshotId: prepared.currentSnapshot.id,
+    candidateSnapshotId: prepared.snapshotId,
+    fingerprint: prepared.fingerprint,
+    preview: prepared.preview,
+  });
+});
+
+/**
+ * POST /api/league/player-pool/preview — normalize a full ESPN pool and return
+ * its exact no-write diff against the active pool.
+ */
+router.post('/player-pool/preview', requireAuth, requireCommissioner, async (req, res) => {
+  let candidate;
+  try {
+    candidate = parsePlayerPoolCandidate(req.body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid player pool' });
+    return;
+  }
+  const { state } = await getState();
+  const prepared = await preparePlayerPoolCandidate(state, candidate);
+  res.json({
+    currentSnapshotId: prepared.currentSnapshot.id,
+    candidateSnapshotId: prepared.snapshotId,
+    fingerprint: prepared.fingerprint,
+    preview: prepared.preview,
+  });
+});
+
+/**
+ * POST /api/league/player-pool/accept — accept the exact candidate that was
+ * previewed. The store changes the active pointer only if the base is still
+ * current and the draft has not started.
+ */
+router.post('/player-pool/accept', requireAuth, requireCommissioner, async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof body.expectedCurrentSnapshotId !== 'string' || body.expectedCurrentSnapshotId === '') {
+    res.status(400).json({ error: 'expectedCurrentSnapshotId is required' });
+    return;
+  }
+  if (typeof body.fingerprint !== 'string' || body.fingerprint === '') {
+    res.status(400).json({ error: 'fingerprint is required' });
+    return;
+  }
+
+  let candidate;
+  try {
+    candidate = parsePlayerPoolCandidate(body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid player pool' });
+    return;
+  }
+
+  const { state } = await getState();
+  const prepared = await preparePlayerPoolCandidate(state, candidate);
+  if (body.expectedCurrentSnapshotId !== prepared.currentSnapshot.id) {
+    res.status(409).json({ error: 'The active player pool changed; preview again' });
+    return;
+  }
+  if (body.fingerprint !== prepared.fingerprint) {
+    res.status(409).json({ error: 'The candidate no longer matches the preview; preview again' });
+    return;
+  }
+  if (prepared.snapshotId === prepared.currentSnapshot.id) {
+    res.status(409).json({ error: 'The candidate already matches the active player pool' });
+    return;
+  }
+
+  const acceptedAt = new Date().toISOString();
+  const acceptedBy = res.locals.owner as string;
+  const snapshot = makePlayerPoolSnapshot(candidate, prepared, acceptedAt, acceptedBy);
+  const result = await acceptPlayerPoolSnapshot(
+    snapshot,
+    body.expectedCurrentSnapshotId,
+    FALLBACK_PLAYER_POOL.id,
+    acceptedAt,
+    acceptedBy,
+  );
+  await appendAudit(acceptedBy, 'player_pool.accepted', {
+    snapshotId: snapshot.id,
+    baseSnapshotId: snapshot.baseSnapshotId,
+    sourceSeason: snapshot.sourceSeason,
+    playerCount: snapshot.players.length,
+    added: prepared.preview.added.length,
+    removed: prepared.preview.removed.length,
+    retainedMissing: prepared.preview.retainedMissing.length,
+    nameChanged: prepared.preview.nameChanged.length,
+    teamChanged: prepared.preview.teamChanged.length,
+    positionChanged: prepared.preview.positionChanged.length,
+  });
+  res.json({
+    ...redactState(result, { owner: acceptedBy, isCommissioner: true }),
+    snapshot,
+  });
 });
 
 /**
@@ -269,23 +398,23 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const overallPick = body.overallPick;
   const playerKey = body.playerKey;
-  const playerName = body.playerName;
 
   if (typeof overallPick !== 'number' || !Number.isInteger(overallPick) || overallPick < 1) {
     res.status(400).json({ error: 'overallPick must be a positive integer' });
     return;
   }
   if (
-    typeof playerKey !== 'string' || playerKey.length === 0 ||
-    typeof playerName !== 'string' || playerName.length === 0
+    typeof playerKey !== 'string' || playerKey.length === 0
   ) {
-    res.status(400).json({ error: 'playerKey and playerName are required' });
+    res.status(400).json({ error: 'playerKey is required' });
     return;
   }
 
   const authedOwner = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
-  const player = leagueDataset.players.find((candidate) => candidate.key === playerKey);
+  const current = await getState();
+  const draftPoolDataset = await resolveDraftDataset(current.state);
+  const player = draftPoolDataset.players.find((candidate) => candidate.key === playerKey);
   if (!player) {
     res.status(400).json({ error: `Unknown player: ${playerKey}` });
     return;
@@ -295,7 +424,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     if (draft.draft.startedAt === null) {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
-    const dataset = applyOverrides(leagueDataset, draft.overrides);
+    const dataset = applyOverrides(draftPoolDataset, draft.overrides);
     const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
     if (!onClock) throw new HttpError(409, 'The draft is complete');
     if (onClock.pick.overall !== overallPick) {
@@ -310,6 +439,8 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     draft.draft.picks[String(overallPick)] = {
       playerKey: player.key,
       playerName: player.name,
+      proTeam: player.proTeam,
+      positions: player.positions,
       isKeeper: false,
       enteredBy: authedOwner,
       timestamp,
@@ -319,6 +450,8 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     overallPick,
     playerKey: player.key,
     playerName: player.name,
+    proTeam: player.proTeam,
+    positions: player.positions,
     isKeeper: false,
   });
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
@@ -356,7 +489,11 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
         throw new HttpError(409, `${team.owner}'s keeper choices must be fixed before the draft starts`);
       }
     }
-    if (draft.draft.startedAt === null) draft.draft.startedAt = new Date().toISOString();
+    if (draft.draft.startedAt === null) {
+      draft.draft.playerPoolSnapshotId =
+        draft.playerPool?.activeSnapshotId ?? FALLBACK_PLAYER_POOL.id;
+      draft.draft.startedAt = new Date().toISOString();
+    }
   });
   await appendAudit(res.locals.owner as string, 'draft.started', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
@@ -370,6 +507,7 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
   const result = await mutateState((draft) => {
     draft.draft.picks = {};
     draft.draft.startedAt = null;
+    draft.draft.playerPoolSnapshotId = null;
   });
   await appendAudit(res.locals.owner as string, 'draft.reset', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
@@ -517,6 +655,10 @@ router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;
+  if (err instanceof PlayerPoolAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });
     return;

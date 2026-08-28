@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 import { teamByOwner } from '../../lib/league/data.js';
-import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import { useApplyStateResponse, useDraftData, useIdentity } from '../../hooks/useLeague.js';
 import { apiErrorMessage, startDraft } from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
@@ -169,7 +169,7 @@ function PickRow({
 }
 
 export default function DraftPage() {
-  const { state, meta, dataset } = useLeagueData(true);
+  const { state, meta, dataset, playerPoolQuery } = useDraftData(true);
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const [view, setView] = useState<'list' | 'grid'>('list');
@@ -180,6 +180,7 @@ export default function DraftPage() {
   const [startError, setStartError] = useState<string | null>(null);
 
   const started = state.draft.startedAt !== null;
+  const poolReady = playerPoolQuery.isSuccess;
 
   const doStartDraft = async () => {
     if (!identity) return;
@@ -213,6 +214,7 @@ export default function DraftPage() {
       if (identity?.isCommissioner) setClearTarget(cell);
       return;
     }
+    if (!poolReady) return;
     if (!identity) {
       setShowSignIn(true);
       return;
@@ -225,6 +227,7 @@ export default function DraftPage() {
     if (!started) return false;
     if (cell.keeper) return false;
     if (cell.selection) return identity?.isCommissioner === true;
+    if (!poolReady) return false;
     if (!cell.onClock) return false;
     return !identity || identity.isCommissioner || identity.owner === cell.pick.currentOwner;
   };
@@ -394,6 +397,27 @@ export default function DraftPage() {
           }}
         >
           Keeper names are still hidden. The commissioner must reveal them before starting the draft.
+        </div>
+      )}
+
+      {started && !poolReady && (
+        <div
+          role="alert"
+          className="panel"
+          style={{
+            borderColor: playerPoolQuery.isError ? 'var(--neon-red)' : 'var(--neon-yellow)',
+            borderRadius: 10,
+            padding: '10px 14px',
+            marginBottom: 12,
+            color: playerPoolQuery.isError ? 'var(--neon-red)' : 'var(--neon-yellow)',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            textAlign: 'center',
+          }}
+        >
+          {playerPoolQuery.isError
+            ? `Player pool failed to load: ${apiErrorMessage(playerPoolQuery.error)}`
+            : 'Loading the locked player pool…'}
         </div>
       )}
 

@@ -1,6 +1,8 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import type { EspnLeagueResponse } from '../../types/index.js';
+import type { EspnPlayerPoolPlayer } from '../league/playerPool.js';
+import { NBA_TEAM_ABBREV } from './calculations.js';
 
 const ESPN_BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba';
 
@@ -12,6 +14,42 @@ interface EspnClientConfig {
   /** Optional: full cookie string override (e.g. copied from browser DevTools Network tab) */
   cookieOverride?: string;
 }
+
+interface EspnKonaPlayerEntry {
+  id: number;
+  player?: {
+    id?: number;
+    fullName?: string;
+    proTeamId?: number;
+    defaultPositionId?: number;
+    eligibleSlots?: number[];
+  };
+  fullName?: string;
+  proTeamId?: number;
+  defaultPositionId?: number;
+  eligibleSlots?: number[];
+}
+
+interface EspnKonaResponse {
+  scoringPeriodId: number;
+  players?: EspnKonaPlayerEntry[];
+}
+
+const ELIGIBLE_SLOT_POSITION: Record<number, string> = {
+  0: 'PG',
+  1: 'SG',
+  2: 'SF',
+  3: 'PF',
+  4: 'C',
+};
+
+const DEFAULT_POSITION: Record<number, string> = {
+  1: 'PG',
+  2: 'SG',
+  3: 'SF',
+  4: 'PF',
+  5: 'C',
+};
 
 export class EspnClient {
   private http: AxiosInstance;
@@ -140,5 +178,62 @@ export class EspnClient {
     });
 
     return data;
+  }
+
+  /** Fetch every active-player page without requesting stats. */
+  async fetchPlayerPool(): Promise<EspnPlayerPoolPlayer[]> {
+    const limit = 500;
+    const byId = new Map<number, EspnPlayerPoolPlayer>();
+
+    for (let page = 0; page < 10; page += 1) {
+      const offset = page * limit;
+      const { data } = await this.http.get<EspnKonaResponse>('', {
+        params: { view: 'kona_player_info', _: Date.now() },
+        headers: {
+          'x-fantasy-filter': JSON.stringify({
+            players: {
+              filterActive: { value: true },
+              limit,
+              offset,
+              sortPercOwned: { sortPriority: 1, sortAsc: false },
+            },
+          }),
+        },
+      });
+      const entries = data.players ?? [];
+      let added = 0;
+      for (const entry of entries) {
+        const raw = entry.player ?? entry;
+        const espnId = raw.id ?? entry.id;
+        const fullName = raw.fullName?.trim();
+        if (!Number.isInteger(espnId) || espnId <= 0 || !fullName) continue;
+        const positions = [...new Set(
+          (raw.eligibleSlots ?? [])
+            .map((slot) => ELIGIBLE_SLOT_POSITION[slot])
+            .filter((position): position is string => Boolean(position)),
+        )];
+        const fallbackPosition = raw.defaultPositionId
+          ? DEFAULT_POSITION[raw.defaultPositionId]
+          : undefined;
+        if (positions.length === 0 && fallbackPosition) positions.push(fallbackPosition);
+        if (positions.length === 0) continue;
+        const proTeamId = raw.proTeamId ?? 0;
+        const player: EspnPlayerPoolPlayer = {
+          espnId,
+          fullName,
+          proTeam: proTeamId === 0 ? 'FA' : (NBA_TEAM_ABBREV[proTeamId] ?? String(proTeamId)),
+          positions,
+        };
+        if (!byId.has(espnId)) added += 1;
+        byId.set(espnId, player);
+      }
+
+      if (entries.length < limit) return [...byId.values()];
+      if (added === 0) {
+        throw new Error(`ESPN player-pool pagination stalled at offset ${offset}`);
+      }
+    }
+
+    throw new Error('ESPN player pool exceeded 5,000 entries');
   }
 }

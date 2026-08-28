@@ -3,6 +3,7 @@ import test from 'node:test';
 import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
 import type { LeagueDataset } from '../src/lib/keeper/types.ts';
 import {
+  applyPlayerPoolToDataset,
   playerPoolFromDataset,
   previewPlayerPoolRefresh,
   type EspnPlayerPoolPlayer,
@@ -106,3 +107,32 @@ test('rejects duplicate ESPN IDs before producing a preview', () => {
   );
 });
 
+test('overlays draft metadata without changing keeper math and adds rookies', () => {
+  const seeded = playerPoolFromDataset(dataset.players);
+  const existing = dataset.players.find((player) => player.keeper.eligible);
+  assert.ok(existing?.espnId);
+  const pool = seeded
+    .filter((player) => player.key !== seeded.at(-1)?.key)
+    .map((player) => player.espnId === existing.espnId
+      ? { ...player, proTeam: 'NEW', positions: ['PG'] }
+      : player);
+  pool.push({
+    key: 'p99999999',
+    espnId: 99_999_999,
+    fullName: 'Test Rookie',
+    proTeam: 'FA',
+    positions: ['SG'],
+    sourceStatus: 'fetched',
+  });
+
+  const overlaid = applyPlayerPoolToDataset(dataset, pool);
+  const changed = overlaid.players.find((player) => player.espnId === existing.espnId);
+  const rookie = overlaid.players.find((player) => player.key === 'p99999999');
+  assert.equal(changed?.proTeam, 'NEW');
+  assert.deepEqual(changed?.keeper, existing.keeper);
+  assert.deepEqual(changed?.stats2026, existing.stats2026);
+  assert.equal(rookie?.name, 'T. Rookie');
+  assert.equal(rookie?.keeper.eligible, false);
+  assert.equal(rookie?.stats2026, null);
+  assert.equal(overlaid.players.length, pool.length);
+});

@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchLeagueState, verifyPin, type Credentials, type StateResponse } from '../lib/league/api.js';
+import {
+  fetchLeagueState,
+  fetchPlayerPool,
+  verifyPin,
+  type Credentials,
+  type StateResponse,
+} from '../lib/league/api.js';
 import { applyOverrides } from '../lib/keeper/engine.js';
 import { leagueDataset } from '../lib/league/data.js';
+import { applyPlayerPoolToDataset } from '../lib/league/playerPool.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
 
 const EMPTY_STATE: LeagueDynamicState = {
@@ -44,6 +51,26 @@ export function useLeagueData(fast = false) {
   const overrides = q.state.overrides;
   const dataset = useMemo(() => applyOverrides(leagueDataset, overrides), [overrides]);
   return { ...q, dataset };
+}
+
+/** Draft-only metadata layered over the keeper dataset from an immutable pool. */
+export function useDraftData(fast = false) {
+  const league = useLeagueData(fast);
+  const poolId = league.state.draft.playerPoolSnapshotId
+    ?? league.meta?.playerPool?.activeSnapshotId
+    ?? `dataset-${league.dataset.season}`;
+  const playerPoolQuery = useQuery({
+    queryKey: ['player-pool', poolId],
+    queryFn: () => fetchPlayerPool(),
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+  });
+  const players = playerPoolQuery.data?.snapshot.players;
+  const dataset = useMemo(
+    () => players ? applyPlayerPoolToDataset(league.dataset, players) : league.dataset,
+    [league.dataset, players],
+  );
+  return { ...league, dataset, playerPoolQuery };
 }
 
 /** Push a fresh state response (from a mutation) straight into the cache. */
