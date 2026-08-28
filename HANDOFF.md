@@ -49,7 +49,7 @@ Commissioner-only sandbox (Admin → 🧪): clones live state into localStorage;
 
 ## Verification baseline
 
-The current keeper/draft hardening batch has automated coverage in `tests/keeper-engine.test.ts` and `tests/league-api.test.ts`. Run all three before shipping:
+The current keeper/draft hardening batch has automated coverage in `tests/keeper-engine.test.ts`, `tests/league-api.test.ts`, and `tests/player-pool.test.ts`. Run all three checks before shipping:
 
 ```text
 npm test
@@ -57,7 +57,7 @@ npm run lint
 npm run build
 ```
 
-As of 2026-08-27: 10 tests pass, lint passes, and the production build passes. A local isolated browser check also passed for sign-in, Admin, test mode, the two-step draft start, player search/position filters, pick confirmation, and advancing the clock. The build still reports one non-blocking JavaScript chunk-size warning.
+As of 2026-08-27: 15 tests pass, lint passes, and the production build passes. A local isolated browser check also passed for sign-in, Admin, test mode, the two-step draft start, player search/position filters, pick confirmation, and advancing the clock. The build still reports one non-blocking JavaScript chunk-size warning.
 
 ## Future features (user's list)
 
@@ -76,6 +76,8 @@ Before draft day:
 Do not pull or show stats in the draft picker. Stats remain part of the keeper math only.
 
 Production cannot persist an accepted pool by writing a normal file from a Vercel Function. Store immutable accepted snapshots in Neon, keep the committed JSON as the fallback seed, and save the chosen snapshot ID into draft state when the draft starts.
+
+Foundation now present: `src/lib/league/playerPool.ts` seeds draft-only metadata from the committed dataset and builds a no-write refresh preview keyed by ESPN ID. It reports added, removed, renamed, team-changed, and position-changed players; keeps existing app keys stable; and retains protected players that ESPN omits. The next cut is snapshot persistence plus commissioner preview/accept routes. Do not wire a live ESPN refresh straight into the draft UI.
 
 ### 2. Add the admin-only 2026-27 schedule grid
 
