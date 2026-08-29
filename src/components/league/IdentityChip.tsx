@@ -50,7 +50,7 @@ export default function IdentityChip() {
         {identity ? (
           <>
             <span>{identity.owner}</span>
-            {identity.isCommissioner && <span title="Commissioner">👑</span>}
+            {identity.isCommissioner && <span title="Commish">👑</span>}
           </>
         ) : (
           <span>Who are you?</span>

@@ -59,10 +59,10 @@ export default function AdminPage() {
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
           <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>
-            COMMISSIONER ONLY
+            COMMISH ONLY
           </div>
           <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            Nice try. Sign in as the commissioner to tweak tiers and the cap.
+            Nice try. Sign in as the commish to tweak tiers and the cap.
           </div>
         </div>
       </div>
@@ -101,7 +101,7 @@ export default function AdminPage() {
           className="hub-heading glow-yellow"
           style={{ fontSize: '0.85rem', color: 'var(--neon-yellow)', margin: 0, lineHeight: 1.6 }}
         >
-          👑 COMMISSIONER ADMIN
+          👑 COMMISH MODE
         </h1>
         <IdentityChip />
       </div>
@@ -191,7 +191,7 @@ export default function AdminPage() {
           TEAM WORKSHEETS
         </div>
         <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', marginBottom: 10 }}>
-          Open any team as commissioner — you see their keepers, cap math and every rule check
+          Open any team in Commish Mode. You see their keepers, cap math, and every rule check
           (e.g. Dustin trying to keep SGA shows the EXPIRED block). You can edit on their behalf.
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -230,7 +230,7 @@ export default function AdminPage() {
           </span>
           <span style={{ color: 'var(--text-mid)', fontSize: '0.78rem' }}>
             {capOverridden
-              ? `commissioner override (computed: ${leagueDataset.cap})`
+              ? `commish override (computed: ${leagueDataset.cap})`
               : `computed: R3 max ${dataset.capRule.round3Max} + R3 min ${dataset.capRule.round3Min}`}
           </span>
         </div>

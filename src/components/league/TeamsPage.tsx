@@ -109,7 +109,7 @@ export default function TeamsPage() {
 
         {hiddenKeepers > 0 && (
           <div style={{ margin: '0 14px 10px', color: 'var(--neon-purple)', fontSize: '0.8rem', fontWeight: 700 }}>
-            🔒 {hiddenKeepers} keeper{hiddenKeepers > 1 ? 's' : ''} in. Names stay hidden until the commissioner reveals them.
+            🔒 {hiddenKeepers} keeper{hiddenKeepers > 1 ? 's' : ''} in. Names stay hidden until the commish reveals them.
           </div>
         )}
 

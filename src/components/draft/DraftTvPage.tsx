@@ -95,7 +95,7 @@ export default function DraftTvPage() {
                 }
               />
               <div style={{ color: 'var(--text-dim)', fontSize: 'clamp(0.65rem, 1.5vh, 0.9rem)' }}>
-                {meta ? formatDraftAt(meta.draftAt) : ''} · board goes live when the commissioner
+                {meta ? formatDraftAt(meta.draftAt) : ''} · board goes live when the commish
                 starts the draft
               </div>
             </>

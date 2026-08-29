@@ -349,7 +349,7 @@ export default function DraftPage() {
               <DraftCountdown targetIso={meta?.draftAt} size="1.9rem" />
             </div>
             <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
-              The board unlocks when the commissioner starts the draft.
+              The board unlocks when the commish starts the draft.
             </div>
             {identity?.isCommissioner && (
               <div style={{ marginTop: 12 }}>
@@ -458,7 +458,7 @@ export default function DraftPage() {
             textAlign: 'center',
           }}
         >
-          Keeper names are still hidden. The commissioner must reveal them before starting the draft.
+          Keeper names are still hidden. The commish must reveal them before starting the draft.
         </div>
       )}
 

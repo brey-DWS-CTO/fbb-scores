@@ -27,17 +27,17 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 
 1. **2026 averages are league-official, from screenshots** (`screenshot-stats-2026.json`) — the ESPN API's season splits include post-fantasy-season games and MUST NOT be used for tiers. Next year: build the season-freeze feature (snapshot averages when the fantasy season ends).
 2. **Tier algorithm** (validated 100% vs the 2026 worksheet): >25 GP players ranked by FPPG, decile = round; ≤25 GP → prior-year avg value-slotted; 0 GP → flat R3; cap = R3max+R3min (**77.8**).
-3. **Keeper secrecy until commissioner reveal** — enforced by server-side redaction in `GET /state` (own keepers always; everything for commissioner; counts for everyone). The commissioner controls `state.keepersRevealed` from Admin. Never expose full keepers in any new endpoint pre-reveal.
+3. **Keeper secrecy until commissioner reveal** — enforced by server-side redaction in `GET /state` (own keepers always; everything for commissioner; counts for everyone). The commissioner controls `state.keepersRevealed` from Commish Mode. Never expose full keepers in any new endpoint pre-reveal.
 4. **Draft static until START** — `draft.startedAt` set only by `POST /draft/start` (commissioner). On-clock = first cell neither drafted nor keeper-locked.
 5. Commissioner **overrides** (cap, per-player rounds) live in dynamic state; apply via `applyOverrides` — always consume the dataset through `useLeagueData()`.
 
 ## Auth / PINs
 
-`x-owner` + `x-pin` headers. PIN states in the `pins` table: `''` = unclaimed (owner self-sets via NEW-badge claim flow), `T:1234` = temporary (login works but forces a change), plain = permanent. Brey = commissioner (config-driven, `league-2027-config.json`), PIN **5624**. Admin: `/admin` → VIEW PINS, or `scripts/admin-pins.ts` with prod `DATABASE_URL`.
+`x-owner` + `x-pin` headers. PIN states in the `pins` table: `''` = unclaimed (owner self-sets via NEW-badge claim flow), `T:1234` = temporary (login works but forces a change), plain = permanent. Brey = commissioner (config-driven, `league-2027-config.json`), PIN **5624**. Commish Mode: `/admin` → VIEW PINS, or `scripts/admin-pins.ts` with prod `DATABASE_URL`.
 
 ## Test mode
 
-Commissioner-only sandbox (Admin → 🧪): clones live state into localStorage; all keeper/draft reads+writes branch in `src/lib/league/api.ts`; secrecy off; yellow banner (chip on TV). Server never touched. EXIT & DISCARD wipes it.
+Commissioner-only sandbox (Commish Mode → 🧪): clones live state into localStorage; all keeper/draft reads+writes branch in `src/lib/league/api.ts`; secrecy off; yellow banner (chip on TV). Server never touched. EXIT & DISCARD wipes it.
 
 ## Urgent next: private keeper scenarios for every member
 
@@ -101,13 +101,13 @@ Production cannot persist an accepted pool by writing a normal file from a Verce
 
 Foundation now present: `src/lib/league/playerPool.ts` seeds draft-only metadata from the committed dataset and builds a no-write refresh preview keyed by ESPN ID. It reports added, removed, renamed, team-changed, and position-changed players; keeps existing app keys stable; and retains protected players that ESPN omits.
 
-Immutable snapshot storage, commissioner API routes, and the Admin preview/accept panel are present. Neon uses `player_pool_snapshots`; local development mirrors snapshots in `.data/league-state.json`. The server fetches every active `kona_player_info` page, then validates and previews the full 2027 pool without writing. Acceptance requires the preview fingerprint and current base ID, moves only the active pointer, and fails if the draft has started or the base changed. Draft start pins the active snapshot ID. General Neon state mutations use compare-and-swap retries, and the file backend serializes writes to prevent lost updates.
+Immutable snapshot storage, commissioner API routes, and the Commish Mode preview/accept panel are present. Neon uses `player_pool_snapshots`; local development mirrors snapshots in `.data/league-state.json`. The server fetches every active `kona_player_info` page, then validates and previews the full 2027 pool without writing. Acceptance requires the preview fingerprint and current base ID, moves only the active pointer, and fails if the draft has started or the base changed. Draft start pins the active snapshot ID. General Neon state mutations use compare-and-swap retries, and the file backend serializes writes to prevent lost updates.
 
 The public player-pool endpoint resolves the active snapshot before the draft and the pinned snapshot after it starts. The draft picker and server pick validation both use that pool, while keeper averages, tiers, contracts, and cap math stay on the committed dataset. The server ignores client-supplied names and stores canonical name, team, and position data from the snapshot. New rookies can be drafted; removed unprotected players cannot. The picker fails closed if the locked pool cannot load.
 
-Before the first live refresh, set production `ESPN_SEASON_ID=2027` and confirm the ESPN cookies still work. The Admin panel will refuse a wrong season, a truncated pool, unknown position codes, duplicate IDs, or a post-start change.
+Before the first live refresh, set production `ESPN_SEASON_ID=2027` and confirm the ESPN cookies still work. The Commish Mode panel will refuse a wrong season, a truncated pool, unknown position codes, duplicate IDs, or a post-start change.
 
-### 2. Add the admin-only 2026-27 schedule grid
+### 2. Add the Commish-only 2026-27 schedule grid
 
 Reference workbook: `Nerds League Keeper Worksheet 2027 v1.xlsx`, especially `Schedule Grid!A1:AK32`. Reference source: <https://basketballmonster.com/ScheduleGrid.aspx>. Basketball Monster currently assigns 82 game slots to each team across 25 calendar weeks. Keep the snapshot provisional until the NBA Cup schedule settles because weekly placement can still change.
 
@@ -124,7 +124,7 @@ Store explicit period dates and phase metadata. Do not infer the All-Star rule f
 
 The workbook's bottom summary omits Play-In 1 and total Play-In games; the app must correct that. Its game-cap formula also hardcodes 100 league games, a 30-game normal cap, and a 133-game threshold. Make any retained values named league settings.
 
-Foundation now present: `src/data/source/basketball-monster-schedule-2027.json` records the live 25-week grid and its source time. `src/lib/league/schedule.ts` validates 30 unique teams, aliases, dates, row parity, and 82 games per team, then maps the first 23 NBA calendar weeks into 22 fantasy periods. It uses ESPN NBA team IDs and leaves NBA weeks 24-25 unused after the league's March 28 end date. The Admin page shows the wide period grid and a postseason summary with each Play-In week, Play-In total, all four playoff weeks, both round totals, playoff total, and combined postseason total. Tests cover the All-Star move, date bounds, aliases, source failures, mapping overlap, and representative team totals.
+Foundation now present: `src/data/source/basketball-monster-schedule-2027.json` records the live 25-week grid and its source time. `src/lib/league/schedule.ts` validates 30 unique teams, aliases, dates, row parity, and 82 games per team, then maps the first 23 NBA calendar weeks into 22 fantasy periods. It uses ESPN NBA team IDs and leaves NBA weeks 24-25 unused after the league's March 28 end date. Commish Mode shows the wide period grid and a postseason summary with each Play-In week, Play-In total, all four playoff weeks, both round totals, playoff total, and combined postseason total. Tests cover the All-Star move, date bounds, aliases, source failures, mapping overlap, and representative team totals.
 
 Next cut: fetch and parse a candidate grid server-side, show source and mapping diffs, then accept an immutable schedule snapshot in Neon. The commissioner must be able to edit the fantasy-period mapping before acceptance. Do not make the current committed fixture mutable in place.
 

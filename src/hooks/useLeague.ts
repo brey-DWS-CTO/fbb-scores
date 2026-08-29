@@ -130,7 +130,7 @@ export function useIdentity() {
     pin: string,
   ): Promise<{ ok: boolean; error?: string; mustChangePin?: boolean }> => {
     const res = await verifyPin({ owner, pin });
-    if (!res.ok) return { ok: false, error: 'Wrong PIN. Ask the commissioner if you lost yours.' };
+    if (!res.ok) return { ok: false, error: 'Wrong PIN. Ask the commish if you lost yours.' };
     // Temporary PIN: valid, but the caller must run the change-PIN step first
     if (res.mustChangePin) return { ok: false, mustChangePin: true };
     const id: Identity = { owner, pin, isCommissioner: res.isCommissioner };

@@ -467,7 +467,7 @@ export default function TeamKeeperPage() {
                 paddingRight: 12,
               }}
             >
-              ← ADMIN
+              ← COMMISH
             </Link>
           )}
           <h1
@@ -548,7 +548,7 @@ export default function TeamKeeperPage() {
                 }}
                 style={{ minHeight: 42, padding: '0 13px', border: '2px solid var(--neon-yellow)', borderRadius: 8, background: 'transparent', color: 'var(--neon-yellow)', fontWeight: 800, fontSize: '0.68rem' }}
               >
-                EDIT REAL AS COMMISSIONER
+                EDIT REAL AS COMMISH
               </button>
             )}
           </div>
@@ -566,7 +566,7 @@ export default function TeamKeeperPage() {
       {locked && !isCommish && !projectionMode && <LockBanner />}
       {locked && isCommish && (
         <div style={{ color: 'var(--neon-yellow)', fontSize: '0.75rem', marginBottom: 12 }}>
-          🔒 Keepers are locked league-wide — commissioner override lets you still edit.
+          🔒 Keepers are locked league-wide. Commish override lets you still edit.
         </div>
       )}
       {!identity && (
@@ -591,7 +591,7 @@ export default function TeamKeeperPage() {
       )}
       {identity && !canEdit && !locked && (
         <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem', marginBottom: 12 }}>
-          Browsing {owner}'s keeper options. Their saved choices stay private until the commissioner reveals them.
+          Browsing {owner}'s keeper options. Their saved choices stay private until the commish reveals them.
         </div>
       )}
       {!canEdit &&
@@ -611,7 +611,7 @@ export default function TeamKeeperPage() {
             }}
           >
             🔒 {owner} has submitted {hiddenSelectionCount} keeper
-            {hiddenSelectionCount > 1 ? 's' : ''}. Names stay hidden until the commissioner reveals them.
+            {hiddenSelectionCount > 1 ? 's' : ''}. Names stay hidden until the commish reveals them.
           </div>
         )}
 
@@ -859,7 +859,7 @@ export default function TeamKeeperPage() {
         </div>
         {meta && !meta.revealed && (
           <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', marginBottom: 10 }}>
-            🕵️ Saved keeper names stay private until the commissioner reveals them.
+            🕵️ Saved keeper names stay private until the commish reveals them.
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>

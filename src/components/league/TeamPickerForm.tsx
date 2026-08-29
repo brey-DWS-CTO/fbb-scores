@@ -182,7 +182,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
       )}
       <div style={{ color: 'var(--text-dim)', marginTop: 10, fontSize: '0.75rem' }}>
         {isFirstTime
-          ? 'Your keeper names stay secret until the commissioner reveals them.'
+          ? 'Your keeper names stay secret until the commish reveals them.'
           : 'Forgot your PIN? Yell at Brey in the group chat and he can reset it.'}
       </div>
     </div>

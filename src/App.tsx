@@ -35,7 +35,7 @@ function App() {
             textDecoration: 'none',
           }}
         >
-          🧪 TEST MODE — sandbox only, nothing is saved · tap to exit in Admin
+          🧪 TEST MODE — sandbox only, nothing is saved · tap to exit in Commish Mode
         </Link>
       )}
       <Routes>

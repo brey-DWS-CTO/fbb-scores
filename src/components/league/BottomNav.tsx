@@ -11,7 +11,7 @@ const TABS = [
 export default function BottomNav() {
   const { identity } = useIdentity();
   const tabs = identity?.isCommissioner
-    ? [...TABS, { to: '/admin', label: 'ADMIN', icon: '👑' }]
+    ? [...TABS, { to: '/admin', label: 'COMMISH', icon: '👑' }]
     : TABS;
 
   return (

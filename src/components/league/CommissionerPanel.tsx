@@ -90,7 +90,7 @@ export default function CommissionerPanel() {
   return (
     <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
       <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)', marginBottom: 12 }}>
-        COMMISSIONER CONTROLS
+        COMMISH CONTROLS
       </div>
 
       {/* Lock toggle */}
