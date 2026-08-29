@@ -1,6 +1,6 @@
 # HANDOFF — The Nerds Draft Hub
 
-_State as of 2026-08-28. For anyone (human or AI) picking this up._
+_State as of 2026-08-29. For anyone (human or AI) picking this up._
 
 ## What this is
 
@@ -39,6 +39,28 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 
 Commissioner-only sandbox (Admin → 🧪): clones live state into localStorage; all keeper/draft reads+writes branch in `src/lib/league/api.ts`; secrecy off; yellow banner (chip on TV). Server never touched. EXIT & DISCARD wipes it.
 
+## Urgent next: private keeper scenarios for every member
+
+The current cross-team worksheet says only “Browsing Kyle's keeper options” in small text. That is too easy to miss. Build this as a first-class scenario mode, not as permission to edit another owner's real keeper state.
+
+Required behavior:
+
+1. When a member opens another team's keeper page, show a clear sticky banner near the top. It must name the viewed owner, say that edits are private projections, and stay visible while scrolling until the member taps an X to dismiss it for that browsing session.
+2. Add a large, obvious `BACK TO MY KEEPERS` button. It should return to `/keepers/{signed-in owner}` without relying on the bottom navigation.
+3. Every signed-in member can choose up to two projected or fake keepers for every other team. Save those picks under the viewing member's own private scenario state, never under the target owner's real keeper submission.
+4. The member must be able to open the draft board and see how it would look with their full projected keeper set applied. Scenario keepers must use the normal keeper engine for cap, contracts, pick costs, traded picks, and same-tier bumps.
+5. Make projected keepers impossible to confuse with real keepers on the worksheet and draft board. Use a clear `PROJECTED` label plus a distinct style such as dashed borders and lower contrast. Do not rely on color alone.
+6. Keep real keeper secrecy intact. Before reveal, another member's saved real choices remain hidden even if that member has made projections for the same team.
+7. When the commissioner reveals the real keepers, the revealed real choices become authoritative and overwrite or clear every member's projection for those teams. The draft board must then show real keepers only.
+8. Scenario state needs its own API/store model keyed by `(season, viewer owner, target owner)`. Do not put these projections in `state.keepers`, the audit trail for real submissions, or the commissioner-only sandbox. A member may keep several target-team projections in one personal scenario so the draft-board preview can apply them together.
+9. Provide a clear way to reset one projected team and to clear the viewer's whole scenario. Neither action may touch real keeper submissions.
+
+Server auth must enforce that a member can read and write only their own scenario records. The commissioner may inspect scenarios only if the product later adds an explicit support tool; commissioner status must not make private projections public by default.
+
+Client first cut now works: each browser stores a versioned scenario by season and signed-in viewer, cross-team worksheets show a sticky private-projection banner and back button, one team or the whole scenario can be reset, projected keeper cards and draft cells use dashed borders plus explicit labels, and revealed keepers suppress and clear the local scenario. The normal keeper engine places those picks on the private mock board, including traded-pick costs. It also prevents one projected player from occupying two teams in the same scenario.
+
+This is not the final storage model. Browser storage does not sync across a member's devices and the server cannot enforce viewer-only access. Move the same UI to the required API/store key `(season, viewer owner, target owner)` before calling the feature complete. Keep the browser layer only as a short-lived migration fallback, then remove it.
+
 ## Known quirks / gotchas
 
 - Vite dev + devtools network throttling = HMR reload loops. Use **localhost:3001** (serves last `npm run build`, no HMR) or prod for devtools work.
@@ -57,7 +79,7 @@ npm run lint
 npm run build
 ```
 
-As of 2026-08-28: 22 tests pass, lint passes, and the production build passes. Local isolated browser checks passed for sign-in, Admin, test mode, the two-step draft start, player search/position filters, pick confirmation, advancing the clock, the player-pool panel, the immutable fallback fetch, and direct `/draft` loading on Windows. The build still reports one non-blocking JavaScript chunk-size warning.
+As of 2026-08-29: 35 tests pass, lint passes, and the production build passes. Local isolated browser checks also pass for the sticky mobile projection banner, back-to-my-keepers action, projected keeper save and reload, correct traded-pick placement on the private mock board, and clear projected labels. The build still reports one non-blocking JavaScript chunk-size warning.
 
 ## Future features (user's list)
 
@@ -83,11 +105,11 @@ Immutable snapshot storage, commissioner API routes, and the Admin preview/accep
 
 The public player-pool endpoint resolves the active snapshot before the draft and the pinned snapshot after it starts. The draft picker and server pick validation both use that pool, while keeper averages, tiers, contracts, and cap math stay on the committed dataset. The server ignores client-supplied names and stores canonical name, team, and position data from the snapshot. New rookies can be drafted; removed unprotected players cannot. The picker fails closed if the locked pool cannot load.
 
-Before the first live refresh, set production `ESPN_SEASON_ID=2027` and confirm the ESPN cookies still work. The Admin panel will refuse a wrong season, a truncated pool, unknown position codes, duplicate IDs, or a post-start change. The next major cut is the schedule snapshot and admin-only grid below.
+Before the first live refresh, set production `ESPN_SEASON_ID=2027` and confirm the ESPN cookies still work. The Admin panel will refuse a wrong season, a truncated pool, unknown position codes, duplicate IDs, or a post-start change.
 
 ### 2. Add the admin-only 2026-27 schedule grid
 
-Reference workbook: `Nerds League Keeper Worksheet 2027 v1.xlsx`, especially `Schedule Grid!A1:AK32`. Reference source: <https://basketballmonster.com/ScheduleGrid.aspx>. The official 2026-27 NBA schedule is live, but only 80 games per team have fixed opponents and dates until the NBA Cup fills the other two.
+Reference workbook: `Nerds League Keeper Worksheet 2027 v1.xlsx`, especially `Schedule Grid!A1:AK32`. Reference source: <https://basketballmonster.com/ScheduleGrid.aspx>. Basketball Monster currently assigns 82 game slots to each team across 25 calendar weeks. Keep the snapshot provisional until the NBA Cup schedule settles because weekly placement can still change.
 
 Build this as a separate accepted schedule snapshot in Neon, not as part of the keeper dataset. Use NBA team IDs internally. The commissioner flow should fetch or paste a candidate grid, map dates into league periods, show a diff, validate all 30 teams, and accept an immutable snapshot with source and fetch times.
 
@@ -96,11 +118,15 @@ Store explicit period dates and phase metadata. Do not infer the All-Star rule f
 - Regular season: league weeks 1-16.
 - Play-In: league weeks 17-18.
 - Playoffs: two two-week rounds, league weeks 19-22.
-- The first Play-In period spans two NBA calendar weeks across the All-Star break and must carry `combinesAllStarBreak: true`.
+- Play-In 1 is February 8-14. Play-In 2 spans February 15-28 across the February 19-24 All-Star break and must carry `combinesAllStarBreak: true`.
 - Derived schedule output must include each Play-In week, total Play-In games, each playoff week, each playoff round, total playoff games, and combined Play-In plus playoff games by NBA team.
 - Later projections inherit those counts through each player's NBA team ID and can sum them for a fantasy roster.
 
 The workbook's bottom summary omits Play-In 1 and total Play-In games; the app must correct that. Its game-cap formula also hardcodes 100 league games, a 30-game normal cap, and a 133-game threshold. Make any retained values named league settings.
+
+Foundation now present: `src/data/source/basketball-monster-schedule-2027.json` records the live 25-week grid and its source time. `src/lib/league/schedule.ts` validates 30 unique teams, aliases, dates, row parity, and 82 games per team, then maps the first 23 NBA calendar weeks into 22 fantasy periods. It uses ESPN NBA team IDs and leaves NBA weeks 24-25 unused after the league's March 28 end date. The Admin page shows the wide period grid and a postseason summary with each Play-In week, Play-In total, all four playoff weeks, both round totals, playoff total, and combined postseason total. Tests cover the All-Star move, date bounds, aliases, source failures, mapping overlap, and representative team totals.
+
+Next cut: fetch and parse a candidate grid server-side, show source and mapping diffs, then accept an immutable schedule snapshot in Neon. The commissioner must be able to edit the fantasy-period mapping before acceptance. Do not make the current committed fixture mutable in place.
 
 ### 3. Build the rulebook as versioned league data
 

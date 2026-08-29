@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
@@ -6,6 +6,13 @@ import { teamByOwner } from '../../lib/league/data.js';
 import { useApplyStateResponse, useDraftData, useIdentity } from '../../hooks/useLeague.js';
 import { apiErrorMessage, startDraft } from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
+import {
+  clearKeeperScenario,
+  projectedPlayerKeys,
+  readKeeperScenario,
+  stateWithKeeperScenario,
+  type KeeperScenario,
+} from '../../lib/league/keeperScenario.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import IdentityChip from '../league/IdentityChip.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
@@ -41,10 +48,12 @@ function PosChip({ positions }: { positions: string[] }) {
 
 function PickRow({
   cell,
+  projected,
   tappable,
   onTap,
 }: {
   cell: BoardCell;
+  projected: boolean;
   tappable: boolean;
   onTap: (cell: BoardCell) => void;
 }) {
@@ -81,6 +90,8 @@ function PickRow({
             : 'transparent',
         outline: cell.onClock ? '2px solid var(--neon-teal)' : undefined,
         outlineOffset: cell.onClock ? -2 : undefined,
+        border: projected ? '1px dashed var(--neon-purple)' : undefined,
+        opacity: projected ? 0.78 : 1,
         cursor: tappable ? 'pointer' : 'default',
       }}
     >
@@ -142,7 +153,7 @@ function PickRow({
                 fontWeight: 700,
               }}
             >
-              KEEPER · R{d.keeperRound ?? '?'}
+              {projected ? 'PROJECTED' : 'KEEPER'} · R{d.keeperRound ?? '?'}
             </span>
           </div>
         ) : d ? (
@@ -171,6 +182,7 @@ function PickRow({
 export default function DraftPage() {
   const { state, meta, dataset, playerPoolQuery } = useDraftData(true);
   const { identity } = useIdentity();
+  const viewerOwner = identity?.owner ?? null;
   const applyState = useApplyStateResponse();
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [pickTarget, setPickTarget] = useState<BoardCell | null>(null);
@@ -181,6 +193,28 @@ export default function DraftPage() {
 
   const started = state.draft.startedAt !== null;
   const poolReady = playerPoolQuery.isSuccess;
+  const scenarioKey = viewerOwner && !started && meta?.revealed !== true
+    ? `${state.season}:${viewerOwner}`
+    : '';
+  const [scenarioState, setScenarioState] = useState<{ key: string; value: KeeperScenario }>(() => ({
+    key: scenarioKey,
+    value: scenarioKey && viewerOwner ? readKeeperScenario(viewerOwner, state.season) : {},
+  }));
+  const scenario = useMemo(() => {
+    if (!scenarioKey || !viewerOwner) return {};
+    if (scenarioState.key === scenarioKey) return scenarioState.value;
+    return readKeeperScenario(viewerOwner, state.season);
+  }, [scenarioKey, scenarioState, state.season, viewerOwner]);
+  const scenarioActive = Object.keys(scenario).length > 0;
+  const projectedKeys = useMemo(() => projectedPlayerKeys(scenario), [scenario]);
+  const boardState = useMemo(
+    () => scenarioActive ? stateWithKeeperScenario(state, scenario) : state,
+    [scenario, scenarioActive, state],
+  );
+
+  useEffect(() => {
+    if (viewerOwner && meta?.revealed) clearKeeperScenario(viewerOwner, state.season);
+  }, [meta?.revealed, state.season, viewerOwner]);
 
   const doStartDraft = async () => {
     if (!identity) return;
@@ -192,8 +226,8 @@ export default function DraftPage() {
     }
   };
 
-  const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
-  const pool = useMemo(() => availablePlayers(dataset, state), [state, dataset]);
+  const board = useMemo(() => buildDraftBoard(dataset, boardState), [boardState, dataset]);
+  const pool = useMemo(() => availablePlayers(dataset, boardState), [boardState, dataset]);
   const recent = useMemo(() => recentPicks(board, 5), [board]);
 
   const onClockIdx = board.findIndex((c) => c.onClock);
@@ -264,6 +298,34 @@ export default function DraftPage() {
       </div>
 
       {/* ON THE CLOCK hero */}
+      {scenarioActive && (
+        <div
+          className="panel"
+          style={{
+            border: '2px dashed var(--neon-purple)',
+            borderRadius: 10,
+            padding: '10px 12px',
+            marginBottom: 12,
+            color: 'var(--neon-purple)',
+          }}
+        >
+          <div className="hub-heading" style={{ fontSize: '0.68rem' }}>PRIVATE MOCK BOARD</div>
+          <div style={{ color: 'var(--text-body)', fontSize: '0.75rem', marginTop: 4 }}>
+            Your projected keepers are applied below. Dashed, dimmed cells are projections, not league picks.
+          </div>
+          <button
+            className="tap-btn"
+            type="button"
+            onClick={() => {
+              clearKeeperScenario(identity!.owner, state.season);
+              setScenarioState({ key: scenarioKey, value: {} });
+            }}
+            style={{ minHeight: 40, marginTop: 9, padding: '0 12px', border: '1px solid var(--neon-purple)', borderRadius: 8, background: 'transparent', color: 'var(--neon-purple)', fontWeight: 800, fontSize: '0.68rem' }}
+          >
+            CLEAR MY WHOLE SCENARIO
+          </button>
+        </div>
+      )}
       <div
         className={`panel ${onClock ? 'pulse-glow' : ''}`}
         style={{
@@ -525,6 +587,7 @@ export default function DraftPage() {
                   <PickRow
                     key={cell.pick.overall}
                     cell={cell}
+                    projected={!!cell.keeper && projectedKeys.has(cell.keeper.selection.playerKey)}
                     tappable={isTappable(cell)}
                     onTap={onCellTap}
                   />
@@ -534,7 +597,7 @@ export default function DraftPage() {
         ))
       ) : (
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 8 }}>
-          <BoardGrid board={board} />
+          <BoardGrid board={board} projectedKeeperKeys={projectedKeys} />
         </div>
       )}
 

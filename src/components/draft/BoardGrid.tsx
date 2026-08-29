@@ -7,9 +7,12 @@ import { cellDisplay, positionTheme } from './boardUtils.js';
 
 interface Props {
   board: BoardCell[];
+  projectedKeeperKeys?: ReadonlySet<string>;
   /** TV mode: fill the parent's height exactly (rows 1fr), viewport-scaled fonts. */
   tv?: boolean;
 }
+
+const NO_PROJECTED_KEEPERS: ReadonlySet<string> = new Set();
 
 interface TradeTip {
   cell: BoardCell;
@@ -79,7 +82,7 @@ function TradeTooltip({ tip }: { tip: TradeTip }) {
  * The classic wall board: 10 team columns (draft order) x 14 round rows,
  * with an owner header row and a round-number rail.
  */
-export default function BoardGrid({ board, tv = false }: Props) {
+export default function BoardGrid({ board, projectedKeeperKeys = NO_PROJECTED_KEEPERS, tv = false }: Props) {
   const [tip, setTip] = useState<TradeTip | null>(null);
 
   const cellMap = useMemo(() => {
@@ -147,6 +150,7 @@ export default function BoardGrid({ board, tv = false }: Props) {
             <GridCell
               key={o}
               cell={cellMap.get(`${r}:${o}`)}
+              projectedKeeperKeys={projectedKeeperKeys}
               tv={tv}
               onTradeShow={(cell, x, y) => setTip({ cell, x, y })}
               onTradeHide={() => setTip(null)}
@@ -162,12 +166,14 @@ export default function BoardGrid({ board, tv = false }: Props) {
 
 function GridCell({
   cell,
+  projectedKeeperKeys,
   tv,
   onTradeShow,
   onTradeHide,
   tipShownFor,
 }: {
   cell?: BoardCell;
+  projectedKeeperKeys: ReadonlySet<string>;
   tv: boolean;
   onTradeShow: (cell: BoardCell, x: number, y: number) => void;
   onTradeHide: () => void;
@@ -177,6 +183,7 @@ function GridCell({
   const d = cellDisplay(cell);
   const theme = positionTheme(d?.positions);
   const traded = cell.pick.viaTradeFrom;
+  const projected = !!cell.keeper && projectedKeeperKeys.has(cell.keeper.selection.playerKey);
 
   const style: CSSProperties = {
     position: 'relative',
@@ -188,12 +195,13 @@ function GridCell({
     flexDirection: 'column',
     justifyContent: 'center',
     overflow: 'hidden',
-    border: `1px solid ${d ? theme.border : 'var(--cell-border)'}`,
+    border: `${projected ? '2px dashed' : '1px solid'} ${projected ? 'var(--neon-purple)' : d ? theme.border : 'var(--cell-border)'}`,
     background: d
       ? `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`
       : 'var(--cell-bg)',
     // position accent as an inset bar (avoids border shorthand/longhand mixing)
     boxShadow: d ? `inset 3px 0 0 ${d.color}` : undefined,
+    opacity: projected ? 0.72 : 1,
   };
   if (cell.onClock) {
     style.outline = '2px solid var(--neon-teal)';
@@ -271,6 +279,11 @@ function GridCell({
           >
             {d.name}
           </span>
+          {projected && (
+            <span style={{ color: 'var(--neon-purple)', fontWeight: 800, fontSize: tv ? 'clamp(7px, 0.65vw, 10px)' : '0.52rem' }}>
+              PROJECTED
+            </span>
+          )}
           <span
             style={{
               color: d.color,

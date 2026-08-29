@@ -5,6 +5,11 @@ import { keeperCandidateError, pickLabel, resolveTeamKeepers } from '../../lib/k
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { apiErrorMessage, saveKeepers } from '../../lib/league/api.js';
 import { fmt1 } from '../../lib/league/format.js';
+import {
+  clearKeeperScenario,
+  readKeeperScenario,
+  saveProjectedKeepers,
+} from '../../lib/league/keeperScenario.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import IdentityChip from '../league/IdentityChip.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
@@ -110,10 +115,12 @@ function RosterRow({
 function KeeperCard({
   k,
   canEdit,
+  projected = false,
   onRemove,
 }: {
   k: ResolvedKeeper;
   canEdit: boolean;
+  projected?: boolean;
   onRemove: () => void;
 }) {
   const p = k.player;
@@ -124,9 +131,19 @@ function KeeperCard({
       style={{
         padding: '12px 14px',
         borderRadius: 10,
-        borderColor: k.errors.length > 0 ? 'var(--neon-red)' : 'var(--panel-border)',
+        borderStyle: projected ? 'dashed' : 'solid',
+        borderColor: k.errors.length > 0 ? 'var(--neon-red)' : projected ? 'var(--neon-purple)' : 'var(--panel-border)',
+        opacity: projected ? 0.82 : 1,
       }}
     >
+      {projected && (
+        <div
+          className="hub-heading"
+          style={{ color: 'var(--neon-purple)', fontSize: '0.58rem', marginBottom: 7 }}
+        >
+          PROJECTED · PRIVATE TO YOU
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-max)' }}>{name}</div>
@@ -246,9 +263,18 @@ export default function TeamKeeperPage() {
 
   const { state, isLoading, meta, dataset } = useLeagueData();
   const { identity } = useIdentity();
+  const viewerOwner = identity?.owner ?? null;
   const applyState = useApplyStateResponse();
 
   const serverSelections = useMemo(() => state.keepers[owner] ?? [], [state.keepers, owner]);
+  const isCommish = identity?.isCommissioner ?? false;
+  const [commissionerRealEdit, setCommissionerRealEdit] = useState(false);
+  const projectionMode = !!identity
+    && identity.owner !== owner
+    && meta?.revealed !== true
+    && (!isCommish || !commissionerRealEdit);
+  const [projectedSelections, setProjectedSelections] = useState<KeeperSelection[]>([]);
+  const [browseBannerOpen, setBrowseBannerOpen] = useState(true);
 
   // null = mirror the server; non-null = local unsaved edits (dirty)
   const [draftSel, setDraftSel] = useState<KeeperSelection[] | null>(null);
@@ -264,12 +290,28 @@ export default function TeamKeeperPage() {
     setDraftSel(null);
     setSaveError(null);
     setLeaguePool(false);
-  }, [owner]);
+    setBrowseBannerOpen(true);
+    setCommissionerRealEdit(false);
+    setProjectedSelections(
+      viewerOwner && viewerOwner !== owner
+        ? (readKeeperScenario(viewerOwner, state.season)[owner] ?? [])
+        : [],
+    );
+  }, [owner, state.season, viewerOwner]);
+
+  useEffect(() => {
+    if (viewerOwner && meta?.revealed) {
+      clearKeeperScenario(viewerOwner, state.season);
+      setProjectedSelections([]);
+      setDraftSel(null);
+    }
+  }, [meta?.revealed, state.season, viewerOwner]);
 
   // Local edits that exactly match the server are no longer "unsaved"
   useEffect(() => {
-    if (draftSel !== null && selKey(draftSel) === selKey(serverSelections)) setDraftSel(null);
-  }, [draftSel, serverSelections]);
+    const savedSelections = projectionMode ? projectedSelections : serverSelections;
+    if (draftSel !== null && selKey(draftSel) === selKey(savedSelections)) setDraftSel(null);
+  }, [draftSel, projectedSelections, projectionMode, serverSelections]);
 
   useEffect(
     () => () => {
@@ -278,17 +320,19 @@ export default function TeamKeeperPage() {
     [],
   );
 
-  const selections = draftSel ?? serverSelections;
+  const savedSelections = projectionMode ? projectedSelections : serverSelections;
+  const selections = draftSel ?? savedSelections;
   const dirty = draftSel !== null;
 
   const locked = state.locks.keepersLocked;
-  const isCommish = identity?.isCommissioner ?? false;
-  const canEdit = !!identity && (identity.owner === owner || isCommish) && (!locked || isCommish);
+  const canEdit = !!identity && (
+    projectionMode || ((identity.owner === owner || isCommish) && (!locked || isCommish))
+  );
   const hiddenSelectionCount =
     !canEdit && meta && !meta.revealed && serverSelections.length === 0
       ? (meta.keeperStatus[owner] ?? 0)
       : 0;
-  const selectionsHidden = hiddenSelectionCount > 0;
+  const selectionsHidden = !projectionMode && hiddenSelectionCount > 0;
 
   // Every derived number comes from the engine, recomputed each render
   const result = useMemo(() => resolveTeamKeepers(dataset, owner, selections), [owner, selections, dataset]);
@@ -345,6 +389,15 @@ export default function TeamKeeperPage() {
     setSaving(true);
     setSaveError(null);
     try {
+      if (projectionMode) {
+        const scenario = saveProjectedKeepers(identity.owner, owner, selections, state.season);
+        setProjectedSelections(scenario[owner] ?? []);
+        setDraftSel(null);
+        setFlash(true);
+        if (flashTimer.current) window.clearTimeout(flashTimer.current);
+        flashTimer.current = window.setTimeout(() => setFlash(false), 2500);
+        return;
+      }
       const res = await saveKeepers(identity, owner, selections);
       applyState(res);
       setDraftSel(null);
@@ -431,7 +484,86 @@ export default function TeamKeeperPage() {
       </div>
 
       {/* ── Access banners ─────────────────────────────────────── */}
-      {locked && !isCommish && <LockBanner />}
+      {projectionMode && browseBannerOpen && (
+        <div
+          className="panel"
+          style={{
+            position: 'sticky',
+            top: 8,
+            zIndex: 45,
+            border: '2px dashed var(--neon-purple)',
+            borderRadius: 10,
+            padding: '11px 12px',
+            marginBottom: 12,
+            background: 'var(--panel-bg)',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.72)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="hub-heading" style={{ color: 'var(--neon-purple)', fontSize: '0.68rem' }}>
+                PROJECTING {owner.toUpperCase()}'S KEEPERS
+              </div>
+              <div style={{ color: 'var(--text-body)', fontSize: '0.76rem', marginTop: 5, lineHeight: 1.45 }}>
+                These picks are private to {identity?.owner}. They do not change {owner}'s real submission.
+              </div>
+            </div>
+            <button
+              className="tap-btn"
+              type="button"
+              aria-label="Dismiss projection banner"
+              onClick={() => setBrowseBannerOpen(false)}
+              style={{ width: 40, height: 40, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'transparent', color: 'var(--text-mid)' }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <Link
+              to={`/keepers/${encodeURIComponent(identity?.owner ?? '')}`}
+              className="tap-btn"
+              style={{ minHeight: 42, display: 'inline-flex', alignItems: 'center', padding: '0 13px', border: '2px solid var(--neon-teal)', borderRadius: 8, color: 'var(--neon-teal)', textDecoration: 'none', fontWeight: 800, fontSize: '0.72rem' }}
+            >
+              ← BACK TO MY KEEPERS
+            </Link>
+            <button
+              className="tap-btn"
+              type="button"
+              onClick={() => {
+                const scenario = saveProjectedKeepers(identity!.owner, owner, [], state.season);
+                setProjectedSelections(scenario[owner] ?? []);
+                setDraftSel(null);
+              }}
+              style={{ minHeight: 42, padding: '0 13px', border: '2px solid var(--panel-border)', borderRadius: 8, background: 'transparent', color: 'var(--text-mid)', fontWeight: 700, fontSize: '0.7rem' }}
+            >
+              RESET {owner.toUpperCase()}
+            </button>
+            {isCommish && (
+              <button
+                className="tap-btn"
+                type="button"
+                onClick={() => {
+                  setCommissionerRealEdit(true);
+                  setDraftSel(null);
+                }}
+                style={{ minHeight: 42, padding: '0 13px', border: '2px solid var(--neon-yellow)', borderRadius: 8, background: 'transparent', color: 'var(--neon-yellow)', fontWeight: 800, fontSize: '0.68rem' }}
+              >
+                EDIT REAL AS COMMISSIONER
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {projectionMode && !browseBannerOpen && (
+        <Link
+          to={`/keepers/${encodeURIComponent(identity?.owner ?? '')}`}
+          className="tap-btn"
+          style={{ minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, border: '2px solid var(--neon-teal)', borderRadius: 9, color: 'var(--neon-teal)', textDecoration: 'none', fontWeight: 800, fontSize: '0.76rem' }}
+        >
+          ← BACK TO MY KEEPERS
+        </Link>
+      )}
+      {locked && !isCommish && !projectionMode && <LockBanner />}
       {locked && isCommish && (
         <div style={{ color: 'var(--neon-yellow)', fontSize: '0.75rem', marginBottom: 12 }}>
           🔒 Keepers are locked league-wide — commissioner override lets you still edit.
@@ -595,6 +727,7 @@ export default function TeamKeeperPage() {
               key={k.selection.playerKey}
               k={k}
               canEdit={canEdit}
+              projected={projectionMode}
               onRemove={() => removeKeeper(k.selection.playerKey)}
             />
           ))}
@@ -689,7 +822,9 @@ export default function TeamKeeperPage() {
         </div>
         {canEdit && (
           <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
-            Tap a player to keep them. Choices that break the cap or another rule are greyed out.
+            {projectionMode
+              ? `Tap players to project ${owner}'s keepers. Only you can see these picks.`
+              : 'Tap a player to keep them. Choices that break the cap or another rule are greyed out.'}
           </div>
         )}
         {!canEdit && (
@@ -789,13 +924,13 @@ export default function TeamKeeperPage() {
               {saveError ? (
                 <span style={{ color: 'var(--neon-red)' }}>{saveError}</span>
               ) : flash ? (
-                <span style={{ color: 'var(--neon-teal)' }}>✓ Keepers saved</span>
+                <span style={{ color: 'var(--neon-teal)' }}>✓ {projectionMode ? 'Projection saved' : 'Keepers saved'}</span>
               ) : dirty ? (
                 <span style={{ color: result.valid ? 'var(--neon-yellow)' : 'var(--neon-red)' }}>
                   {result.valid ? '● Unsaved changes' : 'Fix the blocked keeper choice'}
                 </span>
               ) : (
-                <span style={{ color: 'var(--text-dim)' }}>In sync with the league</span>
+                <span style={{ color: 'var(--text-dim)' }}>{projectionMode ? 'Private projection saved' : 'In sync with the league'}</span>
               )}
             </div>
             <button
@@ -814,7 +949,7 @@ export default function TeamKeeperPage() {
                 flexShrink: 0,
               }}
             >
-              {saving ? 'SAVING…' : 'SAVE KEEPERS'}
+              {saving ? 'SAVING…' : projectionMode ? 'SAVE PROJECTION' : 'SAVE KEEPERS'}
             </button>
           </div>
         </div>
