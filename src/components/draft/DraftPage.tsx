@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 import { teamByOwner } from '../../lib/league/data.js';
-import { useApplyStateResponse, useDraftData, useIdentity } from '../../hooks/useLeague.js';
-import { apiErrorMessage, startDraft } from '../../lib/league/api.js';
+import {
+  useApplyStateResponse,
+  useDraftData,
+  useIdentity,
+  useKeeperScenario,
+} from '../../hooks/useLeague.js';
+import { apiErrorMessage, clearKeeperScenario, startDraft } from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import {
-  clearKeeperScenario,
   projectedPlayerKeys,
-  readKeeperScenario,
   stateWithKeeperScenario,
-  type KeeperScenario,
 } from '../../lib/league/keeperScenario.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import IdentityChip from '../league/IdentityChip.js';
@@ -182,7 +184,7 @@ function PickRow({
 export default function DraftPage() {
   const { state, meta, dataset, playerPoolQuery } = useDraftData(true);
   const { identity } = useIdentity();
-  const viewerOwner = identity?.owner ?? null;
+  const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [pickTarget, setPickTarget] = useState<BoardCell | null>(null);
@@ -190,21 +192,12 @@ export default function DraftPage() {
   const [showSignIn, setShowSignIn] = useState(false);
   const [startArmed, setStartArmed] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [scenarioBusy, setScenarioBusy] = useState(false);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
 
   const started = state.draft.startedAt !== null;
   const poolReady = playerPoolQuery.isSuccess;
-  const scenarioKey = viewerOwner && !started && meta?.revealed !== true
-    ? `${state.season}:${viewerOwner}`
-    : '';
-  const [scenarioState, setScenarioState] = useState<{ key: string; value: KeeperScenario }>(() => ({
-    key: scenarioKey,
-    value: scenarioKey && viewerOwner ? readKeeperScenario(viewerOwner, state.season) : {},
-  }));
-  const scenario = useMemo(() => {
-    if (!scenarioKey || !viewerOwner) return {};
-    if (scenarioState.key === scenarioKey) return scenarioState.value;
-    return readKeeperScenario(viewerOwner, state.season);
-  }, [scenarioKey, scenarioState, state.season, viewerOwner]);
+  const scenario = !started && meta?.revealed !== true ? scenarioQuery.scenario : {};
   const scenarioActive = Object.keys(scenario).length > 0;
   const projectedKeys = useMemo(() => projectedPlayerKeys(scenario), [scenario]);
   const boardState = useMemo(
@@ -212,9 +205,19 @@ export default function DraftPage() {
     [scenario, scenarioActive, state],
   );
 
-  useEffect(() => {
-    if (viewerOwner && meta?.revealed) clearKeeperScenario(viewerOwner, state.season);
-  }, [meta?.revealed, state.season, viewerOwner]);
+  const clearScenario = async () => {
+    if (!identity || scenarioBusy) return;
+    setScenarioBusy(true);
+    setScenarioError(null);
+    try {
+      const response = await clearKeeperScenario(identity);
+      scenarioQuery.setScenario(response.scenario);
+    } catch (error) {
+      setScenarioError(apiErrorMessage(error));
+    } finally {
+      setScenarioBusy(false);
+    }
+  };
 
   const doStartDraft = async () => {
     if (!identity) return;
@@ -316,14 +319,17 @@ export default function DraftPage() {
           <button
             className="tap-btn"
             type="button"
-            onClick={() => {
-              clearKeeperScenario(identity!.owner, state.season);
-              setScenarioState({ key: scenarioKey, value: {} });
-            }}
+            disabled={scenarioBusy}
+            onClick={clearScenario}
             style={{ minHeight: 40, marginTop: 9, padding: '0 12px', border: '1px solid var(--neon-purple)', borderRadius: 8, background: 'transparent', color: 'var(--neon-purple)', fontWeight: 800, fontSize: '0.68rem' }}
           >
-            CLEAR MY WHOLE SCENARIO
+            {scenarioBusy ? 'CLEARING…' : 'CLEAR MY WHOLE SCENARIO'}
           </button>
+          {scenarioError && (
+            <div style={{ color: 'var(--neon-red)', fontSize: '0.72rem', marginTop: 7 }}>
+              {scenarioError}
+            </div>
+          )}
         </div>
       )}
       <div

@@ -130,6 +130,7 @@ before(async () => {
 
 beforeEach(async () => {
   await replaceState(cleanState());
+  await store.clearKeeperScenariosForSeason(dataset.season);
 });
 
 after(async () => {
@@ -166,6 +167,131 @@ test('hides keeper names before reveal except from their owner and commissioner'
     Object.keys((commissionerView.body.state as LeagueDynamicState).keepers).sort(),
     ['Joel', 'Ryan'],
   );
+});
+
+test('keeps each member private scenario isolated, including from the commissioner', async () => {
+  const kylePlayer = dataset.players.find((player) => player.fantasyTeam === 'Kyle');
+  assert.ok(kylePlayer);
+
+  const anonymous = await request('/api/league/keeper-scenario');
+  assert.equal(anonymous.status, 401);
+
+  const beforeAudit = await store.readAudit(1000);
+  const saved = await request('/api/league/keeper-scenario/Kyle', {
+    method: 'PUT',
+    headers: auth('Joel'),
+    body: JSON.stringify({
+      selections: [{ playerKey: kylePlayer.key, playerName: 'Forged Name' }],
+    }),
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.scenario, {
+    Kyle: [{ playerKey: kylePlayer.key, playerName: kylePlayer.name }],
+  });
+
+  const joelView = await request('/api/league/keeper-scenario', { headers: auth('Joel') });
+  const ryanView = await request('/api/league/keeper-scenario', { headers: auth('Ryan') });
+  const commissionerView = await request('/api/league/keeper-scenario', {
+    headers: auth(commissioner),
+  });
+  assert.deepEqual(joelView.body.scenario, saved.body.scenario);
+  assert.deepEqual(ryanView.body.scenario, {});
+  assert.deepEqual(commissionerView.body.scenario, {});
+  assert.equal((await store.readAudit(1000)).length, beforeAudit.length);
+});
+
+test('validates projected keepers and rejects a projection for your own team', async () => {
+  const joelPlayer = dataset.players.find((player) => player.fantasyTeam === 'Joel');
+  const amyPlayer = dataset.players.find((player) => player.fantasyTeam === 'Amy');
+  assert.ok(joelPlayer);
+  assert.ok(amyPlayer);
+
+  const ownTeam = await request('/api/league/keeper-scenario/Joel', {
+    method: 'PUT',
+    headers: auth('Joel'),
+    body: JSON.stringify({
+      selections: [{ playerKey: joelPlayer.key, playerName: joelPlayer.name }],
+    }),
+  });
+  assert.equal(ownTeam.status, 400);
+  assert.match(String(ownTeam.body.error), /real keeper worksheet/);
+
+  const wrongRoster = await request('/api/league/keeper-scenario/Kyle', {
+    method: 'PUT',
+    headers: auth('Joel'),
+    body: JSON.stringify({
+      selections: [{ playerKey: amyPlayer.key, playerName: amyPlayer.name }],
+    }),
+  });
+  assert.equal(wrongRoster.status, 400);
+  assert.match(String(wrongRoster.body.error), /Amy's roster.*only they can keep him/);
+  assert.deepEqual(await store.getKeeperScenario(dataset.season, 'Joel'), {});
+});
+
+test('resets one projected team or the signed-in member whole scenario', async () => {
+  const kylePlayer = dataset.players.find((player) => player.fantasyTeam === 'Kyle');
+  const ryanPlayer = dataset.players.find((player) => player.fantasyTeam === 'Ryan');
+  assert.ok(kylePlayer);
+  assert.ok(ryanPlayer);
+
+  for (const [target, player] of [['Kyle', kylePlayer], ['Ryan', ryanPlayer]] as const) {
+    const saved = await request(`/api/league/keeper-scenario/${target}`, {
+      method: 'PUT',
+      headers: auth('Joel'),
+      body: JSON.stringify({
+        selections: [{ playerKey: player.key, playerName: player.name }],
+      }),
+    });
+    assert.equal(saved.status, 200);
+  }
+
+  const oneReset = await request('/api/league/keeper-scenario/Kyle', {
+    method: 'DELETE',
+    headers: auth('Joel'),
+  });
+  assert.deepEqual(oneReset.body.scenario, {
+    Ryan: [{ playerKey: ryanPlayer.key, playerName: ryanPlayer.name }],
+  });
+
+  const allReset = await request('/api/league/keeper-scenario', {
+    method: 'DELETE',
+    headers: auth('Joel'),
+  });
+  assert.equal(allReset.status, 200);
+  assert.deepEqual(allReset.body.scenario, {});
+});
+
+test('reveal clears every private scenario and closes projection writes', async () => {
+  const kylePlayer = dataset.players.find((player) => player.fantasyTeam === 'Kyle');
+  assert.ok(kylePlayer);
+  const body = JSON.stringify({
+    selections: [{ playerKey: kylePlayer.key, playerName: kylePlayer.name }],
+  });
+  for (const viewer of ['Joel', 'Ryan'] as const) {
+    const saved = await request('/api/league/keeper-scenario/Kyle', {
+      method: 'PUT',
+      headers: auth(viewer),
+      body,
+    });
+    assert.equal(saved.status, 200);
+  }
+
+  const reveal = await request('/api/league/keeper-visibility', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({ revealed: true }),
+  });
+  assert.equal(reveal.status, 200);
+  assert.deepEqual(await store.getKeeperScenario(dataset.season, 'Joel'), {});
+  assert.deepEqual(await store.getKeeperScenario(dataset.season, 'Ryan'), {});
+
+  const closed = await request('/api/league/keeper-scenario/Kyle', {
+    method: 'PUT',
+    headers: auth('Joel'),
+    body,
+  });
+  assert.equal(closed.status, 409);
+  assert.match(String(closed.body.error), /projections are closed/);
 });
 
 test('requires the commissioner to reveal keepers before starting the draft', async () => {

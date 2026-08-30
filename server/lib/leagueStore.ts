@@ -27,6 +27,8 @@ export interface KeeperSelection {
   playerName: string;
 }
 
+export type KeeperScenario = Record<string, KeeperSelection[]>;
+
 export interface DraftPickState {
   playerKey?: string;
   playerName?: string;
@@ -139,6 +141,15 @@ const TEMP_PREFIX = 'T:';
 interface StoreBackend {
   getState(): Promise<StateResult>;
   mutateState(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
+  getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario>;
+  setKeeperScenarioTarget(
+    season: number,
+    viewer: string,
+    target: string,
+    selections: KeeperSelection[],
+  ): Promise<KeeperScenario>;
+  clearKeeperScenario(season: number, viewer: string): Promise<void>;
+  clearKeeperScenariosForSeason(season: number): Promise<void>;
   getPin(owner: string): Promise<string | null>;
   getPins(): Promise<Array<{ owner: string; pin: string }>>;
   setPin(owner: string, pin: string): Promise<void>;
@@ -205,6 +216,14 @@ class NeonBackend implements StoreBackend {
       fingerprint text not null unique,
       players jsonb not null
     )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS keeper_scenarios (
+      season int not null,
+      viewer text not null,
+      target text not null,
+      selections jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (season, viewer, target)
+    )`;
     await this.sql`INSERT INTO league_state (id, data, version)
       VALUES (1, ${JSON.stringify(defaultState())}::jsonb, 0)
       ON CONFLICT (id) DO NOTHING`;
@@ -252,6 +271,51 @@ class NeonBackend implements StoreBackend {
       if (updated[0]) return { state: draft, version: updated[0].version };
     }
     throw new Error('League state changed too often; retry the request');
+  }
+
+  async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT target, selections
+      FROM keeper_scenarios
+      WHERE season = ${season} AND viewer = ${viewer}`) as Array<{
+      target: string;
+      selections: KeeperSelection[];
+    }>;
+    return Object.fromEntries(
+      rows
+        .filter((row) => Array.isArray(row.selections) && row.selections.length > 0)
+        .map((row) => [row.target, row.selections]),
+    );
+  }
+
+  async setKeeperScenarioTarget(
+    season: number,
+    viewer: string,
+    target: string,
+    selections: KeeperSelection[],
+  ): Promise<KeeperScenario> {
+    await this.ensureInit();
+    if (selections.length === 0) {
+      await this.sql`DELETE FROM keeper_scenarios
+        WHERE season = ${season} AND viewer = ${viewer} AND target = ${target}`;
+    } else {
+      await this.sql`INSERT INTO keeper_scenarios (season, viewer, target, selections, updated_at)
+        VALUES (${season}, ${viewer}, ${target}, ${JSON.stringify(selections)}::jsonb, now())
+        ON CONFLICT (season, viewer, target) DO UPDATE
+        SET selections = EXCLUDED.selections, updated_at = now()`;
+    }
+    return this.getKeeperScenario(season, viewer);
+  }
+
+  async clearKeeperScenario(season: number, viewer: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM keeper_scenarios
+      WHERE season = ${season} AND viewer = ${viewer}`;
+  }
+
+  async clearKeeperScenariosForSeason(season: number): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM keeper_scenarios WHERE season = ${season}`;
   }
 
   async getPin(owner: string): Promise<string | null> {
@@ -392,6 +456,13 @@ interface FileDoc {
   pins: Record<string, string>;
   audit: AuditRow[];
   playerPoolSnapshots: PlayerPoolSnapshot[];
+  keeperScenarios: Array<{
+    season: number;
+    viewer: string;
+    target: string;
+    selections: KeeperSelection[];
+    updatedAt: string;
+  }>;
 }
 
 const MAX_FILE_AUDIT_ROWS = 1000;
@@ -432,6 +503,7 @@ class FileBackend implements StoreBackend {
         pins: doc.pins ?? {},
         audit: Array.isArray(doc.audit) ? doc.audit : [],
         playerPoolSnapshots: Array.isArray(doc.playerPoolSnapshots) ? doc.playerPoolSnapshots : [],
+        keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
       };
     } catch {
       return {
@@ -441,6 +513,7 @@ class FileBackend implements StoreBackend {
         pins: {},
         audit: [],
         playerPoolSnapshots: [],
+        keeperScenarios: [],
       };
     }
   }
@@ -474,6 +547,62 @@ class FileBackend implements StoreBackend {
       doc.updatedAt = new Date().toISOString();
       this.writeDoc(doc);
       return { state: doc.state, version: doc.version };
+    });
+  }
+
+  async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
+    await this.ensureInit();
+    const doc = this.readDoc();
+    return Object.fromEntries(
+      doc.keeperScenarios
+        .filter((row) => row.season === season && row.viewer === viewer && row.selections.length > 0)
+        .map((row) => [row.target, structuredClone(row.selections)]),
+    );
+  }
+
+  async setKeeperScenarioTarget(
+    season: number,
+    viewer: string,
+    target: string,
+    selections: KeeperSelection[],
+  ): Promise<KeeperScenario> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.keeperScenarios = doc.keeperScenarios.filter(
+        (row) => !(row.season === season && row.viewer === viewer && row.target === target),
+      );
+      if (selections.length > 0) {
+        doc.keeperScenarios.push({
+          season,
+          viewer,
+          target,
+          selections: structuredClone(selections),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      this.writeDoc(doc);
+    });
+    return this.getKeeperScenario(season, viewer);
+  }
+
+  async clearKeeperScenario(season: number, viewer: string): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.keeperScenarios = doc.keeperScenarios.filter(
+        (row) => row.season !== season || row.viewer !== viewer,
+      );
+      this.writeDoc(doc);
+    });
+  }
+
+  async clearKeeperScenariosForSeason(season: number): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.keeperScenarios = doc.keeperScenarios.filter((row) => row.season !== season);
+      this.writeDoc(doc);
     });
   }
 
@@ -590,6 +719,27 @@ export async function mutateState(
   fn: (draft: LeagueDynamicState) => void,
 ): Promise<MutateResult> {
   return getBackend().mutateState(fn);
+}
+
+export async function getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
+  return getBackend().getKeeperScenario(season, viewer);
+}
+
+export async function setKeeperScenarioTarget(
+  season: number,
+  viewer: string,
+  target: string,
+  selections: KeeperSelection[],
+): Promise<KeeperScenario> {
+  return getBackend().setKeeperScenarioTarget(season, viewer, target, selections);
+}
+
+export async function clearKeeperScenario(season: number, viewer: string): Promise<void> {
+  return getBackend().clearKeeperScenario(season, viewer);
+}
+
+export async function clearKeeperScenariosForSeason(season: number): Promise<void> {
+  return getBackend().clearKeeperScenariosForSeason(season);
 }
 
 /**

@@ -5,6 +5,7 @@ import type {
   PlayerPoolRefreshPreview,
   PlayerPoolSnapshot,
 } from './playerPool.js';
+import type { KeeperScenario } from './keeperScenario.js';
 
 export interface StateMeta {
   draftAt: string;
@@ -46,6 +47,11 @@ export interface PlayerPoolPreviewResponse {
 
 export interface FetchedPlayerPoolPreviewResponse extends PlayerPoolPreviewResponse {
   candidate: PlayerPoolCandidateInput;
+}
+
+export interface KeeperScenarioResponse {
+  season: number;
+  scenario: KeeperScenario;
 }
 
 const authHeaders = (c: Credentials) => ({ 'x-owner': c.owner, 'x-pin': c.pin });
@@ -164,6 +170,44 @@ export async function verifyPin(
 /** Replace your own PIN (used for the forced change on a temporary PIN). */
 export async function changePin(c: Credentials, newPin: string): Promise<void> {
   await axios.post('/api/league/change-pin', { pin: newPin }, { headers: authHeaders(c) });
+}
+
+export async function fetchKeeperScenario(c: Credentials): Promise<KeeperScenarioResponse> {
+  const { data } = await axios.get<KeeperScenarioResponse>('/api/league/keeper-scenario', {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function saveKeeperScenarioTarget(
+  c: Credentials,
+  target: string,
+  selections: KeeperSelection[],
+): Promise<KeeperScenarioResponse> {
+  const { data } = await axios.put<KeeperScenarioResponse>(
+    `/api/league/keeper-scenario/${encodeURIComponent(target)}`,
+    { selections },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function resetKeeperScenarioTarget(
+  c: Credentials,
+  target: string,
+): Promise<KeeperScenarioResponse> {
+  const { data } = await axios.delete<KeeperScenarioResponse>(
+    `/api/league/keeper-scenario/${encodeURIComponent(target)}`,
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function clearKeeperScenario(c: Credentials): Promise<KeeperScenarioResponse> {
+  const { data } = await axios.delete<KeeperScenarioResponse>('/api/league/keeper-scenario', {
+    headers: authHeaders(c),
+  });
+  return data;
 }
 
 export async function saveKeepers(

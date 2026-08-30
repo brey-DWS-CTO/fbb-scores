@@ -3,14 +3,19 @@ import { Link, useParams } from 'react-router-dom';
 import type { DatasetPlayer, KeeperSelection, ResolvedKeeper } from '../../lib/keeper/types.js';
 import { keeperCandidateError, pickLabel, resolveTeamKeepers } from '../../lib/keeper/engine.js';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
-import { apiErrorMessage, saveKeepers } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  resetKeeperScenarioTarget,
+  saveKeeperScenarioTarget,
+  saveKeepers,
+} from '../../lib/league/api.js';
 import { fmt1 } from '../../lib/league/format.js';
 import {
-  clearKeeperScenario,
-  readKeeperScenario,
-  saveProjectedKeepers,
-} from '../../lib/league/keeperScenario.js';
-import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+  useApplyStateResponse,
+  useIdentity,
+  useKeeperScenario,
+  useLeagueData,
+} from '../../hooks/useLeague.js';
 import IdentityChip from '../league/IdentityChip.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
 import { CapBar, LockBanner, RoundChip, SourceBadge } from './keeperUi.js';
@@ -263,7 +268,7 @@ export default function TeamKeeperPage() {
 
   const { state, isLoading, meta, dataset } = useLeagueData();
   const { identity } = useIdentity();
-  const viewerOwner = identity?.owner ?? null;
+  const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
 
   const serverSelections = useMemo(() => state.keepers[owner] ?? [], [state.keepers, owner]);
@@ -273,7 +278,10 @@ export default function TeamKeeperPage() {
     && identity.owner !== owner
     && meta?.revealed !== true
     && (!isCommish || !commissionerRealEdit);
-  const [projectedSelections, setProjectedSelections] = useState<KeeperSelection[]>([]);
+  const projectedSelections = useMemo(
+    () => scenarioQuery.scenario[owner] ?? [],
+    [owner, scenarioQuery.scenario],
+  );
   const [browseBannerOpen, setBrowseBannerOpen] = useState(true);
 
   // null = mirror the server; non-null = local unsaved edits (dirty)
@@ -292,20 +300,11 @@ export default function TeamKeeperPage() {
     setLeaguePool(false);
     setBrowseBannerOpen(true);
     setCommissionerRealEdit(false);
-    setProjectedSelections(
-      viewerOwner && viewerOwner !== owner
-        ? (readKeeperScenario(viewerOwner, state.season)[owner] ?? [])
-        : [],
-    );
-  }, [owner, state.season, viewerOwner]);
+  }, [owner]);
 
   useEffect(() => {
-    if (viewerOwner && meta?.revealed) {
-      clearKeeperScenario(viewerOwner, state.season);
-      setProjectedSelections([]);
-      setDraftSel(null);
-    }
-  }, [meta?.revealed, state.season, viewerOwner]);
+    if (meta?.revealed) setDraftSel(null);
+  }, [meta?.revealed]);
 
   // Local edits that exactly match the server are no longer "unsaved"
   useEffect(() => {
@@ -326,7 +325,8 @@ export default function TeamKeeperPage() {
 
   const locked = state.locks.keepersLocked;
   const canEdit = !!identity && (
-    projectionMode || ((identity.owner === owner || isCommish) && (!locked || isCommish))
+    (projectionMode && scenarioQuery.isSuccess)
+    || ((identity.owner === owner || isCommish) && (!locked || isCommish))
   );
   const hiddenSelectionCount =
     !canEdit && meta && !meta.revealed && serverSelections.length === 0
@@ -390,8 +390,8 @@ export default function TeamKeeperPage() {
     setSaveError(null);
     try {
       if (projectionMode) {
-        const scenario = saveProjectedKeepers(identity.owner, owner, selections, state.season);
-        setProjectedSelections(scenario[owner] ?? []);
+        const response = await saveKeeperScenarioTarget(identity, owner, selections);
+        scenarioQuery.setScenario(response.scenario);
         setDraftSel(null);
         setFlash(true);
         if (flashTimer.current) window.clearTimeout(flashTimer.current);
@@ -406,6 +406,21 @@ export default function TeamKeeperPage() {
       flashTimer.current = window.setTimeout(() => setFlash(false), 2500);
     } catch (e) {
       setSaveError(apiErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetProjection = async () => {
+    if (!identity || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const response = await resetKeeperScenarioTarget(identity, owner);
+      scenarioQuery.setScenario(response.scenario);
+      setDraftSel(null);
+    } catch (error) {
+      setSaveError(apiErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -529,11 +544,8 @@ export default function TeamKeeperPage() {
             <button
               className="tap-btn"
               type="button"
-              onClick={() => {
-                const scenario = saveProjectedKeepers(identity!.owner, owner, [], state.season);
-                setProjectedSelections(scenario[owner] ?? []);
-                setDraftSel(null);
-              }}
+              disabled={saving}
+              onClick={resetProjection}
               style={{ minHeight: 42, padding: '0 13px', border: '2px solid var(--panel-border)', borderRadius: 8, background: 'transparent', color: 'var(--text-mid)', fontWeight: 700, fontSize: '0.7rem' }}
             >
               RESET {owner.toUpperCase()}
@@ -562,6 +574,16 @@ export default function TeamKeeperPage() {
         >
           ← BACK TO MY KEEPERS
         </Link>
+      )}
+      {projectionMode && scenarioQuery.isPending && (
+        <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem', marginBottom: 12 }}>
+          Loading your private scenario…
+        </div>
+      )}
+      {projectionMode && scenarioQuery.isError && (
+        <div style={{ color: 'var(--neon-red)', fontSize: '0.75rem', marginBottom: 12 }}>
+          Could not load your private scenario. Sign out and back in, then try again.
+        </div>
       )}
       {locked && !isCommish && !projectionMode && <LockBanner />}
       {locked && isCommish && (

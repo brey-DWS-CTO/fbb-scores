@@ -1,6 +1,6 @@
 # HANDOFF — The Nerds Draft Hub
 
-_State as of 2026-08-29. For anyone (human or AI) picking this up._
+_State as of 2026-08-30. For anyone (human or AI) picking this up._
 
 ## What this is
 
@@ -39,7 +39,7 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 
 Commissioner-only sandbox (Commish Mode → 🧪): clones live state into localStorage; all keeper/draft reads+writes branch in `src/lib/league/api.ts`; secrecy off; yellow banner (chip on TV). Server never touched. EXIT & DISCARD wipes it.
 
-## Urgent next: private keeper scenarios for every member
+## Complete: private keeper scenarios for every member
 
 The current cross-team worksheet says only “Browsing Kyle's keeper options” in small text. That is too easy to miss. Build this as a first-class scenario mode, not as permission to edit another owner's real keeper state.
 
@@ -57,9 +57,9 @@ Required behavior:
 
 Server auth must enforce that a member can read and write only their own scenario records. The commissioner may inspect scenarios only if the product later adds an explicit support tool; commissioner status must not make private projections public by default.
 
-Client first cut now works: each browser stores a versioned scenario by season and signed-in viewer, cross-team worksheets show a sticky private-projection banner and back button, one team or the whole scenario can be reset, projected keeper cards and draft cells use dashed borders plus explicit labels, and revealed keepers suppress and clear the local scenario. The normal keeper engine places those picks on the private mock board, including traded-pick costs. It also prevents one projected player from occupying two teams in the same scenario.
+Server-backed scenarios now meet the requirements above. Neon uses `keeper_scenarios` keyed by `(season, viewer, target)`; the local file backend mirrors the same rows. Auth derives `viewer` only from the signed-in PIN, so neither another member nor the commissioner can request someone else's scenario. Scenario writes canonicalize player names and run the normal keeper engine before storage. They never enter real keeper state or the audit log. Reveal clears every scenario for that season and closes further writes.
 
-This is not the final storage model. Browser storage does not sync across a member's devices and the server cannot enforce viewer-only access. Move the same UI to the required API/store key `(season, viewer owner, target owner)` before calling the feature complete. Keep the browser layer only as a short-lived migration fallback, then remove it.
+The client no longer uses browser storage for scenarios. Cross-team worksheets load the private server copy before enabling edits. One-team reset and whole-scenario reset call scoped API routes. The draft board loads the same private scenario, including traded-pick costs, then drops it as soon as real keepers are revealed or the draft starts.
 
 ## Known quirks / gotchas
 
@@ -79,7 +79,7 @@ npm run lint
 npm run build
 ```
 
-As of 2026-08-29: 35 tests pass, lint passes, and the production build passes. Local isolated browser checks also pass for the sticky mobile projection banner, back-to-my-keepers action, projected keeper save and reload, correct traded-pick placement on the private mock board, and clear projected labels. The build still reports one non-blocking JavaScript chunk-size warning.
+As of 2026-08-30: 38 tests pass, lint passes, and the production build passes. Local browser checks also pass for the sticky mobile projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, and a clean browser console. The build still reports one non-blocking JavaScript chunk-size warning.
 
 ## Future features (user's list)
 

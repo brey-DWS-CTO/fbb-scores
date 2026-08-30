@@ -25,8 +25,12 @@ import {
   claimPin,
   appendAudit,
   acceptPlayerPoolSnapshot,
+  clearKeeperScenario,
+  clearKeeperScenariosForSeason,
+  getKeeperScenario,
   readAudit,
   isKnownOwner,
+  setKeeperScenarioTarget,
   DRAFT_AT_ISO,
   PlayerPoolAcceptError,
   type KeeperSelection,
@@ -54,6 +58,58 @@ class HttpError extends Error {
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
+  }
+}
+
+function cleanKeeperSelections(value: unknown): KeeperSelection[] {
+  if (!Array.isArray(value)) {
+    throw new HttpError(400, 'Body must include a selections array');
+  }
+  if (value.length > leagueDataset.maxKeepersPerTeam) {
+    throw new HttpError(
+      400,
+      `A team may keep at most ${leagueDataset.maxKeepersPerTeam} players`,
+    );
+  }
+
+  const clean: KeeperSelection[] = [];
+  const seen = new Set<string>();
+  for (const selection of value as Array<Record<string, unknown>>) {
+    if (
+      !selection
+      || typeof selection.playerKey !== 'string'
+      || selection.playerKey.length === 0
+      || typeof selection.playerName !== 'string'
+      || selection.playerName.length === 0
+    ) {
+      throw new HttpError(400, 'Each selection needs a playerKey and playerName');
+    }
+    if (seen.has(selection.playerKey)) {
+      throw new HttpError(400, 'A player can only be selected once');
+    }
+    const player = leagueDataset.players.find((candidate) => candidate.key === selection.playerKey);
+    if (!player) throw new HttpError(400, `Unknown player: ${selection.playerKey}`);
+    seen.add(player.key);
+    clean.push({ playerKey: player.key, playerName: player.name });
+  }
+  return clean;
+}
+
+function validateKeeperSelections(
+  state: LeagueDynamicState,
+  target: string,
+  selections: KeeperSelection[],
+): void {
+  const dataset = applyOverrides(leagueDataset, state.overrides);
+  const validation = resolveTeamKeepers(dataset, target, selections);
+  if (!validation.capOk) {
+    throw new HttpError(
+      400,
+      `Keeper cap exceeded: ${validation.capUsed.toFixed(1)} / ${validation.capLimit.toFixed(1)} FPPG`,
+    );
+  }
+  if (!validation.valid) {
+    throw new HttpError(400, validation.errors[0] ?? 'Invalid keeper selection');
   }
 }
 
@@ -299,6 +355,80 @@ router.post('/change-pin', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+/** GET /api/league/keeper-scenario — the signed-in member's private scenario. */
+router.get('/keeper-scenario', requireAuth, async (_req, res) => {
+  const viewer = res.locals.owner as string;
+  const { state } = await getState();
+  if (state.keepersRevealed === true) {
+    await clearKeeperScenario(state.season, viewer);
+    res.json({ season: state.season, scenario: {} });
+    return;
+  }
+  res.json({
+    season: state.season,
+    scenario: await getKeeperScenario(state.season, viewer),
+  });
+});
+
+/** PUT /api/league/keeper-scenario/:target — save one private projected team. */
+router.put('/keeper-scenario/:target', requireAuth, async (req, res) => {
+  const viewer = res.locals.owner as string;
+  const target = routeParam(req.params.target);
+  if (!isKnownOwner(target)) {
+    res.status(404).json({ error: `Unknown owner: ${target}` });
+    return;
+  }
+  if (target === viewer) {
+    res.status(400).json({ error: 'Use your real keeper worksheet for your own team' });
+    return;
+  }
+
+  const current = await getState();
+  if (current.state.keepersRevealed === true) {
+    res.status(409).json({ error: 'Real keepers have been revealed; projections are closed' });
+    return;
+  }
+  const selections = cleanKeeperSelections(
+    (req.body as { selections?: unknown } | undefined)?.selections,
+  );
+  validateKeeperSelections(current.state, target, selections);
+  const scenario = await setKeeperScenarioTarget(
+    current.state.season,
+    viewer,
+    target,
+    selections,
+  );
+
+  const latest = await getState();
+  if (latest.state.keepersRevealed === true) {
+    await clearKeeperScenario(latest.state.season, viewer);
+    res.status(409).json({ error: 'Real keepers were revealed while this projection was saving' });
+    return;
+  }
+  res.json({ season: current.state.season, scenario });
+});
+
+/** DELETE /api/league/keeper-scenario/:target — reset one projected team. */
+router.delete('/keeper-scenario/:target', requireAuth, async (req, res) => {
+  const viewer = res.locals.owner as string;
+  const target = routeParam(req.params.target);
+  if (!isKnownOwner(target)) {
+    res.status(404).json({ error: `Unknown owner: ${target}` });
+    return;
+  }
+  const { state } = await getState();
+  const scenario = await setKeeperScenarioTarget(state.season, viewer, target, []);
+  res.json({ season: state.season, scenario });
+});
+
+/** DELETE /api/league/keeper-scenario — clear the signed-in member's scenario. */
+router.delete('/keeper-scenario', requireAuth, async (_req, res) => {
+  const viewer = res.locals.owner as string;
+  const { state } = await getState();
+  await clearKeeperScenario(state.season, viewer);
+  res.json({ season: state.season, scenario: {} });
+});
+
 /**
  * PUT /api/league/keepers/:owner — set an owner's keeper selections (max 2).
  * The authed owner must match :owner, or be the commissioner.
@@ -317,54 +447,15 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
     return;
   }
 
-  const selections = (req.body as { selections?: unknown } | undefined)?.selections;
-  if (!Array.isArray(selections)) {
-    res.status(400).json({ error: 'Body must include a selections array' });
-    return;
-  }
-  if (selections.length > leagueDataset.maxKeepersPerTeam) {
-    res.status(400).json({ error: `A team may keep at most ${leagueDataset.maxKeepersPerTeam} players` });
-    return;
-  }
-  const clean: KeeperSelection[] = [];
-  const seen = new Set<string>();
-  for (const s of selections as Array<Record<string, unknown>>) {
-    if (
-      !s ||
-      typeof s.playerKey !== 'string' || s.playerKey.length === 0 ||
-      typeof s.playerName !== 'string' || s.playerName.length === 0
-    ) {
-      res.status(400).json({ error: 'Each selection needs a playerKey and playerName' });
-      return;
-    }
-    if (seen.has(s.playerKey)) {
-      res.status(400).json({ error: 'A player can only be selected once' });
-      return;
-    }
-    const player = leagueDataset.players.find((candidate) => candidate.key === s.playerKey);
-    if (!player) {
-      res.status(400).json({ error: `Unknown player: ${s.playerKey}` });
-      return;
-    }
-    seen.add(s.playerKey);
-    clean.push({ playerKey: player.key, playerName: player.name });
-  }
+  const clean = cleanKeeperSelections(
+    (req.body as { selections?: unknown } | undefined)?.selections,
+  );
 
   const result = await mutateState((draft) => {
     if (draft.locks.keepersLocked && !isCommissioner) {
       throw new HttpError(423, 'Keepers are locked');
     }
-    const dataset = applyOverrides(leagueDataset, draft.overrides);
-    const validation = resolveTeamKeepers(dataset, target, clean);
-    if (!validation.capOk) {
-      throw new HttpError(
-        400,
-        `Keeper cap exceeded: ${validation.capUsed.toFixed(1)} / ${validation.capLimit.toFixed(1)} FPPG`,
-      );
-    }
-    if (!validation.valid) {
-      throw new HttpError(400, validation.errors[0] ?? 'Invalid keeper selection');
-    }
+    validateKeeperSelections(draft, target, clean);
     draft.keepers[target] = clean;
   });
   await appendAudit(authedOwner, 'keepers.set', { target, selections: clean });
@@ -384,6 +475,7 @@ router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, 
     }
     draft.keepersRevealed = revealed;
   });
+  if (revealed) await clearKeeperScenariosForSeason(result.state.season);
   await appendAudit(res.locals.owner as string, revealed ? 'keepers.revealed' : 'keepers.hidden', {
     revealed,
   });

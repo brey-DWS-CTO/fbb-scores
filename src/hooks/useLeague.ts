@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchLeagueState,
+  fetchKeeperScenario,
   fetchPlayerPool,
+  sandboxActive,
   verifyPin,
   type Credentials,
   type StateResponse,
@@ -11,6 +13,9 @@ import { applyOverrides } from '../lib/keeper/engine.js';
 import { leagueDataset } from '../lib/league/data.js';
 import { applyPlayerPoolToDataset } from '../lib/league/playerPool.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
+import type { KeeperScenario } from '../lib/league/keeperScenario.js';
+
+const EMPTY_KEEPER_SCENARIO: KeeperScenario = {};
 
 const EMPTY_STATE: LeagueDynamicState = {
   season: 2027,
@@ -71,6 +76,31 @@ export function useDraftData(fast = false) {
     [league.dataset, players],
   );
   return { ...league, dataset, playerPoolQuery };
+}
+
+export function useKeeperScenario() {
+  const { identity } = useIdentity();
+  const queryClient = useQueryClient();
+  const owner = identity?.owner ?? 'anon';
+  const queryKey = useMemo(() => ['keeper-scenario', owner] as const, [owner]);
+  const query = useQuery({
+    queryKey,
+    queryFn: () => fetchKeeperScenario(identity!),
+    enabled: identity !== null && !sandboxActive(),
+    staleTime: 1000,
+    refetchOnWindowFocus: true,
+  });
+  const setScenario = useCallback((scenario: KeeperScenario) => {
+    queryClient.setQueryData(queryKey, {
+      season: query.data?.season ?? 2027,
+      scenario,
+    });
+  }, [query.data?.season, queryClient, queryKey]);
+  return {
+    ...query,
+    scenario: query.data?.scenario ?? EMPTY_KEEPER_SCENARIO,
+    setScenario,
+  };
 }
 
 /** Push a fresh state response (from a mutation) straight into the cache. */
