@@ -12,11 +12,16 @@ import test, { after, before, beforeEach } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
+import rawSchedule from '../src/data/source/basketball-monster-schedule-2027.json' with { type: 'json' };
 import type {
   LeagueDataset,
   LeagueDynamicState,
 } from '../src/lib/keeper/types.ts';
 import { playerPoolFromDataset } from '../src/lib/league/playerPool.ts';
+import {
+  DEFAULT_2027_LEAGUE_MAPPING,
+  type RawScheduleSource,
+} from '../src/lib/league/schedule.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const tempParent = path.join(repoRoot, 'node_modules', '.tmp');
@@ -56,6 +61,8 @@ async function replaceState(next: LeagueDynamicState): Promise<void> {
     draft.locks = structuredClone(next.locks);
     if (next.playerPool) draft.playerPool = structuredClone(next.playerPool);
     else delete draft.playerPool;
+    if (next.schedule) draft.schedule = structuredClone(next.schedule);
+    else delete draft.schedule;
     delete draft.overrides;
   });
 }
@@ -77,6 +84,14 @@ function playerPoolCandidate() {
     sourceSeason: dataset.season,
     fetchedAt: '2026-08-27T12:00:00.000Z',
     players,
+  };
+}
+
+function scheduleCandidate() {
+  return {
+    source: structuredClone(rawSchedule) as RawScheduleSource,
+    mapping: structuredClone(DEFAULT_2027_LEAGUE_MAPPING),
+    status: 'provisional' as const,
   };
 }
 
@@ -413,6 +428,143 @@ test('rejects a player who is already off the draft board', async () => {
   });
   assert.equal(duplicate.status, 409);
   assert.match(String(duplicate.body.error), /already off the board/);
+});
+
+test('keeps schedule review and acceptance commissioner-only', async () => {
+  const currentDenied = await request('/api/league/schedule', { headers: auth('Joel') });
+  assert.equal(currentDenied.status, 403);
+
+  const previewDenied = await request('/api/league/schedule/preview', {
+    method: 'POST',
+    headers: auth('Joel'),
+    body: JSON.stringify(scheduleCandidate()),
+  });
+  assert.equal(previewDenied.status, 403);
+
+  const acceptDenied = await request('/api/league/schedule/accept', {
+    method: 'POST',
+    headers: auth('Joel'),
+    body: JSON.stringify(scheduleCandidate()),
+  });
+  assert.equal(acceptDenied.status, 403);
+
+  const allowed = await request('/api/league/schedule', { headers: auth(commissioner) });
+  assert.equal(allowed.status, 200);
+  assert.equal(allowed.body.fallback, true);
+  assert.equal((allowed.body.snapshot as { id: string }).id, 'schedule-fixture-2027');
+});
+
+test('previews without writing and accepts the exact schedule snapshot', async () => {
+  const candidate = scheduleCandidate();
+  const preview = await request('/api/league/schedule/preview', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify(candidate),
+  });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.currentSnapshotId, 'schedule-fixture-2027');
+  assert.equal((preview.body.preview as { changedTeamPeriods: unknown[] }).changedTeamPeriods.length, 0);
+  assert.equal((preview.body.preview as { changedMappings: unknown[] }).changedMappings.length, 0);
+  assert.equal((await store.getState()).state.schedule, undefined);
+
+  const accepted = await request('/api/league/schedule/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({
+      ...candidate,
+      expectedCurrentSnapshotId: preview.body.currentSnapshotId,
+      fingerprint: preview.body.fingerprint,
+    }),
+  });
+  assert.equal(accepted.status, 200);
+  const snapshot = accepted.body.snapshot as {
+    id: string;
+    createdBy: string;
+    leaguePeriods: Array<{ leagueWeek: number; sourceNbaWeeks: number[] }>;
+  };
+  assert.equal(snapshot.id, preview.body.candidateSnapshotId);
+  assert.equal(snapshot.createdBy, commissioner);
+  assert.deepEqual(snapshot.leaguePeriods[17]?.sourceNbaWeeks, [18, 19]);
+  assert.equal((accepted.body.state as LeagueDynamicState).schedule?.activeSnapshotId, snapshot.id);
+
+  const current = await request('/api/league/schedule', { headers: auth(commissioner) });
+  assert.equal(current.status, 200);
+  assert.equal(current.body.fallback, false);
+  assert.equal((current.body.snapshot as { id: string }).id, snapshot.id);
+
+  const audit = await store.readAudit(1);
+  assert.equal(audit[0]?.action, 'schedule.accepted');
+  assert.equal((audit[0]?.detail as { snapshotId?: string })?.snapshotId, snapshot.id);
+});
+
+test('rejects a changed candidate, stale preview, and post-draft schedule acceptance', async () => {
+  const candidate = scheduleCandidate();
+  const preview = await request('/api/league/schedule/preview', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify(candidate),
+  });
+  assert.equal(preview.status, 200);
+
+  const changed = structuredClone(candidate);
+  changed.mapping[0]!.label = 'Changed label';
+  const mismatch = await request('/api/league/schedule/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({
+      ...changed,
+      expectedCurrentSnapshotId: preview.body.currentSnapshotId,
+      fingerprint: preview.body.fingerprint,
+    }),
+  });
+  assert.equal(mismatch.status, 409);
+  assert.match(String(mismatch.body.error), /no longer matches/);
+
+  const accepted = await request('/api/league/schedule/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({
+      ...candidate,
+      expectedCurrentSnapshotId: preview.body.currentSnapshotId,
+      fingerprint: preview.body.fingerprint,
+    }),
+  });
+  assert.equal(accepted.status, 200);
+
+  const stale = await request('/api/league/schedule/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({
+      ...candidate,
+      expectedCurrentSnapshotId: preview.body.currentSnapshotId,
+      fingerprint: preview.body.fingerprint,
+    }),
+  });
+  assert.equal(stale.status, 409);
+  assert.match(String(stale.body.error), /changed; preview again|already matches/);
+
+  await replaceState(cleanState());
+  const freshPreview = await request('/api/league/schedule/preview', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify(candidate),
+  });
+  assert.equal(freshPreview.status, 200);
+  const started = cleanState();
+  started.draft.startedAt = '2026-10-18T21:00:00.000Z';
+  await replaceState(started);
+
+  const afterDraft = await request('/api/league/schedule/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({
+      ...candidate,
+      expectedCurrentSnapshotId: freshPreview.body.currentSnapshotId,
+      fingerprint: freshPreview.body.fingerprint,
+    }),
+  });
+  assert.equal(afterDraft.status, 409);
+  assert.equal(afterDraft.body.reason, 'draft-started');
 });
 
 test('keeps player-pool preview and acceptance commissioner-only', async () => {

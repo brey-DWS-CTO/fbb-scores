@@ -134,6 +134,12 @@ export interface LeagueDynamicState {
     acceptedAt?: string;
     acceptedBy?: string;
   };
+  /** Commissioner-accepted NBA schedule used by later projection features. */
+  schedule?: {
+    activeSnapshotId: string | null;
+    acceptedAt?: string;
+    acceptedBy?: string;
+  };
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
 }

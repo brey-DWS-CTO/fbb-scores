@@ -25,6 +25,7 @@ import {
   claimPin,
   appendAudit,
   acceptPlayerPoolSnapshot,
+  acceptScheduleSnapshot,
   clearKeeperScenario,
   clearKeeperScenariosForSeason,
   getKeeperScenario,
@@ -33,6 +34,7 @@ import {
   setKeeperScenarioTarget,
   DRAFT_AT_ISO,
   PlayerPoolAcceptError,
+  ScheduleAcceptError,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
@@ -45,6 +47,13 @@ import {
   resolveDraftDataset,
   resolveDraftPlayerPool,
 } from '../lib/playerPoolService.js';
+import {
+  FALLBACK_SCHEDULE,
+  makeScheduleSnapshot,
+  parseScheduleCandidate,
+  prepareScheduleCandidate,
+  resolveCurrentSchedule,
+} from '../lib/scheduleService.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -184,6 +193,9 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
       activeSnapshotId: state.playerPool?.activeSnapshotId ?? FALLBACK_PLAYER_POOL.id,
       draftSnapshotId: state.draft.playerPoolSnapshotId ?? null,
     },
+    schedule: {
+      activeSnapshotId: state.schedule?.activeSnapshotId ?? FALLBACK_SCHEDULE.id,
+    },
     viewer: viewer.owner,
     isCommissioner: viewer.isCommissioner,
   };
@@ -220,6 +232,92 @@ router.get('/player-pool', async (_req, res) => {
     snapshot,
     fallback: snapshot.id === FALLBACK_PLAYER_POOL.id,
     draftSnapshotId: state.draft.playerPoolSnapshotId ?? null,
+  });
+});
+
+/** GET /api/league/schedule — current immutable schedule snapshot. */
+router.get('/schedule', requireAuth, requireCommissioner, async (_req, res) => {
+  const { state } = await getState();
+  const snapshot = await resolveCurrentSchedule(state);
+  res.json({
+    snapshot,
+    fallback: snapshot.id === FALLBACK_SCHEDULE.id,
+  });
+});
+
+/** POST /api/league/schedule/preview — validate and diff a candidate without writing. */
+router.post('/schedule/preview', requireAuth, requireCommissioner, async (req, res) => {
+  let candidate;
+  try {
+    candidate = parseScheduleCandidate(req.body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid schedule' });
+    return;
+  }
+  const { state } = await getState();
+  const prepared = await prepareScheduleCandidate(state, candidate);
+  res.json({
+    currentSnapshotId: prepared.currentSnapshot.id,
+    candidateSnapshotId: prepared.snapshotId,
+    fingerprint: prepared.fingerprint,
+    preview: prepared.preview,
+  });
+});
+
+/** POST /api/league/schedule/accept — accept the exact previewed candidate. */
+router.post('/schedule/accept', requireAuth, requireCommissioner, async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof body.expectedCurrentSnapshotId !== 'string' || body.expectedCurrentSnapshotId === '') {
+    res.status(400).json({ error: 'expectedCurrentSnapshotId is required' });
+    return;
+  }
+  if (typeof body.fingerprint !== 'string' || body.fingerprint === '') {
+    res.status(400).json({ error: 'fingerprint is required' });
+    return;
+  }
+
+  let candidate;
+  try {
+    candidate = parseScheduleCandidate(body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid schedule' });
+    return;
+  }
+  const { state } = await getState();
+  const prepared = await prepareScheduleCandidate(state, candidate);
+  if (body.expectedCurrentSnapshotId !== prepared.currentSnapshot.id) {
+    res.status(409).json({ error: 'The active schedule changed; preview again' });
+    return;
+  }
+  if (body.fingerprint !== prepared.fingerprint) {
+    res.status(409).json({ error: 'The candidate no longer matches the preview; preview again' });
+    return;
+  }
+  if (state.schedule?.activeSnapshotId === prepared.snapshotId) {
+    res.status(409).json({ error: 'The candidate already matches the active schedule' });
+    return;
+  }
+
+  const acceptedAt = new Date().toISOString();
+  const acceptedBy = res.locals.owner as string;
+  const snapshot = makeScheduleSnapshot(prepared, acceptedAt, acceptedBy);
+  const result = await acceptScheduleSnapshot(
+    snapshot,
+    body.expectedCurrentSnapshotId,
+    FALLBACK_SCHEDULE.id,
+    acceptedAt,
+    acceptedBy,
+  );
+  await appendAudit(acceptedBy, 'schedule.accepted', {
+    snapshotId: snapshot.id,
+    baseSnapshotId: snapshot.baseSnapshotId,
+    status: snapshot.status,
+    changedTeamPeriods: prepared.preview.changedTeamPeriods.length,
+    changedMappings: prepared.preview.changedMappings.length,
+  });
+  res.json({
+    ...redactState(result, { owner: acceptedBy, isCommissioner: true }),
+    snapshot,
   });
 });
 
@@ -748,6 +846,10 @@ router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;
   if (err instanceof PlayerPoolAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof ScheduleAcceptError) {
     res.status(409).json({ error: err.message, reason: err.reason });
     return;
   }

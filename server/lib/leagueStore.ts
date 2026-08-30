@@ -19,6 +19,7 @@ import { fileURLToPath } from 'url';
 import { neon } from '@neondatabase/serverless';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
+import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,11 @@ export interface LeagueDynamicState {
     acceptedAt?: string;
     acceptedBy?: string;
   };
+  schedule?: {
+    activeSnapshotId: string | null;
+    acceptedAt?: string;
+    acceptedBy?: string;
+  };
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
 }
@@ -88,6 +94,15 @@ export class PlayerPoolAcceptError extends Error {
   reason: 'draft-started' | 'stale-base' | 'snapshot-conflict';
 
   constructor(reason: PlayerPoolAcceptError['reason'], message: string) {
+    super(message);
+    this.reason = reason;
+  }
+}
+
+export class ScheduleAcceptError extends Error {
+  reason: 'draft-started' | 'stale-base' | 'snapshot-conflict';
+
+  constructor(reason: ScheduleAcceptError['reason'], message: string) {
     super(message);
     this.reason = reason;
   }
@@ -163,6 +178,14 @@ interface StoreBackend {
     acceptedAt: string,
     acceptedBy: string,
   ): Promise<MutateResult>;
+  getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null>;
+  acceptScheduleSnapshot(
+    snapshot: StoredScheduleSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult>;
 }
 
 // ─── Neon Postgres backend ───────────────────────────────────────────────────
@@ -223,6 +246,14 @@ class NeonBackend implements StoreBackend {
       selections jsonb not null,
       updated_at timestamptz not null default now(),
       primary key (season, viewer, target)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS schedule_snapshots (
+      id text primary key,
+      season int not null,
+      fingerprint text not null unique,
+      data jsonb not null,
+      created_at timestamptz not null,
+      created_by text not null
     )`;
     await this.sql`INSERT INTO league_state (id, data, version)
       VALUES (1, ${JSON.stringify(defaultState())}::jsonb, 0)
@@ -445,6 +476,64 @@ class NeonBackend implements StoreBackend {
     }
     throw new PlayerPoolAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
   }
+
+  async getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data FROM schedule_snapshots WHERE id = ${id}`) as Array<{
+      data: StoredScheduleSnapshot;
+    }>;
+    return rows[0]?.data ?? null;
+  }
+
+  async acceptScheduleSnapshot(
+    snapshot: StoredScheduleSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult> {
+    await this.ensureInit();
+    const pointer = { activeSnapshotId: snapshot.id, acceptedAt, acceptedBy };
+    const rows = (await this.sql`WITH eligible AS (
+        SELECT id FROM league_state
+        WHERE id = 1
+          AND (data #>> '{draft,startedAt}') IS NULL
+          AND COALESCE(data #>> '{schedule,activeSnapshotId}', ${fallbackId}) = ${expectedCurrentId}
+      ), inserted AS (
+        INSERT INTO schedule_snapshots (id, season, fingerprint, data, created_at, created_by)
+        SELECT ${snapshot.id}, ${snapshot.season}, ${snapshot.fingerprint},
+          ${JSON.stringify(snapshot)}::jsonb, ${snapshot.createdAt}, ${snapshot.createdBy}
+        FROM eligible
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id
+      ), valid_snapshot AS (
+        SELECT id FROM inserted
+        UNION ALL
+        SELECT id FROM schedule_snapshots
+          WHERE id = ${snapshot.id} AND fingerprint = ${snapshot.fingerprint}
+      )
+      UPDATE league_state
+      SET data = jsonb_set(data, '{schedule}', ${JSON.stringify(pointer)}::jsonb, true),
+        version = version + 1,
+        updated_at = now()
+      WHERE id = 1
+        AND (data #>> '{draft,startedAt}') IS NULL
+        AND COALESCE(data #>> '{schedule,activeSnapshotId}', ${fallbackId}) = ${expectedCurrentId}
+        AND EXISTS (SELECT 1 FROM valid_snapshot)
+      RETURNING data, version`) as Array<{ data: LeagueDynamicState; version: number }>;
+    const updated = rows[0];
+    if (updated) return { state: updated.data, version: updated.version };
+
+    const state = await this.getState();
+    if (state.state.draft.startedAt !== null) {
+      throw new ScheduleAcceptError('draft-started', 'The schedule cannot change after the draft starts');
+    }
+    const currentId = state.state.schedule?.activeSnapshotId ?? fallbackId;
+    if (currentId !== expectedCurrentId) {
+      throw new ScheduleAcceptError('stale-base', 'The active schedule changed; preview again');
+    }
+    throw new ScheduleAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
+  }
 }
 
 // ─── Local JSON file backend ─────────────────────────────────────────────────
@@ -456,6 +545,7 @@ interface FileDoc {
   pins: Record<string, string>;
   audit: AuditRow[];
   playerPoolSnapshots: PlayerPoolSnapshot[];
+  scheduleSnapshots: StoredScheduleSnapshot[];
   keeperScenarios: Array<{
     season: number;
     viewer: string;
@@ -503,6 +593,7 @@ class FileBackend implements StoreBackend {
         pins: doc.pins ?? {},
         audit: Array.isArray(doc.audit) ? doc.audit : [],
         playerPoolSnapshots: Array.isArray(doc.playerPoolSnapshots) ? doc.playerPoolSnapshots : [],
+        scheduleSnapshots: Array.isArray(doc.scheduleSnapshots) ? doc.scheduleSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
       };
     } catch {
@@ -513,6 +604,7 @@ class FileBackend implements StoreBackend {
         pins: {},
         audit: [],
         playerPoolSnapshots: [],
+        scheduleSnapshots: [],
         keeperScenarios: [],
       };
     }
@@ -687,6 +779,42 @@ class FileBackend implements StoreBackend {
       return { state: doc.state, version: doc.version };
     });
   }
+
+  async getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {
+    await this.ensureInit();
+    const doc = this.readDoc();
+    return doc.scheduleSnapshots.find((snapshot) => snapshot.id === id) ?? null;
+  }
+
+  async acceptScheduleSnapshot(
+    snapshot: StoredScheduleSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (doc.state.draft.startedAt !== null) {
+        throw new ScheduleAcceptError('draft-started', 'The schedule cannot change after the draft starts');
+      }
+      const currentId = doc.state.schedule?.activeSnapshotId ?? fallbackId;
+      if (currentId !== expectedCurrentId) {
+        throw new ScheduleAcceptError('stale-base', 'The active schedule changed; preview again');
+      }
+      const existing = doc.scheduleSnapshots.find((candidate) => candidate.id === snapshot.id);
+      if (existing && existing.fingerprint !== snapshot.fingerprint) {
+        throw new ScheduleAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
+      }
+      if (!existing) doc.scheduleSnapshots.push(structuredClone(snapshot));
+      doc.state.schedule = { activeSnapshotId: snapshot.id, acceptedAt, acceptedBy };
+      doc.version += 1;
+      doc.updatedAt = acceptedAt;
+      this.writeDoc(doc);
+      return { state: doc.state, version: doc.version };
+    });
+  }
 }
 
 // ─── Backend selection (lazy singleton) ──────────────────────────────────────
@@ -837,6 +965,26 @@ export async function acceptPlayerPoolSnapshot(
   acceptedBy: string,
 ): Promise<MutateResult> {
   return getBackend().acceptPlayerPoolSnapshot(
+    snapshot,
+    expectedCurrentId,
+    fallbackId,
+    acceptedAt,
+    acceptedBy,
+  );
+}
+
+export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {
+  return getBackend().getScheduleSnapshot(id);
+}
+
+export async function acceptScheduleSnapshot(
+  snapshot: StoredScheduleSnapshot,
+  expectedCurrentId: string,
+  fallbackId: string,
+  acceptedAt: string,
+  acceptedBy: string,
+): Promise<MutateResult> {
+  return getBackend().acceptScheduleSnapshot(
     snapshot,
     expectedCurrentId,
     fallbackId,

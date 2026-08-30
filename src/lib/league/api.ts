@@ -6,6 +6,13 @@ import type {
   PlayerPoolSnapshot,
 } from './playerPool.js';
 import type { KeeperScenario } from './keeperScenario.js';
+import type {
+  LeagueScheduleMapping,
+  RawScheduleSource,
+  ScheduleRefreshPreview,
+  ScheduleSourceStatus,
+  StoredScheduleSnapshot,
+} from './schedule.js';
 
 export interface StateMeta {
   draftAt: string;
@@ -15,6 +22,9 @@ export interface StateMeta {
   playerPool?: {
     activeSnapshotId: string;
     draftSnapshotId: string | null;
+  };
+  schedule?: {
+    activeSnapshotId: string;
   };
   viewer: string | null;
   isCommissioner: boolean;
@@ -52,6 +62,19 @@ export interface FetchedPlayerPoolPreviewResponse extends PlayerPoolPreviewRespo
 export interface KeeperScenarioResponse {
   season: number;
   scenario: KeeperScenario;
+}
+
+export interface ScheduleCandidateInput {
+  source: RawScheduleSource;
+  mapping: LeagueScheduleMapping[];
+  status: ScheduleSourceStatus;
+}
+
+export interface SchedulePreviewResponse {
+  currentSnapshotId: string;
+  candidateSnapshotId: string;
+  fingerprint: string;
+  preview: ScheduleRefreshPreview;
 }
 
 const authHeaders = (c: Credentials) => ({ 'x-owner': c.owner, 'x-pin': c.pin });
@@ -207,6 +230,40 @@ export async function clearKeeperScenario(c: Credentials): Promise<KeeperScenari
   const { data } = await axios.delete<KeeperScenarioResponse>('/api/league/keeper-scenario', {
     headers: authHeaders(c),
   });
+  return data;
+}
+
+export async function fetchSchedule(
+  c: Credentials,
+): Promise<{ snapshot: StoredScheduleSnapshot; fallback: boolean }> {
+  const { data } = await axios.get('/api/league/schedule', { headers: authHeaders(c) });
+  return data;
+}
+
+export async function previewSchedule(
+  c: Credentials,
+  candidate: ScheduleCandidateInput,
+): Promise<SchedulePreviewResponse> {
+  const { data } = await axios.post('/api/league/schedule/preview', candidate, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function acceptSchedule(
+  c: Credentials,
+  candidate: ScheduleCandidateInput,
+  preview: Pick<SchedulePreviewResponse, 'currentSnapshotId' | 'fingerprint'>,
+): Promise<StateResponse & { snapshot: StoredScheduleSnapshot }> {
+  const { data } = await axios.post(
+    '/api/league/schedule/accept',
+    {
+      ...candidate,
+      expectedCurrentSnapshotId: preview.currentSnapshotId,
+      fingerprint: preview.fingerprint,
+    },
+    { headers: authHeaders(c) },
+  );
   return data;
 }
 

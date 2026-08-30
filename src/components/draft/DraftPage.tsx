@@ -197,7 +197,10 @@ export default function DraftPage() {
 
   const started = state.draft.startedAt !== null;
   const poolReady = playerPoolQuery.isSuccess;
-  const scenario = !started && meta?.revealed !== true ? scenarioQuery.scenario : {};
+  const scenario = useMemo(
+    () => !started && meta?.revealed !== true ? scenarioQuery.scenario : {},
+    [meta?.revealed, scenarioQuery.scenario, started],
+  );
   const scenarioActive = Object.keys(scenario).length > 0;
   const projectedKeys = useMemo(() => projectedPlayerKeys(scenario), [scenario]);
   const boardState = useMemo(

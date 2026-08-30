@@ -76,6 +76,34 @@ export interface TeamScheduleSummary {
   postseasonTotal: number;
 }
 
+export interface StoredScheduleSnapshot extends ScheduleSnapshot {
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  baseSnapshotId: string | null;
+  fingerprint: string;
+  leaguePeriods: LeagueSchedulePeriod[];
+}
+
+export interface SchedulePeriodChange {
+  leagueWeek: number;
+  teamId: number;
+  teamCode: string;
+  before: number;
+  after: number;
+}
+
+export interface ScheduleMappingChange {
+  leagueWeek: number;
+  beforeSourceNbaWeeks: number[];
+  afterSourceNbaWeeks: number[];
+}
+
+export interface ScheduleRefreshPreview {
+  changedTeamPeriods: SchedulePeriodChange[];
+  changedMappings: ScheduleMappingChange[];
+}
+
 export const NBA_TEAMS: readonly NbaTeam[] = [
   { espnId: 1, code: 'ATL' },
   { espnId: 2, code: 'BOS' },
