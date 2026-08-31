@@ -13,7 +13,8 @@
     "start": "node --import tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview",
-    "smoke:prod": "node scripts/smoke-production.mjs"
+    "smoke:prod": "node scripts/smoke-production.mjs",
+    "ship": "node scripts/ship-production.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

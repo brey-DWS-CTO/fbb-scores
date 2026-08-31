@@ -7,7 +7,7 @@ _State as of 2026-08-30. For anyone (human or AI) picking this up._
 The Nerds fantasy basketball league's keeper/draft app for the **2027 season** (draft: **Sun Oct 18, 2026, 2:00 PM PT**). Rebuilt from the old ESPN live-scores app in one day; the scores UI was deleted (recover from git history, pre-`5a024a0`) but the ESPN proxy routes remain server-side for the data pipeline and future live scoring.
 
 - **Prod:** https://fbb-scores.dowhatsolutions.com (alias: nerds-league.vercel.app)
-- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores`; GitHub `master` is the intended production source. Use `vercel deploy --prod` only as a fallback.
+- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores`; run `npm run ship` from a clean `master` branch. The Vercel team's GitHub app still needs access to `brey-DWS-CTO/fbb-scores` before pushes can deploy without the CLI.
 - **DB:** Neon Postgres `neon-cordovan-ball` (Vercel Marketplace, `DATABASE_URL`); local dev falls back to `.data/league-state.json`
 - **DNS:** `fbb-scores` CNAME → `cname.vercel-dns.com` at domain.com; old Render service is defunct
 
@@ -85,12 +85,11 @@ As of 2026-08-30: 41 tests pass, lint passes with no warnings, and the productio
 
 `npm run check` runs the full local gate. During prelaunch, ship each complete user-visible batch instead of leaving it only on a local branch:
 
-1. Run `npm run check`.
-2. Commit the batch to `master`.
-3. Push `master`; the Vercel Git link should deploy production.
-4. Wait for Vercel to report Ready, then run `npm run smoke:prod` and check the changed flow on the custom domain.
+1. Commit the batch to `master`.
+2. Run `npm run ship`.
+3. Check the changed flow on the custom domain.
 
-If a push does not create a deployment, inspect the Vercel Git link before using a manual deploy. A manual deploy hides a broken release path.
+The ship command refuses a dirty tree or any branch other than `master`, runs tests, lint, and the production build, pushes GitHub, deploys the same clean checkout through the Vercel CLI, then checks the real domain. Once the Vercel GitHub app has repo access, replace the CLI deploy step with a wait for the Git-triggered deployment.
 
 ## Future features (user's list)
 
