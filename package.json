@@ -8,10 +8,12 @@
     "dev:client": "vite",
     "server": "tsx watch server/index.ts",
     "test": "node --require ./tests/tsx-windows-shim.cjs --import tsx --test --test-concurrency=1 tests/*.test.ts",
+    "check": "npm test && npm run lint && npm run build",
     "build": "tsc -b && vite build",
     "start": "node --import tsx server/index.ts",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke:prod": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

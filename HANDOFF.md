@@ -7,7 +7,7 @@ _State as of 2026-08-30. For anyone (human or AI) picking this up._
 The Nerds fantasy basketball league's keeper/draft app for the **2027 season** (draft: **Sun Oct 18, 2026, 2:00 PM PT**). Rebuilt from the old ESPN live-scores app in one day; the scores UI was deleted (recover from git history, pre-`5a024a0`) but the ESPN proxy routes remain server-side for the data pipeline and future live scoring.
 
 - **Prod:** https://fbb-scores.dowhatsolutions.com (alias: nerds-league.vercel.app)
-- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores` — deploy with `vercel deploy --prod` (no git integration; CLI is authed)
+- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores`; GitHub `master` is the intended production source. Use `vercel deploy --prod` only as a fallback.
 - **DB:** Neon Postgres `neon-cordovan-ball` (Vercel Marketplace, `DATABASE_URL`); local dev falls back to `.data/league-state.json`
 - **DNS:** `fbb-scores` CNAME → `cname.vercel-dns.com` at domain.com; old Render service is defunct
 
@@ -33,7 +33,7 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 
 ## Auth / PINs
 
-`x-owner` + `x-pin` headers. PIN states in the `pins` table: `''` = unclaimed (owner self-sets via NEW-badge claim flow), `T:1234` = temporary (login works but forces a change), plain = permanent. Brey = commissioner (config-driven, `league-2027-config.json`), PIN **5624**. Commish Mode: `/admin` → VIEW PINS, or `scripts/admin-pins.ts` with prod `DATABASE_URL`.
+`x-owner` + `x-pin` headers. PIN states in the `pins` table: `''` = unclaimed (owner self-sets via NEW-badge claim flow), `T:1234` = temporary (login works but forces a change), plain = permanent. Brey = commissioner (config-driven, `league-2027-config.json`). Never put a real PIN in Git, logs, issues, or this handoff. Manage PINs in Commish Mode (`/admin` → VIEW PINS) or with `scripts/admin-pins.ts` and the production `DATABASE_URL`.
 
 ## Test mode
 
@@ -82,6 +82,15 @@ npm run build
 ```
 
 As of 2026-08-30: 41 tests pass, lint passes with no warnings, and the production build passes. Local browser checks also pass for the mobile owner picker, owner-to-owner navigation, sticky projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, the `COMMISH` bottom tab, the Commish schedule snapshot status, no-write diff preview, and two-step acceptance control. The build still reports one non-blocking JavaScript chunk-size warning.
+
+`npm run check` runs the full local gate. During prelaunch, ship each complete user-visible batch instead of leaving it only on a local branch:
+
+1. Run `npm run check`.
+2. Commit the batch to `master`.
+3. Push `master`; the Vercel Git link should deploy production.
+4. Wait for Vercel to report Ready, then run `npm run smoke:prod` and check the changed flow on the custom domain.
+
+If a push does not create a deployment, inspect the Vercel Git link before using a manual deploy. A manual deploy hides a broken release path.
 
 ## Future features (user's list)
 

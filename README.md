@@ -47,9 +47,13 @@ season end and are the league's convention; the API's full-season splits differ)
 ## Deployment
 
 ```bash
-vercel deploy --prod
+npm run check
+git push origin master
+npm run smoke:prod  # after the Vercel deployment is Ready
 ```
 
-Project `do-what-solutions-llc/fbb-scores`; Neon is attached via the Vercel Marketplace
-(env `DATABASE_URL`). ESPN cookie env vars must be refreshed when they expire.
-Commissioner PIN admin against prod: `DATABASE_URL=<from vercel env> npx tsx scripts/admin-pins.ts [owner] [pin]`.
+Pushes to GitHub `master` deploy through the Vercel Git link. Use `vercel deploy --prod`
+only as a fallback. Project `do-what-solutions-llc/fbb-scores`; Neon is attached via
+the Vercel Marketplace (env `DATABASE_URL`). ESPN cookie env vars must be refreshed
+when they expire. Never commit a real PIN. Manage commissioner PINs through Commish
+Mode or `scripts/admin-pins.ts` with a production `DATABASE_URL`.
