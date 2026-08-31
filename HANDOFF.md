@@ -161,6 +161,45 @@ Rule questions that need a commissioner decision before enforcement include the 
 
 The constitution's draft clock is manual: a member calls “CLOCK,” then the drafter gets 30 seconds. Do not add an automatic pick timer or auto-skip based only on elapsed time.
 
+### 4. Allow member-to-member draft-pick trade proposals
+
+Authenticated members should be able to propose and complete bilateral pick trades before the draft and while the draft is in progress. This feature is **draft picks only**: no players, keeper rights, future-season picks, FAAB, cash, or free-form assets may be included.
+
+Use stable pick identities `(season, round, originalOwner)` and store proposals plus accepted transfers in dynamic league state/Neon. Do not rewrite `league-2027-config.json` or mutate the committed historical trade records. The current owner must derive from the preseason trade seed plus the immutable ledger of accepted in-app transfers, so a pick can move through multiple owners without losing its chain of custody.
+
+Required behavior:
+
+1. A signed-in member can offer one or more picks they currently own for one or more picks currently owned by one other member. The server derives the proposer from the PIN and never trusts a client-supplied owner.
+2. The recipient can accept or reject a pending proposal; the proposer can cancel it. Keep terminal states (`accepted`, `rejected`, `cancelled`, `expired`, `invalidated`) instead of deleting history.
+3. Accept atomically rechecks ownership, proposal version, draft state, and whether every pick is still available. If either side no longer owns an offered pick, the proposal becomes invalid instead of partially executing.
+4. During the draft, only undrafted picks may move. The current on-clock pick may be traded while it is still empty, but trade acceptance and pick submission must serialize so exactly one wins and stale requests fail cleanly.
+5. An accepted trade immediately updates the draft board, TV view, Teams page, on-clock permissions, and traded-pick provenance. Preserve the pick's original owner and show every accepted transfer in its history.
+6. Before keeper lock, proposal previews must show how the trade changes both teams' keeper pick costs, including traded-away-round bumps and same-tier bumps, using the existing keeper engine. After keeper lock, reject any trade that would invalidate a locked keeper assignment; never reimplement keeper math in the trade service.
+7. Pending proposals are visible only to the two participants. Accepted trades become league-visible and append an audit entry with proposal ID, both sides, exact pick identities, acceptance time, and accepting owner.
+8. Provide inbox/sent views, clear pending badges, a pick selector grouped by owner and round, a two-sided review screen, and confirmation before acceptance. Do not use free-form text to determine what transfers.
+9. Commissioner support may cancel a stuck pending proposal but must not silently accept for a member. Any future commissioner override needs an explicit audited action and should not be part of the first cut.
+
+Test ownership races, double acceptance, cancellation versus acceptance, on-clock trades, stale tabs, traded-twice provenance, keeper-cost changes, locked-keeper rejection, authorization/privacy, and persistence across restarts. Accepted trade records are immutable; corrections must be compensating transfers with their own audit history.
+
+### 5. Build League History and the record book
+
+Create a league-history area backed by structured, versioned records rather than prose copied into the UI. At minimum, preserve each season's champion, runner-up, final standings/playoff finish, participating franchises, and the league's recognized high-score records. Keep the model extensible for regular-season champions, semifinalists, awards, and other commissioner-approved historical categories.
+
+Use ESPN as the first source when an old season is still available and complete. Where ESPN cannot supply a season, transcribe the historical tables from the rulebook, but treat the rulebook as a source to review rather than unquestioned authority: its champion history stops at 2024-25, its high-score list says it is incomplete, and Aaron's 1243.0 is currently ordered below Eric's 1241.6. The referenced constitution file has not been committed to this repository; obtain and preserve a reviewed source copy before doing the import.
+
+Required behavior:
+
+1. Store seasons, franchises, participants, final placements, and records as typed data with stable IDs. Separate a franchise from its current owner/display name so renames and ownership changes do not rewrite history.
+2. Every imported fact needs provenance (`espn`, `rulebook`, or `commissioner`), a source reference, verification status, and review notes. Never silently merge conflicting sources.
+3. Provide a commissioner-only import preview and diff before writing. Validate one champion and one runner-up per completed season, distinct placements, known participants, sensible season boundaries, and duplicate record entries.
+4. Publish reviewed history as immutable versions. Corrections create a new revision with an audit entry and reason; they do not overwrite the prior published record invisibly.
+5. Show a season-by-season timeline/table, championship and runner-up totals by franchise/member, complete final standings where available, and sortable record leaderboards with season, opponent, period/date, raw value, and source.
+6. Distinguish raw scores from rule-adjusted or commissioner-recognized scores. Do not resolve the constitution's raw-versus-adjusted high-score ambiguity until the commissioner chooses the official rule.
+7. Link historical entries back to the applicable published rulebook version when one exists, but keep league history queryable even before the rulebook feature is complete.
+8. After each season, support closing the season into a reviewed history draft from final ESPN standings/results, then publish it only after commissioner confirmation.
+
+Seed coverage should include every season since the league began in 2010, explicitly mark unknown fields instead of inventing them, and add the missing 2025-26 champion/results. Tests should cover source conflicts, franchise continuity, duplicate placements, incomplete seasons, revision history, record ordering/ties, authorization, and deterministic totals.
+
 ### Later
 
 Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files).
