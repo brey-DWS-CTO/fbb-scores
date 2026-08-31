@@ -8,7 +8,6 @@ import PlayerCombobox from './PlayerCombobox.js';
 import CommissionerPanel from './CommissionerPanel.js';
 import IdentityChip from './IdentityChip.js';
 import PlayerPoolAdmin from './PlayerPoolAdmin.js';
-import ScheduleAdmin from './ScheduleAdmin.js';
 import { RoundChip } from '../keepers/keeperUi.js';
 
 const baseRound = new Map(leagueDataset.players.map((p) => [p.key, p.keeper.round]));
@@ -116,7 +115,13 @@ export default function AdminPage() {
 
       <PlayerPoolAdmin />
 
-      <ScheduleAdmin />
+      <section className="panel commish-schedule-link">
+        <div>
+          <div className="hub-heading">📅 SCHEDULE</div>
+          <p>Review the 2027 NBA grid, Play-In weeks, playoff totals, and accepted snapshots.</p>
+        </div>
+        <Link className="tap-btn" to="/schedule">OPEN SCHEDULE →</Link>
+      </section>
 
       {/* ── Test mode ──────────────────────────────────────────── */}
       <section

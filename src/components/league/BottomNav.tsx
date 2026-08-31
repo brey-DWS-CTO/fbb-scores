@@ -11,11 +11,12 @@ const TABS = [
 export default function BottomNav() {
   const { identity } = useIdentity();
   const tabs = identity?.isCommissioner
-    ? [...TABS, { to: '/admin', label: 'COMMISH', icon: '👑' }]
+    ? [...TABS, { to: '/schedule', label: 'SCHEDULE', icon: '📅' }, { to: '/admin', label: 'COMMISH', icon: '👑' }]
     : TABS;
 
   return (
     <nav
+      className={identity?.isCommissioner ? 'bottom-nav bottom-nav-commish' : 'bottom-nav'}
       style={{
         position: 'fixed',
         bottom: 0,

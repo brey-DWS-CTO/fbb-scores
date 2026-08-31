@@ -83,7 +83,7 @@ npm run lint
 npm run build
 ```
 
-As of 2026-08-30: 41 tests pass, lint passes with no warnings, and the production build passes. Local browser checks also pass for the mobile owner picker, owner-to-owner navigation, sticky projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, the `COMMISH` bottom tab, the Commish schedule snapshot status, no-write diff preview, and two-step acceptance control. The build still reports one non-blocking JavaScript chunk-size warning.
+As of 2026-08-31: 43 tests pass, lint passes with no warnings, and the production build passes. Local browser checks also pass for the mobile owner picker, owner-to-owner navigation, sticky projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, the `COMMISH` bottom tab, the Commish schedule snapshot status, no-write diff preview, and two-step acceptance control. The build still reports one non-blocking JavaScript chunk-size warning.
 
 `npm run check` runs the full local gate. During prelaunch, ship each complete user-visible batch instead of leaving it only on a local branch:
 
@@ -137,6 +137,8 @@ Store explicit period dates and phase metadata. Do not infer the All-Star rule f
 The workbook's bottom summary omits Play-In 1 and total Play-In games; the app must correct that. Its game-cap formula also hardcodes 100 league games, a 30-game normal cap, and a 133-game threshold. Make any retained values named league settings.
 
 Foundation now present: `src/data/source/basketball-monster-schedule-2027.json` records the live 25-week grid and its source time. `src/lib/league/schedule.ts` validates 30 unique teams, aliases, dates, row parity, and 82 games per team, then maps the first 23 NBA calendar weeks into 22 fantasy periods. It uses ESPN NBA team IDs and leaves NBA weeks 24-25 unused after the league's March 28 end date. Commish Mode shows the wide period grid and a postseason summary with each Play-In week, Play-In total, all four playoff weeks, both round totals, playoff total, and combined postseason total.
+
+The grid now lives on its own commissioner-only `/schedule` page and `SCHEDULE` nav tab; Commish Mode links to it instead of embedding the full table. Its conditional formatting follows the workbook: 2 games red, 3 yellow, 4 light green, and 5+ dark green. Period totals and postseason metrics use a low-to-high red/orange/yellow/light-green/dark-green scale. Headers and period/team labels stay fixed while the grid scrolls.
 
 Immutable snapshot storage, commissioner API routes, and the Commish Mode preview/accept panel are now present. Neon uses `schedule_snapshots`; local development mirrors snapshots in `.data/league-state.json`. A preview validates the source and mapping without writing, reports changed team-period counts and week mappings, and returns a fingerprint tied to the active base. Acceptance requires that exact fingerprint and base ID, moves only the active pointer, logs the action, and fails after the draft starts or when the base changed. The committed JSON remains the fallback. Tests cover auth, no-write preview, exact acceptance, audit, candidate mismatch, stale preview, draft lock, All-Star placement, date bounds, aliases, source failures, mapping overlap, and representative team totals.
 

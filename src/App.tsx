@@ -9,6 +9,7 @@ import DraftTvPage from './components/draft/DraftTvPage.js'
 import LeaguePage from './components/league/LeaguePage.js'
 import TeamsPage from './components/league/TeamsPage.js'
 import AdminPage from './components/league/AdminPage.js'
+import SchedulePage from './components/league/SchedulePage.js'
 
 function App() {
   const location = useLocation()
@@ -47,6 +48,7 @@ function App() {
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/schedule" element={<SchedulePage />} />
         <Route path="*" element={<SplashPage />} />
       </Routes>
       {!bareMode && <BottomNav />}

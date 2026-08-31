@@ -23,8 +23,23 @@ import {
   type SchedulePreviewResponse,
 } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity, useLeagueState } from '../../hooks/useLeague.js';
+import { gameCountHeat, relativeScheduleHeat, scheduleHeatLabel } from './scheduleUi.js';
 
 type View = 'periods' | 'postseason';
+
+const POSTSEASON_HEADERS = [
+  'PI 1',
+  'PI 2',
+  'PI TOTAL',
+  'R1 W1',
+  'R1 W2',
+  'R1 TOTAL',
+  'R2 W1',
+  'R2 W2',
+  'R2 TOTAL',
+  'PLAYOFF',
+  'POSTSEASON',
+] as const;
 
 const teams = [...NBA_TEAMS].sort((a, b) => a.code.localeCompare(b.code));
 const COMMITTED_CANDIDATE: ScheduleCandidateInput = {
@@ -52,12 +67,6 @@ function phaseColor(period: LeagueSchedulePeriod): string {
   if (period.phase === 'fantasy-playoff') return 'var(--neon-orange)';
   return 'var(--text-mid)';
 }
-
-const cellStyle = {
-  borderBottom: '1px solid var(--panel-border)',
-  padding: '5px 7px',
-  textAlign: 'right' as const,
-};
 
 export default function ScheduleAdmin() {
   const { identity } = useIdentity();
@@ -87,6 +96,37 @@ export default function ScheduleAdmin() {
   const summaryByTeamId = useMemo(
     () => new Map(teamScheduleSummaries.map((summary) => [summary.teamId, summary])),
     [teamScheduleSummaries],
+  );
+  const periodTotals = useMemo(
+    () => leaguePeriods.map((period) => Object.values(period.gamesByTeamId).reduce((sum, games) => sum + games, 0)),
+    [leaguePeriods],
+  );
+  const postseasonRows = useMemo(
+    () => teams.flatMap((team) => {
+      const summary = summaryByTeamId.get(team.espnId);
+      if (!summary) return [];
+      return [{
+        team,
+        values: [
+          summary.playIn.byLeagueWeek[17],
+          summary.playIn.byLeagueWeek[18],
+          summary.playIn.total,
+          summary.playoffs.byLeagueWeek[19],
+          summary.playoffs.byLeagueWeek[20],
+          summary.playoffs.round1,
+          summary.playoffs.byLeagueWeek[21],
+          summary.playoffs.byLeagueWeek[22],
+          summary.playoffs.round2,
+          summary.playoffs.total,
+          summary.postseasonTotal,
+        ],
+      }];
+    }),
+    [summaryByTeamId],
+  );
+  const postseasonColumns = useMemo(
+    () => POSTSEASON_HEADERS.map((_, column) => postseasonRows.map((row) => row.values[column])),
+    [postseasonRows],
   );
   const draftStarted = state.draft.startedAt !== null;
   const inSandbox = sandboxActive();
@@ -126,7 +166,7 @@ export default function ScheduleAdmin() {
   };
 
   return (
-    <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
+    <section className="panel schedule-workspace">
       <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-orange)', marginBottom: 6 }}>
         2027 SCHEDULE GRID
       </div>
@@ -302,81 +342,101 @@ export default function ScheduleAdmin() {
         ))}
       </div>
 
-      <div style={{ overflowX: 'auto', marginTop: 12 }}>
+      <div className="schedule-legend" aria-label="Schedule game-count colors">
+        <span>GAMES PER TEAM</span>
+        {[
+          [2, 'LOW'],
+          [3, 'LIGHT'],
+          [4, 'HEAVY'],
+          [5, 'MAX'],
+        ].map(([games, label]) => (
+          <span key={games}>
+            <b className={`schedule-heat-${gameCountHeat(Number(games))}`}>{games}</b>
+            {label}
+          </span>
+        ))}
+      </div>
+
+      <div className="schedule-table-scroll" role="region" aria-label={view === 'periods' ? 'League schedule by period' : 'Postseason schedule totals'} tabIndex={0}>
         {view === 'periods' ? (
-          <table style={{ borderCollapse: 'collapse', minWidth: 1260, fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+          <table className="schedule-grid-table">
             <thead>
               <tr>
-                <th style={{ ...cellStyle, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--panel-bg)', zIndex: 2 }}>PERIOD</th>
-                <th style={{ ...cellStyle, textAlign: 'left' }}>DATES</th>
-                <th style={{ ...cellStyle, textAlign: 'left' }}>NBA WK</th>
-                {teams.map((team) => <th key={team.espnId} style={cellStyle}>{team.code}</th>)}
-                <th style={cellStyle}>TEAM-GAMES</th>
-                <th style={cellStyle}>AVG</th>
+                <th className="schedule-sticky-corner">PERIOD</th>
+                <th>DATES</th>
+                <th>NBA WK</th>
+                {teams.map((team) => <th key={team.espnId}>{team.code}</th>)}
+                <th>TEAM-GAMES</th>
+                <th>AVG</th>
               </tr>
             </thead>
             <tbody>
-              {leaguePeriods.map((period) => {
-                const total = Object.values(period.gamesByTeamId).reduce((sum, games) => sum + games, 0);
+              {leaguePeriods.map((period, periodIndex) => {
+                const total = periodTotals[periodIndex];
+                const totalHeat = relativeScheduleHeat(total, periodTotals);
                 return (
-                  <tr key={period.leagueWeek}>
-                    <td
-                      style={{
-                        ...cellStyle,
-                        textAlign: 'left',
-                        color: phaseColor(period),
-                        fontWeight: 800,
-                        position: 'sticky',
-                        left: 0,
-                        background: 'var(--panel-bg)',
-                      }}
-                    >
+                  <tr
+                    key={period.leagueWeek}
+                    className={[
+                      period.leagueWeek === 17 || period.leagueWeek === 19 || period.leagueWeek === 21 ? 'schedule-period-break' : '',
+                      period.leagueWeek === 17 ? 'schedule-period-play-in' : '',
+                      period.leagueWeek === 19 || period.leagueWeek === 21 ? 'schedule-period-playoff' : '',
+                    ].filter(Boolean).join(' ') || undefined}
+                  >
+                    <td className="schedule-sticky-period" style={{ color: phaseColor(period) }}>
                       {period.label}{period.combinesAllStarBreak ? ' ★' : ''}
                     </td>
-                    <td style={{ ...cellStyle, textAlign: 'left', color: 'var(--text-mid)' }}>{dateRange(period)}</td>
-                    <td style={{ ...cellStyle, textAlign: 'left', color: 'var(--text-dim)' }}>{period.sourceNbaWeeks.join('+')}</td>
-                    {teams.map((team) => (
-                      <td key={team.espnId} style={{ ...cellStyle, color: 'var(--text-hi)' }}>
-                        {period.gamesByTeamId[team.espnId]}
-                      </td>
-                    ))}
-                    <td style={{ ...cellStyle, color: 'var(--text-mid)', fontWeight: 700 }}>{total}</td>
-                    <td style={{ ...cellStyle, color: 'var(--text-mid)' }}>{(total / 30).toFixed(2)}</td>
+                    <td className="schedule-date-cell">{dateRange(period)}</td>
+                    <td className="schedule-source-cell">{period.sourceNbaWeeks.join('+')}</td>
+                    {teams.map((team) => {
+                      const games = period.gamesByTeamId[team.espnId];
+                      const heat = gameCountHeat(games);
+                      return (
+                        <td
+                          key={team.espnId}
+                          className={`schedule-game-cell schedule-heat-${heat}`}
+                          aria-label={`${team.code}, ${period.label}: ${games} games, ${scheduleHeatLabel(heat)}`}
+                          title={`${team.code}: ${games} games`}
+                        >
+                          {games}
+                        </td>
+                      );
+                    })}
+                    <td className={`schedule-total-cell schedule-heat-${totalHeat}`} aria-label={`${total} total team-games, ${scheduleHeatLabel(totalHeat)}`}>
+                      {total}
+                    </td>
+                    <td className={`schedule-total-cell schedule-heat-${totalHeat}`}>{(total / 30).toFixed(2)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         ) : (
-          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 760, fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+          <table className="schedule-summary-table">
             <thead>
               <tr>
-                {['TEAM', 'PI 1', 'PI 2', 'PI TOTAL', 'R1 W1', 'R1 W2', 'R1 TOTAL', 'R2 W1', 'R2 W2', 'R2 TOTAL', 'PLAYOFF', 'POSTSEASON'].map((label, index) => (
-                  <th key={label} style={{ ...cellStyle, textAlign: index === 0 ? 'left' : 'right' }}>{label}</th>
-                ))}
+                <th className="schedule-sticky-corner">TEAM</th>
+                {POSTSEASON_HEADERS.map((label) => <th key={label}>{label}</th>)}
               </tr>
             </thead>
             <tbody>
-              {teams.map((team) => {
-                const summary = summaryByTeamId.get(team.espnId);
-                if (!summary) return null;
-                return (
-                  <tr key={team.espnId}>
-                    <td style={{ ...cellStyle, textAlign: 'left', color: 'var(--neon-orange)', fontWeight: 800 }}>{team.code}</td>
-                    <td style={cellStyle}>{summary.playIn.byLeagueWeek[17]}</td>
-                    <td style={cellStyle}>{summary.playIn.byLeagueWeek[18]}</td>
-                    <td style={{ ...cellStyle, color: 'var(--neon-purple)', fontWeight: 800 }}>{summary.playIn.total}</td>
-                    <td style={cellStyle}>{summary.playoffs.byLeagueWeek[19]}</td>
-                    <td style={cellStyle}>{summary.playoffs.byLeagueWeek[20]}</td>
-                    <td style={{ ...cellStyle, fontWeight: 800 }}>{summary.playoffs.round1}</td>
-                    <td style={cellStyle}>{summary.playoffs.byLeagueWeek[21]}</td>
-                    <td style={cellStyle}>{summary.playoffs.byLeagueWeek[22]}</td>
-                    <td style={{ ...cellStyle, fontWeight: 800 }}>{summary.playoffs.round2}</td>
-                    <td style={{ ...cellStyle, color: 'var(--neon-orange)', fontWeight: 800 }}>{summary.playoffs.total}</td>
-                    <td style={{ ...cellStyle, color: 'var(--neon-yellow)', fontWeight: 800 }}>{summary.postseasonTotal}</td>
-                  </tr>
-                );
-              })}
+              {postseasonRows.map((row) => (
+                <tr key={row.team.espnId}>
+                  <td className="schedule-sticky-team">{row.team.code}</td>
+                  {row.values.map((value, column) => {
+                    const heat = relativeScheduleHeat(value, postseasonColumns[column]);
+                    return (
+                      <td
+                        key={POSTSEASON_HEADERS[column]}
+                        className={`schedule-summary-cell schedule-heat-${heat}`}
+                        aria-label={`${row.team.code} ${POSTSEASON_HEADERS[column]}: ${value}, ${scheduleHeatLabel(heat)}`}
+                      >
+                        {value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
