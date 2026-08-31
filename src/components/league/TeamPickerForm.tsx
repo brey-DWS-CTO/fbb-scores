@@ -1,190 +1,167 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { changePin, claimPin, fetchPinStatus, apiErrorMessage } from '../../lib/league/api.js';
 
-const inputStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  padding: '12px 14px',
-  background: 'var(--input-bg)',
-  border: '2px solid var(--panel-border)',
-  borderRadius: 8,
-  color: 'var(--text-max)',
-  fontSize: '1.1rem',
-  letterSpacing: '0.3em',
-  outline: 'none',
-};
-
-/**
- * The "who are you?" form: pick your team, set a PIN on first entry, then use
- * it. Shared by the splash page and the in-app modal.
- */
+/** Pick an owner and verify or create that owner's PIN. */
 export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
   const { signIn } = useIdentity();
-  const [owner, setOwner] = useState<string | null>(null);
+  const [owner, setOwner] = useState('');
   const [claimed, setClaimed] = useState<Record<string, boolean> | null>(null);
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Set when a temporary (commissioner-assigned) PIN was accepted: the owner
-  // must now choose their own PIN before they're signed in.
   const [tempPin, setTempPin] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPinStatus()
-      .then((rows) => setClaimed(Object.fromEntries(rows.map((r) => [r.owner, r.claimed]))))
+      .then((rows) => setClaimed(Object.fromEntries(rows.map((row) => [row.owner, row.claimed]))))
       .catch(() => setClaimed(null));
   }, []);
 
-  const isFirstTime = owner !== null && claimed !== null && claimed[owner] === false;
+  const team = owner ? teamByOwner.get(owner) : null;
+  const isFirstTime = owner !== '' && claimed !== null && claimed[owner] === false;
   const changing = tempPin !== null;
   const needsRepeat = isFirstTime || changing;
+  const ready = owner !== '' && pin.length >= 4 && (!needsRepeat || pin2.length >= 4);
 
-  const submit = async () => {
-    if (!owner || pin.length < 4) return;
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (!ready || busy) return;
     setBusy(true);
     setError(null);
     try {
       if (needsRepeat && pin !== pin2) {
-        setError("PINs don't match — type the same one twice.");
-        setBusy(false);
+        setError("PINs don't match. Type the same PIN twice.");
         return;
       }
       if (changing) {
-        // Forced change: replace the temp PIN, then sign in with the new one
-        await changePin({ owner, pin: tempPin! }, pin);
-        const res = await signIn(owner, pin);
-        if (res.ok) onDone();
-        else setError(res.error ?? 'Sign-in failed');
+        await changePin({ owner, pin: tempPin }, pin);
+        const result = await signIn(owner, pin);
+        if (result.ok) onDone();
+        else setError(result.error ?? 'Sign-in failed');
         return;
       }
-      if (isFirstTime) {
-        await claimPin(owner, pin);
-      }
-      const res = await signIn(owner, pin);
-      if (res.ok) onDone();
-      else if (res.mustChangePin) {
+      if (isFirstTime) await claimPin(owner, pin);
+      const result = await signIn(owner, pin);
+      if (result.ok) onDone();
+      else if (result.mustChangePin) {
         setTempPin(pin);
         setPin('');
         setPin2('');
-      } else setError(res.error ?? 'Sign-in failed');
-    } catch (e) {
-      setError(apiErrorMessage(e));
+      } else {
+        setError(result.error ?? 'Sign-in failed');
+      }
+    } catch (caught) {
+      setError(apiErrorMessage(caught));
     } finally {
       setBusy(false);
     }
   };
 
-  const ready = owner && pin.length >= 4 && (!needsRepeat || pin2.length >= 4);
+  const chooseOwner = (nextOwner: string) => {
+    setOwner(nextOwner);
+    setPin('');
+    setPin2('');
+    setError(null);
+    setTempPin(null);
+  };
 
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-        {OWNERS.map((o) => {
-          const team = teamByOwner.get(o);
-          const active = owner === o;
-          const unclaimed = claimed !== null && claimed[o] === false;
-          return (
-            <button
-              key={o}
-              onClick={() => {
-                setOwner(o);
-                setError(null);
-                setTempPin(null);
-              }}
-              style={{
-                padding: '10px 8px',
-                background: active ? 'rgba(0,255,204,0.12)' : 'var(--panel-bg)',
-                border: `2px solid ${active ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
-                borderRadius: 8,
-                color: active ? 'var(--neon-teal)' : 'var(--text-hi)',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                {o}
-                {unclaimed && (
-                  <span style={{ color: 'var(--neon-yellow)', fontSize: '0.65rem', marginLeft: 6 }}>
-                    NEW
-                  </span>
-                )}
-              </div>
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: 'var(--text-mid)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {team?.espnTeamName}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {changing ? (
-        <div style={{ color: 'var(--neon-teal)', marginTop: 12, fontSize: '0.8rem', fontWeight: 700 }}>
-          ✓ Temporary PIN accepted — now pick your OWN 4-8 digit PIN. You'll use it from here on.
-        </div>
-      ) : isFirstTime ? (
-        <div style={{ color: 'var(--neon-yellow)', marginTop: 12, fontSize: '0.8rem', fontWeight: 700 }}>
-          First time in — pick a 4-8 digit PIN. You'll use it every time, so remember it.
-        </div>
-      ) : null}
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-        <input
-          type="tel"
-          inputMode="numeric"
-          placeholder={needsRepeat ? 'New PIN' : 'PIN'}
-          value={pin}
-          maxLength={8}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          style={inputStyle}
-        />
-        {needsRepeat && (
-          <input
-            type="tel"
-            inputMode="numeric"
-            placeholder="Repeat it"
-            value={pin2}
-            maxLength={8}
-            onChange={(e) => setPin2(e.target.value.replace(/\D/g, ''))}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-            style={inputStyle}
-          />
-        )}
-        <button
-          onClick={submit}
-          disabled={!ready || busy}
-          style={{
-            padding: '12px 22px',
-            background: !ready ? 'var(--panel-border)' : 'var(--neon-teal)',
-            color: !ready ? 'var(--text-dim)' : '#001a14',
-            border: 'none',
-            borderRadius: 8,
-            fontWeight: 800,
-            cursor: 'pointer',
-          }}
+    <form className="identity-form" onSubmit={submit}>
+      <label className="identity-label" htmlFor="identity-owner">YOUR NAME</label>
+      <div className="identity-select-wrap">
+        <select
+          id="identity-owner"
+          className="identity-select"
+          value={owner}
+          onChange={(event) => chooseOwner(event.target.value)}
         >
-          {busy ? '...' : needsRepeat ? 'SET & GO' : "LET'S GO"}
-        </button>
+          <option value="">Select your name…</option>
+          {OWNERS.map((candidate) => {
+            const candidateTeam = teamByOwner.get(candidate);
+            const isNew = claimed !== null && claimed[candidate] === false;
+            return (
+              <option key={candidate} value={candidate}>
+                {candidate} · {candidateTeam?.espnTeamName}{isNew ? ' · NEW' : ''}
+              </option>
+            );
+          })}
+        </select>
       </div>
-      {error && (
-        <div style={{ color: 'var(--neon-red)', marginTop: 10, fontSize: '0.85rem' }}>{error}</div>
+
+      {team && (
+        <div className="identity-team-card">
+          <div>
+            <strong>{team.owner}</strong>
+            <span>{team.espnTeamName}</span>
+          </div>
+          <div className="identity-draft-slot">
+            <span>DRAFT</span>
+            <strong>#{team.draftPosition}</strong>
+          </div>
+        </div>
       )}
-      <div style={{ color: 'var(--text-dim)', marginTop: 10, fontSize: '0.75rem' }}>
+
+      {owner && (
+        <>
+          {changing && (
+            <div className="identity-notice identity-notice-ok">
+              Temporary PIN accepted. Choose your own 4–8 digit PIN.
+            </div>
+          )}
+          {!changing && isFirstTime && (
+            <div className="identity-notice">
+              First visit: choose a 4–8 digit PIN, then enter it again.
+            </div>
+          )}
+
+          <div className={needsRepeat ? 'identity-pin-grid identity-pin-grid-repeat' : 'identity-pin-grid'}>
+            <label>
+              <span className="identity-label">{needsRepeat ? 'NEW PIN' : 'PIN'}</span>
+              <input
+                className="identity-pin-input"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="current-password"
+                placeholder="••••"
+                value={pin}
+                maxLength={8}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
+                autoFocus
+              />
+            </label>
+            {needsRepeat && (
+              <label>
+                <span className="identity-label">REPEAT PIN</span>
+                <input
+                  className="identity-pin-input"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  placeholder="••••"
+                  value={pin2}
+                  maxLength={8}
+                  onChange={(event) => setPin2(event.target.value.replace(/\D/g, ''))}
+                />
+              </label>
+            )}
+          </div>
+
+          <button className="tap-btn identity-submit" type="submit" disabled={!ready || busy}>
+            {busy ? 'CHECKING…' : needsRepeat ? 'SET PIN & ENTER' : 'ENTER LEAGUE'}
+          </button>
+        </>
+      )}
+
+      {error && <div className="identity-error" role="alert">{error}</div>}
+
+      <p className="identity-help">
         {isFirstTime
-          ? 'Your keeper names stay secret until the commish reveals them.'
-          : 'Forgot your PIN? Yell at Brey in the group chat and he can reset it.'}
-      </div>
-    </div>
+          ? 'Your keeper picks stay hidden until the commish reveals them.'
+          : 'Forgot your PIN? Ask Brey to reset it in Commish Mode.'}
+      </p>
+    </form>
   );
 }

@@ -3,7 +3,7 @@ import { useIdentity } from '../../hooks/useLeague.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import TeamPickerForm from './TeamPickerForm.js';
 
-/** / — splash + login. Already signed in? Straight to the keeper worksheet. */
+/** / — a focused sign-in page. Signed-in owners go straight to their worksheet. */
 export default function SplashPage() {
   const { identity } = useIdentity();
   const navigate = useNavigate();
@@ -11,42 +11,44 @@ export default function SplashPage() {
   if (identity) return <Navigate to="/keepers" replace />;
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '32px 16px 90px',
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: 480 }}>
-        <div style={{ textAlign: 'center', marginBottom: 22 }}>
-          <img
-            src="/logo.png"
-            alt="The Nerds — fbb scores"
-            style={{ width: 'min(320px, 78vw)', height: 'auto', display: 'block', margin: '0 auto' }}
-          />
-          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)', marginTop: 8 }}>
-            SEASON {leagueDataset.season}
-          </div>
-          <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem', marginTop: 8 }}>
-            Keepers · Draft board · League HQ
-          </div>
-        </div>
+    <main className="splash-page">
+      <div className="splash-orb splash-orb-teal" aria-hidden="true" />
+      <div className="splash-orb splash-orb-purple" aria-hidden="true" />
 
-        <div className="panel" style={{ padding: '18px 16px', borderRadius: 12 }}>
-          <div className="hub-heading glow-yellow" style={{ fontSize: '0.72rem', color: 'var(--neon-yellow)', marginBottom: 14 }}>
-            WHO ARE YOU?
+      <div className="splash-shell">
+        <header className="splash-hero">
+          <div className="splash-season">THE NERDS · SEASON {leagueDataset.season}</div>
+          <img className="splash-logo" src="/logo.png" alt="The Nerds fantasy basketball" />
+          <h1>Your league. One place.</h1>
+          <p>Set keepers, test the draft board, and keep every league rule close.</p>
+
+          <div className="splash-feature-row" aria-label="League hub features">
+            <span>🔒 Keepers</span>
+            <span>🎯 Draft</span>
+            <span>📖 League HQ</span>
           </div>
+        </header>
+
+        <section className="panel splash-login-card" aria-labelledby="sign-in-title">
+          <div className="splash-login-heading">
+            <div>
+              <div className="splash-step">OWNER ACCESS</div>
+              <h2 id="sign-in-title">Who are you?</h2>
+            </div>
+            <div className="splash-lock" aria-hidden="true">🔐</div>
+          </div>
+
           <TeamPickerForm onDone={() => navigate('/keepers')} />
-        </div>
+        </section>
 
-        <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.72rem', marginTop: 18 }}>
-          Est. 2010 · 16 seasons of bad decisions
-        </div>
+        <footer className="splash-footer">
+          <span>EST. 2010</span>
+          <span aria-hidden="true">•</span>
+          <span>10 OWNERS</span>
+          <span aria-hidden="true">•</span>
+          <span>1 CHAMPION</span>
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }

@@ -34,6 +34,7 @@ export default function IdentityChip() {
       <button
         className="tap-btn"
         onClick={() => setOpen(true)}
+        aria-label={identity ? `Open account menu for ${identity.owner}` : 'Sign in'}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -51,6 +52,7 @@ export default function IdentityChip() {
           <>
             <span>{identity.owner}</span>
             {identity.isCommissioner && <span title="Commish">👑</span>}
+            <span aria-hidden="true" style={{ fontSize: '0.65rem', opacity: 0.75 }}>▼</span>
           </>
         ) : (
           <span>Who are you?</span>

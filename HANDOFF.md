@@ -63,6 +63,8 @@ The client no longer uses browser storage for scenarios. Cross-team worksheets l
 
 Scenario navigation is member-facing, not Commish-only. Every signed-in keeper page has a large `PROJECT ANOTHER TEAM` or `SWITCH PROJECTED TEAM` control near the top. It opens an explicit two-column owner picker with `PROJECT`, `MY TEAM`, and `OPEN` labels. The `WHO'S IN` cards also show `PROJECT →` or `VIEW →`, and the Teams page calls the action `PROJECT KEEPERS`. Commish-only real-edit controls remain separate.
 
+Owner access is also member-facing. The home page uses one owner dropdown, shows the selected team and draft slot, then asks for the PIN. Tapping the signed-in owner chip on any main page opens an account sheet with a clear `SIGN OUT` action and the same dropdown for switching owners.
+
 ## Known quirks / gotchas
 
 - Vite dev + devtools network throttling = HMR reload loops. Use **localhost:3001** (serves last `npm run build`, no HMR) or prod for devtools work.
