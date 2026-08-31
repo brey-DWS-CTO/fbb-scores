@@ -61,6 +61,8 @@ Server-backed scenarios now meet the requirements above. Neon uses `keeper_scena
 
 The client no longer uses browser storage for scenarios. Cross-team worksheets load the private server copy before enabling edits. One-team reset and whole-scenario reset call scoped API routes. The draft board loads the same private scenario, including traded-pick costs, then drops it as soon as real keepers are revealed or the draft starts.
 
+Scenario navigation is member-facing, not Commish-only. Every signed-in keeper page has a large `PROJECT ANOTHER TEAM` or `SWITCH PROJECTED TEAM` control near the top. It opens an explicit two-column owner picker with `PROJECT`, `MY TEAM`, and `OPEN` labels. The `WHO'S IN` cards also show `PROJECT →` or `VIEW →`, and the Teams page calls the action `PROJECT KEEPERS`. Commish-only real-edit controls remain separate.
+
 ## Known quirks / gotchas
 
 - Vite dev + devtools network throttling = HMR reload loops. Use **localhost:3001** (serves last `npm run build`, no HMR) or prod for devtools work.
@@ -79,7 +81,7 @@ npm run lint
 npm run build
 ```
 
-As of 2026-08-30: 41 tests pass, lint passes with no warnings, and the production build passes. Local browser checks also pass for the sticky mobile projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, the Commish schedule snapshot status, no-write diff preview, and two-step acceptance control. The build still reports one non-blocking JavaScript chunk-size warning.
+As of 2026-08-30: 41 tests pass, lint passes with no warnings, and the production build passes. Local browser checks also pass for the mobile owner picker, owner-to-owner navigation, sticky projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, the `COMMISH` bottom tab, the Commish schedule snapshot status, no-write diff preview, and two-step acceptance control. The build still reports one non-blocking JavaScript chunk-size warning.
 
 ## Future features (user's list)
 

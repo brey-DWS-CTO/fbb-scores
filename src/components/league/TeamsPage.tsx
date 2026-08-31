@@ -28,6 +28,11 @@ export default function TeamsPage() {
     meta && !meta.revealed && (meta.keeperStatus[owner] ?? 0) > 0 && filled.length === 0
       ? meta.keeperStatus[owner]
       : 0;
+  const keeperAction = owner === identity?.owner
+    ? 'MY KEEPER OPTIONS'
+    : meta?.revealed
+      ? 'VIEW KEEPERS'
+      : 'PROJECT KEEPERS';
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 12px 24px' }}>
@@ -99,11 +104,12 @@ export default function TeamsPage() {
               border: '2px solid var(--neon-purple)',
               color: 'var(--neon-purple)',
               textDecoration: 'none',
+              textAlign: 'center',
               fontSize: '0.72rem',
               fontWeight: 800,
             }}
           >
-            KEEPER OPTIONS
+            {keeperAction}
           </Link>
         </div>
 
@@ -115,7 +121,7 @@ export default function TeamsPage() {
 
         {filled.length === 0 && hiddenKeepers === 0 && (
           <div style={{ margin: '0 14px 10px', color: 'var(--text-faint)', fontSize: '0.82rem' }}>
-            No {dataset.season} players yet. Open Keeper Options to browse this team's final roster.
+            No {dataset.season} players yet. Open {keeperAction.toLowerCase()} to browse this team's final roster.
           </div>
         )}
 

@@ -283,6 +283,7 @@ export default function TeamKeeperPage() {
     [owner, scenarioQuery.scenario],
   );
   const [browseBannerOpen, setBrowseBannerOpen] = useState(true);
+  const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
 
   // null = mirror the server; non-null = local unsaved edits (dirty)
   const [draftSel, setDraftSel] = useState<KeeperSelection[] | null>(null);
@@ -299,6 +300,7 @@ export default function TeamKeeperPage() {
     setSaveError(null);
     setLeaguePool(false);
     setBrowseBannerOpen(true);
+    setOwnerPickerOpen(false);
     setCommissionerRealEdit(false);
   }, [owner]);
 
@@ -497,6 +499,94 @@ export default function TeamKeeperPage() {
           <IdentityChip />
         </div>
       </div>
+
+      {identity && (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            className="tap-btn"
+            type="button"
+            aria-expanded={ownerPickerOpen}
+            aria-controls="keeper-owner-picker"
+            onClick={() => setOwnerPickerOpen((open) => !open)}
+            style={{
+              width: '100%',
+              minHeight: 48,
+              padding: '0 14px',
+              borderRadius: 9,
+              border: '2px solid var(--neon-purple)',
+              background: 'rgba(170,0,255,0.08)',
+              color: 'var(--neon-purple)',
+              fontWeight: 900,
+              fontSize: '0.76rem',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {ownerPickerOpen
+              ? 'CLOSE TEAM PICKER'
+              : projectionMode
+                ? '⇄ SWITCH PROJECTED TEAM'
+                : meta?.revealed
+                  ? 'VIEW ANOTHER TEAM'
+                  : '＋ PROJECT ANOTHER TEAM'}
+          </button>
+
+          {ownerPickerOpen && (
+            <section
+              id="keeper-owner-picker"
+              className="panel"
+              style={{
+                padding: 12,
+                marginTop: 8,
+                border: '2px solid var(--neon-purple)',
+                borderRadius: 9,
+              }}
+            >
+              <div className="hub-heading" style={{ color: 'var(--neon-purple)', fontSize: '0.66rem' }}>
+                CHOOSE AN OWNER
+              </div>
+              <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', lineHeight: 1.4, margin: '5px 0 10px' }}>
+                {meta?.revealed
+                  ? 'Open any keeper worksheet.'
+                  : 'Your projected picks stay private and never change that owner’s real submission.'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 7 }}>
+                {OWNERS.map((candidateOwner) => {
+                  const isMine = candidateOwner === identity.owner;
+                  const isCurrent = candidateOwner === owner;
+                  return (
+                    <Link
+                      key={candidateOwner}
+                      to={`/keepers/${encodeURIComponent(candidateOwner)}`}
+                      aria-current={isCurrent ? 'page' : undefined}
+                      className="tap-btn"
+                      style={{
+                        minHeight: 46,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 6,
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        border: `1px solid ${isCurrent ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
+                        background: isCurrent ? 'rgba(0,255,204,0.06)' : 'var(--input-bg)',
+                        color: isCurrent ? 'var(--neon-teal)' : 'var(--text-hi)',
+                        textDecoration: 'none',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                      }}
+                    >
+                      <span>{candidateOwner}</span>
+                      <span style={{ color: 'var(--text-dim)', fontSize: '0.58rem' }}>
+                        {isCurrent ? 'OPEN' : isMine ? 'MY TEAM' : meta?.revealed ? 'VIEW →' : 'PROJECT →'}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
 
       {/* ── Access banners ─────────────────────────────────────── */}
       {projectionMode && browseBannerOpen && (
@@ -888,6 +978,7 @@ export default function TeamKeeperPage() {
           {OWNERS.map((o) => {
             const n = meta?.keeperStatus[o] ?? 0;
             const inYet = n > 0;
+            const isMine = o === identity?.owner;
             const row = (
               <span
                 style={{
@@ -901,8 +992,13 @@ export default function TeamKeeperPage() {
                   background: inYet ? 'rgba(0,255,204,0.05)' : 'transparent',
                 }}
               >
-                <span style={{ fontWeight: o === owner ? 800 : 600, color: o === owner ? 'var(--neon-teal)' : 'var(--text-hi)', fontSize: '0.85rem' }}>
-                  {o}
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontWeight: o === owner ? 800 : 600, color: o === owner ? 'var(--neon-teal)' : 'var(--text-hi)', fontSize: '0.85rem' }}>
+                    {o}
+                  </span>
+                  <span style={{ display: 'block', marginTop: 2, color: 'var(--text-dim)', fontSize: '0.58rem', fontWeight: 800 }}>
+                    {o === owner ? 'OPEN' : isMine ? 'MY TEAM' : meta?.revealed ? 'VIEW →' : 'PROJECT →'}
+                  </span>
                 </span>
                 <span style={{ color: inYet ? 'var(--neon-teal)' : 'var(--text-faint)', fontSize: '0.78rem', fontWeight: 700 }}>
                   {inYet ? `✓ ${n} in` : '—'}
@@ -913,7 +1009,11 @@ export default function TeamKeeperPage() {
               <Link
                 key={o}
                 to={`/keepers/${encodeURIComponent(o)}`}
-                aria-label={`View ${o}'s keeper options`}
+                aria-label={isMine
+                  ? 'Open my keeper options'
+                  : meta?.revealed
+                    ? `View ${o}'s keeper options`
+                    : `Project ${o}'s keepers`}
                 style={{ textDecoration: 'none' }}
               >
                 {row}
