@@ -1,0 +1,1205 @@
+{
+  "schemaVersion": 1,
+  "season": 2027,
+  "revision": 14,
+  "status": "draft",
+  "title": "The Nerds Fantasy Basketball League Constitution & Rule Book",
+  "note": "Numbers are NOT stored. Every clause has a stable id; display numbers are computed from tree position, so adding or removing a clause renumbers the book automatically. Cross-references are stored as ref tokens naming a clause id, and re-resolve to the current number on every render.",
+  "source": {
+    "file": "The Nerds Constitution 2026 v13 with updates for 2027.docx",
+    "documentRevision": 13,
+    "documentDate": "2025-10-05",
+    "importedAt": "2026-08-31",
+    "trackedChanges": false,
+    "comments": false,
+    "warning": "Filename claims 2027 updates but the body is still the 2026 book. Front matter, Appendix A title, and records are stale. Treat as a source to review, not as authority."
+  },
+  "articles": [
+    {
+      "id": "format",
+      "title": "League Format",
+      "clauses": [
+        {
+          "id": "format.style",
+          "legacyNumber": "1.1",
+          "text": "League Format is head-to-head points with a custom scoring system.",
+          "children": [
+            {
+              "id": "format.style.appendix",
+              "legacyNumber": "1.1.1",
+              "text": "Scoring settings can be found in {{ref:appendix-a}}.",
+              "issues": ["numbering-runon"]
+            }
+          ]
+        },
+        {
+          "id": "format.size",
+          "legacyNumber": "1.2",
+          "text": "League size is 10 teams, each with a single owner.",
+          "settings": ["league.teamCount"],
+          "children": [
+            { "id": "format.size.coown", "legacyNumber": "1.2.1", "text": "Co-ownership is allowed." },
+            {
+              "id": "format.size.change",
+              "legacyNumber": "1.2.2",
+              "text": "Expansion or reduction of league size is possible, but must be passed with a 60% vote.",
+              "voteThreshold": 60
+            }
+          ]
+        },
+        {
+          "id": "format.democracy",
+          "legacyNumber": "1.3",
+          "text": "The Nerds League is a democracy. All major changes to league rules must be passed by at least a 60% vote. The threshold is 60% of all teams in the league, not 60% of the votes cast. In a 10 team league that is 6 yes votes. A team that does not vote counts against the proposal.",
+          "voteThreshold": 60,
+          "settings": ["vote.defaultThreshold", "vote.denominator"],
+          "resolvedBy": ["open-quorum"],
+          "children": [
+            {
+              "id": "format.democracy.limit",
+              "legacyNumber": "1.3.1",
+              "text": "A maximum of 3 votes for rule or format changes may occur per year. All votes must occur before the draft, preferably at least one week before the draft date.",
+              "settings": ["vote.maxPerYear"]
+            },
+            {
+              "id": "format.democracy.propose",
+              "legacyNumber": "1.3.2",
+              "text": "Any member of the league can propose a rule or topic to be voted on to the commissioners. The commissioners have final selection over what topics may be voted on for the upcoming year."
+            },
+            {
+              "id": "format.democracy.tie",
+              "legacyNumber": "1.3.3",
+              "text": "If a vote ends in a tie, the proposal does not pass.",
+              "issues": ["open-quorum"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "draft",
+      "title": "Draft",
+      "clauses": [
+        {
+          "id": "draft.serpentine",
+          "legacyNumber": "2.1",
+          "text": "The current draft style is a serpentine draft.",
+          "children": [
+            {
+              "id": "draft.serpentine.change",
+              "legacyNumber": "2.1.1",
+              "text": "Draft style can be changed with an 80% vote.",
+              "voteThreshold": 80,
+              "issues": ["numbering-runon"]
+            }
+          ]
+        },
+        {
+          "id": "draft.order",
+          "legacyNumber": "2.2",
+          "text": "Draft order will be determined by the results of the playoffs and the play-in weeks from the previous year. Draft order determination method can be changed with a 60% vote.",
+          "voteThreshold": 60,
+          "amendedBy": ["vote-2026-1", "amendment-2027-consolation"],
+          "children": [
+            {
+              "id": "draft.order.p1to4",
+              "legacyNumber": "2.2.1",
+              "text": "Picks 1-4: After Play-In Week 1, the four teams eliminated from playoff contention will compete during Play-In Week 2 for Picks 1-4 in the following season's draft.",
+              "children": [
+                {
+                  "id": "draft.order.p1to4.method",
+                  "legacyNumber": "2.2.1.1",
+                  "text": "The order of Picks 1-4 is set by total fantasy points scored during Play-In Week 2, ranked highest to lowest among those four teams. The highest scorer receives the 1st pick, the second highest the 2nd pick, the third highest the 3rd pick, and the lowest scorer the 4th pick.",
+                  "amendedBy": ["amendment-2027-consolation"]
+                },
+                {
+                  "id": "draft.order.p1to4.example",
+                  "legacyNumber": "2.2.1.2",
+                  "kind": "example",
+                  "text": "If seeds 6, 8, 9, and 10 were eliminated in Play-In Week 1 and then score 1150, 1100, 1000, and 950 points respectively in Play-In Week 2, the draft order would be: seed 6 first, seed 8 second, seed 9 third, seed 10 fourth."
+                }
+              ]
+            },
+            {
+              "id": "draft.order.p5to6",
+              "legacyNumber": "2.2.2",
+              "text": "Picks 5-6: After Play-In Week 2, the two teams eliminated from playoff contention are ranked by their total fantasy points scored during Play-In Week 2. The higher scorer receives the 5th pick and the lower scorer the 6th. There is no consolation matchup.",
+              "amendedBy": ["amendment-2027-consolation"]
+            },
+            { "id": "draft.order.p7", "legacyNumber": "2.2.3", "text": "7th pick: rewarded to the winner of the 3rd and 4th place playoff game." },
+            { "id": "draft.order.p8", "legacyNumber": "2.2.4", "text": "8th pick: rewarded to the loser of the 3rd and 4th place playoff game." },
+            { "id": "draft.order.p9", "legacyNumber": "2.2.5", "text": "9th pick: rewarded to the loser of the championship round." },
+            {
+              "id": "draft.order.p10",
+              "legacyNumber": "2.2.10",
+              "text": "10th pick: rewarded to the league champion.",
+              "issues": ["numbering-runon", "numbering-skip"]
+            }
+          ]
+        },
+        {
+          "id": "draft.clock",
+          "legacyNumber": "2.3",
+          "text": "Each team will have roughly 90 seconds to make each of their selections.",
+          "settings": ["draft.softClockSeconds"],
+          "children": [
+            {
+              "id": "draft.clock.call",
+              "legacyNumber": "2.3.1",
+              "text": "No time clock will be kept, but a verbal \"CLOCK\" can be called by any player on any other player during their pick.",
+              "enforcement": "manual"
+            },
+            {
+              "id": "draft.clock.thirty",
+              "legacyNumber": "2.3.2",
+              "text": "If \"CLOCK\" is called, the player will have 30 seconds to make their pick.",
+              "settings": ["draft.calledClockSeconds"],
+              "enforcement": "manual",
+              "children": [
+                {
+                  "id": "draft.clock.yield",
+                  "legacyNumber": "2.3.2.1",
+                  "text": "If they are unable to make their pick, their draft position is yielded. The next player up in draft position can make their pick immediately from the remaining pool of players."
+                },
+                {
+                  "id": "draft.clock.resume",
+                  "legacyNumber": "2.3.2.2",
+                  "text": "The player whose pick was skipped may make their selection at any time as long as it is verbally announced before a current drafting team has made their selection."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rosters",
+      "title": "Rosters",
+      "clauses": [
+        {
+          "id": "rosters.size",
+          "legacyNumber": "3.1",
+          "text": "Roster size is 14 players, and one eligible injured reserve (IR) spot.",
+          "settings": ["roster.size", "roster.irSlots"],
+          "children": [
+            {
+              "id": "rosters.size.starters",
+              "legacyNumber": "3.1.1",
+              "text": "There are 10 starting positions.",
+              "issues": ["numbering-runon"],
+              "children": [
+                {
+                  "id": "rosters.size.starters.config",
+                  "legacyNumber": "3.1.1.1",
+                  "text": "1 C, 1 PF, 1 SF, 1 SG, 1 PG, 1 F, 1 G, 3 FLEX",
+                  "settings": ["roster.starters"],
+                  "issues": ["numbering-lost-list"]
+                }
+              ]
+            },
+            { "id": "rosters.size.bench", "legacyNumber": "3.1.2", "text": "There are 4 bench positions.", "settings": ["roster.bench"] },
+            { "id": "rosters.size.change", "legacyNumber": "3.1.3", "text": "Roster size can be changed, but must be passed with a 60% vote.", "voteThreshold": 60 },
+            { "id": "rosters.size.configChange", "legacyNumber": "3.1.4", "text": "Roster configuration could be changed, but must be passed with a 60% vote.", "voteThreshold": 60 },
+            { "id": "rosters.size.posLimits", "legacyNumber": "3.1.5", "text": "There is currently no maximum or minimum for positions played per week. This could be changed with a 60% vote.", "voteThreshold": 60 }
+          ]
+        },
+        {
+          "id": "rosters.lock",
+          "legacyNumber": "3.2",
+          "title": "Daily Roster Lock",
+          "text": "Rosters lock universally for the whole league at the first minute of the first game of a given day.",
+          "children": [
+            {
+              "id": "rosters.lock.example",
+              "legacyNumber": "3.2.1",
+              "kind": "example",
+              "text": "If the first game on 10/31 starts at 4:00 PM, all rosters lock at 4:00 PM, even those that have no player starting at that time."
+            },
+            {
+              "id": "rosters.lock.lineupChange",
+              "legacyNumber": "3.2.2",
+              "text": "Starting line-ups can still be changed after rosters lock and will reflect for that day, unless the player who is starting has already played."
+            },
+            {
+              "id": "rosters.lock.transactions",
+              "legacyNumber": "3.2.3",
+              "text": "Player acquisitions and trades can be made that day, but they will not be reflected on team rosters until the following day."
+            },
+            {
+              "id": "rosters.lock.gp",
+              "legacyNumber": "3.2.4",
+              "text": "If a player is set in a team's starting line-up at the start of their game, that player counts as a game played (GP) for that week unless:",
+              "children": [
+                { "id": "rosters.lock.gp.zero", "legacyNumber": "3.2.4.1", "text": "The player plays 0 minutes and 0 seconds of game time." },
+                { "id": "rosters.lock.gp.dunn", "legacyNumber": "3.2.4.2", "title": "The Kris Dunn Rule", "text": "If the player plays even 1 second of the game, it will count as a game played for that week." }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "keepers",
+      "title": "Keeper Rules",
+      "legacyTitle": "NEW Keeper Rules",
+      "issues": ["stale-new-label"],
+      "clauses": [
+        {
+          "id": "keepers.select",
+          "legacyNumber": "4.1",
+          "title": "Selecting Keepers",
+          "children": [
+            {
+              "id": "keepers.select.count",
+              "legacyNumber": "4.1.1",
+              "text": "Starting in the 2024-2025 season, each team can keep up to 2 players from their roster from the previous season. See {{ref:keepers.cap}} for more details.",
+              "settings": ["keeper.maxPerTeam"]
+            },
+            { "id": "keepers.select.method", "legacyNumber": "4.1.2", "text": "Keepers may be selected in the ESPN app or by notifying the commissioners." },
+            { "id": "keepers.select.deadline", "legacyNumber": "4.1.3", "text": "If notifying the commissioners, notification must be in public group chat at least 24 hours before the commencement of the draft.", "settings": ["keeper.noticeHours"] }
+          ]
+        },
+        {
+          "id": "keepers.tiers",
+          "legacyNumber": "4.2",
+          "title": "Keeper Draft Pick Tiers & Keeper Contracts",
+          "children": [
+            { "id": "keepers.tiers.cost", "legacyNumber": "4.2.1", "text": "Each player kept costs a draft pick in the upcoming draft." },
+            {
+              "id": "keepers.tiers.basis",
+              "legacyNumber": "4.2.2",
+              "text": "The draft pick that a player costs depends on the Keeper Draft Pick Tiers.",
+              "children": [
+                {
+                  "id": "keepers.tiers.basis.averages",
+                  "legacyNumber": "4.2.2.1",
+                  "text": "These tiers are set by player averages from the prior year. See the Keeper League Worksheet for further information.",
+                  "settings": ["keeper.tierAlgorithm"]
+                },
+                { "id": "keepers.tiers.basis.example", "legacyNumber": "4.2.2.2", "kind": "example", "text": "A 43.7 ppg player would cost a 2nd round pick and a 29.4 ppg player would cost a 9th round pick." },
+                {
+                  "id": "keepers.tiers.basis.sameTier",
+                  "legacyNumber": "4.2.2.3",
+                  "text": "Two keepers in the same tier: if a team wants to keep two players at 36.5 ppg average, they must use their 4th round pick and then their 3rd round pick to keep these players unless they trade for an additional 4th round pick. See {{ref:keepers.picktrade}}.",
+                  "resolvedBy": ["open-first-round-same-tier"]
+                },
+                {
+                  "id": "keepers.tiers.basis.twoFirsts",
+                  "text": "A team may not keep two players who are both in the 1st round tier. There is no round above the 1st for the second keeper to bump to. The Keeper Salary Cap should make this impossible on its own; this rule settles it if it ever happens.",
+                  "settings": ["keeper.allowTwoFirstRoundTier"],
+                  "addedBy": "commissioner-2026-08-31",
+                  "resolvedBy": ["open-first-round-same-tier"]
+                }
+              ]
+            },
+            {
+              "id": "keepers.contracts",
+              "legacyNumber": "4.2.3",
+              "title": "Keeper Contracts (Maximum Years to Keep)",
+              "children": [
+                { "id": "keepers.contracts.draftYear", "legacyNumber": "4.2.3.1", "text": "The year a player is drafted does not count against their Keeper Contract." },
+                { "id": "keepers.contracts.first", "legacyNumber": "4.2.3.2", "text": "The first year a player is kept, they may be kept for the Maximum Years to Keep listed next to their tier." },
+                {
+                  "id": "keepers.contracts.example",
+                  "legacyNumber": "4.2.3.3",
+                  "kind": "example",
+                  "text": "If the first year a player is kept they average 32.5 ppg, the player may be kept for a maximum of 3 years before they must re-enter the draft pool.",
+                  "children": [
+                    { "id": "keepers.contracts.example.rise", "legacyNumber": "4.2.3.3.1", "text": "If the same player averages 50.0 ppg the next year, they must be kept for a first round pick. However, they still may be kept for 2 more years." }
+                  ]
+                },
+                {
+                  "id": "keepers.contracts.follows",
+                  "legacyNumber": "4.2.3.3.2",
+                  "text": "A Keeper Contract follows the player through every transaction. Trading, dropping, or reacquiring a player does not reset, pause, or void their contract. The years already used stay used.",
+                  "settings": ["keeper.contractFollowsPlayer"],
+                  "resolvedBy": ["open-drop-reacquire"],
+                  "note": "Promoted out of an example and broadened. The old text covered trades only, which left drop and reacquire undefined."
+                },
+                {
+                  "id": "keepers.contracts.table",
+                  "kind": "table",
+                  "title": "Maximum Years to Keep, by draft pick cost",
+                  "settings": ["keeper.contractYears"],
+                  "table": {
+                    "columns": ["Draft Pick", "Maximum Years to Keep (from first year kept)"],
+                    "rows": [["1","1"],["2","2"],["3","2"],["4","2"],["5","3"],["6","3"],["7","3"],["8","4"],["9","4"],["10","4"]]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "keepers.cap",
+          "legacyNumber": "4.3",
+          "title": "Keeper Salary Cap",
+          "children": [
+            { "id": "keepers.cap.rule", "legacyNumber": "4.3.1", "text": "The sum of fantasy averages for all players kept on a given team must not exceed the Keeper Salary Cap." },
+            {
+              "id": "keepers.cap.value",
+              "legacyNumber": "4.3.2",
+              "text": "Each year the Keeper Salary Cap is set by the commissioners from the formula below and published in the league app. The app shows the current season's cap on every keeper worksheet.",
+              "settings": ["keeper.salaryCap"],
+              "resolvedBy": ["mismatch-cap"],
+              "note": "Deliberately carries no number. A hardcoded cap was the source of the 78.7 vs 77.8 drift. The app is the single source.",
+              "children": [
+                { "id": "keepers.cap.formula", "legacyNumber": "4.3.2.1", "text": "The salary cap is the bottom ppg of the 3rd round tier added to the top ppg of the 3rd round tier. This can be changed by the commissioners.", "settings": ["keeper.salaryCapFormula"] }
+              ]
+            },
+            {
+              "id": "keepers.cap.source",
+              "legacyNumber": "4.3.3",
+              "text": "Fantasy point per game averages from the previous season count against the salary cap.",
+              "children": [
+                { "id": "keepers.cap.exception", "legacyNumber": "4.3.3.1", "text": "Exception: if the player played 25 or fewer games the previous season, the average from the season before must be used. If the player did not play the previous season, they may be kept for a 3rd round pick.", "settings": ["keeper.lowGpThreshold", "keeper.noPlayRound"] }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "keepers.picktrade",
+          "legacyNumber": "4.4",
+          "title": "Draft Pick Trading",
+          "children": [
+            {
+              "id": "keepers.picktrade.rounds",
+              "legacyNumber": "4.4.1",
+              "text": "Each team may trade its 3rd through 10th round draft picks for the following season.",
+              "settings": ["picktrade.tradableRounds"],
+              "children": [
+                { "id": "keepers.picktrade.rounds.protected", "legacyNumber": "4.4.1.1", "text": "1st and 2nd round draft picks are not tradeable. This can be changed with a 60% vote.", "voteThreshold": 60 },
+                { "id": "keepers.picktrade.rounds.maxAway", "legacyNumber": "4.4.1.2", "text": "Each team may only trade away a maximum of two picks per year.", "settings": ["picktrade.maxTradedAwayPerYear"] },
+                { "id": "keepers.picktrade.rounds.horizon", "legacyNumber": "4.4.1.3", "text": "Draft picks from the draft 2 or more seasons in the future are not tradeable." }
+              ]
+            },
+            {
+              "id": "keepers.picktrade.equal",
+              "legacyNumber": "4.4.2",
+              "text": "Every trade must have the same number of draft picks moving from one team to another team.",
+              "issues": ["numbering-runon"]
+            },
+            {
+              "id": "keepers.picktrade.maxPerRound",
+              "legacyNumber": "4.4.3",
+              "text": "Each team may acquire a maximum of 2 picks for a given round for the next year's draft.",
+              "settings": ["picktrade.maxPerRound"],
+              "children": [
+                { "id": "keepers.picktrade.maxPerRound.example", "legacyNumber": "4.4.3.1", "kind": "example", "text": "If Team A trades for Team B's 3rd round pick and also still has its original 3rd round pick, Team A may acquire no more 3rd round picks unless they trade one of them away." }
+              ]
+            },
+            {
+              "id": "keepers.picktrade.deadline",
+              "legacyNumber": "4.4.4",
+              "title": "Draft pick trade deadline and buy-in commitment",
+              "children": [
+                { "id": "keepers.picktrade.deadline.week", "legacyNumber": "4.4.4.1", "text": "Draft picks may not be traded after Week 15.", "settings": ["picktrade.deadlineWeek"] },
+                { "id": "keepers.picktrade.deadline.buyin", "legacyNumber": "4.4.4.2", "text": "If you are involved in a draft pick trade, you commit to pay at least one-half of your buy-in for the next season, even if you leave the league." }
+              ]
+            },
+            {
+              "id": "keepers.picktrade.kyle",
+              "legacyNumber": "4.4.5",
+              "title": "The Kyle Rule (anti-player dumping)",
+              "text": "For the team receiving the highest draft pick in a draft pick trade, they must receive a player averaging at least 30.0 ppg for each player they give up in the deal. The average is the player's current season average to date at the time of the trade.",
+              "settings": ["picktrade.kyleRuleMinAvg", "picktrade.kyleRuleAvgSource"],
+              "resolvedBy": ["open-kyle-source"],
+              "children": [
+                { "id": "keepers.picktrade.kyle.example", "legacyNumber": "4.4.5.1", "kind": "example", "text": "If Team A gives up Pascal Siakam and an 8th round pick, Team B must give up a pick higher than the 8th and a player averaging at least 30.0 ppg on the season to date." }
+              ]
+            },
+            {
+              "id": "keepers.picktrade.ledger",
+              "legacyNumber": "4.4.6",
+              "text": "Draft picks cannot be traded in ESPN. The league app is the system of record for draft pick trades and Keeper Contracts. A trade is official once it is accepted in the app.",
+              "resolvedBy": ["superseded-by-app"],
+              "dependsOn": "feature-4-pick-trading"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transactions",
+      "title": "In-season Transactions & Waivers",
+      "clauses": [
+        {
+          "id": "transactions.acq",
+          "legacyNumber": "5.1",
+          "title": "Player acquisitions (adds, drops)",
+          "children": [
+            { "id": "transactions.acq.limits", "legacyNumber": "5.1.1", "text": "There are no in-season acquisition limits for total adds, drops, or trades throughout the season. Restrictions still apply to who may be picked up (see {{ref:transactions.waivers.pickup}}) and to who eliminated teams may trade with (see {{ref:transactions.trades.eliminated}}).", "resolvedBy": ["ref-wrong-4.2", "conflict-eliminated-trades"] },
+            { "id": "transactions.acq.waiverAlways", "legacyNumber": "5.1.2", "text": "Free agent players are continuously on waivers. Waivers run once per day; the time waivers run depends on the day of the week and holidays. See {{ref:transactions.waivers}}.", "resolvedBy": ["ref-wrong-4.3"] }
+          ]
+        },
+        {
+          "id": "transactions.waivers",
+          "legacyNumber": "5.3",
+          "title": "Waivers",
+          "children": [
+            {
+              "id": "transactions.waivers.faab",
+              "legacyNumber": "5.3.1",
+              "text": "The waiver system is a free agent auction bid system (FAAB).",
+              "children": [
+                { "id": "transactions.waivers.faab.weekday", "legacyNumber": "5.3.1.1", "text": "On weekdays (Monday-Friday) waivers run at 3:00 PM PT.", "settings": ["waivers.weekdayTime"] },
+                { "id": "transactions.waivers.faab.weekend", "legacyNumber": "5.3.1.2", "text": "On weekends (Saturday-Sunday) waivers run at 9:00 AM PT.", "settings": ["waivers.weekendTime"] },
+                { "id": "transactions.waivers.faab.holiday", "legacyNumber": "5.3.1.3", "text": "Exception: on certain holidays where games start before 4:00 PM PT (MLK Day, Christmas, and similar), waivers will be set to 9:00 AM PT.", "settings": ["waivers.holidayTime"] }
+              ]
+            },
+            {
+              "id": "transactions.waivers.budget",
+              "legacyNumber": "5.3.2",
+              "text": "At the beginning of the season, each team is allocated $200 FAAB dollars.",
+              "settings": ["waivers.faabBudget"],
+              "children": [
+                { "id": "transactions.waivers.budget.norollover", "legacyNumber": "5.3.2.1", "text": "These dollars are not transferrable or tradeable and do not roll over to the following season. Any unused FAAB dollars are lost." }
+              ]
+            },
+            {
+              "id": "transactions.waivers.locked",
+              "legacyNumber": "5.3.3",
+              "text": "All free agents will be locked and only addable through the following processes:",
+              "children": [
+                {
+                  "id": "transactions.waivers.bidding",
+                  "legacyNumber": "5.3.3.1",
+                  "title": "FAAB Bidding",
+                  "text": "Every night Monday through Sunday, team owners can bid on any player in the free agent pool, except those that meet the criteria of {{ref:transactions.waivers.pickup}}. The player will be added to the team who submits the highest bid.",
+                  "children": [
+                    { "id": "transactions.waivers.bidding.tie", "legacyNumber": "5.3.3.1.1", "text": "In the event of a tie, the player will be added to the team who is higher on the waiver priority list." },
+                    { "id": "transactions.waivers.bidding.reverse", "legacyNumber": "5.3.3.1.2", "text": "The priority list is a reverse-order priority system. At the beginning of each season the waiver order is set by the reverse of the draft order." },
+                    { "id": "transactions.waivers.bidding.weekly", "legacyNumber": "5.3.3.1.3", "text": "At the start of each subsequent week, the priority list will be set by reverse order of standings." },
+                    { "id": "transactions.waivers.bidding.demote", "legacyNumber": "5.3.3.1.4", "text": "If a team uses their waiver claim, they are sent to the bottom of the priority list and deducted any FAAB used." },
+                    { "id": "transactions.waivers.bidding.zero", "legacyNumber": "5.3.3.1.5", "text": "Zero dollar bids are allowed." }
+                  ]
+                },
+                {
+                  "id": "transactions.waivers.lmadd",
+                  "legacyNumber": "5.3.3.2",
+                  "title": "League Manager (LM) adds",
+                  "text": "Players can be added to a team through a league manager add on Saturdays and Sundays only, and only if all of the following conditions are met:",
+                  "children": [
+                    { "id": "transactions.waivers.lmadd.cleared", "legacyNumber": "5.3.3.2.1", "text": "The player being LM added must not have been dropped the night before. There must have been at least one night of FAAB bidding that the player went through without receiving a bid." },
+                    { "id": "transactions.waivers.lmadd.playing", "legacyNumber": "5.3.3.2.2", "text": "The player being added must be on a team currently scheduled to play a game that day." },
+                    { "id": "transactions.waivers.lmadd.public", "legacyNumber": "5.3.3.2.3", "text": "The LM add must be announced publicly in the league group chat. No exceptions for phone calls, personal conversations, or similar." },
+                    { "id": "transactions.waivers.lmadd.space", "legacyNumber": "5.3.3.2.4", "text": "The team requesting the LM add must either have a free roster spot already, or drop a player from their team to make space." },
+                    { "id": "transactions.waivers.lmadd.timing", "legacyNumber": "5.3.3.2.5", "text": "The LM add must be requested before the first game starts of that particular Saturday or Sunday." },
+                    { "id": "transactions.waivers.lmadd.failsafe", "legacyNumber": "5.3.3.2.6", "text": "If all above conditions are met and the LM is not available, or is unable to add the requested player before games lock, the player will be assumed to be starting for the requesting team, and all points scored (even if points scored are 0 or negative) will be added to the requesting team's total at the end of the day. The player will then be added for the following scoring period." }
+                  ]
+                },
+                {
+                  "id": "transactions.waivers.pickup",
+                  "legacyNumber": "5.3.3.3",
+                  "title": "FAAB Pick-up Restrictions",
+                  "children": [
+                    { "id": "transactions.waivers.pickup.cp3", "legacyNumber": "5.3.3.3.1", "title": "The Chris Paul Rule", "text": "Any player drafted within the first 5 rounds of the current year's draft and subsequently dropped can be picked up via FAAB auction, but cannot be started in any fantasy matchup the rest of the year.", "settings": ["waivers.protectedRounds"] },
+                    { "id": "transactions.waivers.pickup.porzingis", "legacyNumber": "5.3.3.3.2", "title": "The Porzingis Clause", "text": "After the draft the commissioners can meet and by unanimous decision select up to 3 top-5-round picks that are exempt from {{ref:transactions.waivers.pickup.cp3}}. They must be publicly announced before the start of the season as massive reaches.", "settings": ["waivers.porzingisExemptions"] }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "transactions.trades",
+          "legacyNumber": "5.4",
+          "title": "Trades",
+          "children": [
+            { "id": "transactions.trades.nolimit", "legacyNumber": "5.4.1", "text": "There is no limit to the amount of trades a team can make.", "issues": ["numbering-runon"] },
+            {
+              "id": "transactions.trades.noreview",
+              "legacyNumber": "5.4.2",
+              "text": "There is no trade review period or league trade vote.",
+              "issues": ["numbering-wrong-article"],
+              "children": [
+                { "id": "transactions.trades.veto", "legacyNumber": "5.4.2.1", "text": "A trade can only be vetoed if it is voted upon and all other teams agree that the trade must be reversed. In a 10 team league, all 8 other teams must agree to veto the trade or the trade stands." }
+              ]
+            },
+            {
+              "id": "transactions.trades.deadline",
+              "legacyNumber": "5.4.3",
+              "text": "There is no trade deadline, except when the eliminated team exception applies.",
+              "issues": ["numbering-wrong-article"],
+              "children": [
+                {
+                  "id": "transactions.trades.eliminated",
+                  "legacyNumber": "5.4.3.1",
+                  "title": "Eliminated teams",
+                  "text": "If a team has been eliminated from playoffs, that team can only make trades with other teams who have also been eliminated from playoffs.",
+                  "issues": ["conflict-eliminated-trades"],
+                  "children": [
+                    { "id": "transactions.trades.eliminated.earliest", "legacyNumber": "5.4.3.1.1", "text": "Due to the play-in rules, the earliest any team may be eliminated from playoffs is at the conclusion of Play-In Week 1 (Week 17 of the season)." },
+                    { "id": "transactions.trades.eliminated.oneside", "legacyNumber": "5.4.3.1.2", "text": "Both teams involved in the trade are not required to be eliminated for the trade to be invalid. If one team is eliminated, the trade is not allowed." },
+                    { "id": "transactions.trades.eliminated.eligible", "legacyNumber": "5.4.3.1.3", "text": "Conversely, only teams eligible for playoffs can make trades with one another." }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "transactions.pot",
+          "legacyNumber": "5.5",
+          "title": "Transaction Pot",
+          "status": "inactive",
+          "text": "If a team does not pay their transaction fees by the conclusion of Week 18, the team could face expulsion from the league. (Currently does not apply.)",
+          "issues": ["numbering-wrong-level"],
+          "children": [
+            { "id": "transactions.pot.buyin", "legacyNumber": "5.5.1", "text": "Potentially, a Transaction Buy-in could be added to the league fees. This would be a pre-pay for transaction fees throughout the year. Any money unspent under the Transaction Buy-in would be returned to the team. Any amount spent over the Transaction Buy-in would be owed by the team at the conclusion of Week 18." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "season",
+      "title": "Regular Season Schedule, Game Limits, and Matchups",
+      "clauses": [
+        {
+          "id": "season.length",
+          "legacyNumber": "6.1",
+          "text": "The regular season begins on the first day of the NBA schedule and runs for 18 weeks. Weeks 17 and 18 are regular season weeks that also serve as the play-in weeks. See {{ref:playin}}.",
+          "settings": ["season.regularWeeks"],
+          "resolvedBy": ["conflict-season-length"],
+          "note": "The schedule engine labels weeks 1-16 'regular season' and weeks 17-18 'play-in' as scheduling phases. The constitution counts all 18 as the regular season. Both are correct; do not 'fix' one to match the other.",
+          "children": [
+            { "id": "season.length.opponents", "legacyNumber": "6.1.1", "text": "Each team plays eight other teams exactly twice, and one random team three times." },
+            { "id": "season.length.reset", "legacyNumber": "6.1.2", "text": "At the start of each season, the LM will randomly reset the league schedule." }
+          ]
+        },
+        {
+          "id": "season.matchups",
+          "legacyNumber": "6.2",
+          "text": "The first day of every fantasy matchup is Monday and the last day is the following Sunday, with one exception:",
+          "children": [
+            {
+              "id": "season.matchups.allstar",
+              "legacyNumber": "6.2.1",
+              "text": "One fantasy week each season covers the NBA All-Star break and runs two weeks: it begins on its Monday and ends two Sundays later. The exact dates are fixed by the accepted schedule snapshot for the season, not by this text.",
+              "settings": ["season.allStarDoubleWeek", "season.allStarPeriodFromSnapshot"],
+              "resolvedBy": ["open-allstar-wording"],
+              "note": "For 2027 the schedule snapshot places this at Play-In 2, February 15-28, carrying combinesAllStarBreak: true.",
+              "children": [
+                { "id": "season.matchups.allstar.days", "legacyNumber": "6.2.1.1", "text": "There are typically 8 to 9 days of NBA schedule during this 14 day fantasy week." },
+                {
+                  "id": "season.matchups.allstar.formula",
+                  "legacyNumber": "6.2.1.2",
+                  "text": "The formula to determine the game limit for the All-Star Game week is: (current game limit / 7) x (number of days with NBA games).",
+                  "settings": ["season.allStarGameLimitFormula"],
+                  "children": [
+                    { "id": "season.matchups.allstar.formula.example", "legacyNumber": "6.2.1.2.1", "kind": "example", "text": "(30 / 7) x 8 = 34.3 = 34 games." },
+                    { "id": "season.matchups.allstar.formula.round", "legacyNumber": "6.2.1.2.2", "text": "Always round to the nearest whole number. A result ending in exactly .5 rounds up.", "settings": ["season.allStarRounding"], "resolvedBy": ["open-allstar-rounding"] }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "season.matchups.winner",
+              "legacyNumber": "6.2.2",
+              "text": "The winner of each matchup is the team that has the most total fantasy points scored after the final calendar day of the matchup, minus any deductions. See {{ref:season.overLimit}}.",
+              "children": [
+                { "id": "season.matchups.winner.tie", "legacyNumber": "6.2.2.1", "text": "In the event of a tie, the winner of the matchup will be the team with the most fantasy points scored on the season." }
+              ]
+            }
+          ]
+        },
+        { "id": "season.gameLimit", "legacyNumber": "6.3", "text": "Game limit: 30 games per week.", "settings": ["season.weeklyGameLimit"] },
+        {
+          "id": "season.underLimit",
+          "legacyNumber": "6.4",
+          "text": "If a team plays fewer than 30 games per week (or the current game limit):",
+          "children": [
+            { "id": "season.underLimit.bonus", "legacyNumber": "6.4.1", "text": "The offending team is ineligible for the highest points scored bonus the following week." }
+          ]
+        },
+        {
+          "id": "season.overLimit",
+          "legacyNumber": "6.5",
+          "text": "If a team plays more than 30 games per week (or the current game limit):",
+          "children": [
+            {
+              "id": "season.overLimit.deduct",
+              "legacyNumber": "6.5.1",
+              "text": "The highest scoring games from the last day in which that team played games are deducted from that team's total point scoring until the total number of games played equals the current game limit.",
+              "children": [
+                { "id": "season.overLimit.deduct.example", "legacyNumber": "6.5.1.1", "kind": "example", "text": "Team A plays 32 games in a week and scores 990 points. On the last day of the week their three highest scoring games are 50, 40, and 35. Team A's final score is 990 - (50 + 40) = 900 points." },
+                { "id": "season.overLimit.deduct.bonus", "legacyNumber": "6.5.1.2", "text": "The offending team is ineligible for the highest points scored bonus the following week." }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "season.antitank",
+          "legacyNumber": "6.6",
+          "title": "Anti-tanking",
+          "text": "If a team is under suspicion of tanking, intentionally missing games, or intentionally sitting their best players, missed game point totals can be added to their score at the sole discretion and unanimous decision of both commissioners. If one of the commissioners is involved in this suspicion, the league may elect a third person to determine the outcome, with at least 6 votes."
+        },
+        {
+          "id": "season.missed",
+          "legacyNumber": "6.7",
+          "title": "Missed Game Limit Penalties",
+          "children": [
+            {
+              "id": "season.missed.intro",
+              "legacyNumber": "6.7.1",
+              "text": "The following rules describe the penalties for repeat offenders who miss game limits during matchups throughout the year. Some exemptions are allowed in extreme scenarios such as acts of God, game cancellations, and postponements.",
+              "children": [
+                { "id": "season.missed.intro.approval", "legacyNumber": "6.7.1.1", "text": "Any exceptions to these rules must be approved by both commissioners." }
+              ]
+            },
+            {
+              "id": "season.missed.playin",
+              "legacyNumber": "6.7.2",
+              "title": "Losing Play-In Eligibility",
+              "text": "If 1 or more games are missed during any 3 or more matchups during the season, the owner of that team will lose play-in eligibility.",
+              "settings": ["season.missedMatchupsForPlayInLoss"],
+              "children": [
+                { "id": "season.missed.playin.example", "legacyNumber": "6.7.2.1", "kind": "example", "text": "If Team A misses 1 game in Week 3, 2 games in Week 9, and 1 game in Week 17 they lose play-in eligibility." },
+                { "id": "season.missed.playin.top4", "legacyNumber": "6.7.2.2", "text": "The owner can still make the playoffs but must make it as one of the top 4 seeds." }
+              ]
+            },
+            {
+              "id": "season.missed.weekly",
+              "legacyNumber": "6.7.3",
+              "title": "Losing Weekly Pay-out Eligibility",
+              "text": "If 1 or more games are missed during a matchup, the owner of that team loses eligibility for the weekly pay-out for that matchup and the following matchup."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "playoffs",
+      "title": "Playoffs",
+      "clauses": [
+        { "id": "playoffs.start", "legacyNumber": "7.1", "text": "In a standard year, the playoffs begin after the conclusion of Week 18." },
+        { "id": "playoffs.format", "legacyNumber": "7.2", "text": "The playoffs consist of two two-week rounds for a total of four weeks.", "settings": ["playoffs.roundWeeks"] },
+        { "id": "playoffs.teams", "legacyNumber": "7.3", "text": "A total of four teams make the playoffs.", "settings": ["playoffs.teamCount"] },
+        {
+          "id": "playoffs.eligibility",
+          "legacyNumber": "7.4",
+          "title": "Playoff eligibility",
+          "children": [
+            {
+              "id": "playoffs.eligibility.top4",
+              "legacyNumber": "7.4.1",
+              "text": "The teams with the top 4 regular season records make the playoffs, with one exception:",
+              "children": [
+                { "id": "playoffs.eligibility.top4.playin", "legacyNumber": "7.4.1.1", "text": "A team with a lower regular season record than 4th place can make the playoffs by way of the play-in weeks. See {{ref:playin}}." }
+              ]
+            },
+            {
+              "id": "playoffs.eligibility.tiebreak",
+              "legacyNumber": "7.4.2",
+              "text": "Tie-breaker: the tie-breaker for two teams with the same regular season record is always total fantasy points scored (PF). The team with the higher PF gets the higher seed.",
+              "children": [
+                { "id": "playoffs.eligibility.tiebreak.second", "legacyNumber": "7.4.2.1", "text": "If the teams have the exact same amount of PF, then the secondary tie-breaker is the amount of points scored by those teams during the final week of the regular season." }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "playoffs.winner",
+          "legacyNumber": "7.5",
+          "text": "The winner of each playoff matchup is the team that has the most total fantasy points scored after the conclusion of the final scheduled day of the playoff matchup.",
+          "children": [
+            { "id": "playoffs.winner.tie", "legacyNumber": "7.5.1", "text": "In the event of an exceedingly rare tie, the winner will be the team with the most total fantasy points scored on the season, including any previous playoff matchups." }
+          ]
+        },
+        {
+          "id": "playoffs.deferral",
+          "legacyNumber": "7.6",
+          "title": "Right of Seed Deferral",
+          "children": [
+            { "id": "playoffs.deferral.right", "legacyNumber": "7.6.1", "text": "The winner of the 1st seed has the right to change their first-round matchup by deferring their seed." },
+            {
+              "id": "playoffs.deferral.conditions",
+              "legacyNumber": "7.6.2",
+              "text": "If the 1st seed decides to enact their Right of Seed Deferral, the following must occur:",
+              "children": [
+                {
+                  "id": "playoffs.deferral.announce",
+                  "legacyNumber": "7.6.2.1",
+                  "text": "The 1st seed must announce publicly their decision to defer their seed.",
+                  "children": [
+                    { "id": "playoffs.deferral.announce.proxy", "legacyNumber": "7.6.2.1.1", "text": "If unable to do so, the 1st seed must contact the commissioner or co-commissioner who will publicly announce the decision." }
+                  ]
+                },
+                {
+                  "id": "playoffs.deferral.cost",
+                  "legacyNumber": "7.6.2.2",
+                  "text": "The 1st seed must give up 75% of their 1st seed winnings. See {{ref:fees.firstSeed}}.",
+                  "settings": ["playoffs.deferralForfeitPct"],
+                  "children": [
+                    { "id": "playoffs.deferral.cost.award", "legacyNumber": "7.6.2.2.1", "text": "The 2nd seed is awarded 75% of the 1st seed winnings." }
+                  ]
+                },
+                { "id": "playoffs.deferral.choose", "legacyNumber": "7.6.2.3", "text": "The 1st seed must choose to play either the 2nd or the 3rd seed instead of playing the 4th seed. The remaining two seeds then play each other (2 vs 4 or 3 vs 4)." },
+                { "id": "playoffs.deferral.final", "legacyNumber": "7.6.2.4", "text": "The new seeding must be set by the commissioner immediately and cannot be reversed for any reason once deferral is enacted." }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "playin",
+      "title": "Play-In Weeks (Weeks 17 and 18)",
+      "clauses": [
+        {
+          "id": "playin.week17",
+          "legacyNumber": "8.1",
+          "title": "Week 17 Play-In",
+          "children": [
+            {
+              "id": "playin.week17.field",
+              "legacyNumber": "8.1.1",
+              "text": "Week 17 is the designated play-in week for the teams seeded 6th, 7th, 8th, 9th, and 10th at the conclusion of Week 17. These teams must not have violated the game limit rules in {{ref:season.missed.playin}} or they are ineligible for the play-in.",
+              "issues": ["ref-wrong-662"]
+            },
+            { "id": "playin.week17.advance", "legacyNumber": "8.1.2", "text": "Of the above teams, the team which posts the highest total score during Week 17 will become eligible for participation in the Week 18 play-in." }
+          ]
+        },
+        {
+          "id": "playin.week18",
+          "legacyNumber": "8.2",
+          "title": "Week 18 Play-In",
+          "children": [
+            {
+              "id": "playin.week18.field",
+              "legacyNumber": "8.2.1",
+              "text": "Week 18 is the designated play-in week for the 4th seed, the 5th seed, and the winner of the Week 17 play-in, as seeded at the conclusion of Week 17. Other than the 4th seed, these teams must not have violated the game limit rules in {{ref:season.missed.playin}} or they are ineligible for the play-in.",
+              "issues": ["ref-wrong-662"]
+            },
+            { "id": "playin.week18.winner", "legacyNumber": "8.2.2", "text": "Of the above eligible teams, the team which posts the highest total score during Week 18 will earn the 4th seed in the playoffs." }
+          ]
+        },
+        {
+          "id": "playin.notes",
+          "legacyNumber": "8.3",
+          "title": "Notes and exceptions",
+          "children": [
+            {
+              "id": "playin.notes.advantage",
+              "legacyNumber": "8.3.1",
+              "title": "4th seed advantage",
+              "text": "The team who owns the 4th seed at the start of Week 18 earns a one-time advantage to play a maximum of 31 games during the Week 18 play-in. All other teams eligible for the Week 18 play-in must play a maximum of 30 games.",
+              "settings": ["playin.fourthSeedGameLimit"],
+              "children": [
+                { "id": "playin.notes.advantage.announce", "legacyNumber": "8.3.1.1", "text": "The 4th seed's 31st game must be announced publicly by tip-off of the first game of the final day of Week 18, or this one-time advantage will be lost." }
+              ]
+            },
+            { "id": "playin.notes.moveup", "legacyNumber": "8.3.2", "text": "If after the conclusion of Week 17 a lower seed that did not win the Week 17 play-in moves into the 4th or 5th seed, they will be eligible for the Week 18 play-in." },
+            { "id": "playin.notes.winnermoves", "legacyNumber": "8.3.3", "text": "If the team that won the Week 17 play-in moves into the 4th or 5th seed after Week 17, there will effectively be only 2 teams playing in for the playoffs." },
+            { "id": "playin.notes.drop", "legacyNumber": "8.3.4", "text": "If at the conclusion of Week 17 the 4th or 5th seed drops to the 6th seed or lower, they will not be eligible for the Week 17 play-in and will effectively be eliminated from playoff contention." },
+            { "id": "playin.notes.effect", "legacyNumber": "8.3.5", "text": "In effect, each of the eligible play-in teams are playing each other for a playoff spot, regardless of their scheduled Week 18 matchup." },
+            {
+              "id": "playin.notes.matchup",
+              "legacyNumber": "8.3.6",
+              "text": "The outcome of the individual fantasy matchups for each eligible team does not apply to final playoff seeding.",
+              "children": [
+                { "id": "playin.notes.matchup.example", "legacyNumber": "8.3.6.1", "text": "This means that if the 4th seed during the Week 18 play-in loses the play-in but wins their matchup and ultimately moves up into the 3rd seed, they are still eliminated from playoff contention." },
+                {
+                  "id": "playin.notes.matchup.top3",
+                  "legacyNumber": "8.3.6.2",
+                  "text": "The only teams whose seeding may change due to the result of an individual matchup during Week 18 are those teams seeded 1st, 2nd, and 3rd at the conclusion of Week 17.",
+                  "children": [
+                    { "id": "playin.notes.matchup.top3.example", "legacyNumber": "8.3.6.2.1", "kind": "example", "text": "1st place could lose their Week 18 matchup and fall to 2nd or 3rd, and 2nd place could win and move to first." }
+                  ]
+                },
+                { "id": "playin.notes.matchup.questions", "legacyNumber": "8.3.6.3", "text": "For more questions on the play-in weeks, contact your commissioners." }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fees",
+      "title": "Fees, Winnings and Payout",
+      "clauses": [
+        {
+          "id": "fees.entry",
+          "legacyNumber": "9.1",
+          "title": "Entry fees",
+          "text": "Each team pays the following fees:",
+          "children": [
+            { "id": "fees.entry.base", "legacyNumber": "9.1.1", "text": "$250 entry fee.", "settings": ["fees.entry"] },
+            { "id": "fees.entry.weekly", "legacyNumber": "9.1.2", "text": "$54 weekly bonus fee.", "settings": ["fees.weeklyBonus"] },
+            {
+              "id": "fees.entry.total",
+              "legacyNumber": "9.1.3",
+              "text": "Total fees = $304, unless the team requests to the commissioner to invoke the half entry fee exception.",
+              "settings": ["fees.total"],
+              "children": [
+                { "id": "fees.entry.half", "legacyNumber": "9.1.3.1", "title": "Half entry fee exception", "text": "The Nerds League never wants to lose a member due to high entry fees. For this reason, up to two teams can request to pay only half of the normal entry fee.", "settings": ["fees.halfExceptionMaxTeams"] },
+                { "id": "fees.entry.half.amount", "legacyNumber": "9.1.3.2", "text": "The weekly bonus fee must be paid in full, meaning the total entry fee would be $125 + $54 = $179." },
+                { "id": "fees.entry.half.payout", "legacyNumber": "9.1.3.3", "text": "Any team that invokes the half entry fee exception is only eligible to receive half of the normal payout scheme." },
+                {
+                  "id": "fees.entry.half.deduct",
+                  "legacyNumber": "9.1.3.4",
+                  "text": "The difference in money paid into the pot is deducted from 1st place champion winnings.",
+                  "children": [
+                    { "id": "fees.entry.half.deduct.example", "legacyNumber": "9.1.3.4.1", "kind": "example", "text": "If two teams invoke the exception, the 1st place winnings are deducted by $125 x 2 = $250." }
+                  ]
+                },
+                {
+                  "id": "fees.entry.half.finish",
+                  "legacyNumber": "9.1.3.5",
+                  "title": "Half payout",
+                  "text": "If a team that invokes the exception finishes the playoffs in 1st, 2nd, or 3rd place they are only eligible to receive half of the original payout amount for their position.",
+                  "children": [
+                    { "id": "fees.entry.half.finish.example", "legacyNumber": "9.1.3.5.1", "kind": "example", "text": "If Team A invokes the exception and finishes the playoffs in 2nd place, they are awarded $250 instead of $500. See {{ref:fees.payout}}.", "issues": ["ref-wrong-84"] },
+                    { "id": "fees.entry.half.finish.diff", "legacyNumber": "9.1.3.5.2", "text": "The difference in winnings must be awarded to the 1st place champion." }
+                  ]
+                },
+                { "id": "fees.entry.half.champ", "legacyNumber": "9.1.3.6", "text": "If a team that invokes the exception wins the championship, the difference in payout is awarded to the 2nd place winner, unless that team also invoked the exception. In that case, the winnings would go to the 3rd place winner." }
+              ]
+            }
+          ]
+        },
+        { "id": "fees.due", "legacyNumber": "9.2", "text": "All fees must be paid by the day of the draft or the team may suffer expulsion from league competition." },
+        {
+          "id": "fees.weeklyBonus",
+          "legacyNumber": "9.3",
+          "title": "Weekly scoring bonus",
+          "text": "The $54 weekly bonus fee goes into a pool that pays out $30 each week to the highest total fantasy point scoring team for that week.",
+          "settings": ["fees.weeklyPayout"],
+          "children": [
+            {
+              "id": "fees.weeklyBonus.ineligible",
+              "legacyNumber": "9.3.1",
+              "text": "Exception: any team that failed to make the game limit the prior week is ineligible for the weekly bonus for highest points scored.",
+              "children": [
+                { "id": "fees.weeklyBonus.ineligible.change", "legacyNumber": "9.3.1.1", "text": "This ineligibility can be raised, reduced, or eliminated by a 60% vote.", "voteThreshold": 60 },
+                { "id": "fees.weeklyBonus.ineligible.venmo", "legacyNumber": "9.3.1.2", "text": "Payment will be made through Venmo to the top point scorer that week by the following Monday of each week." },
+                { "id": "fees.weeklyBonus.ineligible.account", "legacyNumber": "9.3.1.3", "text": "Each competitor must have a Venmo account set up, unless they plan on never being the top weekly scorer." }
+              ]
+            },
+            {
+              "id": "fees.weeklyBonus.math",
+              "legacyNumber": "9.3.2",
+              "text": "The total weekly scoring pot is $54 x 10 = $540. The total payout throughout the year is $30 x 18 = $540.",
+              "settings": ["fees.weeklyPaidWeeks"],
+              "issues": ["conflict-season-length"]
+            }
+          ]
+        },
+        {
+          "id": "fees.payout",
+          "legacyNumber": "9.4",
+          "title": "Payout",
+          "text": "The $250 entry fee goes to the final playoff payout pot and first seed winnings. See {{ref:fees.firstSeed}}. The total pot from initial buy-ins is $250 x 10 = $2500. The current payout scheme is:",
+          "issues": ["ref-wrong-86"],
+          "children": [
+            { "id": "fees.payout.first", "legacyNumber": "9.4.1", "text": "1st place champion = $2000, plus the remainder of transaction fees, if any.", "settings": ["fees.payoutFirst"] },
+            { "id": "fees.payout.second", "legacyNumber": "9.4.2", "text": "2nd place runner-up = $400.", "settings": ["fees.payoutSecond"] },
+            { "id": "fees.payout.third", "legacyNumber": "9.4.3", "text": "3rd place = $0.", "settings": ["fees.payoutThird"] },
+            { "id": "fees.payout.firstSeed", "legacyNumber": "9.4.4", "text": "1st overall seed: $100. See {{ref:fees.firstSeed}}.", "resolvedBy": ["dangling-ref-dividends"] },
+            { "id": "fees.payout.change", "legacyNumber": "9.4.5", "text": "This payout scheme and entry fee can be changed by a 60% vote.", "voteThreshold": 60 },
+            { "id": "fees.payout.host", "legacyNumber": "9.4.6", "text": "Any remaining money from entry fees goes to the host of the draft to use to pay for the draft board, trophy upgrades, food, and other amenities." }
+          ]
+        },
+        {
+          "id": "fees.transaction",
+          "legacyNumber": "9.5",
+          "title": "Transaction fees",
+          "children": [
+            {
+              "id": "fees.transaction.current",
+              "legacyNumber": "9.5.1",
+              "text": "The current transaction fees are as follows:",
+              "children": [
+                { "id": "fees.transaction.trades", "legacyNumber": "9.5.1.1", "text": "Trades = $0 per transaction.", "settings": ["fees.perTrade"] },
+                {
+                  "id": "fees.transaction.adds",
+                  "legacyNumber": "9.5.1.2",
+                  "text": "Free agent acquisitions = $0 per transaction. Both changed in 2019-20.",
+                  "settings": ["fees.perAdd"],
+                  "children": [
+                    { "id": "fees.transaction.adds.change", "legacyNumber": "9.5.1.2.1", "text": "These prices can be changed with a 60% vote.", "voteThreshold": 60 }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fees.firstSeed",
+          "legacyNumber": "9.6",
+          "title": "First seed winnings",
+          "children": [
+            {
+              "id": "fees.firstSeed.award",
+              "legacyNumber": "9.6.1",
+              "text": "The winner of the first overall seed by way of best regular season record (total PF breaks all ties) will be awarded all of the following:",
+              "children": [
+                { "id": "fees.firstSeed.award.cash", "legacyNumber": "9.6.1.1", "text": "$100.", "settings": ["fees.firstSeedCash"] },
+                { "id": "fees.firstSeed.award.txn", "legacyNumber": "9.6.1.3", "text": "All transaction fees, if transaction fees are enacted.", "resolvedBy": ["dangling-ref-dividends"] }
+              ]
+            },
+            { "id": "fees.firstSeed.timing", "legacyNumber": "9.6.2", "text": "First seed winnings must be paid out by the commissioner through Venmo by the Monday following the conclusion of the regular season." },
+            { "id": "fees.firstSeed.deferral", "legacyNumber": "9.6.3", "text": "First seed winnings are subject to the first seed's right of deferral. See {{ref:playoffs.deferral}}.", "issues": ["ref-wrong-65"] }
+          ]
+        },
+        {
+          "id": "fees.trophy",
+          "legacyNumber": "9.7",
+          "title": "Trophy",
+          "children": [
+            {
+              "id": "fees.trophy.award",
+              "legacyNumber": "9.7.1",
+              "text": "At the beginning of each season, the new champion is awarded The Nerds Fantasy Basketball League Trophy.",
+              "children": [
+                { "id": "fees.trophy.award.timing", "legacyNumber": "9.7.1.1", "text": "The champion may request to receive the trophy at the conclusion of the playoffs, but typically it is awarded at the draft. This must be agreed upon between the outgoing and incoming champion." },
+                { "id": "fees.trophy.award.speech", "legacyNumber": "9.7.1.2", "text": "The champion is permitted a 5 minute glory speech where they shun all of their non-believers and pledge to repeat their epic championship once again." }
+              ]
+            },
+            { "id": "fees.trophy.plaque", "legacyNumber": "9.7.2", "text": "During the summer, the commissioner must add the new champion's plaque, featuring the champion's name and team name, to the trophy." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scoring",
+      "title": "Scoring",
+      "clauses": [
+        { "id": "scoring.basis", "legacyNumber": "10.1", "text": "The Nerds Fantasy Basketball League scoring is based on years of experience, data analysis, and careful configuration." },
+        { "id": "scoring.intent", "legacyNumber": "10.2", "text": "The scoring system is intended to weight all parts of player statistics including scoring, efficiency, defense, playmaking, rebounding, and shooting." },
+        {
+          "id": "scoring.change",
+          "legacyNumber": "10.3",
+          "text": "A scoring change can be proposed by any member of the league, but must be passed by a 60% vote. This vote must occur before the draft, preferably at least a week before.",
+          "voteThreshold": 60,
+          "children": [
+            { "id": "scoring.change.inseason", "legacyNumber": "10.3.1", "text": "Absolutely no scoring changes can occur during the season.", "issues": ["numbering-wrong-article"] }
+          ]
+        },
+        { "id": "scoring.addremove", "legacyNumber": "10.4", "text": "Scoring can be added and removed. For example, there are currently no points scored for offensive rebounds. This could be added in the future." },
+        { "id": "scoring.limit", "legacyNumber": "10.5", "text": "Only two scoring changes may occur each year.", "settings": ["scoring.maxChangesPerYear"] },
+        {
+          "id": "scoring.escalators",
+          "legacyNumber": "10.6",
+          "title": "Rarity escalators",
+          "children": [
+            { "id": "scoring.escalators.qd", "legacyNumber": "10.6.1", "text": "Quadruple double (QD): every year a quadruple double is not achieved, the point total for it increases by 5.", "settings": ["scoring.qd"] },
+            {
+              "id": "scoring.escalators.fivebyfive",
+              "legacyNumber": "10.6.2",
+              "text": "Five-by-five (5x5): every year a 5x5 is not achieved, the point total increases by 5.",
+              "settings": ["scoring.fiveByFive"],
+              "children": [
+                { "id": "scoring.escalators.fivebyfive.2024", "legacyNumber": "10.6.2.1", "text": "A 5x5 was achieved in the 2023-2024 season, so the total dropped back to 50 pts." },
+                { "id": "scoring.escalators.fivebyfive.2025", "legacyNumber": "10.6.2.2", "text": "A 5x5 was not achieved in the 2024-2025 season, so the total increased to 55 pts." }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "scoring.history",
+          "legacyNumber": "10.7",
+          "title": "Scoring change history log",
+          "issues": ["numbering-duplicate", "numbering-wrong-article"],
+          "children": [
+            {
+              "id": "scoring.history.2019",
+              "legacyNumber": "10.6.1",
+              "title": "2018-2019: enacted",
+              "children": [
+                { "id": "scoring.history.2019.a", "text": "Changed STL/BLK from 1.5 pts to 2.0 pts." },
+                { "id": "scoring.history.2019.b", "text": "Changed TO from -1.0 pts to -1.5 pts." }
+              ]
+            },
+            {
+              "id": "scoring.history.2020",
+              "legacyNumber": "9.6.2",
+              "title": "2019-2020: not enacted, vote failed",
+              "children": [
+                { "id": "scoring.history.2020.a", "text": "Proposed changing TD from 6.2 to 5.2." }
+              ]
+            },
+            {
+              "id": "scoring.history.2021",
+              "legacyNumber": "10.6.2",
+              "title": "2020-2021: not enacted, vote failed",
+              "legacyTitle": "2021-2021, not enacted, vote failed",
+              "issues": ["typo-season-2021-2021"],
+              "children": [
+                { "id": "scoring.history.2021.a", "text": "Proposed changing TD from 6.2 to 4.2." },
+                { "id": "scoring.history.2021.b", "text": "Proposed changing BLK from 2.0 to 2.5." },
+                { "id": "scoring.history.2021.c", "text": "Proposed changing STL from 2.0 to 2.2." }
+              ]
+            },
+            {
+              "id": "scoring.history.2022",
+              "legacyNumber": "10.6.3",
+              "title": "2021-2022: enacted, vote succeeded",
+              "children": [
+                { "id": "scoring.history.2022.a", "text": "Changed STL from 2.0 to 2.5." },
+                { "id": "scoring.history.2022.b", "text": "Changed BLK from 2.0 to 2.5." },
+                { "id": "scoring.history.2022.c", "text": "Changed TO from -1.5 to -1.8." }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "appendices": [
+    {
+      "id": "appendix-a",
+      "label": "Appendix A",
+      "title": "Scoring System",
+      "legacyTitle": "APPENDIX A - 2025-26 Scoring System",
+      "issues": ["stale-appendix-a-title"],
+      "kind": "settingsTable",
+      "settingGroup": "scoring.values",
+      "table": {
+        "columns": ["Statistic", "Value"],
+        "rows": [["PTS","1"],["REB","1"],["AST","1.4"],["STL","2.5"],["BLK","2.5"],["FGM","1"],["FGMI","-0.7"],["FTMI","-0.5"],["3PM","0.5"],["TO","-1.8"],["DD","1.8"],["TD","6.2"],["QD","175"],["5X5","55"]]
+      }
+    },
+    {
+      "id": "appendix-b",
+      "label": "Appendix B",
+      "title": "Records",
+      "kind": "records",
+      "note": "These tables must be generated from the league history records, not hand-edited here. See records below."
+    }
+  ],
+  "records": {
+    "highScores": {
+      "criteria": "1200 pts minimum, 30-game weeks only",
+      "scoreBasis": "raw",
+      "scoreBasisNote": "Records use the raw total points scored. Game-limit deductions under {{ref:season.overLimit}} affect the matchup result, not the record book.",
+      "complete": false,
+      "rebuildFrom": "espn",
+      "note": "Rank is derived from total, not stored. The source document listed Eric 1241.6 above Aaron 1243.0; corrected here. The commissioner has approved rebuilding this table from ESPN; every entry stays source 'rulebook' and verified false until that rebuild lands.",
+      "resolvedBy": ["records-misordered", "open-raw-vs-adjusted", "records-incomplete"],
+      "entries": [
+        { "owner": "Brey", "season": 9, "week": 10, "total": 1421.6, "source": "rulebook", "verified": false },
+        { "owner": "Aaron", "season": 14, "week": null, "total": 1316.4, "source": "rulebook", "verified": false, "note": "Week unknown in source." },
+        { "owner": "Bryan", "season": 13, "week": 11, "total": 1292.7, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Derek", "season": 13, "week": 7, "total": 1282.5, "source": "rulebook", "verified": false },
+        { "owner": "Eric", "season": 1, "week": 10, "total": 1281.5, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Ryan", "season": 14, "week": 15, "total": 1269.1, "source": "rulebook", "verified": false },
+        { "owner": "Derek", "season": 14, "week": 10, "total": 1268.6, "source": "rulebook", "verified": false },
+        { "owner": "Bryan", "season": 14, "week": 18, "total": 1265.4, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Eric", "season": 10, "week": 18, "total": 1256.4, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Amy", "season": 13, "week": 15, "total": 1252.9, "source": "rulebook", "verified": false },
+        { "owner": "Ryan", "season": 14, "week": 10, "total": 1247.6, "source": "rulebook", "verified": false },
+        { "owner": "Eric", "season": 1, "week": 13, "total": 1244.1, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Aaron", "season": 14, "week": 8, "total": 1243.0, "source": "rulebook", "verified": false, "note": "Source listed this below Eric's 1241.6." },
+        { "owner": "Eric", "season": 1, "week": 15, "total": 1241.6, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Amy", "season": 14, "week": 11, "total": 1236.0, "source": "rulebook", "verified": false },
+        { "owner": "Amy", "season": 11, "week": 2, "total": 1223.0, "source": "rulebook", "verified": false },
+        { "owner": "Ryan", "season": 10, "week": 14, "total": 1220.3, "source": "rulebook", "verified": false },
+        { "owner": "Dustin", "season": 15, "week": 13, "total": 1217.4, "source": "rulebook", "verified": false },
+        { "owner": "Aaron", "season": 14, "week": 13, "total": 1214.9, "source": "rulebook", "verified": false },
+        { "owner": "Eric", "season": 1, "week": 6, "total": 1213.8, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Bryan", "season": 13, "week": 19, "total": 1213.2, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Eric", "season": 1, "week": 18, "total": 1208.9, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Aaron", "season": 12, "week": 14, "total": 1207.1, "source": "rulebook", "verified": false },
+        { "owner": "Kyle", "season": 15, "week": 15, "total": 1206.4, "source": "rulebook", "verified": false },
+        { "owner": "Sam", "season": 14, "week": 15, "total": 1205.9, "source": "rulebook", "verified": false },
+        { "owner": "Eric", "season": 1, "week": 7, "total": 1205.7, "source": "rulebook", "verified": false, "former": true },
+        { "owner": "Ryan", "season": 10, "week": 15, "total": 1205.1, "source": "rulebook", "verified": false },
+        { "owner": "Ryan", "season": 10, "week": 16, "total": 1201.6, "source": "rulebook", "verified": false }
+      ]
+    },
+    "champions": {
+      "complete": true,
+      "resolvedBy": ["records-missing-2026"],
+      "entries": [
+        { "season": 1, "year": "2010-2011", "champion": "Eric Runnels", "runnerUp": "Ryan Shaug", "source": "rulebook" },
+        { "season": 2, "year": "2011-2012", "champion": "Amy Shaug", "runnerUp": "Eric Runnels", "source": "rulebook" },
+        { "season": 3, "year": "2012-2013", "champion": "Brey Funkhouser", "runnerUp": "Amy Shaug", "source": "rulebook" },
+        { "season": 4, "year": "2013-2014", "champion": "Ryan Shaug", "runnerUp": "Eric Runnels", "source": "rulebook" },
+        { "season": 5, "year": "2014-2015", "champion": "Amy Shaug", "runnerUp": "Marcus Riggs", "source": "rulebook" },
+        { "season": 6, "year": "2015-2016", "champion": "Ryan Shaug", "runnerUp": "Bryan Russell", "source": "rulebook" },
+        { "season": 7, "year": "2016-2017", "champion": "Justin Riggs", "runnerUp": "Brey Funkhouser", "source": "rulebook" },
+        { "season": 8, "year": "2017-2018", "champion": "Amy Shaug", "runnerUp": "Bryan Russell", "source": "rulebook" },
+        { "season": 9, "year": "2018-2019", "champion": "Brey Funkhouser", "runnerUp": "Bryan Russell", "source": "rulebook" },
+        { "season": 10, "year": "2019-2020", "champion": "Brey Funkhouser", "runnerUp": "Eric Runnels", "source": "rulebook" },
+        { "season": 11, "year": "2020-2021", "champion": "Aaron Jensen", "runnerUp": "Amy Shaug", "source": "rulebook" },
+        { "season": 12, "year": "2021-2022", "champion": "Derek McCoy", "runnerUp": "Aaron Jensen", "source": "rulebook" },
+        { "season": 13, "year": "2022-2023", "champion": "Derek McCoy", "runnerUp": "Bryan Russell", "source": "rulebook" },
+        { "season": 14, "year": "2023-2024", "champion": "Aaron Jensen", "runnerUp": "Amy Shaug", "source": "rulebook" },
+        { "season": 15, "year": "2024-2025", "champion": "Aaron Jensen", "runnerUp": "Ryan Shaug", "source": "rulebook" },
+        { "season": 16, "year": "2025-2026", "champion": "Amy Shaug", "runnerUp": "Brey Funkhouser", "source": "commissioner", "verified": true, "note": "Supplied by the commissioner 2026-08-31. Amy's 4th title; Brey's 2nd runner-up finish. The member table in the front matter still shows the pre-2025-26 counts." }
+      ]
+    },
+    "formerMembers": ["Eric Runnels", "Bryan Russell", "Marcus Riggs", "Justin Riggs"]
+  },
+  "votes": [
+    {
+      "id": "vote-2026-1",
+      "season": 2026,
+      "title": "Change to draft pick seeding determination",
+      "affects": ["draft.order"],
+      "result": "passed",
+      "note": "The document recorded only the 'no change' bullet for picks 7-10. The commissioner confirmed on 2026-08-31 that the picks 1-6 text in the rule body is what the league passed, so it is attached here as the passed amendment.",
+      "passedText": ["draft.order.p1to4", "draft.order.p1to4.method", "draft.order.p1to4.example", "draft.order.p5to6"],
+      "confirmedBy": "commissioner",
+      "confirmedAt": "2026-08-31",
+      "resolvedBy": ["vote-record-incomplete"]
+    },
+    {
+      "id": "amendment-2027-consolation",
+      "season": 2027,
+      "title": "Remove the consolation matchup; picks 5-6 decided by Play-In Week 2 score",
+      "affects": ["draft.order", "draft.order.p1to4.method", "draft.order.p5to6"],
+      "result": "passed",
+      "source": "commissioner",
+      "recordedAt": "2026-08-31",
+      "note": "The commissioner states the league agreed to this. The two-week consolation matchup is gone. Picks 5 and 6 are now ranked on the same Play-In Week 2 scores that already decide picks 1-4, so every pick from 1 to 6 comes from one week of scoring. Picks 1-4 wording also made explicit: highest to lowest scorer. If this needs a formal vote record rather than a commissioner amendment, raise it as a poll once feature 3 phase 4 ships."
+    },
+    { "id": "vote-2026-2", "season": 2026, "title": "Injured Reserve expansion from 1 to 2 slots", "affects": ["rosters.size"], "result": "failed" },
+    { "id": "vote-2026-3", "season": 2026, "title": "Last place punishment: last place in the regular season buys In-N-Out for the league at the next draft", "affects": [], "result": "failed" }
+  ],
+  "staleFrontMatter": {
+    "note": "All of this is 2026-season copy carried into a file named for 2027. Do not publish as 2027 without rewriting.",
+    "items": [
+      { "id": "front.champion", "text": "LAST SEASON'S CHAMPION: The Queen Slayer, Aaron Jensen. Runner-up Ryan Shaug.", "issue": "Wrong season. The 2025-26 champion is Amy Shaug, runner-up Brey Funkhouser. Rewrite from the champions record." },
+      { "id": "front.changes", "text": "LEAGUE CHANGES IN 2025-2026 section, including outgoing members and Joel's contract year.", "issue": "Stale season. Needs 2026-27 copy." },
+      { "id": "front.year", "text": "WELCOME TO YEAR 16.", "issue": "2026-27 is year 17." },
+      { "id": "front.keeperUpdates", "text": "Jokic and Wembanyama keeper contracts have expired.", "issue": "2026-specific. Recompute expiring contracts for 2027." },
+      { "id": "front.members", "text": "League members table with years of experience, playoff appearances, and titles.", "issue": "Counts are through 2024-25 and are now wrong: Amy has 4 titles, not 3, and Brey has 2 runner-up finishes, not 1. Generate from league history rather than typing." },
+      { "id": "front.signatures", "text": "Signature block.", "issue": "13 blank lines for 10 members. Replace with per-member digital signature records." }
+    ]
+  },
+  "issues": [
+    { "id": "numbering-runon", "type": "numbering", "severity": "medium", "summary": "Number typed into the previous paragraph's text instead of being its own list item, so the clause lost its number in Word.", "fix": "Auto-fixed. Each is now its own node and numbers from tree position." },
+    { "id": "numbering-skip", "type": "numbering", "severity": "medium", "summary": "Draft order jumps 2.2.5 to 2.2.10 because '10th pick' was typed as literal text.", "fix": "Auto-fixed." },
+    { "id": "numbering-lost-list", "type": "numbering", "severity": "low", "summary": "Roster configuration line was Body Text, not a list item, so it never numbered.", "fix": "Auto-fixed." },
+    { "id": "numbering-wrong-article", "type": "numbering", "severity": "high", "summary": "Whole blocks carry the previous article's number. Article 5 trades are numbered 4.3.x; Article 10 in-season scoring lock is numbered 9.3.1.", "fix": "Auto-fixed." },
+    { "id": "numbering-wrong-level", "type": "numbering", "severity": "medium", "summary": "Transaction Pot sits at the wrong outline level and reads as a top-level item.", "fix": "Auto-fixed as 5.5." },
+    { "id": "numbering-duplicate", "type": "numbering", "severity": "high", "summary": "Scoring change history log entries are numbered 10.6.1, 9.6.2, 10.6.2, 10.6.3. Two different items share 10.6.2 and one uses article 9.", "fix": "Auto-fixed." },
+    { "id": "ref-wrong-4.2", "type": "crossref", "severity": "medium", "summary": "'see sec 4.2' points at Keeper Draft Pick Tiers. It means acquisition restrictions (5.2).", "fix": "Auto-fixed via ref token." },
+    { "id": "ref-wrong-4.3", "type": "crossref", "severity": "medium", "summary": "'see 4.3 waivers' points at the Keeper Salary Cap. It means Waivers (5.3).", "fix": "Auto-fixed via ref token." },
+    { "id": "ref-wrong-662", "type": "crossref", "severity": "medium", "summary": "Play-in eligibility cites 'section 6.6.2' for game limit rules. That number is anti-tanking. It means Losing Play-In Eligibility.", "fix": "Auto-fixed via ref token." },
+    { "id": "ref-wrong-84", "type": "crossref", "severity": "low", "summary": "'See 8.4 PAYOUT' should be 9.4.", "fix": "Auto-fixed via ref token." },
+    { "id": "ref-wrong-86", "type": "crossref", "severity": "low", "summary": "'see 8.6' for First Seed Winnings should be 9.6.", "fix": "Auto-fixed via ref token." },
+    { "id": "ref-wrong-65", "type": "crossref", "severity": "low", "summary": "'See 6.5 Right of Seed Deferral' should be 7.6.", "fix": "Auto-fixed via ref token." },
+    { "id": "dangling-ref-dividends", "type": "crossref", "severity": "high", "status": "resolved", "summary": "Payout rules cite 'section 6.6.4' for missed game dividends and decreased weekly max pay-out penalties, twice. No such rule exists anywhere in the book.", "ruling": "Strike the dividend rule. The first overall seed receives a flat $100, plus transaction fees if they are ever enacted. Both references removed.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "conflict-eliminated-trades", "type": "conflict", "severity": "high", "status": "resolved", "summary": "5.2.1 said an eliminated team may not add, drop, or trade, with no exceptions. 5.4.3.1 says an eliminated team may trade with other eliminated teams.", "ruling": "5.2.1 is wrong and was removed entirely, along with the now-empty Acquisition Restrictions section. 5.4.3.1 governs. 5.1.1 was reworded to point at the surviving restrictions.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "conflict-season-length", "type": "conflict", "severity": "high", "status": "resolved", "summary": "6.1 said the regular season runs 19 weeks, but play-in is weeks 17-18 and playoffs start after week 18.", "ruling": "The regular season is 18 weeks. It ran 19 once, historically. Weeks 17 and 18 are regular season weeks that double as the play-in weeks, so the weekly bonus paying $30 x 18 = $540 is correct and needs no change. The schedule engine's separate 'regular season = weeks 1-16' phase label is a scheduling term and is also correct.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "mismatch-cap", "type": "settings", "severity": "high", "status": "resolved", "summary": "4.3.2 stated a keeper salary cap of 78.7. The 2027 app computes 77.8 from the stated formula.", "ruling": "The rulebook no longer states a cap number. 4.3.2 now says the commissioners set it from the formula each year and the app publishes it. This removes the whole class of drift rather than fixing one number.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "open-allstar-wording", "type": "open", "severity": "medium", "status": "resolved", "summary": "The All-Star double week was described only as 'usually mid-February'. The schedule engine needs explicit dates.", "ruling": "The dates come from the accepted schedule snapshot for the season, not from the prose. For 2027 that is Play-In 2, February 15-28, flagged combinesAllStarBreak.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "open-allstar-rounding", "type": "open", "severity": "low", "status": "resolved", "summary": "'Round to the nearest whole number' with a worked example that rounds 34.3 down.", "ruling": "Nearest whole number, as the original text said. A result ending in exactly .5 rounds up, the ordinary convention. The book's worked example (30/7) x 8 = 34.3 = 34 holds.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "open-first-round-same-tier", "type": "open", "severity": "medium", "status": "resolved", "summary": "The same-tier bump rule had no answer for two keepers both in the 1st round tier, since there is no round above 1.", "ruling": "A team may not keep two 1st round tier players. Added as a new clause. The salary cap should make it impossible anyway; the rule is a backstop.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "open-drop-reacquire", "type": "open", "severity": "medium", "status": "resolved", "summary": "Nothing stated what happens to a keeper contract when a kept player is dropped and later reacquired.", "ruling": "A contract follows the player through every transaction. Trade, drop, and reacquisition all leave it untouched, and used years stay used. The old trade-only sentence was promoted out of an example into its own clause and broadened to cover all three.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "open-kyle-source", "type": "open", "severity": "medium", "status": "resolved", "summary": "The Kyle Rule's 30.0 ppg threshold did not say which average applied.", "ruling": "Current season average to date, measured at the time of the trade.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "open-quorum", "type": "open", "severity": "medium", "status": "resolved", "summary": "Votes need 60% but the book never defined the denominator or how abstentions count.", "ruling": "60% of all teams in the league, not of votes cast. In a 10 team league that is 6 yes votes. A team that does not vote counts against the proposal.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "open-raw-vs-adjusted", "type": "open", "severity": "medium", "status": "resolved", "summary": "High-score records did not say whether the total is raw or after game-limit deductions.", "ruling": "Raw total points scored. Game-limit deductions decide the matchup, not the record book.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "records-misordered", "type": "records", "severity": "medium", "summary": "Ranks 13 and 14 were inverted: Eric 1241.6 was listed above Aaron 1243.0.", "fix": "Auto-fixed. Rank is now derived from total." },
+    { "id": "records-incomplete", "type": "records", "severity": "medium", "status": "resolved", "summary": "The source marks the high-score list incomplete, and one entry has an unknown week (Aaron, S14, 1316.4).", "ruling": "Rebuild the table from ESPN. Until that lands, every entry stays source 'rulebook' and unverified. See the ESPN coverage note in the plan: recent seasons are reachable through the existing client by changing seasonId; the earliest seasons may not be.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "records-missing-2026", "type": "records", "severity": "high", "status": "resolved", "summary": "Champion history stopped at season 15 (2024-25). Season 16 (2025-26) was missing.", "ruling": "2025-26: Amy Shaug champion, Brey Funkhouser runner-up. Amy's 4th title. Recorded with source 'commissioner'.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "stale-appendix-a-title", "type": "stale", "severity": "low", "summary": "Appendix A is titled '2025-26 Scoring System' in a 2027 book.", "fix": "Title is now generated from the season." },
+    { "id": "stale-new-label", "type": "stale", "severity": "low", "summary": "Article 4 is titled 'NEW Keeper Rules'. The rules took effect in 2024-25.", "fix": "Renamed to 'Keeper Rules'." },
+    { "id": "superseded-by-app", "type": "stale", "severity": "medium", "status": "resolved", "summary": "4.4.6 said pick trades live in a Google Sheet. This app is now the ledger.", "ruling": "Rewritten: the app is the system of record for pick trades and keeper contracts, and a trade is official once accepted in the app. The clause now depends on feature 4 shipping, so ship pick trading before publishing a version that carries this text.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" },
+    { "id": "typo-season-2021-2021", "type": "stale", "severity": "low", "summary": "Scoring history lists a season as '2021-2021'.", "fix": "Read as 2020-2021." },
+    { "id": "vote-record-incomplete", "type": "records", "severity": "medium", "status": "resolved", "summary": "The 2026 seeding vote recorded only the unchanged part (picks 7-10). The passed language for picks 1-6 was folded into the rule body with no change note.", "ruling": "Confirmed as the passed text and attached to vote-2026-1 via passedText. Separately amended for 2027 by amendment-2027-consolation, which removes the consolation matchup and decides picks 5-6 on Play-In Week 2 score.", "ruledBy": "commissioner", "ruledAt": "2026-08-31" }
+  ]
+}

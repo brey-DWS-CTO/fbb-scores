@@ -148,6 +148,47 @@ Next cut: fetch and parse a new Basketball Monster candidate server-side, then a
 
 Reference: `The Nerds Constitution 2026 v13 with updates for 2027.docx`. Despite its filename, it still displays Revision 13 dated 2025-10-05, contains no tracked changes or comments, and still has stale 2025-26 front matter and history. Do not import it as a clean 2027 authority without review.
 
+**Import is complete.** `src/data/source/rulebook-2027.json` holds all 251 clauses, 10 articles, 2 appendices, the record tables, the 2026 vote log, and a 31-entry issue catalogue. It is the committed fallback seed, matching the player-pool and schedule pattern.
+
+Core design decision: **the file stores no clause numbers.** Every clause carries a stable slug id (`keepers.cap.value`); the displayed number is derived from tree position, so any add, delete, or move renumbers the book correctly. `legacyNumber` records what the Word file showed, for auditing only. Cross-references are ref tokens naming a target id and re-resolve on every render, so a reference can never go stale. Clauses link to typed settings keys via `settings[]`, and publishing must block on prose/settings mismatch.
+
+The import auto-fixed 16 defects (7 numbering, 6 wrong cross-references, 1 misordered record, 2 stale titles). The commissioner ruled on 12 more on 2026-08-31; each carries `status: "resolved"` plus a `ruling` string in `issues[]`. Rulings that change app behavior:
+
+- **Eliminated teams.** 5.2.1 was wrong and is deleted, along with the now-empty Acquisition Restrictions section. 5.4.3.1 governs: an eliminated team may trade only with other eliminated teams. 5.1.1 was reworded to point at the surviving restrictions.
+- **Season length is 18 weeks**, not 19. Weeks 17-18 are regular-season weeks that double as play-in weeks, so `$30 x 18 = $540` was already right. The schedule engine's separate "regular season = weeks 1-16" phase label is a scheduling term and stays as it is. Do not reconcile the two; the clause carries a `note` saying so.
+- **First-seed dividends struck.** No such rule ever existed. Flat $100, plus transaction fees if ever enacted. Both dangling references removed.
+- **The keeper cap number is out of the rulebook.** 4.3.2 now says the commissioners set it from the formula and the app publishes it. This kills the drift class rather than fixing 78.7 to 77.8. `keeper.salaryCap` in the settings layer is the only source.
+- **Vote threshold is 60% of all teams**, not of votes cast: 6 of 10. A team that does not vote counts against. Phase 4 must enforce this denominator.
+- **Kyle Rule** uses the player's current-season average to date at the time of the trade.
+- **Two 1st-round-tier keepers are not allowed.** New clause `keepers.tiers.basis.twoFirsts`. The cap should already prevent it; this is a backstop.
+- **All-Star week dates come from the accepted schedule snapshot**, not prose.
+- **4.4.6 now names this app as the system of record** for pick trades and keeper contracts. It carries `dependsOn: "feature-4-pick-trading"` — do not publish a version with that text until pick trading ships.
+- **Records are raw totals.** Game-limit deductions decide matchups, not the record book.
+- **2025-26 champion: Amy Shaug, runner-up Brey Funkhouser** (source `commissioner`). Amy's 4th title. The front-matter member table is now wrong in two cells and must be generated, not typed.
+- **High scores get rebuilt from ESPN.** Entries stay `verified: false` until then.
+
+- **A keeper contract follows the player through every transaction.** Trade, drop, and reacquisition all leave it untouched; used years stay used. The old sentence covered trades only and sat inside an example; it was promoted to its own clause (`keepers.contracts.follows`) and broadened.
+- **All-Star game-limit rounding** is nearest whole number, .5 up, as the original text said.
+- **2.2's picks 1-6 text is confirmed** as what the 2026 vote passed, attached to `vote-2026-1` via `passedText`.
+
+**Amendment `amendment-2027-consolation`** (commissioner, league agreed, recorded 2026-08-31): the two-week consolation matchup is abolished. Picks 5-6 are now ranked on the same Play-In Week 2 scores that decide picks 1-4, so every pick from 1 to 6 comes out of one week of scoring. Picks 1-4 wording made explicit (highest to lowest scorer). 2.2's opening sentence no longer cites the consolation bracket. Recorded as a commissioner amendment, not a poll; re-run it as a formal poll once phase 4 ships if the league wants the record.
+
+All 31 catalogued issues are now closed. `issues[]` has zero entries with `needsDecision: true`.
+
+ESPN history: `src/lib/espn/client.ts` builds its base URL as `/seasons/{seasonId}/segments/0/leagues/{leagueId}`, so any season is reachable by changing `ESPN_SEASON_ID`. Recent seasons should return `mMatchup`/`mTeam` normally. The league began in 2010-11 and ESPN's modern endpoint thins out for the oldest seasons, which need `/leagueHistory/{id}?seasonId={year}` and may be gone entirely. Untested: no ESPN credentials exist locally, only in Vercel env.
+
+`scripts/render-rulebook.mjs` renders the book to text with numbers derived from tree position and ref tokens resolved. It is the reference implementation for the phase 1 renderer; keep the two in step. Run `node scripts/render-rulebook.mjs [articleId]`.
+
+Build order, each phase shippable on its own:
+
+1. **Read.** `/rules` page, published version only, full-text search over all clauses, per-clause deep links that survive renumbering, `RULES` bottom-nav tab. Port the numbering and ref resolution from `scripts/render-rulebook.mjs`.
+2. **Edit.** `rulebook_draft` (mutable, compare-and-swap). Per-clause menu: edit, add child/sibling, move, promote, demote, delete. Numbers recompute live; deleting a referenced clause warns first. Draft invisible to members. Settings-mismatch panel.
+3. **Publish and share.** `rulebook_versions` (immutable, fingerprinted, two-step accept). Diff before publish. Publish blocks on settings mismatch. `rulebook_shares` mints public per-clause links needing no sign-in. Version history.
+4. **Votes.** `rulebook_polls` + `rulebook_votes`. A poll names affected clause ids and carries replacement text; voters snapshotted at open; one vote per team; threshold read from the clause (60%, 80% for draft style); the three-per-year and before-the-draft limits enforced. A passed poll creates an amendment draft, never rewrites a published rule. Blocked on the `open-quorum` ruling.
+5. **Sign, print, records.** `rulebook_signatures` binding member, time, acknowledgement, version hash. PDF from the frozen version with signature status and amendment history. Appendix B and the front matter generate from league history records instead of prose. Overlaps feature 5; build the record tables once.
+
+Plan artifact with the full searchable defect ledger: https://claude.ai/code/artifact/f479f46f-7873-4ccc-b870-eb95bd3b1e64
+
 Use two linked layers:
 
 1. A versioned, searchable rulebook with stable section IDs, draft/published state, effective season, revision notes, cross-references, and immutable published versions.
