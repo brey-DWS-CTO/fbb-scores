@@ -5,8 +5,9 @@ function read(command, args) {
 }
 
 function run(command, args) {
-  const executable = process.platform === 'win32' && command === 'npm' ? 'npm.cmd' : command
-  const result = spawnSync(executable, args, { stdio: 'inherit', shell: process.platform === 'win32' })
+  const result = process.platform === 'win32'
+    ? spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/c', command, ...args], { stdio: 'inherit' })
+    : spawnSync(command, args, { stdio: 'inherit' })
   if (result.error) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
