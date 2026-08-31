@@ -365,7 +365,7 @@ export function buildLeagueSchedule(
       );
     }
     const startDate = sourceWeeks[0].startDate;
-    const endDate = sourceWeeks.at(-1)?.endDate ?? startDate;
+    const endDate = sourceWeeks[sourceWeeks.length - 1]?.endDate ?? startDate;
 
     return {
       ...entry,
