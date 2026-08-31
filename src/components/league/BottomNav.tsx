@@ -5,7 +5,8 @@ const TABS = [
   { to: '/keepers', label: 'KEEPERS', icon: '🔒' },
   { to: '/draft', label: 'DRAFT', icon: '🎯' },
   { to: '/teams', label: 'TEAMS', icon: '👥' },
-  { to: '/league', label: 'LEAGUE', icon: '📖' },
+  { to: '/rules', label: 'RULES', icon: '📖' },
+  { to: '/league', label: 'LEAGUE', icon: '🏀' },
 ];
 
 export default function BottomNav() {
