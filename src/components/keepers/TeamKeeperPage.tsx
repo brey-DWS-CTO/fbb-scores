@@ -139,7 +139,7 @@ function KeeperCard({
     <div
       className="panel"
       style={{
-        padding: '12px 14px',
+        padding: '9px 12px 10px',
         borderRadius: 10,
         borderStyle: projected ? 'dashed' : 'solid',
         borderColor: k.errors.length > 0 ? 'var(--neon-red)' : projected ? 'var(--neon-purple)' : 'var(--panel-border)',
@@ -149,25 +149,25 @@ function KeeperCard({
       {projected && (
         <div
           className="hub-heading"
-          style={{ color: 'var(--neon-purple)', fontSize: '0.58rem', marginBottom: 7 }}
+          style={{ color: 'var(--neon-purple)', fontSize: '0.58rem', marginBottom: 5 }}
         >
           PROJECTED · PRIVATE TO YOU
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-max)' }}>{name}</div>
-          {p && (
-            <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem' }}>
-              {p.proTeam} · {p.positions.join('/')}
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-            <span style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--neon-teal)' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-max)' }}>{name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 2, color: 'var(--text-mid)', fontSize: '0.72rem' }}>
+            {p && (
+              <span>
+                {p.proTeam} · {p.positions.join('/')}
+              </span>
+            )}
+            <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--neon-teal)' }}>
               {fmt1(k.effectiveAvg)}
             </span>
-            <span style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>FPPG</span>
-            {p && <SourceBadge info={p.keeper} />}
+            <span style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>FPPG</span>
+            {p && <SourceBadge info={p.keeper} compact />}
           </div>
         </div>
         {canEdit && (
@@ -176,14 +176,14 @@ function KeeperCard({
             onClick={onRemove}
             aria-label={`Remove ${name}`}
             style={{
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               flexShrink: 0,
               background: 'rgba(255,34,34,0.08)',
               border: '2px solid rgba(255,34,34,0.5)',
               borderRadius: 10,
               color: 'var(--neon-red)',
-              fontSize: '1.05rem',
+              fontSize: '0.95rem',
               fontWeight: 700,
             }}
           >
@@ -198,25 +198,25 @@ function KeeperCard({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
-            marginTop: 12,
-            padding: '10px 14px',
+            gap: 10,
+            marginTop: 8,
+            padding: '6px 12px',
             background: 'rgba(255,230,0,0.07)',
             border: '1px solid rgba(255,230,0,0.4)',
-            borderRadius: 10,
+            borderRadius: 8,
             flexWrap: 'wrap',
           }}
         >
-          <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)', opacity: 0.75 }}>
+          <span className="hub-heading" style={{ fontSize: '0.6rem', color: 'var(--neon-yellow)', opacity: 0.75 }}>
             COSTS
           </span>
           <span
-            style={{ fontSize: '1.45rem', color: 'var(--neon-yellow)', fontWeight: 800, lineHeight: 1, letterSpacing: '0.02em' }}
+            style={{ fontSize: '1.15rem', color: 'var(--neon-yellow)', fontWeight: 800, lineHeight: 1, letterSpacing: '0.02em' }}
           >
             {k.pick ? `PICK ${pickLabel(k.pick)}` : `A ROUND ${k.round} PICK`}
           </span>
           {k.pick?.viaTradeFrom && (
-            <span style={{ color: 'var(--text-mid)', fontWeight: 500, fontSize: '0.75rem' }}>
+            <span style={{ color: 'var(--text-mid)', fontWeight: 500, fontSize: '0.72rem' }}>
               (from {k.pick.viaTradeFrom})
             </span>
           )}
@@ -226,11 +226,11 @@ function KeeperCard({
       <div
         style={{
           borderTop: '1px solid var(--panel-border)',
-          marginTop: 10,
-          paddingTop: 8,
+          marginTop: 8,
+          paddingTop: 6,
           display: 'grid',
-          gap: 4,
-          fontSize: '0.8rem',
+          gap: 3,
+          fontSize: '0.75rem',
         }}
       >
         {k.bumped && (
@@ -776,6 +776,20 @@ export default function TeamKeeperPage() {
           )}
         </div>
         <CapBar used={selectionsHidden ? 0 : result.capUsed} limit={result.capLimit} height={10} />
+        <div
+          className={result.keepers.length > 0 && !result.capOk ? 'blink' : undefined}
+          style={{
+            marginTop: 8,
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            fontStyle: 'italic',
+            lineHeight: 1.4,
+            textAlign: 'center',
+            color: statusColor,
+          }}
+        >
+          {selectionsHidden ? 'Saved keeper total is private.' : result.statusLine}
+        </div>
       </section>
 
       {/* ── Selected keepers ───────────────────────────────────── */}
@@ -996,21 +1010,8 @@ export default function TeamKeeperPage() {
         </div>
       </section>
 
-      {/* ── Trash talk — the status lines live below WHO'S IN ──── */}
-      <section style={{ margin: '4px 0 14px', display: 'grid', gap: 6 }}>
-        <div
-          className={result.keepers.length > 0 && !result.capOk ? 'blink' : undefined}
-          style={{
-            fontSize: '0.9rem',
-            fontWeight: 700,
-            fontStyle: 'italic',
-            lineHeight: 1.5,
-            textAlign: 'center',
-            color: statusColor,
-          }}
-        >
-          {selectionsHidden ? 'Saved keeper total is private.' : result.statusLine}
-        </div>
+      {/* ── The pick-status one-liner closes out the page ──────── */}
+      <section style={{ margin: '4px 0 14px' }}>
         <div
           style={{
             fontSize: '0.9rem',
