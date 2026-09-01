@@ -19,6 +19,14 @@ import { buildRulebookIndex, type Rulebook } from './rulebook.js';
 export type PollStatus = 'open' | 'passed' | 'failed' | 'cancelled';
 export type VoteChoice = 'yes' | 'no';
 
+/**
+ * Every vote is one of two things, and the kind decides what a passed vote
+ * seeds in the commissioner's draft: an edit of a named rule, or a new rule.
+ */
+export type PollKind = 'new-rule' | 'change';
+
+export const POLL_KINDS: PollKind[] = ['new-rule', 'change'];
+
 export interface PollVote {
   owner: string;
   choice: VoteChoice;
@@ -28,11 +36,15 @@ export interface PollVote {
 export interface Poll {
   id: string;
   season: number;
+  kind: PollKind;
   title: string;
   /** What is being proposed, in the proposer's words. */
   detail: string;
   proposedBy: string;
-  /** Clause ids this would change. May be empty for a general question. */
+  /**
+   * Clause ids this touches. A change names at least one rule. A new rule may
+   * name one clause to say where it should sit, or none at all.
+   */
   affects: string[];
   /** Percent of all teams needed, taken from the clauses it touches. */
   threshold: number;
@@ -44,6 +56,18 @@ export interface Poll {
   closedAt?: string;
   closedBy?: string;
   votes: PollVote[];
+  /** Set when the commissioner seeded the rule book draft from this vote. */
+  seededAt?: string;
+  seededBy?: string;
+  /** The published revision that carried the change, once it goes out. */
+  appliedVersionId?: string;
+  appliedRevision?: number;
+  appliedAt?: string;
+}
+
+/** How a kind reads on screen. */
+export function pollKindLabel(kind: PollKind): string {
+  return kind === 'new-rule' ? 'NEW RULE' : 'RULE CHANGE';
 }
 
 /** Default threshold when a poll touches no clause that names its own. */
@@ -122,6 +146,8 @@ export type LaunchRefusal =
   | 'draft-started'
   | 'past-deadline'
   | 'empty-title'
+  | 'bad-kind'
+  | 'change-needs-clause'
   | 'not-a-member';
 
 export interface LaunchCheck {
@@ -140,6 +166,9 @@ export function canLaunchPoll(input: {
   owner: string;
   members: string[];
   seasonPolls: Poll[];
+  kind: string;
+  /** Clause ids the vote names. A change must name at least one. */
+  affects: string[];
   title: string;
   now: Date;
   draftAt: Date;
@@ -148,8 +177,23 @@ export function canLaunchPoll(input: {
   if (!input.members.includes(input.owner)) {
     return { ok: false, reason: 'not-a-member', message: 'Only league members can start a vote.' };
   }
+  if (!POLL_KINDS.includes(input.kind as PollKind)) {
+    return {
+      ok: false,
+      reason: 'bad-kind',
+      message: 'Say whether this is a new rule or a change to one.',
+    };
+  }
   if (!input.title.trim()) {
     return { ok: false, reason: 'empty-title', message: 'Give the vote a title.' };
+  }
+  // A change has to say what it changes, or nobody can tell what passed.
+  if (input.kind === 'change' && input.affects.length === 0) {
+    return {
+      ok: false,
+      reason: 'change-needs-clause',
+      message: 'Pick the rule this would change.',
+    };
   }
   if (input.draftStarted) {
     return { ok: false, reason: 'draft-started', message: 'The draft has started; rules are locked.' };

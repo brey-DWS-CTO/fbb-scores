@@ -7,6 +7,8 @@ import test, { after, before, beforeEach } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import type { Poll } from '../src/lib/league/polls.ts';
+import type { Rulebook } from '../src/lib/league/rulebook.ts';
+import { rulebookFingerprint } from '../src/lib/league/rulebookDiff.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const tempParent = path.join(repoRoot, 'node_modules', '.tmp');
@@ -47,17 +49,23 @@ async function request(
 
 const asRecord = (body: unknown) => body as Record<string, unknown>;
 
+/** A new-rule vote by default, so a caller only names clauses when it matters. */
 async function openPoll(
   owner: string,
   title = 'Expand IR to two slots',
   affects: string[] = [],
+  kind: unknown = 'new-rule',
 ): Promise<{ status: number; body: unknown }> {
   return request('/api/league/polls', {
     method: 'POST',
     headers: auth(owner),
-    body: JSON.stringify({ title, detail: 'Because one is not enough.', affects }),
+    body: JSON.stringify({ kind, title, detail: 'Because one is not enough.', affects }),
   });
 }
+
+/** A change vote against a rule that is really in the book. */
+const openChange = (owner: string, title = 'Change the keeper cap', affects = ['keepers.cap']) =>
+  openPoll(owner, title, affects, 'change');
 
 const vote = (owner: string, id: string, choice: string) =>
   request(`/api/league/polls/${id}/vote`, {
@@ -175,6 +183,47 @@ test('an empty title is refused', async () => {
   assert.equal(asRecord(blocked.body).code, 'empty-title');
 });
 
+test('a vote must say whether it is a new rule or a change', async () => {
+  const missing = await request('/api/league/polls', {
+    method: 'POST',
+    headers: auth('Ryan'),
+    body: JSON.stringify({ title: 'No kind given', detail: '', affects: [] }),
+  });
+  assert.equal(missing.status, 409);
+  assert.equal(asRecord(missing.body).code, 'bad-kind');
+
+  const nonsense = await openPoll('Ryan', 'Nonsense kind', [], 'whatever');
+  assert.equal(nonsense.status, 409);
+  assert.equal(asRecord(nonsense.body).code, 'bad-kind');
+});
+
+test('a change with no rule named is refused', async () => {
+  const bare = await openPoll('Ryan', 'Change something', [], 'change');
+  assert.equal(bare.status, 409);
+  assert.equal(asRecord(bare.body).code, 'change-needs-clause');
+});
+
+test('a new rule needs no rule named', async () => {
+  const created = await openPoll('Ryan', 'Add a trade deadline', [], 'new-rule');
+  assert.equal(created.status, 200);
+  assert.equal((created.body as Poll).kind, 'new-rule');
+  assert.deepEqual((created.body as Poll).affects, []);
+});
+
+test('a change naming a rule that is not in the book is refused', async () => {
+  const bad = await openPoll('Ryan', 'Change a ghost', ['no.such.rule'], 'change');
+  assert.equal(bad.status, 400);
+  assert.match(String(asRecord(bad.body).error), /not in the book/);
+});
+
+test('a change keeps the rule it names, so a passed vote knows what it touched', async () => {
+  const created = await openChange('Ryan');
+  assert.equal(created.status, 200);
+  const poll = created.body as Poll;
+  assert.equal(poll.kind, 'change');
+  assert.deepEqual(poll.affects, ['keepers.cap']);
+});
+
 test('a vote naming a rule that does not exist is refused', async () => {
   const bad = await openPoll('Ryan', 'Change something', ['no.such.rule']);
   assert.equal(bad.status, 400);
@@ -279,6 +328,113 @@ test('closing twice is refused', async () => {
     body,
   });
   assert.equal(again.status, 409);
+});
+
+// ─── A passed vote becomes an amendment draft ──────────────────────────────
+
+const YES_SIX = ['Ryan', 'Amy', 'Joel', 'Aaron', 'Derek', 'Kyle'];
+
+/** Open a vote, carry it six to nothing, and close it. */
+async function passPoll(
+  owner: string,
+  kind: 'change' | 'new-rule',
+  affects: string[],
+  title: string,
+): Promise<Poll> {
+  const poll = (await openPoll(owner, title, affects, kind)).body as Poll;
+  for (const voter of YES_SIX) await vote(voter, poll.id, 'yes');
+  const closed = await request(`/api/league/polls/${poll.id}/close`, {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify({}),
+  });
+  const result = closed.body as Poll;
+  assert.equal(result.status, 'passed');
+  return result;
+}
+
+const amend = (owner: string, id: string) =>
+  request(`/api/league/polls/${id}/amend`, { method: 'POST', headers: auth(owner) });
+
+test('a passed change lands in the draft against the rule it named', async () => {
+  await store.deleteRulebookDraft(SEASON);
+  const publishedBefore = asRecord((await request('/api/league/rulebook')).body);
+  const poll = await passPoll('Ryan', 'change', ['keepers.cap'], 'Raise the keeper cap');
+
+  const seeded = await amend(commissioner, poll.id);
+  assert.equal(seeded.status, 200);
+  const body = asRecord(seeded.body);
+  assert.deepEqual(body.focusIds, ['keepers.cap']);
+
+  const draft = await store.getRulebookDraft(SEASON);
+  assert.ok(draft, 'the draft was saved');
+  assert.match(JSON.stringify(draft.book), /Raise the keeper cap/);
+
+  const publishedAfter = asRecord((await request('/api/league/rulebook')).body);
+  assert.deepEqual(
+    publishedAfter.book,
+    publishedBefore.book,
+    'a vote never rewrites the published book by itself',
+  );
+
+  const stored = (await store.getPoll(poll.id)) as Poll;
+  assert.ok(stored.seededAt, 'the vote records that it reached the draft');
+  assert.equal(stored.seededBy, commissioner);
+});
+
+test('a passed new rule seeds a clause where the vote pointed', async () => {
+  await store.deleteRulebookDraft(SEASON);
+  const poll = await passPoll('Amy', 'new-rule', ['keepers.cap'], 'Add a trade deadline');
+  assert.equal((await amend(commissioner, poll.id)).status, 200);
+  const draft = await store.getRulebookDraft(SEASON);
+  assert.match(JSON.stringify(draft?.book), /Add a trade deadline/);
+});
+
+test('only the commissioner turns a vote into an amendment', async () => {
+  await store.deleteRulebookDraft(SEASON);
+  const poll = await passPoll('Ryan', 'change', ['keepers.cap'], 'Members cannot seed');
+  assert.equal((await amend('Amy', poll.id)).status, 403);
+  assert.equal(await store.getRulebookDraft(SEASON), null, 'nothing was written');
+});
+
+test('a vote that has not passed cannot be seeded', async () => {
+  await store.deleteRulebookDraft(SEASON);
+  const open = (await openChange('Ryan', 'Still being voted on')).body as Poll;
+  const refused = await amend(commissioner, open.id);
+  assert.equal(refused.status, 409);
+  assert.equal(asRecord(refused.body).code, 'not-passed');
+});
+
+test('the same vote is not seeded twice', async () => {
+  await store.deleteRulebookDraft(SEASON);
+  const poll = await passPoll('Ryan', 'change', ['keepers.cap'], 'Once only');
+  assert.equal((await amend(commissioner, poll.id)).status, 200);
+  const again = await amend(commissioner, poll.id);
+  assert.equal(again.status, 409);
+  assert.equal(asRecord(again.body).code, 'already-seeded');
+});
+
+test('publishing ties the vote to the revision that carried it', async () => {
+  await store.deleteRulebookDraft(SEASON);
+  const poll = await passPoll('Ryan', 'change', ['keepers.cap'], 'Written into the book');
+  assert.equal((await amend(commissioner, poll.id)).status, 200);
+
+  const draft = await store.getRulebookDraft(SEASON);
+  assert.ok(draft);
+  const published = await request('/api/league/rulebook/publish', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({
+      fingerprint: rulebookFingerprint(draft.book as Rulebook),
+      notes: 'Amendment from the vote',
+    }),
+  });
+  assert.equal(published.status, 200);
+
+  const stored = (await store.getPoll(poll.id)) as Poll;
+  assert.equal(stored.appliedVersionId, asRecord(published.body).versionId);
+  assert.equal(stored.appliedRevision, asRecord(published.body).revision);
+  assert.ok(stored.appliedAt);
 });
 
 // ─── Audit ─────────────────────────────────────────────────────────────────

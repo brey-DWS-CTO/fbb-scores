@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
+import RulePicker from './RulePicker.js';
 import { useIdentity } from '../../hooks/useLeague.js';
 import {
+  amendFromPoll,
   apiErrorMessage,
   castPollVote,
   closePollById,
@@ -11,7 +13,14 @@ import {
   type PollsResponse,
   fetchPublishedRulebook,
 } from '../../lib/league/api.js';
-import { describeTally, tallyPoll, voteOf, type Poll } from '../../lib/league/polls.js';
+import {
+  describeTally,
+  pollKindLabel,
+  tallyPoll,
+  voteOf,
+  type Poll,
+  type PollKind,
+} from '../../lib/league/polls.js';
 import {
   anchorFor,
   buildRulebookIndex,
@@ -52,6 +61,7 @@ function PollCard({
   index,
   onVote,
   onClose,
+  onAmend,
 }: {
   poll: Poll;
   owner: string;
@@ -61,10 +71,12 @@ function PollCard({
   index: RulebookIndex;
   onVote: (poll: Poll, choice: 'yes' | 'no') => void;
   onClose: (poll: Poll, cancel: boolean) => void;
+  onAmend: (poll: Poll) => void;
 }) {
   const mine = voteOf(poll, owner);
   const open = poll.status === 'open';
   const canClose = open && (poll.proposedBy === owner || isCommish);
+  const kind = poll.kind ?? 'change';
 
   return (
     <article className={`panel vote-card vote-${poll.status}`}>
@@ -74,12 +86,15 @@ function PollCard({
           {poll.proposedBy} · {formatDate(poll.openedAt)} · needs {poll.threshold}%
         </span>
       </div>
+      <span className={kind === 'new-rule' ? 'vote-kind vote-kind-new' : 'vote-kind'}>
+        {pollKindLabel(kind)}
+      </span>
       <h3 className="vote-title">{poll.title}</h3>
       {poll.detail && <p className="vote-detail">{poll.detail}</p>}
 
       {poll.affects.length > 0 && (
         <p className="vote-affects">
-          Changes{' '}
+          {kind === 'new-rule' ? 'Goes near ' : 'Changes '}
           {poll.affects.map((id, i) => {
             const entry = index.byId.get(id);
             return (
@@ -135,6 +150,38 @@ function PollCard({
           {poll.closedAt ? ` on ${formatDate(poll.closedAt)}` : ''}.
         </p>
       )}
+
+      {/* A passed vote is a mandate. It reaches the book only when the
+          commissioner writes it into the draft and publishes. */}
+      {poll.status === 'passed' && (
+        <div className="vote-amend">
+          {poll.appliedRevision !== undefined ? (
+            <p className="vote-yours">In the book since revision {poll.appliedRevision}.</p>
+          ) : poll.seededAt ? (
+            <p className="vote-yours">
+              In the commissioner's draft since {formatDate(poll.seededAt)}, waiting to be
+              published.
+            </p>
+          ) : (
+            <p className="vote-yours">Waiting for the commissioner to write it into the book.</p>
+          )}
+          {isCommish && !poll.seededAt && (
+            <button
+              type="button"
+              className="rule-edit-save tap-btn"
+              disabled={busy}
+              onClick={() => onAmend(poll)}
+            >
+              START THE AMENDMENT
+            </button>
+          )}
+          {isCommish && poll.seededAt && poll.appliedRevision === undefined && (
+            <Link className="vote-close tap-btn" to="/rules">
+              OPEN THE DRAFT
+            </Link>
+          )}
+        </div>
+      )}
     </article>
   );
 }
@@ -145,11 +192,14 @@ export default function VotesPage() {
   const [data, setData] = useState<PollsResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [kind, setKind] = useState<PollKind | null>(null);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
-  const [affects, setAffects] = useState('');
+  const [affects, setAffects] = useState<string[]>([]);
   const [index, setIndex] = useState<RulebookIndex>(rulebookIndex2027);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Rule numbers must match the book members actually read.
   useEffect(() => {
@@ -177,6 +227,18 @@ export default function VotesPage() {
     void load();
   }, [load]);
 
+  // Arriving from a rule on /rules: the composer opens already set to a change
+  // of that rule, so the member never types an id.
+  const askedKind = searchParams.get('kind');
+  const askedRule = searchParams.get('rule');
+  useEffect(() => {
+    if (askedKind !== 'change' && askedKind !== 'new-rule') return;
+    setComposing(true);
+    setKind(askedKind);
+    if (askedRule) setAffects([askedRule]);
+    setSearchParams(new URLSearchParams(), { replace: true });
+  }, [askedKind, askedRule, setSearchParams]);
+
   if (!identity) {
     return (
       <main className="rules-page">
@@ -191,6 +253,7 @@ export default function VotesPage() {
   const act = async (run: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await run();
       await load();
@@ -201,20 +264,25 @@ export default function VotesPage() {
     }
   };
 
+  const closeComposer = () => {
+    setComposing(false);
+    setKind(null);
+    setTitle('');
+    setDetail('');
+    setAffects([]);
+  };
+
   const submit = () =>
     act(async () => {
-      await openPoll(identity, {
-        title,
-        detail,
-        affects: affects
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-      });
-      setComposing(false);
-      setTitle('');
-      setDetail('');
-      setAffects('');
+      if (!kind) return;
+      await openPoll(identity, { kind, title, detail, affects });
+      closeComposer();
+    });
+
+  const amend = (poll: Poll) =>
+    act(async () => {
+      const result = await amendFromPoll(identity, poll.id);
+      setNotice(`${result.note} Open the rule book to write it and publish.`);
     });
 
   const polls = data?.polls ?? [];
@@ -237,6 +305,7 @@ export default function VotesPage() {
       </header>
 
       {error && <p className="rules-draft-error">{error}</p>}
+      {!error && notice && <p className="rules-draft-note">{notice}</p>}
 
       {!composing && (
         <button
@@ -251,43 +320,79 @@ export default function VotesPage() {
 
       {composing && (
         <div className="rule-edit-form">
-          <label className="rule-edit-label">
-            What are you proposing?
-            <input
-              className="hub-input rule-edit-input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Expand IR to two slots"
-            />
-          </label>
-          <label className="rule-edit-label">
-            Why
-            <textarea
-              className="hub-input rule-edit-textarea"
-              rows={4}
-              value={detail}
-              onChange={(e) => setDetail(e.target.value)}
-              placeholder="Make the case in a sentence or two."
-            />
-          </label>
-          <label className="rule-edit-label">
-            Rules it would change (optional)
-            <input
-              className="hub-input rule-edit-input"
-              value={affects}
-              onChange={(e) => setAffects(e.target.value)}
-              placeholder="rosters.size, format.size"
-            />
-          </label>
+          <span className="rule-edit-label">What kind of vote is this?</span>
+          <div className="vote-kind-picker">
+            <button
+              type="button"
+              className={kind === 'change' ? 'vote-kind-btn vote-kind-on tap-btn' : 'vote-kind-btn tap-btn'}
+              aria-pressed={kind === 'change'}
+              onClick={() => setKind('change')}
+            >
+              CHANGE A RULE
+            </button>
+            <button
+              type="button"
+              className={kind === 'new-rule' ? 'vote-kind-btn vote-kind-on tap-btn' : 'vote-kind-btn tap-btn'}
+              aria-pressed={kind === 'new-rule'}
+              onClick={() => setKind('new-rule')}
+            >
+              ADD A NEW RULE
+            </button>
+          </div>
+
+          {kind && (
+            <>
+              <label className="rule-edit-label">
+                What are you proposing?
+                <input
+                  className="hub-input rule-edit-input"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={kind === 'change' ? 'Expand IR to two slots' : 'Add a trade deadline'}
+                />
+              </label>
+              <label className="rule-edit-label">
+                Why
+                <textarea
+                  className="hub-input rule-edit-textarea"
+                  rows={4}
+                  value={detail}
+                  onChange={(e) => setDetail(e.target.value)}
+                  placeholder="Make the case in a sentence or two."
+                />
+              </label>
+
+              <RulePicker
+                index={index}
+                selected={affects}
+                onChange={setAffects}
+                label={kind === 'change' ? 'Which rule would change?' : 'Where should it sit? (optional)'}
+                hint={
+                  kind === 'change'
+                    ? 'Pick at least one rule. Everyone voting sees exactly what this touches.'
+                    : 'Naming a rule tells the commissioner where the new one goes.'
+                }
+                max={kind === 'new-rule' ? 1 : undefined}
+              />
+            </>
+          )}
+
           <p className="rule-edit-hint">
             You get one vote to start each season. Cancelling gives it back. Nothing can start
             once the draft begins.
           </p>
           <div className="rule-edit-actions">
-            <button type="button" className="rule-edit-save tap-btn" disabled={busy || !title.trim()} onClick={submit}>
+            <button
+              type="button"
+              className="rule-edit-save tap-btn"
+              disabled={
+                busy || !kind || !title.trim() || (kind === 'change' && affects.length === 0)
+              }
+              onClick={submit}
+            >
               {busy ? 'STARTING...' : 'START THE VOTE'}
             </button>
-            <button type="button" className="rule-edit-cancel tap-btn" onClick={() => setComposing(false)}>
+            <button type="button" className="rule-edit-cancel tap-btn" onClick={closeComposer}>
               CANCEL
             </button>
           </div>
@@ -305,6 +410,7 @@ export default function VotesPage() {
             index={index}
             onVote={(p, choice) => act(() => castPollVote(identity, p.id, choice))}
             onClose={(p, cancel) => act(() => closePollById(identity, p.id, cancel))}
+            onAmend={amend}
           />
         ))}
         {open.length === 0 && !composing && (
@@ -324,6 +430,7 @@ export default function VotesPage() {
                 index={index}
                 onVote={() => undefined}
                 onClose={() => undefined}
+                onAmend={amend}
               />
             ))}
           </>

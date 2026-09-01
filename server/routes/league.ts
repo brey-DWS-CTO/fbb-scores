@@ -45,6 +45,9 @@ import {
   getRulebookVersion,
   listRulebookVersions,
   PollWriteError,
+  RulebookSignError,
+  listRulebookSignatures,
+  insertRulebookSignature,
   listPolls,
   getPoll,
   insertPoll,
@@ -61,12 +64,20 @@ import {
   thresholdFor,
   unknownClauses,
   type Poll,
+  type PollKind,
   type VoteChoice,
 } from '../../src/lib/league/polls.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
 import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
 import type { Rulebook } from '../../src/lib/league/rulebook.js';
+import {
+  ACKNOWLEDGEMENT,
+  canSign,
+  makeSignature,
+  signatureStatus,
+} from '../../src/lib/league/rulebookSignatures.js';
+import { AmendmentError, canSeedAmendment, seedAmendment } from '../../src/lib/league/rulebookAmendment.js';
 import {
   FALLBACK_PLAYER_POOL,
   fetchEspnPlayerPoolCandidate,
@@ -1009,6 +1020,93 @@ router.get('/rulebook/versions/:id', async (req, res, next) => {
   }
 });
 
+// ─── Signatures ──────────────────────────────────────────────────────────────
+//
+// A signature binds a member, a time, the words they agreed to, and the
+// version's fingerprint to ONE frozen revision. Rows are inserted and never
+// updated, and they never carry to a later revision: publishing again means
+// the league signs again.
+
+/** Anyone may read who has signed, the same way anyone may read the book. */
+router.get('/rulebook/signatures', async (req, res, next) => {
+  try {
+    const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
+    const asked = typeof req.query.versionId === 'string' ? req.query.versionId : '';
+    const versionId = asked || latest?.id || null;
+    const signatures = await listRulebookSignatures(RULEBOOK_SEASON);
+    const status = signatureStatus(OWNERS, signatures, versionId);
+    res.json({
+      versionId,
+      currentVersionId: latest?.id ?? null,
+      revision: latest?.revision ?? null,
+      fingerprint: latest?.fingerprint ?? null,
+      acknowledgement: ACKNOWLEDGEMENT,
+      members: OWNERS,
+      signed: status.signed,
+      missing: status.missing,
+      complete: status.complete,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/rulebook/sign', requireAuth, async (req, res, next) => {
+  try {
+    // The owner comes from the PIN, never the body: nobody signs for anyone else.
+    const owner = res.locals.owner as string;
+    const body = req.body as { versionId?: unknown; fingerprint?: unknown };
+    const versionId = typeof body.versionId === 'string' ? body.versionId : '';
+    const fingerprint = typeof body.fingerprint === 'string' ? body.fingerprint : '';
+    if (!versionId || !fingerprint) {
+      throw new HttpError(400, 'versionId and fingerprint are required');
+    }
+
+    const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
+    const signatures = await listRulebookSignatures(RULEBOOK_SEASON);
+    const check = canSign({
+      owner,
+      members: OWNERS,
+      current: latest ? { versionId: latest.id, fingerprint: latest.fingerprint } : null,
+      versionId,
+      fingerprint,
+      acknowledgement: ACKNOWLEDGEMENT,
+      signatures,
+    });
+    if (!check.ok) {
+      res.status(409).json({ error: check.message, code: check.reason });
+      return;
+    }
+
+    const signature = makeSignature({
+      season: RULEBOOK_SEASON,
+      versionId,
+      revision: latest?.revision ?? SEED_RULEBOOK.revision,
+      fingerprint,
+      owner,
+      // Stored as it reads today, so later wording cannot rewrite what was agreed.
+      acknowledgement: ACKNOWLEDGEMENT,
+      signedAt: new Date().toISOString(),
+    });
+    await insertRulebookSignature(signature);
+    await appendAudit(owner, 'rulebook-sign', { versionId, revision: signature.revision });
+
+    const after = signatureStatus(OWNERS, [...signatures, signature], versionId);
+    res.json({
+      signature,
+      signed: after.signed,
+      missing: after.missing,
+      complete: after.complete,
+    });
+  } catch (err) {
+    if (err instanceof RulebookSignError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
 router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, res, next) => {
   try {
     const body = req.body as { fingerprint?: unknown; notes?: unknown };
@@ -1074,17 +1172,23 @@ router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, r
       publishedBy: owner,
     });
 
+    // Any passed vote already seeded into this draft went out with it. Stamping
+    // the poll is what ties a vote to the revision that carried it.
+    const carried = await stampSeededPolls(saved.id, revision, publishedAt);
+
     await appendAudit(owner, 'rulebook-publish', {
       versionId: saved.id,
       revision,
       notes,
       previousVersionId: previous?.id ?? null,
+      polls: carried,
     });
     res.json({
       versionId: saved.id,
       revision,
       publishedAt: saved.publishedAt,
       publishedBy: saved.publishedBy,
+      polls: carried,
     });
   } catch (err) {
     if (err instanceof RulebookPublishError) {
@@ -1112,6 +1216,36 @@ async function seasonPolls(): Promise<Poll[]> {
   return (await listPolls(RULEBOOK_SEASON)) as Poll[];
 }
 
+/**
+ * Tie every vote already seeded into the draft to the revision that just went
+ * out. Returns the poll ids, for the audit row and the publish response.
+ */
+async function stampSeededPolls(
+  versionId: string,
+  revision: number,
+  at: string,
+): Promise<string[]> {
+  const waiting = (await seasonPolls()).filter(
+    (poll) => poll.status === 'passed' && poll.seededAt && !poll.appliedVersionId,
+  );
+  const stamped: string[] = [];
+  for (const poll of waiting) {
+    try {
+      await updatePoll(poll.id, (current) => {
+        const row = current as Poll;
+        if (row.appliedVersionId) return row;
+        return { ...row, appliedVersionId: versionId, appliedRevision: revision, appliedAt: at };
+      });
+      stamped.push(poll.id);
+    } catch (err) {
+      // A vote that could not be stamped must not undo a publish that already
+      // happened; the publish is the immutable part.
+      console.error('[league] Could not stamp poll', poll.id, err);
+    }
+  }
+  return stamped;
+}
+
 /** Everyone sees every vote. A league vote is not a secret ballot. */
 router.get('/polls', requireAuth, async (_req, res, next) => {
   try {
@@ -1130,7 +1264,8 @@ router.get('/polls', requireAuth, async (_req, res, next) => {
 router.post('/polls', requireAuth, async (req, res, next) => {
   try {
     const owner = res.locals.owner as string;
-    const body = req.body as { title?: unknown; detail?: unknown; affects?: unknown };
+    const body = req.body as { kind?: unknown; title?: unknown; detail?: unknown; affects?: unknown };
+    const kind = typeof body.kind === 'string' ? body.kind : '';
     const title = typeof body.title === 'string' ? body.title.trim().slice(0, 140) : '';
     const detail = typeof body.detail === 'string' ? body.detail.trim().slice(0, 2000) : '';
     const affects = Array.isArray(body.affects)
@@ -1142,6 +1277,8 @@ router.post('/polls', requireAuth, async (req, res, next) => {
       owner,
       members: OWNERS,
       seasonPolls: await seasonPolls(),
+      kind,
+      affects,
       title,
       now: new Date(),
       draftAt: new Date(DRAFT_AT_ISO),
@@ -1165,6 +1302,7 @@ router.post('/polls', requireAuth, async (req, res, next) => {
     const poll: Poll = {
       id: `poll-${RULEBOOK_SEASON}-${owner.toLowerCase()}-${stamp}`,
       season: RULEBOOK_SEASON,
+      kind: kind as PollKind,
       title,
       detail,
       proposedBy: owner,
@@ -1178,7 +1316,7 @@ router.post('/polls', requireAuth, async (req, res, next) => {
     };
 
     await insertPoll(poll.id, RULEBOOK_SEASON, poll);
-    await appendAudit(owner, 'poll-open', { pollId: poll.id, title, affects });
+    await appendAudit(owner, 'poll-open', { pollId: poll.id, kind, title, affects });
     res.json(poll);
   } catch (err) {
     if (err instanceof PollWriteError) {
@@ -1263,6 +1401,78 @@ router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
     });
     res.json(updated);
   } catch (err) {
+    if (err instanceof PollWriteError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
+/**
+ * POST /polls/:id/amend — put a passed vote into the rule book draft.
+ *
+ * This writes the draft only. The published book is untouched: the
+ * commissioner edits the seeded wording and publishes, which is the one way a
+ * published rule ever changes.
+ */
+router.post('/polls/:id/amend', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const id = String(req.params.id);
+    const poll = (await getPoll(id)) as Poll | null;
+    if (!poll) {
+      res.status(404).json({ error: 'No such vote' });
+      return;
+    }
+
+    const draftRow = await getRulebookDraft(RULEBOOK_SEASON);
+    const base = (draftRow?.book as Rulebook | undefined) ?? SEED_RULEBOOK;
+    const check = canSeedAmendment(base, poll);
+    if (!check.ok) {
+      res.status(409).json({ error: check.message, code: check.reason });
+      return;
+    }
+
+    const at = new Date().toISOString();
+    const seeded = seedAmendment(base, poll, at);
+    const problems = validateDraft(seeded.book);
+    if (problems.length) {
+      res.status(422).json({ error: 'The seeded draft has problems', problems });
+      return;
+    }
+
+    const saved = await saveRulebookDraft(
+      RULEBOOK_SEASON,
+      seeded.book,
+      draftRow?.version ?? 0,
+      owner,
+    );
+    await updatePoll(id, (current) => {
+      const row = current as Poll;
+      return { ...row, seededAt: at, seededBy: owner };
+    });
+    await appendAudit(owner, 'poll-amend', {
+      pollId: id,
+      draftVersion: saved.version,
+      focusIds: seeded.focusIds,
+    });
+
+    res.json({
+      book: seeded.book,
+      version: saved.version,
+      focusIds: seeded.focusIds,
+      note: seeded.note,
+    });
+  } catch (err) {
+    if (err instanceof AmendmentError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    if (err instanceof RulebookSaveError) {
+      res.status(409).json({ error: err.message, code: err.code, currentVersion: err.currentVersion });
+      return;
+    }
     if (err instanceof PollWriteError) {
       res.status(409).json({ error: err.message, code: err.code });
       return;

@@ -951,6 +951,9 @@ body::before {
   .publish-panel,
   .audit-block,
   .rules-published-line,
+  .rules-history,
+  .rules-propose,
+  .sign-actions,
   .rules-article-editor { display: none !important; }
 
   .rules-page { width: auto; max-width: none; margin: 0; padding: 0; }
@@ -1013,6 +1016,53 @@ body::before {
     color: #000;
     background: none;
     white-space: normal;
+  }
+
+  /* A printed constitution has to stand on its own: who signed this exact
+     revision, and every revision that came before it. */
+  .sign-block {
+    display: block;
+    margin: 0 0 14pt;
+    padding: 0 0 8pt;
+    border: 0;
+    border-bottom: 0.75pt solid #000;
+    background: none;
+    break-inside: avoid;
+  }
+  .sign-title, .sign-count, .sign-column-head { color: #000; }
+  .sign-title { font-size: 11pt; }
+  .sign-count { font-size: 9pt; }
+  .sign-ack {
+    margin: 4pt 0 6pt;
+    padding: 0 0 0 8pt;
+    border-left: 1pt solid #000;
+    background: none;
+    color: #000;
+    font-size: 9.5pt;
+    font-style: italic;
+  }
+  .sign-lists { display: block; }
+  .sign-column { margin-bottom: 4pt; }
+  .sign-names { display: block; }
+  .sign-names li { display: inline; }
+  .sign-names li + li::before { content: ', '; }
+  .sign-name, .sign-when, .sign-none, .sign-line { color: #000; font-size: 9pt; }
+  .sign-when { color: #444; }
+
+  .rules-print-history {
+    display: block;
+    margin-top: 16pt;
+    padding-top: 8pt;
+    border-top: 0.75pt solid #000;
+    break-inside: avoid;
+  }
+  .rules-print-history h2 { margin: 0 0 5pt; font-size: 11pt; }
+  .rules-print-history ul { margin: 0; padding-left: 14pt; }
+  .rules-print-history li, .rules-print-history p {
+    margin: 0 0 3pt;
+    color: #000;
+    font-size: 9pt;
+    line-height: 1.45;
   }
 
   @page { margin: 14mm; }
@@ -1363,3 +1413,171 @@ body::before {
   letter-spacing: 0.07em;
 }
 .vote-done-heading { margin-top: 18px; color: var(--text-dim); font-size: 0.66rem; }
+
+/* ─── Signatures, past revisions, proposing a change ─────────────────── */
+.rules-old-revision { border-color: var(--neon-yellow); }
+.rules-old-revision .hub-heading { color: var(--neon-yellow); }
+.rules-old-notes { margin: 0; color: var(--text-body); font-size: 0.68rem; line-height: 1.5; }
+.rules-old-revision .rules-tool { align-self: flex-start; margin-top: 4px; }
+
+.rules-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 9px;
+}
+.history-list { max-height: 46vh; }
+.history-actions { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+.history-tag {
+  color: var(--neon-teal);
+  font-size: 0.53rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+
+.rules-propose {
+  margin-top: 5px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+.rules-propose:hover, .rules-propose:focus-visible {
+  border-color: var(--neon-purple);
+  color: var(--neon-purple);
+  outline: none;
+}
+
+.sign-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+}
+.sign-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.sign-title { color: var(--neon-teal); font-size: 0.62rem; }
+.sign-count { color: var(--text-mid); font-size: 0.68rem; }
+.sign-ack {
+  margin: 0;
+  padding: 7px 9px;
+  border-left: 3px solid var(--neon-teal);
+  border-radius: 0 6px 6px 0;
+  background: var(--cell-bg);
+  color: var(--text-body);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.sign-lists { display: flex; flex-wrap: wrap; gap: 10px; }
+.sign-column { flex: 1 1 46%; display: flex; flex-direction: column; gap: 4px; }
+.sign-column-head {
+  color: var(--text-dim);
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+.sign-names { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.sign-names li { display: flex; align-items: baseline; gap: 6px; }
+.sign-name { color: var(--text-hi); font-size: 0.7rem; font-weight: 700; }
+.sign-when { color: var(--text-dim); font-size: 0.62rem; }
+.sign-none { color: var(--text-faint); font-size: 0.66rem; }
+.sign-line { margin: 0; color: var(--text-dim); font-size: 0.66rem; line-height: 1.5; }
+.sign-mine { color: var(--neon-teal); }
+.sign-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Paper only. On screen the history lives behind the REVISIONS button. */
+.rules-print-history { display: none; }
+
+/* ─── Vote kinds and the rule picker ─────────────────────────────────── */
+.vote-kind {
+  align-self: flex-start;
+  padding: 2px 7px;
+  border: 1px solid var(--neon-purple);
+  border-radius: 5px;
+  color: var(--neon-purple);
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+.vote-kind-new { border-color: var(--neon-teal); color: var(--neon-teal); }
+.vote-kind-picker { display: flex; gap: 7px; }
+.vote-kind-btn {
+  flex: 1;
+  min-height: 42px;
+  border: 2px solid var(--panel-border);
+  border-radius: 9px;
+  background: var(--chip-bg);
+  color: var(--text-mid);
+  font-family: inherit;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+.vote-kind-on { border-color: var(--neon-purple); color: var(--neon-purple); background: rgba(204,0,255,0.1); }
+.vote-amend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 7px;
+  border-top: 1px solid var(--panel-border);
+}
+.vote-amend .vote-close { text-align: center; line-height: 36px; text-decoration: none; }
+
+.rule-picker { display: flex; flex-direction: column; gap: 6px; }
+.rule-picker-label { display: block; }
+.rule-picked { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.rule-picked-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--neon-purple);
+  border-radius: 7px;
+  background: rgba(204,0,255,0.08);
+  color: var(--text-hi);
+  font-family: inherit;
+  font-size: 0.66rem;
+  text-align: left;
+}
+.rule-picked-number { color: var(--neon-purple); font-weight: 900; }
+.rule-picked-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-picked-x { color: var(--text-dim); font-size: 0.6rem; }
+.rule-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 38vh;
+  overflow-y: auto;
+}
+.rule-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 5px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  background: var(--cell-bg);
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: 0.68rem;
+  text-align: left;
+}
+.rule-hit-on { border-color: var(--neon-purple); color: var(--neon-purple); }
+.rule-hit-number { color: var(--neon-teal); font-weight: 900; font-size: 0.62rem; }
+.rule-hit-title { flex: 1; line-height: 1.4; }
