@@ -11,7 +11,9 @@
  *  - Votes must happen before the draft (rule 1.3.1).
  *
  * The launch quota is the commissioner's 2026-08-31 addition: each member may
- * launch one poll per season.
+ * launch one poll per season. The commissioner is exempt from that count, so
+ * league business is never blocked by one vote already spent; the draft
+ * deadline still binds them like everyone else.
  */
 
 import { buildRulebookIndex, type Rulebook } from './rulebook.js';
@@ -31,6 +33,24 @@ export interface PollVote {
   owner: string;
   choice: VoteChoice;
   castAt: string;
+}
+
+/** The parts of a vote the commissioner may rewrite while it is open. */
+export type PollEditField = 'title' | 'detail' | 'affects';
+
+/**
+ * One commissioner edit of an open vote.
+ *
+ * Kept on the poll forever. A member who voted before the wording moved has to
+ * be able to see that it moved, and who moved it.
+ */
+export interface PollEdit {
+  at: string;
+  by: string;
+  /** Which parts changed. Never empty; an edit that changes nothing is refused. */
+  changed: PollEditField[];
+  /** How many votes this edit threw out. Zero when the question did not move. */
+  votesCleared: number;
 }
 
 export interface Poll {
@@ -56,6 +76,8 @@ export interface Poll {
   closedAt?: string;
   closedBy?: string;
   votes: PollVote[];
+  /** Every commissioner edit, oldest first. Absent on votes never edited. */
+  edits?: PollEdit[];
   /** Set when the commissioner seeded the rule book draft from this vote. */
   seededAt?: string;
   seededBy?: string;
@@ -160,7 +182,9 @@ export interface LaunchCheck {
  * Whether `owner` may launch a poll right now.
  *
  * One per member per season, and nothing after the draft, because a rule
- * change mid-draft would rewrite the board under everyone.
+ * change mid-draft would rewrite the board under everyone. The commissioner
+ * runs the league's business, so the one-per-season count does not apply to
+ * them; every other bar still does.
  */
 export function canLaunchPoll(input: {
   owner: string;
@@ -173,6 +197,8 @@ export function canLaunchPoll(input: {
   now: Date;
   draftAt: Date;
   draftStarted: boolean;
+  /** Exempt from the one-per-season count, and only that. */
+  isCommissioner?: boolean;
 }): LaunchCheck {
   if (!input.members.includes(input.owner)) {
     return { ok: false, reason: 'not-a-member', message: 'Only league members can start a vote.' };
@@ -209,7 +235,7 @@ export function canLaunchPoll(input: {
   const launched = input.seasonPolls.filter(
     (p) => p.proposedBy === input.owner && p.status !== 'cancelled',
   );
-  if (launched.length > 0) {
+  if (launched.length > 0 && input.isCommissioner !== true) {
     return {
       ok: false,
       reason: 'already-launched',
@@ -244,6 +270,135 @@ export function castVote(poll: Poll, owner: string, choice: VoteChoice, at: stri
   votes.push({ owner, choice, castAt: at });
   votes.sort((a, b) => a.owner.localeCompare(b.owner));
   return { ...poll, votes };
+}
+
+// ─── Editing an open vote ───────────────────────────────────────────────────
+//
+// Only the commissioner, and only while the vote is open. Members cannot edit
+// their own, because the league is voting on the words as they stood.
+//
+// What happens to votes already cast turns on whether the question moved. The
+// title and the rules a vote names ARE the question, so changing either makes
+// every vote already in an answer to something else: those votes are cleared
+// and the league votes again. The "why" is the argument for it, not the
+// question, so fixing or sharpening it leaves the votes standing. Either way
+// the edit is recorded on the poll and shown on the card.
+
+export interface PollEditInput {
+  title: string;
+  detail: string;
+  affects: string[];
+  /** Read fresh from the book, since changing the rules can move the bar. */
+  threshold: number;
+}
+
+export type EditRefusal =
+  | 'not-commissioner'
+  | 'not-open'
+  | 'empty-title'
+  | 'change-needs-clause'
+  | 'no-change';
+
+export interface EditCheck {
+  ok: boolean;
+  reason?: EditRefusal;
+  message?: string;
+}
+
+const sameRules = (a: string[], b: string[]): boolean => {
+  // Order is presentation. Two lists naming the same rules ask the same thing.
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.length === right.length && left.every((id, i) => id === right[i]);
+};
+
+/** Which parts of a vote an edit would actually change. */
+export function pollEditChanges(poll: Poll, next: PollEditInput): PollEditField[] {
+  const changed: PollEditField[] = [];
+  if (poll.title !== next.title.trim()) changed.push('title');
+  if (poll.detail !== next.detail.trim()) changed.push('detail');
+  if (!sameRules(poll.affects, next.affects)) changed.push('affects');
+  return changed;
+}
+
+/** True when an edit changes what the vote asks, not just how it argues for it. */
+export function editResetsVotes(changed: PollEditField[]): boolean {
+  return changed.some((field) => field !== 'detail');
+}
+
+export function canEditPoll(input: {
+  poll: Poll;
+  isCommissioner: boolean;
+  next: PollEditInput;
+}): EditCheck {
+  if (!input.isCommissioner) {
+    return {
+      ok: false,
+      reason: 'not-commissioner',
+      message: 'Only the commissioner can edit a vote.',
+    };
+  }
+  if (input.poll.status !== 'open') {
+    return { ok: false, reason: 'not-open', message: 'That vote is closed.' };
+  }
+  if (!input.next.title.trim()) {
+    return { ok: false, reason: 'empty-title', message: 'Give the vote a title.' };
+  }
+  if (input.poll.kind === 'change' && input.next.affects.length === 0) {
+    return {
+      ok: false,
+      reason: 'change-needs-clause',
+      message: 'Pick the rule this would change.',
+    };
+  }
+  if (pollEditChanges(input.poll, input.next).length === 0) {
+    return { ok: false, reason: 'no-change', message: 'Nothing changed.' };
+  }
+  return { ok: true };
+}
+
+/**
+ * Apply an edit. Returns a new poll; the input is untouched.
+ *
+ * Check with canEditPoll first. This trusts what it is given.
+ */
+export function editPoll(poll: Poll, next: PollEditInput, by: string, at: string): Poll {
+  const changed = pollEditChanges(poll, next);
+  const reset = editResetsVotes(changed);
+  const edit: PollEdit = {
+    at,
+    by,
+    changed,
+    votesCleared: reset ? poll.votes.length : 0,
+  };
+  return {
+    ...poll,
+    title: next.title.trim(),
+    detail: next.detail.trim(),
+    affects: [...next.affects],
+    threshold: next.threshold,
+    votes: reset ? [] : poll.votes,
+    edits: [...(poll.edits ?? []), edit],
+  };
+}
+
+const FIELD_WORDS: Record<PollEditField, string> = {
+  title: 'the title',
+  detail: 'the why',
+  affects: 'the rules',
+};
+
+/** One plain line for the card, so nobody has to guess that a vote moved. */
+export function describePollEdit(edit: PollEdit): string {
+  const words = edit.changed.map((field) => FIELD_WORDS[field]);
+  const what =
+    words.length <= 1
+      ? (words[0] ?? 'the vote')
+      : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+  const head = `${edit.by} changed ${what}.`;
+  if (edit.votesCleared === 0) return head;
+  const votes = edit.votesCleared === 1 ? '1 vote was' : `${edit.votesCleared} votes were`;
+  return `${head} ${votes} cleared, so the league votes again.`;
 }
 
 /** Close a poll, recording whether it carried. */

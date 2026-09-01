@@ -1920,3 +1920,25 @@ body::before {
 .history-preview { margin-top: 12px; }
 .history-admin-error { margin-top: 10px; color: var(--neon-red); font-size: 0.76rem; }
 .history-admin-notice { margin-top: 10px; color: var(--neon-teal); font-size: 0.76rem; }
+
+/* ─── Commissioner edits of an open vote ──────────────────────────────── */
+
+/* An edit is shown, never implied. The list sits above the tally so a member
+   reads that the wording moved before they read the count. */
+.vote-edits {
+  margin: 0;
+  padding-left: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.vote-edits li {
+  color: var(--neon-yellow);
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+.vote-edits li::marker { color: var(--text-ghost); }
+
+.vote-edit-form { margin: 2px 0; }
+/* Live warning that saving throws away the votes already cast. */
+.vote-edit-warn { color: var(--neon-orange); font-weight: 700; }

@@ -8,13 +8,17 @@ import {
   apiErrorMessage,
   castPollVote,
   closePollById,
+  editPollById,
   fetchPolls,
   openPoll,
   type PollsResponse,
   fetchPublishedRulebook,
 } from '../../lib/league/api.js';
 import {
+  describePollEdit,
   describeTally,
+  editResetsVotes,
+  pollEditChanges,
   pollKindLabel,
   tallyPoll,
   voteOf,
@@ -53,15 +57,99 @@ function Tally({ poll }: { poll: Poll }) {
   );
 }
 
+/**
+ * The commissioner's rewrite of an open vote.
+ *
+ * It warns before it clears anything: changing the title or the rules makes
+ * every vote already cast an answer to a different question.
+ */
+function PollEditForm({
+  poll,
+  busy,
+  index,
+  onSave,
+  onCancel,
+}: {
+  poll: Poll;
+  busy: boolean;
+  index: RulebookIndex;
+  onSave: (input: { title: string; detail: string; affects: string[] }) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(poll.title);
+  const [detail, setDetail] = useState(poll.detail);
+  const [affects, setAffects] = useState<string[]>(poll.affects);
+  const kind = poll.kind ?? 'change';
+
+  const changed = pollEditChanges(poll, { title, detail, affects, threshold: poll.threshold });
+  const clears = editResetsVotes(changed) && poll.votes.length > 0;
+  const blocked = !title.trim() || (kind === 'change' && affects.length === 0);
+
+  return (
+    <div className="rule-edit-form vote-edit-form">
+      <label className="rule-edit-label">
+        What are you proposing?
+        <input
+          className="hub-input rule-edit-input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </label>
+      <label className="rule-edit-label">
+        Why
+        <textarea
+          className="hub-input rule-edit-textarea"
+          rows={4}
+          value={detail}
+          onChange={(e) => setDetail(e.target.value)}
+        />
+      </label>
+
+      <RulePicker
+        index={index}
+        selected={affects}
+        onChange={setAffects}
+        label={kind === 'change' ? 'Which rule would change?' : 'Where should it sit? (optional)'}
+        hint="Everyone voting sees exactly which rules this touches."
+        max={kind === 'new-rule' ? 1 : undefined}
+      />
+
+      <p className={clears ? 'rule-edit-hint vote-edit-warn' : 'rule-edit-hint'}>
+        {clears
+          ? `This changes what the vote asks, so the ${poll.votes.length} votes already cast get cleared.`
+          : 'Changing the title or the rules clears the votes already cast. Changing the why does not.'}
+      </p>
+
+      <div className="rule-edit-actions">
+        <button
+          type="button"
+          className="rule-edit-save tap-btn"
+          disabled={busy || blocked || changed.length === 0}
+          onClick={() => onSave({ title, detail, affects })}
+        >
+          {busy ? 'SAVING...' : 'SAVE THE VOTE'}
+        </button>
+        <button type="button" className="rule-edit-cancel tap-btn" onClick={onCancel}>
+          CANCEL
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PollCard({
   poll,
   owner,
   isCommish,
   busy,
   index,
+  editing,
   onVote,
   onClose,
   onAmend,
+  onEdit,
+  onEditSave,
+  onEditCancel,
 }: {
   poll: Poll;
   owner: string;
@@ -69,14 +157,19 @@ function PollCard({
   busy: boolean;
   /** Built from the published book, so rule numbers match what members read. */
   index: RulebookIndex;
+  editing: boolean;
   onVote: (poll: Poll, choice: 'yes' | 'no') => void;
   onClose: (poll: Poll, cancel: boolean) => void;
   onAmend: (poll: Poll) => void;
+  onEdit: (poll: Poll) => void;
+  onEditSave: (poll: Poll, input: { title: string; detail: string; affects: string[] }) => void;
+  onEditCancel: () => void;
 }) {
   const mine = voteOf(poll, owner);
   const open = poll.status === 'open';
   const canClose = open && (poll.proposedBy === owner || isCommish);
   const kind = poll.kind ?? 'change';
+  const edits = poll.edits ?? [];
 
   return (
     <article className={`panel vote-card vote-${poll.status}`}>
@@ -89,98 +182,138 @@ function PollCard({
       <span className={kind === 'new-rule' ? 'vote-kind vote-kind-new' : 'vote-kind'}>
         {pollKindLabel(kind)}
       </span>
-      <h3 className="vote-title">{poll.title}</h3>
-      {poll.detail && <p className="vote-detail">{poll.detail}</p>}
 
-      {poll.affects.length > 0 && (
-        <p className="vote-affects">
-          {kind === 'new-rule' ? 'Goes near ' : 'Changes '}
-          {poll.affects.map((id, i) => {
-            const entry = index.byId.get(id);
-            return (
-              <span key={id}>
-                {i > 0 && ', '}
-                <Link to={`/rules#${anchorFor(id)}`}>{entry ? entry.number : id}</Link>
-              </span>
-            );
-          })}
-        </p>
-      )}
+      {editing ? (
+        <PollEditForm
+          poll={poll}
+          busy={busy}
+          index={index}
+          onSave={(input) => onEditSave(poll, input)}
+          onCancel={onEditCancel}
+        />
+      ) : (
+        <>
+          <h3 className="vote-title">{poll.title}</h3>
+          {poll.detail && <p className="vote-detail">{poll.detail}</p>}
 
-      <Tally poll={poll} />
-
-      {open && (
-        <div className="vote-actions">
-          <button
-            type="button"
-            className={mine === 'yes' ? 'vote-btn vote-btn-yes vote-btn-on tap-btn' : 'vote-btn vote-btn-yes tap-btn'}
-            disabled={busy}
-            onClick={() => onVote(poll, 'yes')}
-          >
-            YES
-          </button>
-          <button
-            type="button"
-            className={mine === 'no' ? 'vote-btn vote-btn-no vote-btn-on tap-btn' : 'vote-btn vote-btn-no tap-btn'}
-            disabled={busy}
-            onClick={() => onVote(poll, 'no')}
-          >
-            NO
-          </button>
-        </div>
-      )}
-
-      {open && mine && <p className="vote-yours">You voted {mine}. You can change it until it closes.</p>}
-      {open && !mine && <p className="vote-yours">You have not voted. Silence counts as no.</p>}
-
-      {canClose && (
-        <div className="vote-actions vote-actions-close">
-          <button type="button" className="vote-close tap-btn" disabled={busy} onClick={() => onClose(poll, false)}>
-            CLOSE &amp; COUNT
-          </button>
-          <button type="button" className="vote-close tap-btn" disabled={busy} onClick={() => onClose(poll, true)}>
-            CANCEL VOTE
-          </button>
-        </div>
-      )}
-
-      {!open && poll.closedBy && (
-        <p className="vote-yours">
-          Closed by {poll.closedBy}
-          {poll.closedAt ? ` on ${formatDate(poll.closedAt)}` : ''}.
-        </p>
-      )}
-
-      {/* A passed vote is a mandate. It reaches the book only when the
-          commissioner writes it into the draft and publishes. */}
-      {poll.status === 'passed' && (
-        <div className="vote-amend">
-          {poll.appliedRevision !== undefined ? (
-            <p className="vote-yours">In the book since revision {poll.appliedRevision}.</p>
-          ) : poll.seededAt ? (
-            <p className="vote-yours">
-              In the commissioner's draft since {formatDate(poll.seededAt)}, waiting to be
-              published.
+          {poll.affects.length > 0 && (
+            <p className="vote-affects">
+              {kind === 'new-rule' ? 'Goes near ' : 'Changes '}
+              {poll.affects.map((id, i) => {
+                const entry = index.byId.get(id);
+                return (
+                  <span key={id}>
+                    {i > 0 && ', '}
+                    <Link to={`/rules#${anchorFor(id)}`}>{entry ? entry.number : id}</Link>
+                  </span>
+                );
+              })}
             </p>
-          ) : (
-            <p className="vote-yours">Waiting for the commissioner to write it into the book.</p>
           )}
-          {isCommish && !poll.seededAt && (
-            <button
-              type="button"
-              className="rule-edit-save tap-btn"
-              disabled={busy}
-              onClick={() => onAmend(poll)}
-            >
-              START THE AMENDMENT
-            </button>
+
+          {/* An edit is never silent. A member who voted on the old wording
+              has to see that it moved, and what moved. */}
+          {edits.length > 0 && (
+            <ul className="vote-edits">
+              {edits.map((edit, i) => (
+                <li key={`${edit.at}-${String(i)}`}>
+                  {formatDate(edit.at)}: {describePollEdit(edit)}
+                </li>
+              ))}
+            </ul>
           )}
-          {isCommish && poll.seededAt && poll.appliedRevision === undefined && (
-            <Link className="vote-close tap-btn" to="/rules">
-              OPEN THE DRAFT
-            </Link>
+
+          <Tally poll={poll} />
+
+          {open && (
+            <div className="vote-actions">
+              <button
+                type="button"
+                className={mine === 'yes' ? 'vote-btn vote-btn-yes vote-btn-on tap-btn' : 'vote-btn vote-btn-yes tap-btn'}
+                disabled={busy}
+                onClick={() => onVote(poll, 'yes')}
+              >
+                YES
+              </button>
+              <button
+                type="button"
+                className={mine === 'no' ? 'vote-btn vote-btn-no vote-btn-on tap-btn' : 'vote-btn vote-btn-no tap-btn'}
+                disabled={busy}
+                onClick={() => onVote(poll, 'no')}
+              >
+                NO
+              </button>
+            </div>
           )}
-        </div>
+
+          {open && mine && <p className="vote-yours">You voted {mine}. You can change it until it closes.</p>}
+          {open && !mine && <p className="vote-yours">You have not voted. Silence counts as no.</p>}
+
+          {canClose && (
+            <div className="vote-actions vote-actions-close">
+              <button type="button" className="vote-close tap-btn" disabled={busy} onClick={() => onClose(poll, false)}>
+                CLOSE &amp; COUNT
+              </button>
+              <button type="button" className="vote-close tap-btn" disabled={busy} onClick={() => onClose(poll, true)}>
+                CANCEL VOTE
+              </button>
+            </div>
+          )}
+
+          {/* Only the commissioner, and only while it is open. Members never
+              edit a vote, not even their own. */}
+          {open && isCommish && (
+            <div className="vote-actions vote-actions-close">
+              <button
+                type="button"
+                className="vote-close tap-btn"
+                disabled={busy}
+                onClick={() => onEdit(poll)}
+              >
+                EDIT THIS VOTE
+              </button>
+            </div>
+          )}
+
+          {!open && poll.closedBy && (
+            <p className="vote-yours">
+              Closed by {poll.closedBy}
+              {poll.closedAt ? ` on ${formatDate(poll.closedAt)}` : ''}.
+            </p>
+          )}
+
+          {/* A passed vote is a mandate. It reaches the book only when the
+              commissioner writes it into the draft and publishes. */}
+          {poll.status === 'passed' && (
+            <div className="vote-amend">
+              {poll.appliedRevision !== undefined ? (
+                <p className="vote-yours">In the book since revision {poll.appliedRevision}.</p>
+              ) : poll.seededAt ? (
+                <p className="vote-yours">
+                  In the commissioner's draft since {formatDate(poll.seededAt)}, waiting to be
+                  published.
+                </p>
+              ) : (
+                <p className="vote-yours">Waiting for the commissioner to write it into the book.</p>
+              )}
+              {isCommish && !poll.seededAt && (
+                <button
+                  type="button"
+                  className="rule-edit-save tap-btn"
+                  disabled={busy}
+                  onClick={() => onAmend(poll)}
+                >
+                  START THE AMENDMENT
+                </button>
+              )}
+              {isCommish && poll.seededAt && poll.appliedRevision === undefined && (
+                <Link className="vote-close tap-btn" to="/rules">
+                  OPEN THE DRAFT
+                </Link>
+              )}
+            </div>
+          )}
+        </>
       )}
     </article>
   );
@@ -194,6 +327,8 @@ export default function VotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  /** Which open vote the commissioner is rewriting, if any. */
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [kind, setKind] = useState<PollKind | null>(null);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
@@ -279,6 +414,14 @@ export default function VotesPage() {
       closeComposer();
     });
 
+  const saveEdit = (poll: Poll, input: { title: string; detail: string; affects: string[] }) =>
+    act(async () => {
+      const updated = await editPollById(identity, poll.id, input);
+      setEditingId(null);
+      const last = updated.edits?.[updated.edits.length - 1];
+      setNotice(last ? describePollEdit(last) : 'The vote was saved.');
+    });
+
   const amend = (poll: Poll) =>
     act(async () => {
       const result = await amendFromPoll(identity, poll.id);
@@ -314,7 +457,11 @@ export default function VotesPage() {
           disabled={busy || !data?.you.canLaunch}
           onClick={() => setComposing(true)}
         >
-          {data?.you.canLaunch ? '+ START YOUR VOTE' : 'YOU HAVE USED YOUR VOTE THIS SEASON'}
+          {!data?.you.canLaunch
+            ? 'YOU HAVE USED YOUR VOTE THIS SEASON'
+            : identity.isCommissioner
+              ? '+ START A VOTE'
+              : '+ START YOUR VOTE'}
         </button>
       )}
 
@@ -382,7 +529,11 @@ export default function VotesPage() {
             </>
           )}
 
-          <p className="rule-edit-hint">One vote each per season. Cancelling gives it back.</p>
+          <p className="rule-edit-hint">
+            {identity.isCommissioner
+              ? 'As commissioner you can start as many votes as the league needs.'
+              : 'One vote each per season. Cancelling gives it back.'}
+          </p>
           <div className="rule-edit-actions">
             <button
               type="button"
@@ -410,9 +561,13 @@ export default function VotesPage() {
             isCommish={identity.isCommissioner}
             busy={busy}
             index={index}
+            editing={editingId === poll.id}
             onVote={(p, choice) => act(() => castPollVote(identity, p.id, choice))}
             onClose={(p, cancel) => act(() => closePollById(identity, p.id, cancel))}
             onAmend={amend}
+            onEdit={(p) => setEditingId(p.id)}
+            onEditSave={saveEdit}
+            onEditCancel={() => setEditingId(null)}
           />
         ))}
         {open.length === 0 && !composing && (
@@ -430,9 +585,13 @@ export default function VotesPage() {
                 isCommish={identity.isCommissioner}
                 busy={busy}
                 index={index}
+                editing={false}
                 onVote={() => undefined}
                 onClose={() => undefined}
                 onAmend={amend}
+                onEdit={() => undefined}
+                onEditSave={() => undefined}
+                onEditCancel={() => undefined}
               />
             ))}
           </>
