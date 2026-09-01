@@ -29,6 +29,7 @@ function RosterRow({
   selected,
   canEdit,
   reason,
+  tapThrough,
   onTap,
 }: {
   p: DatasetPlayer;
@@ -36,6 +37,8 @@ function RosterRow({
   selected: boolean;
   canEdit: boolean;
   reason: string | null;
+  /** Blocked only by the cap: keep the greyed look but let the tap land. */
+  tapThrough?: boolean;
   onTap: () => void;
 }) {
   const s = p.stats2026 ?? p.api2026;
@@ -44,7 +47,9 @@ function RosterRow({
   const effDiff = eff != null && (!s || Math.abs(eff - s.avg) > 0.05);
   const c = p.keeper.contract;
   const expired = !!c && (c.expired || c.lastKeepableSeason < season);
-  const tappable = canEdit && (selected || reason === null);
+  const tappable = canEdit && (selected || reason === null || !!tapThrough);
+  // Keep the pre-tap look of a blocked row: no plus sign, dimmed, no pointer.
+  const looksBlocked = !selected && reason !== null;
   return (
     <button
       className={tappable ? 'tap-btn' : undefined}
@@ -62,8 +67,8 @@ function RosterRow({
         border: 'none',
         borderBottom: '1px solid var(--panel-border)',
         boxShadow: selected ? 'inset 3px 0 0 var(--neon-teal)' : undefined,
-        cursor: tappable ? 'pointer' : 'default',
-        opacity: reason && !selected ? 0.45 : 1,
+        cursor: tappable && !looksBlocked ? 'pointer' : 'default',
+        opacity: looksBlocked ? 0.45 : 1,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -98,7 +103,7 @@ function RosterRow({
           </span>
         )}
       </div>
-      {tappable && (
+      {tappable && !looksBlocked && (
         <span
           style={{
             flexShrink: 0,
@@ -369,15 +374,19 @@ export default function TeamKeeperPage() {
       removeKeeper(p.key);
       return;
     }
-    if (disabledReason(p) || selections.length >= dataset.maxKeepersPerTeam) return;
+    if (keeperCandidateError(dataset, owner, selections, p, { allowOverCap: true })) return;
     addKeeper(p);
   };
 
-  // Over-cap picks stay tappable on purpose: the league deserves to see the
-  // YA FIRED banner. Saving is still blocked until the set is legal.
   const disabledReason = (p: DatasetPlayer): string | null => {
-    return keeperCandidateError(dataset, owner, selections, p, { allowOverCap: true });
+    return keeperCandidateError(dataset, owner, selections, p);
   };
+  // A row blocked ONLY by the cap keeps its greyed look and reason, but the
+  // tap still lands, so the league gets to see the YA FIRED banner. Saving
+  // stays blocked until the set is legal.
+  const overCapTapThrough = (p: DatasetPlayer): boolean =>
+    disabledReason(p) !== null
+    && keeperCandidateError(dataset, owner, selections, p, { allowOverCap: true }) === null;
 
   const comboMeta = (p: DatasetPlayer) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -936,7 +945,7 @@ export default function TeamKeeperPage() {
           <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
             {projectionMode
               ? `Tap players to project ${owner}'s keepers. Only you can see these picks.`
-              : 'Tap a player to keep them. Rule-breakers are greyed out. Cap-breakers still tap, so you can see the damage.'}
+              : 'Tap a player to keep them. Choices that break the cap or another rule are greyed out.'}
           </div>
         )}
         {!canEdit && (
@@ -953,6 +962,7 @@ export default function TeamKeeperPage() {
               selected={selections.some((x) => x.playerKey === p.key)}
               canEdit={canEdit}
               reason={disabledReason(p)}
+              tapThrough={overCapTapThrough(p)}
               onTap={() => toggleKeeper(p)}
             />
           ))}

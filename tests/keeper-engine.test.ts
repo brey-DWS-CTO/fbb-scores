@@ -4,6 +4,7 @@ import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
 import {
   availablePlayers,
   buildDraftBoard,
+  keeperCandidateError,
   resolveTeamKeepers,
 } from '../src/lib/keeper/engine.ts';
 import type {
@@ -107,4 +108,39 @@ test('does not reserve a player from an invalid keeper selection', () => {
   const keys = new Set(availablePlayers(dataset, dynamic).map((player) => player.key));
 
   assert.equal(keys.has(amyPlayer.key), true);
+});
+
+test('an over-cap candidate blocks by default but taps through with allowOverCap', () => {
+  // Two highest-value players on one roster are guaranteed to break the
+  // 77.8 cap together (each decile-1 player runs ~40+ FPPG).
+  const team = dataset.teams[0].owner;
+  const [first, second] = dataset.players
+    .filter((p) => p.fantasyTeam === team && p.keeper.eligible && p.keeper.round !== null)
+    .sort((a, b) => (b.keeper.effectiveAvg ?? 0) - (a.keeper.effectiveAvg ?? 0));
+  assert.ok(first && second, 'fixture needs two eligible players on one roster');
+
+  const selections = [{ playerKey: first.key, playerName: first.name }];
+  const overCap =
+    resolveTeamKeepers(dataset, team, [
+      ...selections,
+      { playerKey: second.key, playerName: second.name },
+    ]).capOk === false;
+  assert.ok(overCap, 'fixture needs the top two players to break the cap');
+
+  assert.match(
+    keeperCandidateError(dataset, team, selections, second) ?? '',
+    /Over cap by/,
+  );
+  assert.equal(
+    keeperCandidateError(dataset, team, selections, second, { allowOverCap: true }),
+    null,
+  );
+
+  // The full resolution still refuses the set, so it can be shown but not saved.
+  const result = resolveTeamKeepers(dataset, team, [
+    ...selections,
+    { playerKey: second.key, playerName: second.name },
+  ]);
+  assert.equal(result.valid, false);
+  assert.match(result.statusLine, /ILLEGAL KEEPERS/);
 });
