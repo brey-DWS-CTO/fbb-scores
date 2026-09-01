@@ -948,6 +948,8 @@ body::before {
   .rules-draft-off,
   .rule-edit-bar,
   .rule-edit-form,
+  .publish-panel,
+  .rules-published-line,
   .rules-article-editor { display: none !important; }
 
   .rules-page { width: auto; max-width: none; margin: 0; padding: 0; }
@@ -1152,3 +1154,71 @@ body::before {
 .rule-edit-save { border-color: var(--neon-teal); color: var(--neon-teal); }
 .rule-edit-delete { border-color: var(--neon-red); color: var(--neon-red); }
 .rule-edit-delete:disabled { opacity: 0.35; }
+
+/* ─── Publishing a revision ──────────────────────────────────────────── */
+.rules-published-line {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+}
+.rules-tool-publish { border-color: var(--neon-teal); color: var(--neon-teal); width: 100%; }
+
+.publish-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid var(--neon-teal);
+  border-radius: 9px;
+  background: var(--cell-bg);
+}
+.publish-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.publish-title { color: var(--neon-teal); font-size: 0.64rem; }
+.publish-summary { color: var(--text-mid); font-size: 0.68rem; }
+
+.publish-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.publish-change {
+  padding: 7px 9px;
+  border-left: 3px solid var(--panel-border);
+  border-radius: 0 6px 6px 0;
+  background: var(--chip-bg);
+}
+.publish-added { border-left-color: var(--neon-teal); }
+.publish-removed { border-left-color: var(--neon-red); }
+.publish-reworded, .publish-retitled { border-left-color: var(--neon-yellow); }
+.publish-moved { border-left-color: var(--text-dim); }
+
+.publish-change-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 7px; }
+.publish-kind {
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  color: var(--text-dim);
+}
+.publish-added .publish-kind { color: var(--neon-teal); }
+.publish-removed .publish-kind { color: var(--neon-red); }
+.publish-reworded .publish-kind, .publish-retitled .publish-kind { color: var(--neon-yellow); }
+.publish-number {
+  color: var(--text-hi);
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.publish-change-title { color: var(--text-mid); font-size: 0.68rem; }
+.publish-text, .publish-before, .publish-after {
+  margin: 3px 0 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: var(--text-body);
+}
+.publish-before { color: var(--text-dim); text-decoration: line-through; }
+.publish-after { color: var(--text-hi); }

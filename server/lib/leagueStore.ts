@@ -109,6 +109,27 @@ export interface RulebookDraftRow {
   updatedBy: string;
 }
 
+/** An immutable published rule book. Never edited in place. */
+export interface RulebookVersionRow {
+  id: string;
+  season: number;
+  revision: number;
+  fingerprint: string;
+  book: unknown;
+  notes: string;
+  publishedAt: string;
+  publishedBy: string;
+}
+
+export class RulebookPublishError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'RulebookPublishError';
+  }
+}
+
 export class RulebookSaveError extends Error {
   code: string;
   currentVersion?: number;
@@ -216,6 +237,47 @@ interface StoreBackend {
     savedBy: string,
   ): Promise<RulebookDraftRow>;
   deleteRulebookDraft(season: number): Promise<void>;
+  publishRulebookVersion(row: RulebookVersionRow): Promise<RulebookVersionRow>;
+  getLatestRulebookVersion(season: number): Promise<RulebookVersionRow | null>;
+  getRulebookVersion(id: string): Promise<RulebookVersionRow | null>;
+  listRulebookVersions(season: number): Promise<Array<Omit<RulebookVersionRow, 'book'>>>;
+}
+
+interface RawVersionRow {
+  id: string;
+  season: number;
+  revision: number;
+  fingerprint: string;
+  data?: unknown;
+  notes: string;
+  published_at: string | Date;
+  published_by: string;
+}
+
+/** A version row without the book, for listings. */
+function versionSummary(row: RulebookVersionRow): Omit<RulebookVersionRow, 'book'> {
+  return {
+    id: row.id,
+    season: row.season,
+    revision: row.revision,
+    fingerprint: row.fingerprint,
+    notes: row.notes,
+    publishedAt: row.publishedAt,
+    publishedBy: row.publishedBy,
+  };
+}
+
+function toVersionRow(raw: RawVersionRow): RulebookVersionRow {
+  return {
+    id: raw.id,
+    season: raw.season,
+    revision: raw.revision,
+    fingerprint: raw.fingerprint,
+    book: raw.data,
+    notes: raw.notes,
+    publishedAt: new Date(raw.published_at).toISOString(),
+    publishedBy: raw.published_by,
+  };
 }
 
 // ─── Neon Postgres backend ───────────────────────────────────────────────────
@@ -284,6 +346,16 @@ class NeonBackend implements StoreBackend {
       data jsonb not null,
       created_at timestamptz not null,
       created_by text not null
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS rulebook_versions (
+      id text primary key,
+      season int not null,
+      revision int not null,
+      fingerprint text not null,
+      data jsonb not null,
+      notes text not null,
+      published_at timestamptz not null,
+      published_by text not null
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_draft (
       season int primary key,
@@ -637,6 +709,46 @@ class NeonBackend implements StoreBackend {
     await this.ensureInit();
     await this.sql`DELETE FROM rulebook_draft WHERE season = ${season}`;
   }
+
+  async publishRulebookVersion(row: RulebookVersionRow): Promise<RulebookVersionRow> {
+    await this.ensureInit();
+    const inserted = (await this.sql`INSERT INTO rulebook_versions
+      (id, season, revision, fingerprint, data, notes, published_at, published_by)
+      VALUES (${row.id}, ${row.season}, ${row.revision}, ${row.fingerprint},
+        ${JSON.stringify(row.book)}::jsonb, ${row.notes}, ${row.publishedAt}, ${row.publishedBy})
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id`) as Array<{ id: string }>;
+    if (!inserted[0]) {
+      throw new RulebookPublishError('duplicate-version', 'That version has already been published');
+    }
+    return row;
+  }
+
+  async getLatestRulebookVersion(season: number): Promise<RulebookVersionRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, data, notes,
+        published_at, published_by
+      FROM rulebook_versions WHERE season = ${season}
+      ORDER BY published_at DESC, id DESC LIMIT 1`) as RawVersionRow[];
+    return rows[0] ? toVersionRow(rows[0]) : null;
+  }
+
+  async getRulebookVersion(id: string): Promise<RulebookVersionRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, data, notes,
+        published_at, published_by
+      FROM rulebook_versions WHERE id = ${id}`) as RawVersionRow[];
+    return rows[0] ? toVersionRow(rows[0]) : null;
+  }
+
+  async listRulebookVersions(season: number): Promise<Array<Omit<RulebookVersionRow, 'book'>>> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, notes,
+        published_at, published_by
+      FROM rulebook_versions WHERE season = ${season}
+      ORDER BY published_at DESC, id DESC`) as RawVersionRow[];
+    return rows.map((raw) => versionSummary(toVersionRow(raw)));
+  }
 }
 
 // ─── Local JSON file backend ─────────────────────────────────────────────────
@@ -657,6 +769,7 @@ interface FileDoc {
     updatedAt: string;
   }>;
   rulebookDrafts: RulebookDraftRow[];
+  rulebookVersions: RulebookVersionRow[];
 }
 
 const MAX_FILE_AUDIT_ROWS = 1000;
@@ -700,6 +813,7 @@ class FileBackend implements StoreBackend {
         scheduleSnapshots: Array.isArray(doc.scheduleSnapshots) ? doc.scheduleSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
+        rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
       };
     } catch {
       return {
@@ -966,6 +1080,44 @@ class FileBackend implements StoreBackend {
       this.writeDoc(doc);
     });
   }
+
+  async publishRulebookVersion(row: RulebookVersionRow): Promise<RulebookVersionRow> {
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (doc.rulebookVersions.some((v) => v.id === row.id)) {
+        throw new RulebookPublishError('duplicate-version', 'That version has already been published');
+      }
+      doc.rulebookVersions.push(structuredClone(row));
+      this.writeDoc(doc);
+      return row;
+    });
+  }
+
+  /** Newest first, matching the Neon ordering. */
+  private sortedVersions(season: number): RulebookVersionRow[] {
+    return this.readDoc()
+      .rulebookVersions.filter((v) => v.season === season)
+      .sort((a, b) =>
+        a.publishedAt === b.publishedAt
+          ? b.id.localeCompare(a.id)
+          : b.publishedAt.localeCompare(a.publishedAt),
+      );
+  }
+
+  async getLatestRulebookVersion(season: number): Promise<RulebookVersionRow | null> {
+    await this.ensureInit();
+    return this.sortedVersions(season)[0] ?? null;
+  }
+
+  async getRulebookVersion(id: string): Promise<RulebookVersionRow | null> {
+    await this.ensureInit();
+    return this.readDoc().rulebookVersions.find((v) => v.id === id) ?? null;
+  }
+
+  async listRulebookVersions(season: number): Promise<Array<Omit<RulebookVersionRow, 'book'>>> {
+    await this.ensureInit();
+    return this.sortedVersions(season).map(versionSummary);
+  }
 }
 
 // ─── Backend selection (lazy singleton) ──────────────────────────────────────
@@ -1145,6 +1297,24 @@ export async function saveRulebookDraft(
 
 export async function deleteRulebookDraft(season: number): Promise<void> {
   return getBackend().deleteRulebookDraft(season);
+}
+
+export async function publishRulebookVersion(row: RulebookVersionRow): Promise<RulebookVersionRow> {
+  return getBackend().publishRulebookVersion(row);
+}
+
+export async function getLatestRulebookVersion(season: number): Promise<RulebookVersionRow | null> {
+  return getBackend().getLatestRulebookVersion(season);
+}
+
+export async function getRulebookVersion(id: string): Promise<RulebookVersionRow | null> {
+  return getBackend().getRulebookVersion(id);
+}
+
+export async function listRulebookVersions(
+  season: number,
+): Promise<Array<Omit<RulebookVersionRow, 'book'>>> {
+  return getBackend().listRulebookVersions(season);
 }
 
 export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {

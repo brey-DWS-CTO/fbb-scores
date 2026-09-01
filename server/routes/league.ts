@@ -36,14 +36,20 @@ import {
   PlayerPoolAcceptError,
   ScheduleAcceptError,
   RulebookSaveError,
+  RulebookPublishError,
   getRulebookDraft,
   saveRulebookDraft,
   deleteRulebookDraft,
+  publishRulebookVersion,
+  getLatestRulebookVersion,
+  getRulebookVersion,
+  listRulebookVersions,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
+import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
 import type { Rulebook } from '../../src/lib/league/rulebook.js';
 import {
   FALLBACK_PLAYER_POOL,
@@ -925,6 +931,150 @@ router.delete('/rulebook/draft', requireAuth, requireCommissioner, async (_req, 
     await appendAudit(owner, 'rulebook-draft-reset', { season: RULEBOOK_SEASON });
     res.json({ book: SEED_RULEBOOK, version: 0, seeded: true });
   } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Published rule book ─────────────────────────────────────────────────────
+//
+// Published versions are immutable and readable by anyone, signed in or not:
+// the constitution is not a secret, and that is what makes a shared link work
+// without a token. Publishing is commissioner-only and gated on the exact
+// fingerprint the commissioner saw in the diff.
+
+/** Everyone reads this. Falls back to the committed seed before a first publish. */
+router.get('/rulebook', async (_req, res, next) => {
+  try {
+    const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
+    if (!latest) {
+      res.json({
+        book: SEED_RULEBOOK,
+        versionId: null,
+        revision: SEED_RULEBOOK.revision,
+        publishedAt: null,
+        publishedBy: null,
+        notes: '',
+        published: false,
+      });
+      return;
+    }
+    res.json({
+      book: latest.book,
+      versionId: latest.id,
+      revision: latest.revision,
+      publishedAt: latest.publishedAt,
+      publishedBy: latest.publishedBy,
+      notes: latest.notes,
+      published: true,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/rulebook/versions', async (_req, res, next) => {
+  try {
+    res.json(await listRulebookVersions(RULEBOOK_SEASON));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/rulebook/versions/:id', async (req, res, next) => {
+  try {
+    const version = await getRulebookVersion(String(req.params.id));
+    if (!version) {
+      res.status(404).json({ error: 'No such version' });
+      return;
+    }
+    res.json(version);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const body = req.body as { fingerprint?: unknown; notes?: unknown };
+    if (typeof body.fingerprint !== 'string' || !body.fingerprint) {
+      throw new HttpError(400, 'fingerprint is required; preview the diff first');
+    }
+    const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
+
+    const draftRow = await getRulebookDraft(RULEBOOK_SEASON);
+    if (!draftRow) {
+      throw new HttpError(409, 'There is no draft to publish');
+    }
+    const book = draftRow.book as Rulebook;
+
+    // The draft must be exactly what the commissioner previewed. Anything else
+    // means it moved underneath them, so refuse instead of publishing a
+    // surprise.
+    const actual = rulebookFingerprint(book);
+    if (actual !== body.fingerprint) {
+      res.status(409).json({
+        error: 'The draft changed since you previewed it. Look at the diff again.',
+        code: 'stale-fingerprint',
+        fingerprint: actual,
+      });
+      return;
+    }
+
+    const problems = validateDraft(book);
+    if (problems.length) {
+      res.status(422).json({ error: 'The draft has problems that must be fixed', problems });
+      return;
+    }
+
+    const previous = await getLatestRulebookVersion(RULEBOOK_SEASON);
+    if (previous && previous.fingerprint === actual) {
+      res.status(409).json({
+        error: 'That is already the published rule book; nothing has changed.',
+        code: 'no-changes',
+      });
+      return;
+    }
+
+    const owner = res.locals.owner as string;
+    const publishedAt = new Date().toISOString();
+    const revision = (previous?.revision ?? SEED_RULEBOOK.revision - 1) + 1;
+    // Published books carry their own revision and a published status, so a
+    // reader can never mistake a frozen version for the working draft.
+    const frozen = { ...book, revision, status: 'published' };
+    const id = `rb-${RULEBOOK_SEASON}-r${revision}-${actual.slice(3, 11)}`;
+
+    const saved = await publishRulebookVersion({
+      id,
+      season: RULEBOOK_SEASON,
+      revision,
+      // The DRAFT's fingerprint, not the frozen book's. Freezing bumps the
+      // revision, which is part of the fingerprint, so storing the frozen one
+      // would make every version look different and the no-changes check above
+      // would never fire.
+      fingerprint: actual,
+      book: frozen,
+      notes,
+      publishedAt,
+      publishedBy: owner,
+    });
+
+    await appendAudit(owner, 'rulebook-publish', {
+      versionId: saved.id,
+      revision,
+      notes,
+      previousVersionId: previous?.id ?? null,
+    });
+    res.json({
+      versionId: saved.id,
+      revision,
+      publishedAt: saved.publishedAt,
+      publishedBy: saved.publishedBy,
+    });
+  } catch (err) {
+    if (err instanceof RulebookPublishError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
     next(err);
   }
 });

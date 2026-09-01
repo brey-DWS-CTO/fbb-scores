@@ -500,6 +500,70 @@ export function isStaleDraftError(e: unknown): boolean {
   return axios.isAxiosError(e) && e.response?.status === 409;
 }
 
+// ─── Published rule book (readable by anyone) ────────────────────────────────
+
+export interface PublishedRulebookResponse {
+  book: Rulebook;
+  versionId: string | null;
+  revision: number;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  notes: string;
+  published: boolean;
+}
+
+export async function fetchPublishedRulebook(): Promise<PublishedRulebookResponse> {
+  const { data } = await axios.get<PublishedRulebookResponse>('/api/league/rulebook');
+  return data;
+}
+
+export interface RulebookVersionSummary {
+  id: string;
+  season: number;
+  revision: number;
+  fingerprint: string;
+  notes: string;
+  publishedAt: string;
+  publishedBy: string;
+}
+
+export async function fetchRulebookVersions(): Promise<RulebookVersionSummary[]> {
+  const { data } = await axios.get<RulebookVersionSummary[]>('/api/league/rulebook/versions');
+  return data;
+}
+
+export async function fetchRulebookVersion(
+  id: string,
+): Promise<RulebookVersionSummary & { book: Rulebook }> {
+  const { data } = await axios.get(`/api/league/rulebook/versions/${encodeURIComponent(id)}`);
+  return data;
+}
+
+export interface PublishRulebookResponse {
+  versionId: string;
+  revision: number;
+  publishedAt: string;
+  publishedBy: string;
+}
+
+/**
+ * Freeze the stored draft as a new published version.
+ * `fingerprint` must be the one the commissioner previewed, so the server can
+ * refuse if the draft moved underneath them.
+ */
+export async function publishRulebook(
+  c: Credentials,
+  fingerprint: string,
+  notes: string,
+): Promise<PublishRulebookResponse> {
+  const { data } = await axios.post<PublishRulebookResponse>(
+    '/api/league/rulebook/publish',
+    { fingerprint, notes },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
 export function apiErrorMessage(e: unknown): string {
   if (axios.isAxiosError(e)) {
     const data = e.response?.data as { error?: string } | undefined;

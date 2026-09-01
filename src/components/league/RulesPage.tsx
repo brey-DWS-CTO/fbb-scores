@@ -3,11 +3,14 @@ import { useLocation } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import RecordTables from './RecordTables.js';
 import RuleEditMenu from './RuleEditMenu.js';
+import PublishPanel from './PublishPanel.js';
 import { useIdentity } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
+  fetchPublishedRulebook,
   fetchRulebookDraft,
   isStaleDraftError,
+  publishRulebook,
   resetRulebookDraft,
   saveRulebookDraft,
 } from '../../lib/league/api.js';
@@ -67,6 +70,9 @@ function initialCollapsed(): Set<string> {
   if (section) shut.delete(section);
   return shut;
 }
+
+const formatPublished = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 /** Marks the matched run without dangerouslySetInnerHTML. */
 function Marked({ text, term }: { text: string; term: string }) {
@@ -176,6 +182,36 @@ export default function RulesPage() {
   const location = useLocation();
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // The published book, once it arrives. Rendering starts from the committed
+  // seed so the page never flashes empty, then swaps to the published version.
+  const [publishedBook, setPublishedBook] = useState<Rulebook>(rulebook2027);
+  const [publishedMeta, setPublishedMeta] = useState<{
+    published: boolean;
+    revision: number;
+    publishedAt: string | null;
+    publishedBy: string | null;
+  }>({ published: false, revision: rulebook2027.revision, publishedAt: null, publishedBy: null });
+
+  const loadPublished = useCallback(async () => {
+    try {
+      const latest = await fetchPublishedRulebook();
+      setPublishedBook(latest.book);
+      setPublishedMeta({
+        published: latest.published,
+        revision: latest.revision,
+        publishedAt: latest.publishedAt,
+        publishedBy: latest.publishedBy,
+      });
+    } catch {
+      // Offline or the API is down: the committed seed is the fallback, which
+      // is exactly what the player pool and schedule do.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPublished();
+  }, [loadPublished]);
+
   // ─── Draft mode ──────────────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Rulebook | null>(null);
@@ -186,7 +222,7 @@ export default function RulesPage() {
   const [error, setError] = useState<string | null>(null);
   const undoStack = useRef<Rulebook[]>([]);
 
-  const book = editing && draft ? draft : rulebook2027;
+  const book = editing && draft ? draft : publishedBook;
   const index = useMemo(
     () => (book === rulebook2027 ? rulebookIndex2027 : buildRulebookIndex(book)),
     [book],
@@ -327,6 +363,21 @@ export default function RulesPage() {
     }
   };
 
+  const publish = async (fingerprint: string, notes: string) => {
+    if (!identity) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await publishRulebook(identity, fingerprint, notes);
+      await loadPublished();
+      setNotice(`Published revision ${result.revision}. Everyone reads it now.`);
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const leaveDraft = () => {
     if (dirty && !window.confirm('You have unsaved changes. Leave draft mode anyway?')) return;
     setEditing(false);
@@ -361,14 +412,22 @@ export default function RulesPage() {
         <IdentityChip />
       </header>
 
-      {book.status !== 'published' && !editing && (
+      {!editing && !publishedMeta.published && (
         <div className="panel rules-status">
-          <span className="hub-heading">NOT YET RATIFIED</span>
+          <span className="hub-heading">NOT YET PUBLISHED</span>
           <p>
             Revision {book.revision} is a working draft. It carries the commissioner's 2026 rulings
             and the {book.season} amendment removing the consolation matchup. Nobody has signed it.
           </p>
         </div>
+      )}
+
+      {!editing && publishedMeta.published && (
+        <p className="rules-published-line">
+          Revision {publishedMeta.revision}, published{' '}
+          {publishedMeta.publishedAt ? formatPublished(publishedMeta.publishedAt) : ''}
+          {publishedMeta.publishedBy ? ` by ${publishedMeta.publishedBy}` : ''}.
+        </p>
       )}
 
       {isCommish && (
@@ -430,6 +489,15 @@ export default function RulesPage() {
                   ))}
                   {problems.length > 6 && <li>and {problems.length - 6} more</li>}
                 </ul>
+              )}
+              {problems.length === 0 && draft && (
+                <PublishPanel
+                  published={publishedBook}
+                  draft={draft}
+                  dirty={dirty}
+                  busy={busy}
+                  onPublish={publish}
+                />
               )}
               {error && <p className="rules-draft-error">{error}</p>}
               {!error && notice && <p className="rules-draft-note">{notice}</p>}
