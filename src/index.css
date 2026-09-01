@@ -933,6 +933,27 @@ body::before {
 .rules-print-head { display: none; }
 
 @media print {
+  /* The app pins html, body and #root to height:100% with overflow on body so
+     the draft board can scroll. Printing that yields the right page count and
+     blank paper, because the flow is trapped in one viewport-tall box. Let it
+     grow instead. */
+  html, body, #root {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  /* A fixed full-screen overlay repeats on every printed page. */
+  body::before { display: none !important; }
+  /* App.tsx paints the shell dark and pins it to 100vh with an inline style,
+     which covers the white page and pins the flow to one screen. Inline styles
+     only lose to !important. */
+  #root > div {
+    background: transparent !important;
+    min-height: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
   /* Ink on paper: ignore the app's neon theme entirely. */
   html, body {
     background: #fff !important;
@@ -1703,6 +1724,7 @@ body::before {
   align-items: baseline;
   gap: 6px;
   max-width: 100%;
+  min-width: 0;
   min-height: 32px;
   padding: 0 9px;
   border: 1px solid var(--neon-purple);
@@ -1714,7 +1736,7 @@ body::before {
   text-align: left;
 }
 .rule-picked-number { color: var(--neon-purple); font-weight: 900; }
-.rule-picked-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-picked-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rule-picked-x { color: var(--text-dim); font-size: 0.6rem; }
 .rule-hits {
   display: flex;
@@ -1743,4 +1765,48 @@ body::before {
 }
 .rule-hit-on { border-color: var(--neon-purple); color: var(--neon-purple); }
 .rule-hit-number { color: var(--neon-teal); font-weight: 900; font-size: 0.62rem; }
-.rule-hit-title { flex: 1; line-height: 1.4; }
+.rule-hit-title { flex: 1; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
+
+/* ─── Trades made before the app ─────────────────────────────────────── */
+.earlier-trades { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.earlier-heading { margin: 6px 0 0; color: var(--text-dim); font-size: 0.62rem; }
+.earlier-caption { margin: 0; color: var(--text-dim); font-size: 0.68rem; line-height: 1.5; }
+.earlier-card {
+  padding: 11px 12px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.earlier-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.earlier-teams { color: var(--neon-orange); font-size: 0.68rem; }
+.earlier-swap { color: var(--text-dim); }
+.earlier-date { color: var(--text-dim); font-size: 0.65rem; margin-left: auto; }
+.earlier-sides { display: flex; flex-wrap: wrap; gap: 10px; }
+.earlier-side { flex: 1 1 45%; min-width: 140px; display: flex; flex-direction: column; gap: 3px; }
+.earlier-got {
+  color: var(--neon-teal);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.earlier-list { margin: 0; padding-left: 15px; display: flex; flex-direction: column; gap: 2px; }
+.earlier-list li { color: var(--text-body); font-size: 0.72rem; line-height: 1.45; }
+.earlier-list li::marker { color: var(--text-ghost); }
+.earlier-pick { color: var(--neon-yellow) !important; }
+
+/* A download glyph, so the tool row stays two words wide on a phone. */
+.rules-tool-icon {
+  flex: 0 0 auto;
+  min-width: 52px;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0;
+}
+
+/* Rule text was set for density and read too small on a phone. */
+.rules-clause-text { font-size: 0.95rem; line-height: 1.62; }
+.rules-clause-title { font-size: 0.92rem; }
+.rules-number { font-size: 0.76rem; }
+.rules-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 2px 22px; }
+.rules-number-open { border-color: var(--neon-purple); color: var(--neon-purple); }

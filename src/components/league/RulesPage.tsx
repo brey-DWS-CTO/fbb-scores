@@ -139,6 +139,8 @@ function Clause({
   term,
   copied,
   onCopy,
+  open,
+  onToggle,
   onPropose,
   breadcrumb,
   editor,
@@ -148,6 +150,9 @@ function Clause({
   term: string;
   copied: boolean;
   onCopy: (id: string) => void;
+  /** True while this rule's actions are showing. Only one rule at a time. */
+  open: boolean;
+  onToggle: (id: string) => void;
   /** Only set when the reader still has their one vote for the season. */
   onPropose?: (id: string) => void;
   /** Set while searching, where article headings are not on screen. */
@@ -167,9 +172,10 @@ function Clause({
       <p className={body ? 'rules-clause-text' : 'rules-clause-text rules-clause-heading'}>
         <button
           type="button"
-          className="rules-number tap-btn"
-          onClick={() => onCopy(entry.id)}
-          title="Copy a link to this rule"
+          className={open ? 'rules-number rules-number-open tap-btn' : 'rules-number tap-btn'}
+          onClick={() => onToggle(entry.id)}
+          aria-expanded={open}
+          title={`Actions for rule ${entry.number}`}
         >
           {copied ? 'LINK COPIED' : entry.number}
         </button>
@@ -183,14 +189,22 @@ function Clause({
         {body && <Marked text={body} term={term} />}
       </p>
       <ClauseTable entry={entry} term={term} />
-      {onPropose && (
-        <button
-          type="button"
-          className="rules-propose tap-btn"
-          onClick={() => onPropose(entry.id)}
-        >
-          PROPOSE A CHANGE
-        </button>
+      {open && (
+        <div className="rules-actions">
+          <button type="button" className="rules-propose tap-btn" onClick={() => onCopy(entry.id)}>
+            COPY LINK
+          </button>
+          {/* An example illustrates a rule; there is nothing separate to vote on. */}
+          {onPropose && entry.kind !== 'example' && (
+            <button
+              type="button"
+              className="rules-propose tap-btn"
+              onClick={() => onPropose(entry.id)}
+            >
+              PROPOSE A CHANGE
+            </button>
+          )}
+        </div>
       )}
       {editor}
     </div>
@@ -205,6 +219,8 @@ export default function RulesPage() {
 
   const [term, setTerm] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  // Which rule is showing its actions. One at a time, so the book stays a book.
+  const [openId, setOpenId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(initialCollapsed);
   const location = useLocation();
   const navigate = useNavigate();
@@ -546,7 +562,7 @@ export default function RulesPage() {
         <div>
           <h1 className="hub-heading glow-teal">📖 RULE BOOK</h1>
           <p>
-            The Nerds constitution for {book.season}. Tap any rule number to copy a link to it.
+            The Nerds constitution, {book.season}.
           </p>
         </div>
         <IdentityChip />
@@ -572,10 +588,7 @@ export default function RulesPage() {
       {!editing && !historical && !publishedMeta.published && (
         <div className="panel rules-status">
           <span className="hub-heading">NOT YET PUBLISHED</span>
-          <p>
-            Revision {book.revision} is a working draft. It carries the commissioner's 2026 rulings
-            and the {book.season} amendment removing the consolation matchup. Nobody has signed it.
-          </p>
+          <p>Revision {book.revision} is a working draft. Nobody has signed it.</p>
         </div>
       )}
 
@@ -706,24 +719,27 @@ export default function RulesPage() {
         >
           {showHistory ? 'HIDE REVISIONS' : 'REVISIONS'}
         </button>
-        <button type="button" className="rules-tool tap-btn" onClick={() => window.print()}>
-          PRINT / PDF
+        <button
+          type="button"
+          className="rules-tool rules-tool-icon tap-btn"
+          onClick={() => window.print()}
+          title="Save the rule book as a PDF"
+          aria-label="Save the rule book as a PDF"
+        >
+          <span aria-hidden="true">⤓</span>
         </button>
       </div>
 
       {showHistory && (
         <section className="panel rules-history">
           <span className="hub-heading">AMENDMENT HISTORY</span>
-          <p className="rule-edit-hint">
-            Every published revision. Open one to read the book exactly as it stood.
-          </p>
           <RulebookHistory
             versions={versions}
             error={versionError}
             currentVersionId={publishedMeta.versionId}
             viewingId={revParam}
             onOpen={openVersion}
-            emptyLine={`Nothing published yet. The first publish becomes revision ${publishedBook.revision}.`}
+            emptyLine="Nothing published yet."
           />
         </section>
       )}
@@ -755,6 +771,8 @@ export default function RulesPage() {
                 term={term}
                 copied={copied === hit.entry.id}
                 onCopy={copyLink}
+                open={openId === hit.entry.id}
+                onToggle={(id) => setOpenId((prev) => (prev === id ? null : id))}
                 onPropose={proposeFor}
                 breadcrumb={hit.breadcrumb}
                 editor={editorFor(hit.entry)}
@@ -803,6 +821,8 @@ export default function RulesPage() {
                         term={term}
                         copied={copied === entry.id}
                         onCopy={copyLink}
+                        open={openId === entry.id}
+                        onToggle={(id) => setOpenId((prev) => (prev === id ? null : id))}
                         onPropose={proposeFor}
                         editor={editorFor(entry)}
                       />

@@ -382,10 +382,7 @@ export default function VotesPage() {
             </>
           )}
 
-          <p className="rule-edit-hint">
-            You get one vote to start each season. Cancelling gives it back. Nothing can start
-            once the draft begins.
-          </p>
+          <p className="rule-edit-hint">One vote each per season. Cancelling gives it back.</p>
           <div className="rule-edit-actions">
             <button
               type="button"

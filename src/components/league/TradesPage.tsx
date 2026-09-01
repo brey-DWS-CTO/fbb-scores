@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import IdentityChip from './IdentityChip.js';
+import EarlierTrades from './EarlierTrades.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { OWNERS } from '../../lib/league/data.js';
 import {
@@ -564,9 +565,11 @@ export default function TradesPage() {
               ? 'Nobody has offered you a trade.'
               : tab === 'sent'
                 ? 'You have no offers out.'
-                : 'No trades have been settled yet.'}
+                : 'No trades have been made in the app yet.'}
           </div>
         )}
+        {/* The league's own trade record, so SETTLED is never a dead end. */}
+        {tab === 'done' && <EarlierTrades />}
       </div>
     </main>
   );

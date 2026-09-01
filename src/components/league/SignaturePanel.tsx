@@ -62,7 +62,7 @@ export default function SignaturePanel({
       </div>
 
       {!data.versionId && (
-        <p className="sign-line">Nothing is published yet, so there is nothing to sign.</p>
+        <p className="sign-line">Nothing to sign yet.</p>
       )}
 
       {data.versionId && (
