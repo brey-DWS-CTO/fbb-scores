@@ -212,45 +212,139 @@ export function referrersOf(book: Rulebook, id: string): string[] {
   return hits;
 }
 
+/** The parts of an entry a search reads, kept apart so a title can outrank a body. */
+interface EntryText {
+  /** The title alone. A word here says the rule is about that word. */
+  title: string;
+  /** Body text with references resolved, plus any note and table cells. */
+  body: string;
+}
+
+function entryText(entry: RulebookEntry, index: RulebookIndex): EntryText {
+  const body: string[] = [];
+  if (entry.text) body.push(resolveRefs(entry.text, index));
+  if (entry.note) body.push(entry.note);
+  if (entry.table) {
+    body.push(entry.table.columns.join(' '));
+    entry.table.rows.forEach((row) => body.push(row.join(' ')));
+  }
+  return { title: entry.title ?? '', body: body.join(' ') };
+}
+
 /** The searchable text of an entry, with references already resolved. */
 export function entryHaystack(entry: RulebookEntry, index: RulebookIndex): string {
-  const parts = [entry.number, entry.title ?? '', entry.text ? resolveRefs(entry.text, index) : ''];
-  if (entry.table) {
-    parts.push(entry.table.columns.join(' '));
-    entry.table.rows.forEach((row) => parts.push(row.join(' ')));
+  const { title, body } = entryText(entry, index);
+  return [entry.number, title, body].join(' ');
+}
+
+/**
+ * Filler words that sit in nearly every clause. A query made only of these
+ * finds nothing rather than the whole book. The list stays short on purpose:
+ * words that carry rule meaning, like "not" or "must", are never dropped.
+ */
+const STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'but', 'by', 'for', 'from',
+  'has', 'have', 'in', 'into', 'is', 'it', 'its', 'of', 'on', 'or', 'that',
+  'the', 'their', 'this', 'to', 'was', 'were', 'with',
+]);
+
+/** A word, or a rule number like `4.3.2` held together as one word. */
+const WORD_PATTERN = /[a-z0-9]+(?:\.[0-9]+)*/g;
+const NUMBERISH = /^[0-9]+(\.[0-9]+)*$/;
+
+/**
+ * The words a query asks for, lowercased, deduped, filler removed.
+ * Exported because both search and highlighting must agree on them.
+ */
+export function queryWords(query: string): string[] {
+  const found = query.toLowerCase().match(WORD_PATTERN) ?? [];
+  return [...new Set(found.filter((word) => !STOP_WORDS.has(word)))];
+}
+
+/**
+ * A word matches where a word in the text starts with it, so "cap" finds "cap"
+ * and "capped" but not "handicap". Matching from the start is what makes a
+ * half-typed word useful without dragging in every word that merely contains it.
+ */
+function wordStart(word: string, flags: string): RegExp {
+  return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, flags);
+}
+
+// Weights, best first. They are plain numbers so a hit's score can be read back
+// and explained. Nothing here learns or guesses.
+const SCORE_NUMBER_EXACT = 1000;
+const SCORE_NUMBER_PREFIX = 500;
+const SCORE_TITLE_WORD = 100;
+const SCORE_BODY_WORD = 10;
+
+/** One query word, with its matcher built once for the whole search. */
+interface QueryWord {
+  word: string;
+  isNumber: boolean;
+  match: RegExp;
+}
+
+/** How well one entry answers the query. 0 means at least one word is missing. */
+function scoreEntry(entry: RulebookEntry, text: EntryText, words: QueryWord[]): number {
+  let score = 0;
+  for (const { word, isNumber, match } of words) {
+    let best = 0;
+    if (isNumber) {
+      if (entry.number === word) best = SCORE_NUMBER_EXACT;
+      else if (entry.number.startsWith(`${word}.`)) best = SCORE_NUMBER_PREFIX;
+      else if (match.test(text.title)) best = SCORE_TITLE_WORD;
+      else if (match.test(text.body)) best = SCORE_BODY_WORD;
+      // The number carries the label of an appendix, which reads as its title.
+    } else if (match.test(entry.number) || match.test(text.title)) {
+      best = SCORE_TITLE_WORD;
+    } else if (match.test(text.body)) {
+      best = SCORE_BODY_WORD;
+    }
+    if (!best) return 0;
+    score += best;
   }
-  return parts.join(' ');
+  return score;
 }
 
 export interface RulebookSearchHit {
   entry: RulebookEntry;
   /** Ancestor numbers plus titles, so a bare clause still reads in context. */
   breadcrumb: string;
+  /** Why it sits where it sits. Higher is a better answer to the query. */
+  score: number;
 }
 
 /**
- * Case-insensitive search over number, title, body, and table cells.
- * A query that looks like a rule number ("4.3.2") also matches by prefix, so
- * searching a number pulls up that rule and everything under it.
+ * Search the book by words, in any order.
+ *
+ * Every word of the query must appear somewhere in the entry, so "keeper cap"
+ * and "cap keeper" both find 4.3 Keeper Salary Cap while neither drags in every
+ * rule that says "cap". A word that looks like a rule number also matches that
+ * rule and everything nested under it, so typing 4.3 still opens the branch.
+ *
+ * Results come back best first: an exact rule number, then rules whose title
+ * holds more of the words, then rules that only mention them in the body.
+ * Entries that tie keep book order.
  */
 export function searchRulebook(
   index: RulebookIndex,
   query: string,
 ): RulebookSearchHit[] {
-  const term = query.trim().toLowerCase();
-  if (!term) return [];
+  const words: QueryWord[] = queryWords(query).map((word) => ({
+    word,
+    isNumber: NUMBERISH.test(word),
+    match: wordStart(word, 'i'),
+  }));
+  if (!words.length) return [];
 
-  const numberish = /^[0-9]+(\.[0-9]+)*$/.test(term);
+  const scored: Array<{ hit: RulebookSearchHit; at: number }> = [];
+  index.entries.forEach((entry, at) => {
+    const score = scoreEntry(entry, entryText(entry, index), words);
+    if (!score) return;
+    scored.push({ hit: { entry, breadcrumb: breadcrumbFor(entry, index), score }, at });
+  });
 
-  return index.entries
-    .filter((entry) => {
-      if (entry.isArticle && !entry.text && !entry.table) {
-        return entry.number.toLowerCase() === term || (entry.title ?? '').toLowerCase().includes(term);
-      }
-      if (numberish && (entry.number === term || entry.number.startsWith(`${term}.`))) return true;
-      return entryHaystack(entry, index).toLowerCase().includes(term);
-    })
-    .map((entry) => ({ entry, breadcrumb: breadcrumbFor(entry, index) }));
+  return scored.sort((a, b) => b.hit.score - a.hit.score || a.at - b.at).map((row) => row.hit);
 }
 
 /** "4 Keeper Rules › 4.3 Keeper Salary Cap" for a nested clause. */
@@ -269,26 +363,49 @@ export interface TextSegment {
   hit: boolean;
 }
 
-/** Split text so a component can mark the matched run without dangerous HTML. */
+/**
+ * Split text so a component can mark the matched words without dangerous HTML.
+ *
+ * Every word of the query gets marked, not just the first, because search only
+ * returns an entry when all of them match. Runs that touch or overlap merge, so
+ * "keeper cap" on "Keeper Salary Cap" marks two runs and never nests them.
+ */
 export function highlight(text: string, query: string): TextSegment[] {
-  const term = query.trim();
-  if (!term) return [{ text, hit: false }];
+  const words = queryWords(query);
+  if (!words.length) return [{ text, hit: false }];
+
+  const spans: Array<[number, number]> = [];
+  for (const word of words) {
+    for (const match of text.matchAll(wordStart(word, 'gi'))) {
+      spans.push([match.index, match.index + match[0].length]);
+    }
+  }
+  if (!spans.length) return [{ text, hit: false }];
+  spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 
   const segments: TextSegment[] = [];
-  const lowerText = text.toLowerCase();
-  const lowerTerm = term.toLowerCase();
   let cursor = 0;
+  let start = spans[0][0];
+  let end = spans[0][1];
+  const flush = () => {
+    if (start > cursor) segments.push({ text: text.slice(cursor, start), hit: false });
+    segments.push({ text: text.slice(start, end), hit: true });
+    cursor = end;
+  };
 
-  for (;;) {
-    const at = lowerText.indexOf(lowerTerm, cursor);
-    if (at === -1) break;
-    if (at > cursor) segments.push({ text: text.slice(cursor, at), hit: false });
-    segments.push({ text: text.slice(at, at + term.length), hit: true });
-    cursor = at + term.length;
+  for (let i = 1; i < spans.length; i += 1) {
+    if (spans[i][0] <= end) {
+      end = Math.max(end, spans[i][1]);
+      continue;
+    }
+    flush();
+    start = spans[i][0];
+    end = spans[i][1];
   }
+  flush();
 
   if (cursor < text.length) segments.push({ text: text.slice(cursor), hit: false });
-  return segments.length ? segments : [{ text, hit: false }];
+  return segments;
 }
 
 /** Anchor id for a clause, used by `/rules#rule-<id>` deep links. */
