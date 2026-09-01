@@ -7,6 +7,7 @@ import {
   castVote,
   closePoll,
   describeTally,
+  pollKindLabel,
   tallyPoll,
   thresholdFor,
   unknownClauses,
@@ -20,6 +21,7 @@ function poll(overrides: Partial<Poll> = {}): Poll {
   return {
     id: 'p1',
     season: 2027,
+    kind: 'change',
     title: 'Expand IR to 2 slots',
     detail: 'Two IR slots instead of one.',
     proposedBy: 'Ryan',
@@ -131,6 +133,8 @@ const launch = (over: Partial<Parameters<typeof canLaunchPoll>[0]> = {}) =>
     owner: 'Ryan',
     members: MEMBERS,
     seasonPolls: [],
+    kind: 'change',
+    affects: ['keepers.cap'],
     title: 'A proposal',
     now: beforeDraft,
     draftAt,
@@ -168,6 +172,29 @@ test('nothing can be launched once the draft is here', () => {
 test('non-members and empty titles are refused', () => {
   assert.equal(launch({ owner: 'Stranger' }).reason, 'not-a-member');
   assert.equal(launch({ title: '   ' }).reason, 'empty-title');
+});
+
+test('every vote says whether it is a new rule or a change', () => {
+  assert.equal(launch({ kind: '' }).reason, 'bad-kind');
+  assert.equal(launch({ kind: 'something-else' }).reason, 'bad-kind');
+  assert.equal(launch({ kind: 'new-rule', affects: [] }).ok, true);
+});
+
+test('a change must name the rule it changes', () => {
+  const bare = launch({ kind: 'change', affects: [] });
+  assert.equal(bare.ok, false);
+  assert.equal(bare.reason, 'change-needs-clause');
+  assert.equal(launch({ kind: 'change', affects: ['keepers.cap'] }).ok, true);
+});
+
+test('a new rule may name where it goes, or nothing at all', () => {
+  assert.equal(launch({ kind: 'new-rule', affects: [] }).ok, true);
+  assert.equal(launch({ kind: 'new-rule', affects: ['keepers.cap'] }).ok, true);
+});
+
+test('each kind reads plainly on screen', () => {
+  assert.equal(pollKindLabel('change'), 'RULE CHANGE');
+  assert.equal(pollKindLabel('new-rule'), 'NEW RULE');
 });
 
 // ─── Thresholds from the rule book ─────────────────────────────────────────

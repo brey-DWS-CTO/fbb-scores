@@ -19,6 +19,7 @@ import { fileURLToPath } from 'url';
 import { neon } from '@neondatabase/serverless';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
+import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
 
@@ -127,6 +128,15 @@ export interface RulebookVersionRow {
   notes: string;
   publishedAt: string;
   publishedBy: string;
+}
+
+export class RulebookSignError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'RulebookSignError';
+  }
 }
 
 /** A league poll, stored whole. Votes live inside it. */
@@ -268,6 +278,8 @@ interface StoreBackend {
   getLatestRulebookVersion(season: number): Promise<RulebookVersionRow | null>;
   getRulebookVersion(id: string): Promise<RulebookVersionRow | null>;
   listRulebookVersions(season: number): Promise<Array<Omit<RulebookVersionRow, 'book'>>>;
+  listRulebookSignatures(season: number): Promise<RulebookSignature[]>;
+  insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature>;
   listPolls(season: number): Promise<unknown[]>;
   getPoll(id: string): Promise<unknown | null>;
   insertPoll(id: string, season: number, data: unknown, at: string): Promise<void>;
@@ -394,6 +406,18 @@ class NeonBackend implements StoreBackend {
       notes text not null,
       published_at timestamptz not null,
       published_by text not null
+    )`;
+    // One row per member per version, and never updated: a signature is the
+    // record of what someone agreed to at a moment, so it is written once.
+    await this.sql`CREATE TABLE IF NOT EXISTS rulebook_signatures (
+      version_id text not null,
+      owner text not null,
+      season int not null,
+      revision int not null,
+      fingerprint text not null,
+      acknowledgement text not null,
+      signed_at timestamptz not null,
+      primary key (version_id, owner)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_draft (
       season int primary key,
@@ -788,6 +812,46 @@ class NeonBackend implements StoreBackend {
     return rows.map((raw) => versionSummary(toVersionRow(raw)));
   }
 
+  async listRulebookSignatures(season: number): Promise<RulebookSignature[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT version_id, owner, season, revision, fingerprint,
+        acknowledgement, signed_at
+      FROM rulebook_signatures WHERE season = ${season}
+      ORDER BY signed_at ASC`) as Array<{
+      version_id: string;
+      owner: string;
+      season: number;
+      revision: number;
+      fingerprint: string;
+      acknowledgement: string;
+      signed_at: string | Date;
+    }>;
+    return rows.map((row) => ({
+      versionId: row.version_id,
+      owner: row.owner,
+      season: row.season,
+      revision: row.revision,
+      fingerprint: row.fingerprint,
+      acknowledgement: row.acknowledgement,
+      signedAt: new Date(row.signed_at).toISOString(),
+    }));
+  }
+
+  async insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature> {
+    await this.ensureInit();
+    // DO NOTHING, never DO UPDATE: a signature already on file stands.
+    const written = (await this.sql`INSERT INTO rulebook_signatures
+      (version_id, owner, season, revision, fingerprint, acknowledgement, signed_at)
+      VALUES (${row.versionId}, ${row.owner}, ${row.season}, ${row.revision},
+        ${row.fingerprint}, ${row.acknowledgement}, ${row.signedAt})
+      ON CONFLICT (version_id, owner) DO NOTHING
+      RETURNING owner`) as Array<{ owner: string }>;
+    if (!written[0]) {
+      throw new RulebookSignError('already-signed', 'You have already signed this revision');
+    }
+    return row;
+  }
+
   async listPolls(season: number): Promise<unknown[]> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data FROM polls WHERE season = ${season}
@@ -861,7 +925,26 @@ interface FileDoc {
   }>;
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
+  rulebookSignatures: RulebookSignature[];
   polls: PollRow[];
+}
+
+/** Every list a fresh document starts with. */
+function emptyDoc(): FileDoc {
+  return {
+    state: defaultState(),
+    version: 0,
+    updatedAt: new Date().toISOString(),
+    pins: {},
+    audit: [],
+    playerPoolSnapshots: [],
+    scheduleSnapshots: [],
+    keeperScenarios: [],
+    rulebookDrafts: [],
+    rulebookVersions: [],
+    rulebookSignatures: [],
+    polls: [],
+  };
 }
 
 const MAX_FILE_AUDIT_ROWS = 1000;
@@ -892,13 +975,14 @@ class FileBackend implements StoreBackend {
   }
 
   private readDoc(): FileDoc {
+    const blank = emptyDoc();
     try {
       const raw = fs.readFileSync(this.filePath, 'utf8');
       const doc = JSON.parse(raw) as Partial<FileDoc>;
       return {
-        state: doc.state ?? defaultState(),
+        state: doc.state ?? blank.state,
         version: typeof doc.version === 'number' ? doc.version : 0,
-        updatedAt: doc.updatedAt ?? new Date().toISOString(),
+        updatedAt: doc.updatedAt ?? blank.updatedAt,
         pins: doc.pins ?? {},
         audit: Array.isArray(doc.audit) ? doc.audit : [],
         playerPoolSnapshots: Array.isArray(doc.playerPoolSnapshots) ? doc.playerPoolSnapshots : [],
@@ -906,24 +990,13 @@ class FileBackend implements StoreBackend {
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
+        rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
         polls: Array.isArray(doc.polls) ? doc.polls : [],
       };
     } catch {
-      return {
-        state: defaultState(),
-        version: 0,
-        updatedAt: new Date().toISOString(),
-        pins: {},
-        audit: [],
-        playerPoolSnapshots: [],
-        scheduleSnapshots: [],
-        keeperScenarios: [],
-        // Omitting these once meant a fresh or unreadable file blew up on the
-        // first poll or rule book read.
-        rulebookDrafts: [],
-        rulebookVersions: [],
-        polls: [],
-      };
+      // A missing or unreadable file starts empty. Every list must be present,
+      // or the next write throws on a push into undefined.
+      return blank;
     }
   }
 
@@ -1217,6 +1290,30 @@ class FileBackend implements StoreBackend {
     return this.sortedVersions(season).map(versionSummary);
   }
 
+  async listRulebookSignatures(season: number): Promise<RulebookSignature[]> {
+    await this.ensureInit();
+    return this.readDoc()
+      .rulebookSignatures.filter((row) => row.season === season)
+      .sort((a, b) => a.signedAt.localeCompare(b.signedAt));
+  }
+
+  async insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const taken = doc.rulebookSignatures.some(
+        (s) => s.versionId === row.versionId && s.owner === row.owner,
+      );
+      // Never replaced: a signature on file stands, exactly as Neon does it.
+      if (taken) {
+        throw new RulebookSignError('already-signed', 'You have already signed this revision');
+      }
+      doc.rulebookSignatures.push(structuredClone(row));
+      this.writeDoc(doc);
+      return row;
+    });
+  }
+
   async listPolls(season: number): Promise<unknown[]> {
     await this.ensureInit();
     return this.readDoc()
@@ -1481,6 +1578,16 @@ export async function listRulebookVersions(
   season: number,
 ): Promise<Array<Omit<RulebookVersionRow, 'book'>>> {
   return getBackend().listRulebookVersions(season);
+}
+
+export async function listRulebookSignatures(season: number): Promise<RulebookSignature[]> {
+  return getBackend().listRulebookSignatures(season);
+}
+
+export async function insertRulebookSignature(
+  row: RulebookSignature,
+): Promise<RulebookSignature> {
+  return getBackend().insertRulebookSignature(row);
 }
 
 export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {

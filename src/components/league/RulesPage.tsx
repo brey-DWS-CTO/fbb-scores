@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import RecordTables from './RecordTables.js';
 import RuleEditMenu from './RuleEditMenu.js';
 import PublishPanel from './PublishPanel.js';
 import RulebookAudit from './RulebookAudit.js';
+import RulebookHistory from './RulebookHistory.js';
+import SignaturePanel from './SignaturePanel.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
+  fetchPolls,
   fetchPublishedRulebook,
   fetchRulebookDraft,
+  fetchRulebookSignatures,
+  fetchRulebookVersion,
+  fetchRulebookVersions,
   isStaleDraftError,
   publishRulebook,
   resetRulebookDraft,
   saveRulebookDraft,
+  type RulebookSignaturesResponse,
+  type RulebookVersionSummary,
 } from '../../lib/league/api.js';
+import { printedRevisionLine } from '../../lib/league/rulebookSignatures.js';
 import { rulebook2027, rulebookIndex2027 } from '../../lib/league/rulebookData.js';
 import {
   anchorFor,
@@ -130,6 +139,7 @@ function Clause({
   term,
   copied,
   onCopy,
+  onPropose,
   breadcrumb,
   editor,
 }: {
@@ -138,6 +148,8 @@ function Clause({
   term: string;
   copied: boolean;
   onCopy: (id: string) => void;
+  /** Only set when the reader still has their one vote for the season. */
+  onPropose?: (id: string) => void;
   /** Set while searching, where article headings are not on screen. */
   breadcrumb?: string;
   editor?: React.ReactNode;
@@ -171,6 +183,15 @@ function Clause({
         {body && <Marked text={body} term={term} />}
       </p>
       <ClauseTable entry={entry} term={term} />
+      {onPropose && (
+        <button
+          type="button"
+          className="rules-propose tap-btn"
+          onClick={() => onPropose(entry.id)}
+        >
+          PROPOSE A CHANGE
+        </button>
+      )}
       {editor}
     </div>
   );
@@ -186,6 +207,7 @@ export default function RulesPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(initialCollapsed);
   const location = useLocation();
+  const navigate = useNavigate();
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The published book, once it arrives. Rendering starts from the committed
@@ -193,10 +215,17 @@ export default function RulesPage() {
   const [publishedBook, setPublishedBook] = useState<Rulebook>(rulebook2027);
   const [publishedMeta, setPublishedMeta] = useState<{
     published: boolean;
+    versionId: string | null;
     revision: number;
     publishedAt: string | null;
     publishedBy: string | null;
-  }>({ published: false, revision: rulebook2027.revision, publishedAt: null, publishedBy: null });
+  }>({
+    published: false,
+    versionId: null,
+    revision: rulebook2027.revision,
+    publishedAt: null,
+    publishedBy: null,
+  });
 
   const loadPublished = useCallback(async () => {
     try {
@@ -204,6 +233,7 @@ export default function RulesPage() {
       setPublishedBook(latest.book);
       setPublishedMeta({
         published: latest.published,
+        versionId: latest.versionId,
         revision: latest.revision,
         publishedAt: latest.publishedAt,
         publishedBy: latest.publishedBy,
@@ -218,6 +248,86 @@ export default function RulesPage() {
     void loadPublished();
   }, [loadPublished]);
 
+  // ─── Past revisions ──────────────────────────────────────────────────────
+  // `?rev=` names a frozen version. It is a real URL so a link to an old
+  // revision can be shared, the same way a link to a rule can.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const revParam = searchParams.get('rev');
+  const [versions, setVersions] = useState<RulebookVersionSummary[] | null>(null);
+  const [versionError, setVersionError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [pastVersion, setPastVersion] = useState<
+    (RulebookVersionSummary & { book: Rulebook }) | null
+  >(null);
+  const [pastError, setPastError] = useState<string | null>(null);
+  const [signatures, setSignatures] = useState<RulebookSignaturesResponse | null>(null);
+  const [canPropose, setCanPropose] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRulebookVersions()
+      .then((rows) => {
+        if (!cancelled) setVersions(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setVersionError('Could not load the revision history.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publishedMeta.versionId]);
+
+  useEffect(() => {
+    if (!revParam) {
+      setPastVersion(null);
+      setPastError(null);
+      return;
+    }
+    let cancelled = false;
+    setPastError(null);
+    fetchRulebookVersion(revParam)
+      .then((version) => {
+        if (!cancelled) setPastVersion(version);
+      })
+      .catch(() => {
+        if (!cancelled) setPastError('That revision could not be loaded.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [revParam]);
+
+  const loadSignatures = useCallback(async () => {
+    try {
+      setSignatures(await fetchRulebookSignatures(revParam ?? undefined));
+    } catch {
+      setSignatures(null);
+    }
+  }, [revParam]);
+
+  useEffect(() => {
+    void loadSignatures();
+  }, [loadSignatures, publishedMeta.versionId]);
+
+  // The propose action only shows to a member who still has their one launch.
+  useEffect(() => {
+    if (!identity) {
+      setCanPropose(false);
+      return;
+    }
+    let cancelled = false;
+    fetchPolls(identity)
+      .then((data) => {
+        if (!cancelled) setCanPropose(data.you.canLaunch);
+      })
+      .catch(() => {
+        if (!cancelled) setCanPropose(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [identity]);
+
   // ─── Draft mode ──────────────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Rulebook | null>(null);
@@ -228,7 +338,9 @@ export default function RulesPage() {
   const [error, setError] = useState<string | null>(null);
   const undoStack = useRef<Rulebook[]>([]);
 
-  const book = editing && draft ? draft : publishedBook;
+  // Draft beats a chosen revision, which beats what is published now.
+  const book = editing && draft ? draft : (pastVersion?.book ?? publishedBook);
+  const historical = pastVersion !== null && pastVersion.id !== publishedMeta.versionId;
   const index = useMemo(
     () => (book === rulebook2027 ? rulebookIndex2027 : buildRulebookIndex(book)),
     [book],
@@ -406,13 +518,28 @@ export default function RulesPage() {
       <RuleEditMenu book={draft} entry={entry} onChange={applyEdit} onError={setError} />
     ) : undefined;
 
+  const openVersion = (versionId: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (versionId) next.set('rev', versionId);
+    else next.delete('rev');
+    setSearchParams(next);
+    window.scrollTo({ top: 0 });
+  };
+
+  // A change vote starts where the member is reading, with the rule already set.
+  const proposeChange = (id: string) => navigate(`/votes?kind=change&rule=${encodeURIComponent(id)}`);
+  const proposeFor =
+    !editing && !historical && identity && canPropose ? proposeChange : undefined;
+
+  const printedAt = pastVersion?.publishedAt ?? publishedMeta.publishedAt;
+
   return (
     <main className={editing ? 'rules-page rules-page-editing' : 'rules-page'}>
       <div className="rules-print-head" aria-hidden="true">
         <h1>{book.title}</h1>
         <p>
-          {book.season} season · Revision {book.revision} ·{' '}
-          {book.status === 'published' ? 'Published' : 'Working draft, not ratified'}
+          {book.season} season · {printedRevisionLine(book, printedAt)}
+          {historical ? ' · superseded revision' : ''}
         </p>
       </div>
       <header className="rules-page-header">
@@ -425,7 +552,24 @@ export default function RulesPage() {
         <IdentityChip />
       </header>
 
-      {!editing && !publishedMeta.published && (
+      {pastError && <p className="rules-draft-error">{pastError}</p>}
+
+      {historical && pastVersion && (
+        <div className="panel rules-status rules-old-revision">
+          <span className="hub-heading">OLD REVISION</span>
+          <p>
+            You are reading revision {pastVersion.revision}, published{' '}
+            {formatPublished(pastVersion.publishedAt)} by {pastVersion.publishedBy}. It is not the
+            constitution in force.
+          </p>
+          {pastVersion.notes && <p className="rules-old-notes">{pastVersion.notes}</p>}
+          <button type="button" className="rules-tool tap-btn" onClick={() => openVersion(null)}>
+            BACK TO THE CURRENT BOOK
+          </button>
+        </div>
+      )}
+
+      {!editing && !historical && !publishedMeta.published && (
         <div className="panel rules-status">
           <span className="hub-heading">NOT YET PUBLISHED</span>
           <p>
@@ -435,7 +579,7 @@ export default function RulesPage() {
         </div>
       )}
 
-      {!editing && publishedMeta.published && (
+      {!editing && !historical && publishedMeta.published && (
         <p className="rules-published-line">
           Revision {publishedMeta.revision}, published{' '}
           {publishedMeta.publishedAt ? formatPublished(publishedMeta.publishedAt) : ''}
@@ -443,7 +587,7 @@ export default function RulesPage() {
         </p>
       )}
 
-      {isCommish && (
+      {isCommish && !historical && (
         <div className={editing ? 'panel rules-draft-bar rules-draft-on' : 'rules-draft-off'}>
           {!editing ? (
             <button type="button" className="rules-tool tap-btn" disabled={busy} onClick={enterDraft}>
@@ -503,7 +647,14 @@ export default function RulesPage() {
                   {problems.length > 6 && <li>and {problems.length - 6} more</li>}
                 </ul>
               )}
-              {draft && <RulebookAudit book={draft} />}
+              {draft && (
+                <RulebookAudit
+                  book={draft}
+                  versions={versions}
+                  versionError={versionError}
+                  currentVersionId={publishedMeta.versionId}
+                />
+              )}
               {problems.length === 0 && draft && (
                 <PublishPanel
                   published={publishedBook}
@@ -547,10 +698,44 @@ export default function RulesPage() {
         >
           {allShut ? 'OPEN ALL' : 'CLOSE ALL'}
         </button>
+        <button
+          type="button"
+          className="rules-tool tap-btn"
+          aria-pressed={showHistory}
+          onClick={() => setShowHistory(!showHistory)}
+        >
+          {showHistory ? 'HIDE REVISIONS' : 'REVISIONS'}
+        </button>
         <button type="button" className="rules-tool tap-btn" onClick={() => window.print()}>
           PRINT / PDF
         </button>
       </div>
+
+      {showHistory && (
+        <section className="panel rules-history">
+          <span className="hub-heading">AMENDMENT HISTORY</span>
+          <p className="rule-edit-hint">
+            Every published revision. Open one to read the book exactly as it stood.
+          </p>
+          <RulebookHistory
+            versions={versions}
+            error={versionError}
+            currentVersionId={publishedMeta.versionId}
+            viewingId={revParam}
+            onOpen={openVersion}
+            emptyLine={`Nothing published yet. The first publish becomes revision ${publishedBook.revision}.`}
+          />
+        </section>
+      )}
+
+      {!editing && (
+        <SignaturePanel
+          identity={identity}
+          data={signatures}
+          historical={historical}
+          onSigned={() => void loadSignatures()}
+        />
+      )}
 
       {results && (
         <p className="rules-result-count">
@@ -570,6 +755,7 @@ export default function RulesPage() {
                 term={term}
                 copied={copied === hit.entry.id}
                 onCopy={copyLink}
+                onPropose={proposeFor}
                 breadcrumb={hit.breadcrumb}
                 editor={editorFor(hit.entry)}
               />
@@ -617,6 +803,7 @@ export default function RulesPage() {
                         term={term}
                         copied={copied === entry.id}
                         onCopy={copyLink}
+                        onPropose={proposeFor}
                         editor={editorFor(entry)}
                       />
                     ))}
@@ -631,6 +818,25 @@ export default function RulesPage() {
           </div>
         )}
       </div>
+
+      {/* Paper only. A printed constitution has to carry its own history, since
+          the reader cannot tap REVISIONS on a sheet of paper. */}
+      <section className="rules-print-history" aria-hidden="true">
+        <h2>Amendment history</h2>
+        {versions && versions.length > 0 ? (
+          <ul>
+            {versions.map((revision) => (
+              <li key={revision.id}>
+                <strong>Revision {revision.revision}</strong> · {formatPublished(revision.publishedAt)}{' '}
+                · {revision.publishedBy}
+                {revision.notes ? ` — ${revision.notes}` : ''}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No revision has been published yet.</p>
+        )}
+      </section>
     </main>
   );
 }

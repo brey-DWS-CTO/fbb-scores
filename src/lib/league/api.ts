@@ -14,7 +14,8 @@ import type {
 } from './playerPool.js';
 import type { KeeperScenario } from './keeperScenario.js';
 import type { Rulebook } from './rulebook.js';
-import type { Poll } from './polls.js';
+import type { RulebookSignature } from './rulebookSignatures.js';
+import type { Poll, PollKind } from './polls.js';
 import type {
   LeagueScheduleMapping,
   RawScheduleSource,
@@ -554,6 +555,51 @@ export interface PublishRulebookResponse {
   revision: number;
   publishedAt: string;
   publishedBy: string;
+  /** Passed votes that were already in the draft and went out with it. */
+  polls: string[];
+}
+
+// ─── Signatures ──────────────────────────────────────────────────────────────
+
+export interface RulebookSignaturesResponse {
+  versionId: string | null;
+  currentVersionId: string | null;
+  revision: number | null;
+  fingerprint: string | null;
+  acknowledgement: string;
+  members: string[];
+  signed: RulebookSignature[];
+  missing: string[];
+  complete: boolean;
+}
+
+/** Anyone may read this, signed in or not, like the book itself. */
+export async function fetchRulebookSignatures(
+  versionId?: string,
+): Promise<RulebookSignaturesResponse> {
+  const { data } = await axios.get<RulebookSignaturesResponse>('/api/league/rulebook/signatures', {
+    params: versionId ? { versionId } : undefined,
+  });
+  return data;
+}
+
+/** Sign the published revision. The server takes the signer from the PIN. */
+export async function signRulebook(
+  c: Credentials,
+  versionId: string,
+  fingerprint: string,
+): Promise<{
+  signature: RulebookSignature;
+  signed: RulebookSignature[];
+  missing: string[];
+  complete: boolean;
+}> {
+  const { data } = await axios.post(
+    '/api/league/rulebook/sign',
+    { versionId, fingerprint },
+    { headers: authHeaders(c) },
+  );
+  return data;
 }
 
 /**
@@ -590,11 +636,32 @@ export async function fetchPolls(c: Credentials): Promise<PollsResponse> {
 
 export async function openPoll(
   c: Credentials,
-  input: { title: string; detail: string; affects: string[] },
+  input: { kind: PollKind; title: string; detail: string; affects: string[] },
 ): Promise<Poll> {
   const { data } = await axios.post<Poll>('/api/league/polls', input, {
     headers: authHeaders(c),
   });
+  return data;
+}
+
+export interface AmendmentDraftResponse {
+  book: Rulebook;
+  version: number;
+  /** The rules the commissioner now has to write. */
+  focusIds: string[];
+  note: string;
+}
+
+/** Commissioner only: seed the rule book draft from a vote that passed. */
+export async function amendFromPoll(
+  c: Credentials,
+  pollId: string,
+): Promise<AmendmentDraftResponse> {
+  const { data } = await axios.post<AmendmentDraftResponse>(
+    `/api/league/polls/${encodeURIComponent(pollId)}/amend`,
+    {},
+    { headers: authHeaders(c) },
+  );
   return data;
 }
 

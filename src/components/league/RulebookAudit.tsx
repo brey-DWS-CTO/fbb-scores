@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import RulebookHistory from './RulebookHistory.js';
 import { anchorFor, type Rulebook } from '../../lib/league/rulebook.js';
 import { auditRulebookSettings, type SettingAudit } from '../../lib/league/rulebookSettings.js';
-import { fetchRulebookVersions, type RulebookVersionSummary } from '../../lib/league/api.js';
+import type { RulebookVersionSummary } from '../../lib/league/api.js';
 import { useLeagueData } from '../../hooks/useLeague.js';
 
 const STATUS_LABEL: Record<SettingAudit['status'], string> = {
@@ -19,32 +20,26 @@ const STATUS_LABEL: Record<SettingAudit['status'], string> = {
  * Both are read-only. The settings audit is deliberately cautious; see
  * rulebookSettings.ts for why it would rather report a gap than guess.
  */
-export default function RulebookAudit({ book }: { book: Rulebook }) {
+export default function RulebookAudit({
+  book,
+  versions,
+  versionError,
+  currentVersionId,
+}: {
+  book: Rulebook;
+  /** Loaded once by the page, so the list, the tab, and print agree. */
+  versions: RulebookVersionSummary[] | null;
+  versionError: string | null;
+  currentVersionId: string | null;
+}) {
   const { dataset } = useLeagueData();
   const [tab, setTab] = useState<'settings' | 'history' | null>(null);
-  const [versions, setVersions] = useState<RulebookVersionSummary[] | null>(null);
-  const [versionError, setVersionError] = useState<string | null>(null);
 
   const audits = useMemo(
     () => (dataset ? auditRulebookSettings(book, dataset) : []),
     [book, dataset],
   );
   const needsCheck = audits.filter((a) => a.status === 'check');
-
-  useEffect(() => {
-    if (tab !== 'history' || versions) return;
-    let cancelled = false;
-    fetchRulebookVersions()
-      .then((rows) => {
-        if (!cancelled) setVersions(rows);
-      })
-      .catch(() => {
-        if (!cancelled) setVersionError('Could not load the version history.');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tab, versions]);
 
   return (
     <div className="audit-block">
@@ -106,31 +101,13 @@ export default function RulebookAudit({ book }: { book: Rulebook }) {
 
       {tab === 'history' && (
         <div className="audit-body">
-          {versionError && <p className="rules-draft-error">{versionError}</p>}
-          {!versionError && !versions && <p className="rule-edit-hint">Loading…</p>}
-          {versions?.length === 0 && (
-            <p className="rule-edit-hint">Nothing published yet. The first publish becomes revision {book.revision}.</p>
-          )}
-          {versions && versions.length > 0 && (
-            <ul className="audit-list">
-              {versions.map((version) => (
-                <li key={version.id} className="audit-row audit-version">
-                  <div className="audit-row-head">
-                    <span className="audit-status">REV {version.revision}</span>
-                    <span className="audit-label">
-                      {new Date(version.publishedAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </span>
-                    <span className="audit-value">{version.publishedBy}</span>
-                  </div>
-                  {version.notes && <p className="audit-detail">{version.notes}</p>}
-                </li>
-              ))}
-            </ul>
-          )}
+          <RulebookHistory
+            versions={versions}
+            error={versionError}
+            currentVersionId={currentVersionId}
+            viewingId={null}
+            emptyLine={`Nothing published yet. The first publish becomes revision ${book.revision}.`}
+          />
         </div>
       )}
     </div>
