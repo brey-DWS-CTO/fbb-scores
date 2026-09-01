@@ -1,1428 +1,1415 @@
 {
-  "schemaVersion": 1,
-  "season": 2027,
-  "revision": 1,
-  "status": "draft",
-  "title": "The Nerds league history",
-  "note": "Seeded from the constitution record tables plus the commissioner ruling of 2026-08-31. This is the committed fallback, the same pattern the player pool, schedule, and rule book use.",
-  "franchises": [
+ "schemaVersion": 1,
+ "season": 2027,
+ "revision": 1,
+ "status": "draft",
+ "title": "The Nerds league history",
+ "note": "Seeded from the constitution record tables plus the commissioner ruling of 2026-08-31. This is the committed fallback, the same pattern the player pool, schedule, and rule book use.",
+ "franchises": [
+  {
+   "id": "fr-runnels",
+   "name": "Eric Runnels",
+   "currentOwner": null,
+   "currentOwnerKey": null,
+   "active": false,
+   "formerMember": true,
+   "aliases": [
+    "Eric"
+   ],
+   "note": "Left the league. The record book prints an asterisk by the name.",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false
+   }
+  },
+  {
+   "id": "fr-shaug-ryan",
+   "name": "Ryan Shaug",
+   "currentOwner": "Ryan Shaug",
+   "currentOwnerKey": "Ryan",
+   "active": true,
+   "aliases": [
+    "Ryan"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-shaug-amy",
+   "name": "Amy Shaug",
+   "currentOwner": "Amy Shaug",
+   "currentOwnerKey": "Amy",
+   "active": true,
+   "aliases": [
+    "Amy"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-funkhouser",
+   "name": "Brey Funkhouser",
+   "currentOwner": "Brey Funkhouser",
+   "currentOwnerKey": "Brey",
+   "active": true,
+   "aliases": [
+    "Brey"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-riggs-marcus",
+   "name": "Marcus Riggs",
+   "currentOwner": null,
+   "currentOwnerKey": null,
+   "active": false,
+   "formerMember": true,
+   "aliases": [
+    "Marcus"
+   ],
+   "note": "Left the league.",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false
+   }
+  },
+  {
+   "id": "fr-riggs-justin",
+   "name": "Justin Riggs",
+   "currentOwner": null,
+   "currentOwnerKey": null,
+   "active": false,
+   "formerMember": true,
+   "aliases": [
+    "Justin"
+   ],
+   "note": "Left the league.",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false
+   }
+  },
+  {
+   "id": "fr-russell",
+   "name": "Bryan Russell",
+   "currentOwner": "Bryan Russell",
+   "currentOwnerKey": "Bryan",
+   "active": true,
+   "aliases": [
+    "Bryan",
+    "Sam"
+   ],
+   "note": "Bryan ran his own team through 2022-23, then returned for 2027 in the slot Sam left. The commissioner ruled these are one record, so his earlier finishes count for him. Season rows still name whoever owned the team that year.",
+   "source": {
+    "provenance": "commissioner",
+    "reference": "Commissioner ruling, 2026-09-01",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-jensen",
+   "name": "Aaron Jensen",
+   "currentOwner": "Aaron Jensen",
+   "currentOwnerKey": "Aaron",
+   "active": true,
+   "aliases": [
+    "Aaron"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-mccoy",
+   "name": "Derek McCoy",
+   "currentOwner": "Derek McCoy",
+   "currentOwnerKey": "Derek",
+   "active": true,
+   "aliases": [
+    "Derek"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-weigle",
+   "name": "Joel Weigle",
+   "currentOwner": "Joel Weigle",
+   "currentOwnerKey": "Joel",
+   "active": true,
+   "aliases": [
+    "Joel"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-akin",
+   "name": "Patrick Akin",
+   "currentOwner": "Patrick Akin",
+   "currentOwnerKey": "Patrick",
+   "active": true,
+   "aliases": [
+    "Patrick"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-commons",
+   "name": "Kyle Commons",
+   "currentOwner": "Kyle Commons",
+   "currentOwnerKey": "Kyle",
+   "active": true,
+   "aliases": [
+    "Kyle"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  },
+  {
+   "id": "fr-morgan",
+   "name": "Dustin Morgan",
+   "currentOwner": "Dustin Morgan",
+   "currentOwnerKey": "Dustin",
+   "active": true,
+   "aliases": [
+    "Dustin"
+   ],
+   "source": {
+    "provenance": "commissioner",
+    "reference": "src/data/source/league-2027-config.json",
+    "verified": true
+   }
+  }
+ ],
+ "seasons": [
+  {
+   "id": "season-1",
+   "seasonNumber": 1,
+   "label": "2010-2011",
+   "startYear": 2010,
+   "endYear": 2011,
+   "espnSeasonId": 2011,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
     {
-      "id": "fr-runnels",
-      "name": "Eric Runnels",
-      "currentOwner": null,
-      "currentOwnerKey": null,
-      "active": false,
-      "formerMember": true,
-      "aliases": [
-        "Eric"
-      ],
-      "note": "Left the league. The record book prints an asterisk by the name.",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false
-      }
+     "franchiseId": "fr-runnels",
+     "ownerName": "Eric Runnels",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     },
     {
-      "id": "fr-shaug-ryan",
-      "name": "Ryan Shaug",
-      "currentOwner": "Ryan Shaug",
-      "currentOwnerKey": "Ryan",
-      "active": true,
-      "aliases": [
-        "Ryan"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-shaug-amy",
-      "name": "Amy Shaug",
-      "currentOwner": "Amy Shaug",
-      "currentOwnerKey": "Amy",
-      "active": true,
-      "aliases": [
-        "Amy"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-funkhouser",
-      "name": "Brey Funkhouser",
-      "currentOwner": "Brey Funkhouser",
-      "currentOwnerKey": "Brey",
-      "active": true,
-      "aliases": [
-        "Brey"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-riggs-marcus",
-      "name": "Marcus Riggs",
-      "currentOwner": null,
-      "currentOwnerKey": null,
-      "active": false,
-      "formerMember": true,
-      "aliases": [
-        "Marcus"
-      ],
-      "note": "Left the league.",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false
-      }
-    },
-    {
-      "id": "fr-riggs-justin",
-      "name": "Justin Riggs",
-      "currentOwner": null,
-      "currentOwnerKey": null,
-      "active": false,
-      "formerMember": true,
-      "aliases": [
-        "Justin"
-      ],
-      "note": "Left the league.",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false
-      }
-    },
-    {
-      "id": "fr-russell",
-      "name": "Bryan Russell",
-      "currentOwner": null,
-      "currentOwnerKey": null,
-      "active": false,
-      "formerMember": true,
-      "aliases": [
-        "Bryan"
-      ],
-      "note": "The rule book lists Bryan Russell as a former member. The 2027 league config lists Bryan running the franchise Sam left. See the open conflict before counting these finishes for the current member.",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false
-      }
-    },
-    {
-      "id": "fr-jensen",
-      "name": "Aaron Jensen",
-      "currentOwner": "Aaron Jensen",
-      "currentOwnerKey": "Aaron",
-      "active": true,
-      "aliases": [
-        "Aaron"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-mccoy",
-      "name": "Derek McCoy",
-      "currentOwner": "Derek McCoy",
-      "currentOwnerKey": "Derek",
-      "active": true,
-      "aliases": [
-        "Derek"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-sam",
-      "name": "Sam's franchise",
-      "currentOwner": "Bryan Russell",
-      "currentOwnerKey": "Bryan",
-      "active": true,
-      "aliases": [
-        "Sam"
-      ],
-      "note": "Sam ran this team through 2025-26. Bryan Russell took it over for 2027. The surname of the original owner is not recorded anywhere in the sources.",
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-weigle",
-      "name": "Joel Weigle",
-      "currentOwner": "Joel Weigle",
-      "currentOwnerKey": "Joel",
-      "active": true,
-      "aliases": [
-        "Joel"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-akin",
-      "name": "Patrick Akin",
-      "currentOwner": "Patrick Akin",
-      "currentOwnerKey": "Patrick",
-      "active": true,
-      "aliases": [
-        "Patrick"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-commons",
-      "name": "Kyle Commons",
-      "currentOwner": "Kyle Commons",
-      "currentOwnerKey": "Kyle",
-      "active": true,
-      "aliases": [
-        "Kyle"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
-    },
-    {
-      "id": "fr-morgan",
-      "name": "Dustin Morgan",
-      "currentOwner": "Dustin Morgan",
-      "currentOwnerKey": "Dustin",
-      "active": true,
-      "aliases": [
-        "Dustin"
-      ],
-      "source": {
-        "provenance": "commissioner",
-        "reference": "src/data/source/league-2027-config.json",
-        "verified": true
-      }
+     "franchiseId": "fr-shaug-ryan",
+     "ownerName": "Ryan Shaug",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     }
-  ],
-  "seasons": [
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-2",
+   "seasonNumber": 2,
+   "label": "2011-2012",
+   "startYear": 2011,
+   "endYear": 2012,
+   "espnSeasonId": 2012,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
     {
-      "id": "season-1",
-      "seasonNumber": 1,
-      "label": "2010-2011",
-      "startYear": 2010,
-      "endYear": 2011,
-      "espnSeasonId": 2011,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-runnels",
-          "ownerName": "Eric Runnels",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-shaug-ryan",
-          "ownerName": "Ryan Shaug",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
+     "franchiseId": "fr-shaug-amy",
+     "ownerName": "Amy Shaug",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     },
     {
-      "id": "season-2",
-      "seasonNumber": 2,
-      "label": "2011-2012",
-      "startYear": 2011,
-      "endYear": 2012,
-      "espnSeasonId": 2012,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-shaug-amy",
-          "ownerName": "Amy Shaug",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-runnels",
-          "ownerName": "Eric Runnels",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-3",
-      "seasonNumber": 3,
-      "label": "2012-2013",
-      "startYear": 2012,
-      "endYear": 2013,
-      "espnSeasonId": 2013,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-funkhouser",
-          "ownerName": "Brey Funkhouser",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-shaug-amy",
-          "ownerName": "Amy Shaug",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-4",
-      "seasonNumber": 4,
-      "label": "2013-2014",
-      "startYear": 2013,
-      "endYear": 2014,
-      "espnSeasonId": 2014,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-shaug-ryan",
-          "ownerName": "Ryan Shaug",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-runnels",
-          "ownerName": "Eric Runnels",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-5",
-      "seasonNumber": 5,
-      "label": "2014-2015",
-      "startYear": 2014,
-      "endYear": 2015,
-      "espnSeasonId": 2015,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-shaug-amy",
-          "ownerName": "Amy Shaug",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-riggs-marcus",
-          "ownerName": "Marcus Riggs",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-6",
-      "seasonNumber": 6,
-      "label": "2015-2016",
-      "startYear": 2015,
-      "endYear": 2016,
-      "espnSeasonId": 2016,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-shaug-ryan",
-          "ownerName": "Ryan Shaug",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-russell",
-          "ownerName": "Bryan Russell",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-7",
-      "seasonNumber": 7,
-      "label": "2016-2017",
-      "startYear": 2016,
-      "endYear": 2017,
-      "espnSeasonId": 2017,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-riggs-justin",
-          "ownerName": "Justin Riggs",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-funkhouser",
-          "ownerName": "Brey Funkhouser",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-8",
-      "seasonNumber": 8,
-      "label": "2017-2018",
-      "startYear": 2017,
-      "endYear": 2018,
-      "espnSeasonId": 2018,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-shaug-amy",
-          "ownerName": "Amy Shaug",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-russell",
-          "ownerName": "Bryan Russell",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-9",
-      "seasonNumber": 9,
-      "label": "2018-2019",
-      "startYear": 2018,
-      "endYear": 2019,
-      "espnSeasonId": 2019,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-funkhouser",
-          "ownerName": "Brey Funkhouser",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-russell",
-          "ownerName": "Bryan Russell",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-10",
-      "seasonNumber": 10,
-      "label": "2019-2020",
-      "startYear": 2019,
-      "endYear": 2020,
-      "espnSeasonId": 2020,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-funkhouser",
-          "ownerName": "Brey Funkhouser",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-runnels",
-          "ownerName": "Eric Runnels",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-11",
-      "seasonNumber": 11,
-      "label": "2020-2021",
-      "startYear": 2020,
-      "endYear": 2021,
-      "espnSeasonId": 2021,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-jensen",
-          "ownerName": "Aaron Jensen",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-shaug-amy",
-          "ownerName": "Amy Shaug",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-12",
-      "seasonNumber": 12,
-      "label": "2021-2022",
-      "startYear": 2021,
-      "endYear": 2022,
-      "espnSeasonId": 2022,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-mccoy",
-          "ownerName": "Derek McCoy",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-jensen",
-          "ownerName": "Aaron Jensen",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-13",
-      "seasonNumber": 13,
-      "label": "2022-2023",
-      "startYear": 2022,
-      "endYear": 2023,
-      "espnSeasonId": 2023,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-mccoy",
-          "ownerName": "Derek McCoy",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-russell",
-          "ownerName": "Bryan Russell",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-14",
-      "seasonNumber": 14,
-      "label": "2023-2024",
-      "startYear": 2023,
-      "endYear": 2024,
-      "espnSeasonId": 2024,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-jensen",
-          "ownerName": "Aaron Jensen",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-shaug-amy",
-          "ownerName": "Amy Shaug",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-15",
-      "seasonNumber": 15,
-      "label": "2024-2025",
-      "startYear": 2024,
-      "endYear": 2025,
-      "espnSeasonId": 2025,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-jensen",
-          "ownerName": "Aaron Jensen",
-          "placement": 1,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        },
-        {
-          "franchiseId": "fr-shaug-ryan",
-          "ownerName": "Ryan Shaug",
-          "placement": 2,
-          "source": {
-            "provenance": "rulebook",
-            "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-            "verified": false,
-            "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
-      }
-    },
-    {
-      "id": "season-16",
-      "seasonNumber": 16,
-      "label": "2025-2026",
-      "startYear": 2025,
-      "endYear": 2026,
-      "espnSeasonId": 2026,
-      "status": "complete",
-      "standingsComplete": false,
-      "placements": [
-        {
-          "franchiseId": "fr-shaug-amy",
-          "ownerName": "Amy Shaug",
-          "placement": 1,
-          "source": {
-            "provenance": "commissioner",
-            "reference": "Commissioner ruling, 2026-08-31",
-            "verified": true,
-            "recordedAt": "2026-08-31"
-          }
-        },
-        {
-          "franchiseId": "fr-funkhouser",
-          "ownerName": "Brey Funkhouser",
-          "placement": 2,
-          "source": {
-            "provenance": "commissioner",
-            "reference": "Commissioner ruling, 2026-08-31",
-            "verified": true,
-            "recordedAt": "2026-08-31"
-          }
-        }
-      ],
-      "rulebookVersionId": null,
-      "source": {
-        "provenance": "commissioner",
-        "reference": "Commissioner ruling, 2026-08-31",
-        "verified": true,
-        "recordedAt": "2026-08-31"
-      },
-      "note": "Supplied by the commissioner 2026-08-31. Amy's 4th title; Brey's 2nd runner-up finish. The member table in the front matter still shows the pre-2025-26 counts."
+     "franchiseId": "fr-runnels",
+     "ownerName": "Eric Runnels",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     }
-  ],
-  "recordCategories": [
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-3",
+   "seasonNumber": 3,
+   "label": "2012-2013",
+   "startYear": 2012,
+   "endYear": 2013,
+   "espnSeasonId": 2013,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
     {
-      "id": "weekly-high-score",
-      "label": "Highest scoring weeks",
-      "criteria": "1200 pts minimum, 30-game weeks only",
-      "basis": "raw",
-      "basisNote": "Raw totals as scored. Game-limit deductions decide the matchup, not the record book (commissioner ruling, 2026-08-31).",
-      "complete": false,
-      "note": "The constitution says this list is incomplete. The commissioner has approved rebuilding it from ESPN.",
-      "higherIsBetter": true
+     "franchiseId": "fr-funkhouser",
+     "ownerName": "Brey Funkhouser",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-shaug-amy",
+     "ownerName": "Amy Shaug",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     }
-  ],
-  "records": [
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-4",
+   "seasonNumber": 4,
+   "label": "2013-2014",
+   "startYear": 2013,
+   "endYear": 2014,
+   "espnSeasonId": 2014,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
     {
-      "id": "hs-s9-w10-fr-funkhouser",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-funkhouser",
-      "ownerName": "Brey",
-      "seasonNumber": 9,
-      "period": 10,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1421.6,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
+     "franchiseId": "fr-shaug-ryan",
+     "ownerName": "Ryan Shaug",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     },
     {
-      "id": "hs-s14-wx-fr-jensen",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-jensen",
-      "ownerName": "Aaron",
-      "seasonNumber": 14,
-      "period": null,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1316.4,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Week unknown in source. Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s13-w11-fr-russell",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-russell",
-      "ownerName": "Bryan",
-      "seasonNumber": 13,
-      "period": 11,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1292.7,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s13-w7-fr-mccoy",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-mccoy",
-      "ownerName": "Derek",
-      "seasonNumber": 13,
-      "period": 7,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1282.5,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s1-w10-fr-runnels",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-runnels",
-      "ownerName": "Eric",
-      "seasonNumber": 1,
-      "period": 10,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1281.5,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w15-fr-shaug-ryan",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-ryan",
-      "ownerName": "Ryan",
-      "seasonNumber": 14,
-      "period": 15,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1269.1,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w10-fr-mccoy",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-mccoy",
-      "ownerName": "Derek",
-      "seasonNumber": 14,
-      "period": 10,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1268.6,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w18-fr-russell",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-russell",
-      "ownerName": "Bryan",
-      "seasonNumber": 14,
-      "period": 18,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1265.4,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s10-w18-fr-runnels",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-runnels",
-      "ownerName": "Eric",
-      "seasonNumber": 10,
-      "period": 18,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1256.4,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s13-w15-fr-shaug-amy",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-amy",
-      "ownerName": "Amy",
-      "seasonNumber": 13,
-      "period": 15,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1252.9,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w10-fr-shaug-ryan",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-ryan",
-      "ownerName": "Ryan",
-      "seasonNumber": 14,
-      "period": 10,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1247.6,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s1-w13-fr-runnels",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-runnels",
-      "ownerName": "Eric",
-      "seasonNumber": 1,
-      "period": 13,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1244.1,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w8-fr-jensen",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-jensen",
-      "ownerName": "Aaron",
-      "seasonNumber": 14,
-      "period": 8,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1243,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Source listed this below Eric's 1241.6. Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s1-w15-fr-runnels",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-runnels",
-      "ownerName": "Eric",
-      "seasonNumber": 1,
-      "period": 15,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1241.6,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w11-fr-shaug-amy",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-amy",
-      "ownerName": "Amy",
-      "seasonNumber": 14,
-      "period": 11,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1236,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s11-w2-fr-shaug-amy",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-amy",
-      "ownerName": "Amy",
-      "seasonNumber": 11,
-      "period": 2,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1223,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s10-w14-fr-shaug-ryan",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-ryan",
-      "ownerName": "Ryan",
-      "seasonNumber": 10,
-      "period": 14,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1220.3,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s15-w13-fr-morgan",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-morgan",
-      "ownerName": "Dustin",
-      "seasonNumber": 15,
-      "period": 13,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1217.4,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w13-fr-jensen",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-jensen",
-      "ownerName": "Aaron",
-      "seasonNumber": 14,
-      "period": 13,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1214.9,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s1-w6-fr-runnels",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-runnels",
-      "ownerName": "Eric",
-      "seasonNumber": 1,
-      "period": 6,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1213.8,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s13-w19-fr-russell",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-russell",
-      "ownerName": "Bryan",
-      "seasonNumber": 13,
-      "period": 19,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1213.2,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s1-w18-fr-runnels",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-runnels",
-      "ownerName": "Eric",
-      "seasonNumber": 1,
-      "period": 18,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1208.9,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s12-w14-fr-jensen",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-jensen",
-      "ownerName": "Aaron",
-      "seasonNumber": 12,
-      "period": 14,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1207.1,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s15-w15-fr-commons",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-commons",
-      "ownerName": "Kyle",
-      "seasonNumber": 15,
-      "period": 15,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1206.4,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s14-w15-fr-sam",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-sam",
-      "ownerName": "Sam",
-      "seasonNumber": 14,
-      "period": 15,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1205.9,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s1-w7-fr-runnels",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-runnels",
-      "ownerName": "Eric",
-      "seasonNumber": 1,
-      "period": 7,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1205.7,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s10-w15-fr-shaug-ryan",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-ryan",
-      "ownerName": "Ryan",
-      "seasonNumber": 10,
-      "period": 15,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1205.1,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
-    },
-    {
-      "id": "hs-s10-w16-fr-shaug-ryan",
-      "categoryId": "weekly-high-score",
-      "franchiseId": "fr-shaug-ryan",
-      "ownerName": "Ryan",
-      "seasonNumber": 10,
-      "period": 16,
-      "opponentFranchiseId": null,
-      "opponentName": null,
-      "value": 1201.6,
-      "basis": "raw",
-      "source": {
-        "provenance": "rulebook",
-        "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-        "verified": false,
-        "reviewNote": "Rebuild from ESPN before treating as verified."
-      }
+     "franchiseId": "fr-runnels",
+     "ownerName": "Eric Runnels",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     }
-  ],
-  "conflicts": [
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-5",
+   "seasonNumber": 5,
+   "label": "2014-2015",
+   "startYear": 2014,
+   "endYear": 2015,
+   "espnSeasonId": 2015,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
     {
-      "id": "conflict-franchise-russell",
-      "scope": "franchise",
-      "targetId": "fr-russell",
-      "field": "active",
-      "values": [
-        {
-          "provenance": "rulebook",
-          "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
-          "value": "Bryan Russell is a former member"
-        },
-        {
-          "provenance": "commissioner",
-          "reference": "src/data/source/league-2027-config.json",
-          "value": "Bryan Russell owns Sam's old franchise for 2027"
-        }
-      ],
-      "note": "The rule book calls Bryan Russell a former member while the 2027 config has him running Sam's old team. Until the commissioner rules, his four runner-up finishes stay on his own franchise and are not counted for the current member.",
-      "resolved": false
+     "franchiseId": "fr-shaug-amy",
+     "ownerName": "Amy Shaug",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-riggs-marcus",
+     "ownerName": "Marcus Riggs",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
     }
-  ]
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-6",
+   "seasonNumber": 6,
+   "label": "2015-2016",
+   "startYear": 2015,
+   "endYear": 2016,
+   "espnSeasonId": 2016,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-shaug-ryan",
+     "ownerName": "Ryan Shaug",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-russell",
+     "ownerName": "Bryan Russell",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-7",
+   "seasonNumber": 7,
+   "label": "2016-2017",
+   "startYear": 2016,
+   "endYear": 2017,
+   "espnSeasonId": 2017,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-riggs-justin",
+     "ownerName": "Justin Riggs",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-funkhouser",
+     "ownerName": "Brey Funkhouser",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-8",
+   "seasonNumber": 8,
+   "label": "2017-2018",
+   "startYear": 2017,
+   "endYear": 2018,
+   "espnSeasonId": 2018,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-shaug-amy",
+     "ownerName": "Amy Shaug",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-russell",
+     "ownerName": "Bryan Russell",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-9",
+   "seasonNumber": 9,
+   "label": "2018-2019",
+   "startYear": 2018,
+   "endYear": 2019,
+   "espnSeasonId": 2019,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-funkhouser",
+     "ownerName": "Brey Funkhouser",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-russell",
+     "ownerName": "Bryan Russell",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-10",
+   "seasonNumber": 10,
+   "label": "2019-2020",
+   "startYear": 2019,
+   "endYear": 2020,
+   "espnSeasonId": 2020,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-funkhouser",
+     "ownerName": "Brey Funkhouser",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-runnels",
+     "ownerName": "Eric Runnels",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-11",
+   "seasonNumber": 11,
+   "label": "2020-2021",
+   "startYear": 2020,
+   "endYear": 2021,
+   "espnSeasonId": 2021,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-jensen",
+     "ownerName": "Aaron Jensen",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-shaug-amy",
+     "ownerName": "Amy Shaug",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-12",
+   "seasonNumber": 12,
+   "label": "2021-2022",
+   "startYear": 2021,
+   "endYear": 2022,
+   "espnSeasonId": 2022,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-mccoy",
+     "ownerName": "Derek McCoy",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-jensen",
+     "ownerName": "Aaron Jensen",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-13",
+   "seasonNumber": 13,
+   "label": "2022-2023",
+   "startYear": 2022,
+   "endYear": 2023,
+   "espnSeasonId": 2023,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-mccoy",
+     "ownerName": "Derek McCoy",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-russell",
+     "ownerName": "Bryan Russell",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-14",
+   "seasonNumber": 14,
+   "label": "2023-2024",
+   "startYear": 2023,
+   "endYear": 2024,
+   "espnSeasonId": 2024,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-jensen",
+     "ownerName": "Aaron Jensen",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-shaug-amy",
+     "ownerName": "Amy Shaug",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-15",
+   "seasonNumber": 15,
+   "label": "2024-2025",
+   "startYear": 2024,
+   "endYear": 2025,
+   "espnSeasonId": 2025,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-jensen",
+     "ownerName": "Aaron Jensen",
+     "placement": 1,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    },
+    {
+     "franchiseId": "fr-shaug-ryan",
+     "ownerName": "Ryan Shaug",
+     "placement": 2,
+     "source": {
+      "provenance": "rulebook",
+      "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+      "verified": false,
+      "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Transcribed from the constitution. Not yet checked against ESPN."
+   }
+  },
+  {
+   "id": "season-16",
+   "seasonNumber": 16,
+   "label": "2025-2026",
+   "startYear": 2025,
+   "endYear": 2026,
+   "espnSeasonId": 2026,
+   "status": "complete",
+   "standingsComplete": false,
+   "placements": [
+    {
+     "franchiseId": "fr-shaug-amy",
+     "ownerName": "Amy Shaug",
+     "placement": 1,
+     "source": {
+      "provenance": "commissioner",
+      "reference": "Commissioner ruling, 2026-08-31",
+      "verified": true,
+      "recordedAt": "2026-08-31"
+     }
+    },
+    {
+     "franchiseId": "fr-funkhouser",
+     "ownerName": "Brey Funkhouser",
+     "placement": 2,
+     "source": {
+      "provenance": "commissioner",
+      "reference": "Commissioner ruling, 2026-08-31",
+      "verified": true,
+      "recordedAt": "2026-08-31"
+     }
+    }
+   ],
+   "rulebookVersionId": null,
+   "source": {
+    "provenance": "commissioner",
+    "reference": "Commissioner ruling, 2026-08-31",
+    "verified": true,
+    "recordedAt": "2026-08-31"
+   },
+   "note": "Supplied by the commissioner 2026-08-31. Amy's 4th title; Brey's 2nd runner-up finish. The member table in the front matter still shows the pre-2025-26 counts."
+  }
+ ],
+ "recordCategories": [
+  {
+   "id": "weekly-high-score",
+   "label": "Highest scoring weeks",
+   "criteria": "1200 pts minimum, 30-game weeks only",
+   "basis": "raw",
+   "basisNote": "Raw totals as scored. Game-limit deductions decide the matchup, not the record book (commissioner ruling, 2026-08-31).",
+   "complete": false,
+   "note": "The constitution says this list is incomplete. The commissioner has approved rebuilding it from ESPN.",
+   "higherIsBetter": true
+  }
+ ],
+ "records": [
+  {
+   "id": "hs-s9-w10-fr-funkhouser",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-funkhouser",
+   "ownerName": "Brey",
+   "seasonNumber": 9,
+   "period": 10,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1421.6,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-wx-fr-jensen",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-jensen",
+   "ownerName": "Aaron",
+   "seasonNumber": 14,
+   "period": null,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1316.4,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Week unknown in source. Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s13-w11-fr-russell",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-russell",
+   "ownerName": "Bryan",
+   "seasonNumber": 13,
+   "period": 11,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1292.7,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s13-w7-fr-mccoy",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-mccoy",
+   "ownerName": "Derek",
+   "seasonNumber": 13,
+   "period": 7,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1282.5,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s1-w10-fr-runnels",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-runnels",
+   "ownerName": "Eric",
+   "seasonNumber": 1,
+   "period": 10,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1281.5,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w15-fr-shaug-ryan",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-ryan",
+   "ownerName": "Ryan",
+   "seasonNumber": 14,
+   "period": 15,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1269.1,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w10-fr-mccoy",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-mccoy",
+   "ownerName": "Derek",
+   "seasonNumber": 14,
+   "period": 10,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1268.6,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w18-fr-russell",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-russell",
+   "ownerName": "Bryan",
+   "seasonNumber": 14,
+   "period": 18,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1265.4,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s10-w18-fr-runnels",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-runnels",
+   "ownerName": "Eric",
+   "seasonNumber": 10,
+   "period": 18,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1256.4,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s13-w15-fr-shaug-amy",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-amy",
+   "ownerName": "Amy",
+   "seasonNumber": 13,
+   "period": 15,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1252.9,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w10-fr-shaug-ryan",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-ryan",
+   "ownerName": "Ryan",
+   "seasonNumber": 14,
+   "period": 10,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1247.6,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s1-w13-fr-runnels",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-runnels",
+   "ownerName": "Eric",
+   "seasonNumber": 1,
+   "period": 13,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1244.1,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w8-fr-jensen",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-jensen",
+   "ownerName": "Aaron",
+   "seasonNumber": 14,
+   "period": 8,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1243,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Source listed this below Eric's 1241.6. Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s1-w15-fr-runnels",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-runnels",
+   "ownerName": "Eric",
+   "seasonNumber": 1,
+   "period": 15,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1241.6,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w11-fr-shaug-amy",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-amy",
+   "ownerName": "Amy",
+   "seasonNumber": 14,
+   "period": 11,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1236,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s11-w2-fr-shaug-amy",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-amy",
+   "ownerName": "Amy",
+   "seasonNumber": 11,
+   "period": 2,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1223,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s10-w14-fr-shaug-ryan",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-ryan",
+   "ownerName": "Ryan",
+   "seasonNumber": 10,
+   "period": 14,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1220.3,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s15-w13-fr-morgan",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-morgan",
+   "ownerName": "Dustin",
+   "seasonNumber": 15,
+   "period": 13,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1217.4,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w13-fr-jensen",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-jensen",
+   "ownerName": "Aaron",
+   "seasonNumber": 14,
+   "period": 13,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1214.9,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s1-w6-fr-runnels",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-runnels",
+   "ownerName": "Eric",
+   "seasonNumber": 1,
+   "period": 6,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1213.8,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s13-w19-fr-russell",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-russell",
+   "ownerName": "Bryan",
+   "seasonNumber": 13,
+   "period": 19,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1213.2,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s1-w18-fr-runnels",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-runnels",
+   "ownerName": "Eric",
+   "seasonNumber": 1,
+   "period": 18,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1208.9,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s12-w14-fr-jensen",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-jensen",
+   "ownerName": "Aaron",
+   "seasonNumber": 12,
+   "period": 14,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1207.1,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s15-w15-fr-commons",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-commons",
+   "ownerName": "Kyle",
+   "seasonNumber": 15,
+   "period": 15,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1206.4,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s14-w15-fr-sam",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-russell",
+   "ownerName": "Sam",
+   "seasonNumber": 14,
+   "period": 15,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1205.9,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s1-w7-fr-runnels",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-runnels",
+   "ownerName": "Eric",
+   "seasonNumber": 1,
+   "period": 7,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1205.7,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s10-w15-fr-shaug-ryan",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-ryan",
+   "ownerName": "Ryan",
+   "seasonNumber": 10,
+   "period": 15,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1205.1,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  },
+  {
+   "id": "hs-s10-w16-fr-shaug-ryan",
+   "categoryId": "weekly-high-score",
+   "franchiseId": "fr-shaug-ryan",
+   "ownerName": "Ryan",
+   "seasonNumber": 10,
+   "period": 16,
+   "opponentFranchiseId": null,
+   "opponentName": null,
+   "value": 1201.6,
+   "basis": "raw",
+   "source": {
+    "provenance": "rulebook",
+    "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+    "verified": false,
+    "reviewNote": "Rebuild from ESPN before treating as verified."
+   }
+  }
+ ],
+ "conflicts": [
+  {
+   "id": "conflict-franchise-russell",
+   "scope": "franchise",
+   "targetId": "fr-russell",
+   "field": "active",
+   "values": [
+    {
+     "provenance": "rulebook",
+     "reference": "The Nerds Constitution, revision 13 (2025-10-05), Appendix B",
+     "value": "Bryan Russell is a former member"
+    },
+    {
+     "provenance": "commissioner",
+     "reference": "src/data/source/league-2027-config.json",
+     "value": "Bryan Russell owns Sam's old franchise for 2027"
+    }
+   ],
+   "note": "The rule book calls Bryan Russell a former member while the 2027 config has him running Sam's old team. Until the commissioner rules, his four runner-up finishes stay on his own franchise and are not counted for the current member.",
+   "resolved": true,
+   "resolution": "Combined. Bryan Russell is one member with one record: his own franchise resumed when he took the slot Sam left.",
+   "resolvedBy": "commissioner",
+   "resolvedAt": "2026-09-01"
+  }
+ ]
 }

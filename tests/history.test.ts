@@ -281,10 +281,26 @@ test('the seed keeps its known-shaky bits as review notes', () => {
   const flags = reviewFlags(leagueHistorySeed).map((flag) => flag.id);
   assert.ok(flags.includes('category-incomplete-weekly-high-score'), 'the list says it is incomplete');
   assert.ok(flags.includes('records-missing-week'), "Aaron's week is unknown and stays unknown");
-  assert.ok(
-    flags.some((id) => id.startsWith('conflict-')),
-    'the sources disagree about Bryan Russell and that is on the record',
+  // The Bryan Russell conflict was ruled on 2026-09-01: one member, one record.
+  // A resolved conflict is no longer a review flag, but it stays on the record.
+  const bryan = leagueHistorySeed.conflicts.find((c) => c.id === 'conflict-franchise-russell');
+  assert.ok(bryan, 'the disagreement is still recorded');
+  assert.equal(bryan.resolved, true);
+  assert.match(String(bryan.resolution), /one record/i);
+  assert.equal(
+    flags.some((id) => id === 'conflict-franchise-russell'),
+    false,
+    'a settled conflict stops asking for review',
   );
+});
+
+test('Bryan Russell is one member with one combined record', () => {
+  const totals = franchiseTotals(leagueHistorySeed);
+  const bryan = totals.filter((t) => /Bryan/i.test(`${t.name} ${t.currentOwner ?? ''}`));
+  assert.equal(bryan.length, 1, 'his old franchise and his current team are one row');
+  assert.equal(bryan[0].runnerUps, 4, 'his four runner-up finishes count for him');
+  assert.equal(bryan[0].active, true);
+  assert.equal(bryan[0].formerMember, false, 'he is back, so no asterisk');
 });
 
 // ─── Seed facts ────────────────────────────────────────────────────────────
