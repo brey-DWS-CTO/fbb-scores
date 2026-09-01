@@ -8,6 +8,7 @@ import PlayerCombobox from './PlayerCombobox.js';
 import CommissionerPanel from './CommissionerPanel.js';
 import IdentityChip from './IdentityChip.js';
 import PlayerPoolAdmin from './PlayerPoolAdmin.js';
+import HistoryAdmin from './HistoryAdmin.js';
 import { RoundChip } from '../keepers/keeperUi.js';
 
 const baseRound = new Map(leagueDataset.players.map((p) => [p.key, p.keeper.round]));
@@ -114,6 +115,8 @@ export default function AdminPage() {
       <CommissionerPanel />
 
       <PlayerPoolAdmin />
+
+      <HistoryAdmin />
 
       <section className="panel commish-schedule-link">
         <div>

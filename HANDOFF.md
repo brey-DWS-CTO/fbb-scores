@@ -219,7 +219,7 @@ Build order, each phase shippable on its own:
 
    Print still uses the browser, with no PDF library and no new dependency. The printed document renders the version on screen, so printing while reading `?rev=` prints that frozen revision, headed with its number, its published date, and `superseded revision` when it is not the one in force. The signature block prints with it, and a print-only amendment history lists every revision with its note, because a sheet of paper has no `REVISIONS` button. Anything interactive is in the `@media print` exclusion list.
 
-   Still to build: Appendix B and the front matter generating from league history records instead of prose. Overlaps feature 5; build the record tables once.
+   Appendix B and the member table now generate from league history (feature 5). `RecordTables.tsx` is the one record-table component and reads the published history, not the rule book's `records` blob. That blob stays in the seed as the transcription it came from; nothing renders it any more.
 
 Plan artifact with the full searchable defect ledger: https://claude.ai/code/artifact/f479f46f-7873-4ccc-b870-eb95bd3b1e64
 
@@ -292,6 +292,20 @@ Required behavior:
 8. After each season, support closing the season into a reviewed history draft from final ESPN standings/results, then publish it only after commissioner confirmation.
 
 Seed coverage should include every season since the league began in 2010, explicitly mark unknown fields instead of inventing them, and add the missing 2025-26 champion/results. Tests should cover source conflicts, franchise continuity, duplicate placements, incomplete seasons, revision history, record ordering/ties, authorization, and deterministic totals.
+
+**Built, except a live ESPN pull.** `src/lib/league/history.ts` is the pure core: franchises, seasons, placements, records, conflicts, totals, ranking, sorting, validation, review flags, fingerprint, diff, merge, and close-season. `historyImport.ts` reads one ESPN season payload into a season import and is driven by fixtures. `src/data/source/league-history-2027.json` is the committed seed: 16 seasons, 14 franchises, 28 record entries, every fact carrying provenance, a source reference, and a verification flag.
+
+A franchise is not its owner. `fr-sam` is the team Bryan Russell took over; `fr-russell` holds his own four runner-up finishes. The two sources disagree about him (the rule book calls him a former member, the 2027 config has him active) and that disagreement is stored as an open conflict rather than settled by an agent. `memberTotals` marks a row that spans a handover.
+
+Nothing merges quietly. `mergeSeasonImport` keeps the stored value and writes the difference down as a conflict for the commissioner. Amy's 4th title and Brey's 2nd runner-up finish now come out of counting, which is the front-matter fix.
+
+Storage mirrors the rule book: `league_history_draft` and the immutable `league_history_versions` in Neon, mirrored in the file backend. Routes: `GET /history`, `/history/versions`, `/history/versions/:id` are public; `/history/draft` (GET/PUT/DELETE), `/history/import/preview`, `/history/import/apply`, and `/history/publish` are commissioner-only and audited. A preview writes nothing. Applying an import needs the previewed fingerprint and lands in the DRAFT only. Publishing needs the fingerprint and a **reason**, so a correction can never be silent. Closing a season is preview, apply, read, publish.
+
+UI: `/history` (public) has the season table with per-season sources and standings, titles by franchise, a sortable record leaderboard showing season, week, opponent, raw value and source, a "how solid is this" panel, and the revision list. `RecordTables.tsx` now reads published history, so Appendix B and `/league` show reviewed data. `HistoryAdmin.tsx` sits on `/admin`. No new bottom-nav tab; the record book links through, because nine tabs on a phone is already a lot.
+
+**Not done: the live ESPN pull is untested.** `EspnClient.fetchSeasonHistory()` asks the modern endpoint and falls back to `/leagueHistory/{id}?seasonId=`, but no ESPN credentials exist outside Vercel, so it has never run against the real service. `POST /history/import/preview` without a `payload` returns 502 `espn-unavailable` on any machine without them. To finish: set ESPN credentials, preview season 16 (`espnSeasonId: 2026`) first because that one is already on file and any disagreement will show as a conflict, then work backwards. Expect the oldest seasons to return nothing.
+
+54 tests in `tests/history.test.ts` and `tests/history-api.test.ts`, taking the suite to 336.
 
 ### Later
 

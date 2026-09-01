@@ -4,6 +4,7 @@ import {
   fetchLeagueState,
   fetchKeeperScenario,
   fetchPlayerPool,
+  fetchPublishedHistory,
   sandboxActive,
   verifyPin,
   type Credentials,
@@ -12,6 +13,7 @@ import {
 import { applyOverrides } from '../lib/keeper/engine.js';
 import { datasetWithTransfers, transfersOf } from '../lib/league/pickTrades.js';
 import { leagueDataset } from '../lib/league/data.js';
+import { leagueHistorySeed } from '../lib/league/historyData.js';
 import { applyPlayerPoolToDataset } from '../lib/league/playerPool.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
 import type { KeeperScenario } from '../lib/league/keeperScenario.js';
@@ -107,6 +109,27 @@ export function useKeeperScenario() {
     ...query,
     scenario: query.data?.scenario ?? EMPTY_KEEPER_SCENARIO,
     setScenario,
+  };
+}
+
+/**
+ * The published league history, starting from the committed seed.
+ *
+ * The seed means the record book is on screen at once and still reads if the
+ * API is down, the same fallback the player pool, schedule, and rule book use.
+ */
+export function useLeagueHistory() {
+  const query = useQuery({
+    queryKey: ['league-history'],
+    queryFn: fetchPublishedHistory,
+    staleTime: 60_000,
+  });
+  return {
+    ...query,
+    history: query.data?.history ?? leagueHistorySeed,
+    published: query.data?.published ?? false,
+    revision: query.data?.revision ?? leagueHistorySeed.revision,
+    publishedAt: query.data?.publishedAt ?? null,
   };
 }
 

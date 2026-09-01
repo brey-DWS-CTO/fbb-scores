@@ -156,6 +156,50 @@ export class PollWriteError extends Error {
   }
 }
 
+/** The commissioner's working copy of league history, with a version for safe writes. */
+export interface LeagueHistoryDraftRow {
+  season: number;
+  /** A whole LeagueHistory document; the store never inspects its shape. */
+  history: unknown;
+  version: number;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+/** An immutable published league history. Corrections add a row, never edit one. */
+export interface LeagueHistoryVersionRow {
+  id: string;
+  season: number;
+  revision: number;
+  fingerprint: string;
+  history: unknown;
+  notes: string;
+  /** Why this revision exists. Required, so a correction always says why. */
+  reason: string;
+  publishedAt: string;
+  publishedBy: string;
+}
+
+export class HistorySaveError extends Error {
+  code: string;
+  currentVersion?: number;
+  constructor(code: string, message: string, currentVersion?: number) {
+    super(message);
+    this.code = code;
+    this.currentVersion = currentVersion;
+    this.name = 'HistorySaveError';
+  }
+}
+
+export class HistoryPublishError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'HistoryPublishError';
+  }
+}
+
 export class RulebookPublishError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -280,6 +324,19 @@ interface StoreBackend {
   listRulebookVersions(season: number): Promise<Array<Omit<RulebookVersionRow, 'book'>>>;
   listRulebookSignatures(season: number): Promise<RulebookSignature[]>;
   insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature>;
+  getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null>;
+  saveHistoryDraft(
+    season: number,
+    history: unknown,
+    expectedVersion: number,
+    savedAt: string,
+    savedBy: string,
+  ): Promise<LeagueHistoryDraftRow>;
+  deleteHistoryDraft(season: number): Promise<void>;
+  publishHistoryVersion(row: LeagueHistoryVersionRow): Promise<LeagueHistoryVersionRow>;
+  getLatestHistoryVersion(season: number): Promise<LeagueHistoryVersionRow | null>;
+  getHistoryVersion(id: string): Promise<LeagueHistoryVersionRow | null>;
+  listHistoryVersions(season: number): Promise<Array<Omit<LeagueHistoryVersionRow, 'history'>>>;
   listPolls(season: number): Promise<unknown[]>;
   getPoll(id: string): Promise<unknown | null>;
   insertPoll(id: string, season: number, data: unknown, at: string): Promise<void>;
@@ -319,6 +376,40 @@ function toVersionRow(raw: RawVersionRow): RulebookVersionRow {
     fingerprint: raw.fingerprint,
     book: raw.data,
     notes: raw.notes,
+    publishedAt: new Date(raw.published_at).toISOString(),
+    publishedBy: raw.published_by,
+  };
+}
+
+interface RawHistoryVersionRow extends RawVersionRow {
+  reason?: string;
+}
+
+/** A history version row without the document, for listings. */
+function historyVersionSummary(
+  row: LeagueHistoryVersionRow,
+): Omit<LeagueHistoryVersionRow, 'history'> {
+  return {
+    id: row.id,
+    season: row.season,
+    revision: row.revision,
+    fingerprint: row.fingerprint,
+    notes: row.notes,
+    reason: row.reason,
+    publishedAt: row.publishedAt,
+    publishedBy: row.publishedBy,
+  };
+}
+
+function toHistoryVersionRow(raw: RawHistoryVersionRow): LeagueHistoryVersionRow {
+  return {
+    id: raw.id,
+    season: raw.season,
+    revision: raw.revision,
+    fingerprint: raw.fingerprint,
+    history: raw.data,
+    notes: raw.notes,
+    reason: raw.reason ?? '',
     publishedAt: new Date(raw.published_at).toISOString(),
     publishedBy: raw.published_by,
   };
@@ -418,6 +509,26 @@ class NeonBackend implements StoreBackend {
       acknowledgement text not null,
       signed_at timestamptz not null,
       primary key (version_id, owner)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS league_history_draft (
+      season int primary key,
+      data jsonb not null,
+      version int not null default 0,
+      updated_at timestamptz not null default now(),
+      updated_by text not null
+    )`;
+    // Immutable, exactly like rulebook_versions: a correction inserts a new
+    // revision carrying its reason, so nothing is ever rewritten unseen.
+    await this.sql`CREATE TABLE IF NOT EXISTS league_history_versions (
+      id text primary key,
+      season int not null,
+      revision int not null,
+      fingerprint text not null,
+      data jsonb not null,
+      notes text not null,
+      reason text not null,
+      published_at timestamptz not null,
+      published_by text not null
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_draft (
       season int primary key,
@@ -852,6 +963,113 @@ class NeonBackend implements StoreBackend {
     return row;
   }
 
+  async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data, version, updated_at, updated_by
+      FROM league_history_draft WHERE season = ${season}`) as Array<{
+      data: unknown;
+      version: number;
+      updated_at: string | Date;
+      updated_by: string;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      season,
+      history: row.data,
+      version: row.version,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      updatedBy: row.updated_by,
+    };
+  }
+
+  async saveHistoryDraft(
+    season: number,
+    history: unknown,
+    expectedVersion: number,
+    savedAt: string,
+    savedBy: string,
+  ): Promise<LeagueHistoryDraftRow> {
+    await this.ensureInit();
+    // expectedVersion 0 means "there is no draft yet"; anything else must match
+    // what is stored, so a stale tab cannot overwrite newer work.
+    const rows = (await this.sql`INSERT INTO league_history_draft (season, data, version, updated_at, updated_by)
+      VALUES (${season}, ${JSON.stringify(history)}::jsonb, 1, ${savedAt}, ${savedBy})
+      ON CONFLICT (season) DO UPDATE
+        SET data = EXCLUDED.data,
+            version = league_history_draft.version + 1,
+            updated_at = EXCLUDED.updated_at,
+            updated_by = EXCLUDED.updated_by
+        WHERE league_history_draft.version = ${expectedVersion}
+      RETURNING version, updated_at, updated_by`) as Array<{
+      version: number;
+      updated_at: string | Date;
+      updated_by: string;
+    }>;
+    const saved = rows[0];
+    if (saved) {
+      return {
+        season,
+        history,
+        version: saved.version,
+        updatedAt: new Date(saved.updated_at).toISOString(),
+        updatedBy: saved.updated_by,
+      };
+    }
+    const current = await this.getHistoryDraft(season);
+    throw new HistorySaveError(
+      'stale-version',
+      'Someone saved newer history. Reload before editing again.',
+      current?.version,
+    );
+  }
+
+  async deleteHistoryDraft(season: number): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM league_history_draft WHERE season = ${season}`;
+  }
+
+  async publishHistoryVersion(row: LeagueHistoryVersionRow): Promise<LeagueHistoryVersionRow> {
+    await this.ensureInit();
+    const inserted = (await this.sql`INSERT INTO league_history_versions
+      (id, season, revision, fingerprint, data, notes, reason, published_at, published_by)
+      VALUES (${row.id}, ${row.season}, ${row.revision}, ${row.fingerprint},
+        ${JSON.stringify(row.history)}::jsonb, ${row.notes}, ${row.reason},
+        ${row.publishedAt}, ${row.publishedBy})
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id`) as Array<{ id: string }>;
+    if (!inserted[0]) {
+      throw new HistoryPublishError('duplicate-version', 'That history revision has already been published');
+    }
+    return row;
+  }
+
+  async getLatestHistoryVersion(season: number): Promise<LeagueHistoryVersionRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, data, notes, reason,
+        published_at, published_by
+      FROM league_history_versions WHERE season = ${season}
+      ORDER BY published_at DESC, id DESC LIMIT 1`) as RawHistoryVersionRow[];
+    return rows[0] ? toHistoryVersionRow(rows[0]) : null;
+  }
+
+  async getHistoryVersion(id: string): Promise<LeagueHistoryVersionRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, data, notes, reason,
+        published_at, published_by
+      FROM league_history_versions WHERE id = ${id}`) as RawHistoryVersionRow[];
+    return rows[0] ? toHistoryVersionRow(rows[0]) : null;
+  }
+
+  async listHistoryVersions(season: number): Promise<Array<Omit<LeagueHistoryVersionRow, 'history'>>> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, notes, reason,
+        published_at, published_by
+      FROM league_history_versions WHERE season = ${season}
+      ORDER BY published_at DESC, id DESC`) as RawHistoryVersionRow[];
+    return rows.map((raw) => historyVersionSummary(toHistoryVersionRow(raw)));
+  }
+
   async listPolls(season: number): Promise<unknown[]> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data FROM polls WHERE season = ${season}
@@ -926,6 +1144,8 @@ interface FileDoc {
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
+  historyDrafts: LeagueHistoryDraftRow[];
+  historyVersions: LeagueHistoryVersionRow[];
   polls: PollRow[];
 }
 
@@ -943,6 +1163,8 @@ function emptyDoc(): FileDoc {
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
+    historyDrafts: [],
+    historyVersions: [],
     polls: [],
   };
 }
@@ -991,6 +1213,8 @@ class FileBackend implements StoreBackend {
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
+        historyDrafts: Array.isArray(doc.historyDrafts) ? doc.historyDrafts : [],
+        historyVersions: Array.isArray(doc.historyVersions) ? doc.historyVersions : [],
         polls: Array.isArray(doc.polls) ? doc.polls : [],
       };
     } catch {
@@ -1314,6 +1538,91 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
+    await this.ensureInit();
+    return this.readDoc().historyDrafts.find((row) => row.season === season) ?? null;
+  }
+
+  async saveHistoryDraft(
+    season: number,
+    history: unknown,
+    expectedVersion: number,
+    savedAt: string,
+    savedBy: string,
+  ): Promise<LeagueHistoryDraftRow> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const existing = doc.historyDrafts.find((row) => row.season === season);
+      const currentVersion = existing?.version ?? 0;
+      if (currentVersion !== expectedVersion) {
+        throw new HistorySaveError(
+          'stale-version',
+          'Someone saved newer history. Reload before editing again.',
+          currentVersion,
+        );
+      }
+      const row: LeagueHistoryDraftRow = {
+        season,
+        history,
+        version: currentVersion + 1,
+        updatedAt: savedAt,
+        updatedBy: savedBy,
+      };
+      if (existing) doc.historyDrafts[doc.historyDrafts.indexOf(existing)] = row;
+      else doc.historyDrafts.push(row);
+      this.writeDoc(doc);
+      return row;
+    });
+  }
+
+  async deleteHistoryDraft(season: number): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.historyDrafts = doc.historyDrafts.filter((row) => row.season !== season);
+      this.writeDoc(doc);
+    });
+  }
+
+  async publishHistoryVersion(row: LeagueHistoryVersionRow): Promise<LeagueHistoryVersionRow> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (doc.historyVersions.some((version) => version.id === row.id)) {
+        throw new HistoryPublishError('duplicate-version', 'That history revision has already been published');
+      }
+      doc.historyVersions.push(structuredClone(row));
+      this.writeDoc(doc);
+      return row;
+    });
+  }
+
+  /** Newest first, matching the Neon ordering. */
+  private sortedHistoryVersions(season: number): LeagueHistoryVersionRow[] {
+    return this.readDoc()
+      .historyVersions.filter((version) => version.season === season)
+      .sort((a, b) =>
+        a.publishedAt === b.publishedAt
+          ? b.id.localeCompare(a.id)
+          : b.publishedAt.localeCompare(a.publishedAt),
+      );
+  }
+
+  async getLatestHistoryVersion(season: number): Promise<LeagueHistoryVersionRow | null> {
+    await this.ensureInit();
+    return this.sortedHistoryVersions(season)[0] ?? null;
+  }
+
+  async getHistoryVersion(id: string): Promise<LeagueHistoryVersionRow | null> {
+    await this.ensureInit();
+    return this.readDoc().historyVersions.find((version) => version.id === id) ?? null;
+  }
+
+  async listHistoryVersions(season: number): Promise<Array<Omit<LeagueHistoryVersionRow, 'history'>>> {
+    await this.ensureInit();
+    return this.sortedHistoryVersions(season).map(historyVersionSummary);
+  }
+
   async listPolls(season: number): Promise<unknown[]> {
     await this.ensureInit();
     return this.readDoc()
@@ -1536,6 +1845,53 @@ export async function saveRulebookDraft(
 
 export async function deleteRulebookDraft(season: number): Promise<void> {
   return getBackend().deleteRulebookDraft(season);
+}
+
+// ─── League history ──────────────────────────────────────────────────────────
+
+export async function getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
+  return getBackend().getHistoryDraft(season);
+}
+
+export async function saveHistoryDraft(
+  season: number,
+  history: unknown,
+  expectedVersion: number,
+  savedBy: string,
+): Promise<LeagueHistoryDraftRow> {
+  return getBackend().saveHistoryDraft(
+    season,
+    history,
+    expectedVersion,
+    new Date().toISOString(),
+    savedBy,
+  );
+}
+
+export async function deleteHistoryDraft(season: number): Promise<void> {
+  return getBackend().deleteHistoryDraft(season);
+}
+
+export async function publishHistoryVersion(
+  row: LeagueHistoryVersionRow,
+): Promise<LeagueHistoryVersionRow> {
+  return getBackend().publishHistoryVersion(row);
+}
+
+export async function getLatestHistoryVersion(
+  season: number,
+): Promise<LeagueHistoryVersionRow | null> {
+  return getBackend().getLatestHistoryVersion(season);
+}
+
+export async function getHistoryVersion(id: string): Promise<LeagueHistoryVersionRow | null> {
+  return getBackend().getHistoryVersion(id);
+}
+
+export async function listHistoryVersions(
+  season: number,
+): Promise<Array<Omit<LeagueHistoryVersionRow, 'history'>>> {
+  return getBackend().listHistoryVersions(season);
 }
 
 export async function listPolls(season: number): Promise<unknown[]> {

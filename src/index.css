@@ -961,7 +961,11 @@ body::before {
   .trade-tabs,
   .trade-open,
   .trade-actions,
-  .trade-picker { display: none !important; }
+  .trade-picker,
+  /* History controls are taps, not paper. */
+  .history-admin,
+  .history-sort span,
+  .records-link { display: none !important; }
 
   .rules-page { width: auto; max-width: none; margin: 0; padding: 0; }
   .rules-print-head {
@@ -1744,3 +1748,108 @@ body::before {
 .rule-hit-on { border-color: var(--neon-purple); color: var(--neon-purple); }
 .rule-hit-number { color: var(--neon-teal); font-weight: 900; font-size: 0.62rem; }
 .rule-hit-title { flex: 1; line-height: 1.4; }
+
+/* ─── League history and the record book ─────────────────────────────── */
+.history-page { max-width: 720px; margin: 0 auto; padding: 16px 12px 24px; }
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.history-title { font-size: 0.85rem; color: var(--neon-teal); margin: 0; line-height: 1.6; }
+.history-status { margin: 0 0 14px; color: var(--text-dim); font-size: 0.7rem; }
+.history-panel { padding: 14px; border-radius: 10px; margin-bottom: 14px; }
+.history-heading { font-size: 0.62rem; color: var(--neon-teal); margin-bottom: 10px; }
+.history-subheading { font-size: 0.58rem; color: var(--neon-blue); margin: 12px 0 6px; }
+.history-page .rules-table-wrap { margin-left: 0; }
+
+.history-sort {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.history-sort-on { color: var(--neon-teal); }
+
+.history-season-row { cursor: pointer; }
+.history-season-detail {
+  white-space: normal !important;
+  color: var(--text-mid);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.history-standings { margin: 6px 0; padding-left: 18px; }
+.history-source { color: var(--text-faint); font-size: 0.64rem; line-height: 1.5; }
+
+.history-flags {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-body);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+.history-flags li { margin-bottom: 4px; }
+.history-revisions { margin: 0; padding: 0; list-style: none; font-size: 0.74rem; color: var(--text-body); }
+.history-revisions li { padding: 6px 0; border-bottom: 1px solid var(--panel-border); }
+.history-revision-number { color: var(--neon-yellow); font-weight: 800; }
+
+/* Commissioner panel */
+.history-admin { padding: 14px; border-radius: 10px; margin-bottom: 14px; }
+.history-admin-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.history-admin-row label {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-mid);
+  font-size: 0.68rem;
+}
+.history-input {
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-hi);
+  font-family: inherit;
+  font-size: 0.82rem;
+  width: 100%;
+}
+.history-textarea { min-height: 90px; font-size: 0.7rem; }
+.history-admin-details { margin-top: 10px; color: var(--text-mid); font-size: 0.72rem; }
+.history-admin-map { margin-top: 12px; }
+.history-map-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  color: var(--text-body);
+  font-size: 0.76rem;
+}
+.history-map-row select { max-width: 55%; }
+.history-admin-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.history-btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--neon-teal);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+.history-btn:disabled { color: var(--text-ghost); border-color: var(--panel-border); }
+.history-preview { margin-top: 12px; }
+.history-admin-error { margin-top: 10px; color: var(--neon-red); font-size: 0.76rem; }
+.history-admin-notice { margin-top: 10px; color: var(--neon-teal); font-size: 0.76rem; }

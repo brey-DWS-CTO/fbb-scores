@@ -7,6 +7,7 @@ import TeamKeeperPage from './components/keepers/TeamKeeperPage.js'
 import DraftPage from './components/draft/DraftPage.js'
 import DraftTvPage from './components/draft/DraftTvPage.js'
 import LeaguePage from './components/league/LeaguePage.js'
+import HistoryPage from './components/league/HistoryPage.js'
 import TeamsPage from './components/league/TeamsPage.js'
 import AdminPage from './components/league/AdminPage.js'
 import SchedulePage from './components/league/SchedulePage.js'
@@ -50,6 +51,7 @@ function App() {
         <Route path="/draft/tv" element={<DraftTvPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />
+        <Route path="/history" element={<HistoryPage />} />
         <Route path="/rules" element={<RulesPage />} />
         <Route path="/votes" element={<VotesPage />} />
         <Route path="/trades" element={<TradesPage />} />

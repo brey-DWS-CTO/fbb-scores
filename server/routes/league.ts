@@ -68,6 +68,15 @@ import {
   getLatestRulebookVersion,
   getRulebookVersion,
   listRulebookVersions,
+  HistoryPublishError,
+  HistorySaveError,
+  deleteHistoryDraft,
+  getHistoryDraft,
+  getHistoryVersion,
+  getLatestHistoryVersion,
+  listHistoryVersions,
+  publishHistoryVersion,
+  saveHistoryDraft,
   PollWriteError,
   RulebookSignError,
   listRulebookSignatures,
@@ -111,6 +120,21 @@ import {
   resolveDraftDataset,
   resolveDraftPlayerPool,
 } from '../lib/playerPoolService.js';
+import {
+  historyFingerprint,
+  validateHistory,
+  type LeagueHistory,
+} from '../../src/lib/league/history.js';
+import {
+  FALLBACK_HISTORY,
+  HISTORY_SEASON,
+  fetchEspnSeasonPayload,
+  parseHistoryDocument,
+  parseImportRequest,
+  prepareSeasonImport,
+  resolveHistoryDraft,
+  resolvePublishedHistory,
+} from '../lib/historyService.js';
 import {
   FALLBACK_SCHEDULE,
   makeScheduleSnapshot,
@@ -1896,6 +1920,322 @@ function settleRoute(action: 'reject' | 'cancel', auditAction: string) {
 
 router.post('/pick-trades/:id/reject', requireAuth, settleRoute('reject', 'pick-trade.rejected'));
 router.post('/pick-trades/:id/cancel', requireAuth, settleRoute('cancel', 'pick-trade.cancelled'));
+
+// ─── League history ──────────────────────────────────────────────────────────
+//
+// Published history is immutable and readable by anyone, the same as the rule
+// book. Importing writes to the draft and never to a published revision, and a
+// correction publishes a new revision carrying the reason for it.
+
+/** Everyone reads this. Falls back to the committed seed before a first publish. */
+router.get('/history', async (_req, res, next) => {
+  try {
+    res.json(await resolvePublishedHistory());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/history/versions', async (_req, res, next) => {
+  try {
+    res.json(await listHistoryVersions(HISTORY_SEASON));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/history/draft', requireAuth, requireCommissioner, async (_req, res, next) => {
+  try {
+    res.json(await resolveHistoryDraft());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/history/draft', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const body = req.body as { history?: unknown; expectedVersion?: unknown };
+    if (
+      typeof body.expectedVersion !== 'number'
+      || !Number.isInteger(body.expectedVersion)
+      || body.expectedVersion < 0
+    ) {
+      throw new HttpError(400, 'expectedVersion must be a whole number');
+    }
+    let history;
+    try {
+      history = parseHistoryDocument(body.history);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : 'Invalid history');
+    }
+
+    // Broken facts are refused on the way in rather than found at publish time.
+    const problems = validateHistory(history).filter((problem) => problem.severity === 'error');
+    if (problems.length) {
+      res.status(422).json({ error: 'The history draft has problems that must be fixed', problems });
+      return;
+    }
+
+    const owner = res.locals.owner as string;
+    const saved = await saveHistoryDraft(HISTORY_SEASON, history, body.expectedVersion, owner);
+    await appendAudit(owner, 'history-draft-save', {
+      version: saved.version,
+      seasons: history.seasons.length,
+      records: history.records.length,
+    });
+    res.json({ version: saved.version, updatedAt: saved.updatedAt, updatedBy: saved.updatedBy });
+  } catch (err) {
+    if (err instanceof HistorySaveError) {
+      res.status(409).json({ error: err.message, code: err.code, currentVersion: err.currentVersion });
+      return;
+    }
+    next(err);
+  }
+});
+
+router.delete('/history/draft', requireAuth, requireCommissioner, async (_req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    await deleteHistoryDraft(HISTORY_SEASON);
+    await appendAudit(owner, 'history-draft-reset', { season: HISTORY_SEASON });
+    res.json(await resolveHistoryDraft());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Read one ESPN season and show what it would change. Writes nothing.
+ *
+ * With no `payload` in the body the server pulls the season live, which needs
+ * ESPN credentials in the environment. A commissioner who has the response
+ * already can post it as `payload` instead.
+ */
+router.post('/history/import/preview', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    let request;
+    try {
+      request = parseImportRequest(req.body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : 'Invalid import request');
+    }
+
+    const live = request.payload === undefined;
+    let payload = request.payload;
+    if (!payload) {
+      try {
+        payload = await fetchEspnSeasonPayload(request.espnSeasonId);
+      } catch (error) {
+        res.status(502).json({
+          error: error instanceof Error ? error.message : 'ESPN could not be reached',
+          code: 'espn-unavailable',
+        });
+        return;
+      }
+    }
+
+    const { history } = await resolveHistoryDraft();
+    const prepared = prepareSeasonImport(history, payload, request, new Date().toISOString(), live);
+    res.json({
+      fingerprint: prepared.fingerprint,
+      blocked: prepared.blocked,
+      diff: prepared.diff,
+      conflicts: prepared.conflicts,
+      problems: prepared.problems,
+      importProblems: prepared.importProblems,
+      espnTeams: prepared.espnTeams,
+      candidate: prepared.candidate,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Save the exact previewed import into the draft. Still not published: the
+ * commissioner reads the draft, then confirms.
+ */
+router.post('/history/import/apply', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    if (typeof body.fingerprint !== 'string' || body.fingerprint === '') {
+      throw new HttpError(400, 'fingerprint is required; preview the import first');
+    }
+    if (typeof body.expectedVersion !== 'number' || !Number.isInteger(body.expectedVersion)) {
+      throw new HttpError(400, 'expectedVersion must be a whole number');
+    }
+    let request;
+    try {
+      request = parseImportRequest(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : 'Invalid import request');
+    }
+
+    const live = request.payload === undefined;
+    let payload = request.payload;
+    if (!payload) {
+      try {
+        payload = await fetchEspnSeasonPayload(request.espnSeasonId);
+      } catch (error) {
+        res.status(502).json({
+          error: error instanceof Error ? error.message : 'ESPN could not be reached',
+          code: 'espn-unavailable',
+        });
+        return;
+      }
+    }
+
+    const draft = await resolveHistoryDraft();
+    const prepared = prepareSeasonImport(draft.history, payload, request, new Date().toISOString(), live);
+    if (prepared.blocked) {
+      res.status(422).json({
+        error: 'That season cannot be imported yet',
+        importProblems: prepared.importProblems,
+      });
+      return;
+    }
+    // The import must be exactly what was previewed. Anything else means the
+    // draft or the ESPN answer moved, so refuse rather than write a surprise.
+    if (prepared.fingerprint !== body.fingerprint) {
+      res.status(409).json({
+        error: 'The import changed since you previewed it. Look again.',
+        code: 'stale-fingerprint',
+        fingerprint: prepared.fingerprint,
+      });
+      return;
+    }
+    const errors = prepared.problems.filter((problem) => problem.severity === 'error');
+    if (errors.length) {
+      res.status(422).json({ error: 'The import would break the record book', problems: errors });
+      return;
+    }
+
+    const owner = res.locals.owner as string;
+    const saved = await saveHistoryDraft(
+      HISTORY_SEASON,
+      prepared.candidate,
+      body.expectedVersion,
+      owner,
+    );
+    await appendAudit(owner, 'history-import', {
+      seasonNumber: request.seasonNumber,
+      espnSeasonId: request.espnSeasonId,
+      live,
+      changes: prepared.diff.changes.length,
+      conflicts: prepared.conflicts.length,
+      version: saved.version,
+    });
+    res.json({
+      version: saved.version,
+      changes: prepared.diff.changes.length,
+      conflicts: prepared.conflicts,
+      problems: prepared.problems,
+    });
+  } catch (err) {
+    if (err instanceof HistorySaveError) {
+      res.status(409).json({ error: err.message, code: err.code, currentVersion: err.currentVersion });
+      return;
+    }
+    next(err);
+  }
+});
+
+router.post('/history/publish', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const body = req.body as { fingerprint?: unknown; notes?: unknown; reason?: unknown };
+    if (typeof body.fingerprint !== 'string' || !body.fingerprint) {
+      throw new HttpError(400, 'fingerprint is required; preview the changes first');
+    }
+    // Every revision says why it exists, so a correction can never be silent.
+    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) : '';
+    if (reason.length < 3) {
+      throw new HttpError(400, 'reason is required; say why this revision exists');
+    }
+    const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
+
+    const draftRow = await getHistoryDraft(HISTORY_SEASON);
+    if (!draftRow) throw new HttpError(409, 'There is no history draft to publish');
+    const history = draftRow.history as LeagueHistory;
+
+    const actual = historyFingerprint(history);
+    if (actual !== body.fingerprint) {
+      res.status(409).json({
+        error: 'The draft changed since you previewed it. Look at the diff again.',
+        code: 'stale-fingerprint',
+        fingerprint: actual,
+      });
+      return;
+    }
+
+    const problems = validateHistory(history).filter((problem) => problem.severity === 'error');
+    if (problems.length) {
+      res.status(422).json({ error: 'The history has problems that must be fixed', problems });
+      return;
+    }
+
+    const previous = await getLatestHistoryVersion(HISTORY_SEASON);
+    if (previous && previous.fingerprint === actual) {
+      res.status(409).json({
+        error: 'That is already the published history; nothing has changed.',
+        code: 'no-changes',
+      });
+      return;
+    }
+
+    const owner = res.locals.owner as string;
+    const publishedAt = new Date().toISOString();
+    const revision = (previous?.revision ?? FALLBACK_HISTORY.revision - 1) + 1;
+    // The stored fingerprint is the DRAFT's, not the frozen document's. Freezing
+    // bumps the revision, which is part of the fingerprint, so storing the
+    // frozen one would make the no-changes check above dead.
+    const frozen = { ...history, revision, status: 'published' as const };
+    const saved = await publishHistoryVersion({
+      id: `lh-${HISTORY_SEASON}-r${revision}-${actual.slice(3, 11)}`,
+      season: HISTORY_SEASON,
+      revision,
+      fingerprint: actual,
+      history: frozen,
+      notes,
+      reason,
+      publishedAt,
+      publishedBy: owner,
+    });
+
+    await appendAudit(owner, 'history-publish', {
+      versionId: saved.id,
+      revision,
+      reason,
+      notes,
+      previousVersionId: previous?.id ?? null,
+    });
+    res.json({
+      versionId: saved.id,
+      revision,
+      publishedAt: saved.publishedAt,
+      publishedBy: saved.publishedBy,
+      reason,
+    });
+  } catch (err) {
+    if (err instanceof HistoryPublishError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
+router.get('/history/versions/:id', async (req, res, next) => {
+  try {
+    const version = await getHistoryVersion(routeParam(req.params.id));
+    if (!version) {
+      res.status(404).json({ error: 'No such history revision' });
+      return;
+    }
+    res.json(version);
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
   const parsed = parseInt(String(req.query.limit ?? '50'), 10);

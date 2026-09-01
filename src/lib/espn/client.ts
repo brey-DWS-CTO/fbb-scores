@@ -54,9 +54,37 @@ const DEFAULT_POSITION: Record<number, string> = {
 export class EspnClient {
   private http: AxiosInstance;
 
+  /**
+   * Same headers, no interceptor. The leagueHistory endpoint answers with an
+   * array, which the main interceptor treats as a failed login.
+   */
+  private historyHttp: AxiosInstance;
+
+  private leagueId: string;
+
+  private seasonId: number;
+
   constructor(config: EspnClientConfig) {
     const cookieString = config.cookieOverride
       ?? `espn_s2=${config.espnS2 ?? ''}; SWID=${config.swid ?? ''}`;
+    this.leagueId = config.leagueId;
+    this.seasonId = config.seasonId;
+
+    const headers = {
+      Cookie: cookieString,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'application/json',
+      'Accept-Language': 'en-US,en;q=0.9',
+      Referer: `https://fantasy.espn.com/basketball/league?leagueId=${config.leagueId}`,
+      Origin: 'https://fantasy.espn.com',
+    };
+
+    this.historyHttp = axios.create({
+      baseURL: `${ESPN_BASE}/leagueHistory`,
+      maxRedirects: 0,
+      validateStatus: (status) => status < 400,
+      headers,
+    });
 
     this.http = axios.create({
       baseURL: `${ESPN_BASE}/seasons/${config.seasonId}/segments/0/leagues/${config.leagueId}`,
@@ -178,6 +206,48 @@ export class EspnClient {
     });
 
     return data;
+  }
+
+  /**
+   * One finished season's teams, final ranks, and matchup scores, for the
+   * league-history import.
+   *
+   * The modern endpoint answers for recent seasons. The league began in
+   * 2010-11 and the oldest seasons need `/leagueHistory`, which is tried second
+   * and may still come back empty: ESPN does not keep everything forever.
+   * Untested against the live service, because no ESPN credentials exist
+   * outside Vercel.
+   */
+  async fetchSeasonHistory(): Promise<unknown> {
+    const params = {
+      view: ['mTeam', 'mMatchupScore', 'mSettings', 'mStatus'],
+      _: Date.now(),
+    };
+    try {
+      const { data } = await this.http.get('', {
+        params,
+        paramsSerializer: { indexes: null },
+      });
+      return data;
+    } catch (error) {
+      const fallback = await this.fetchLeagueHistorySeason();
+      if (fallback) return fallback;
+      throw error;
+    }
+  }
+
+  /** The old-season endpoint. Returns null when ESPN has nothing for that year. */
+  private async fetchLeagueHistorySeason(): Promise<unknown | null> {
+    const { data } = await this.historyHttp.get(`/${this.leagueId}`, {
+      params: {
+        seasonId: this.seasonId,
+        view: ['mTeam', 'mMatchupScore', 'mSettings', 'mStatus'],
+        _: Date.now(),
+      },
+      paramsSerializer: { indexes: null },
+    });
+    if (Array.isArray(data)) return data[0] ?? null;
+    return data ?? null;
   }
 
   /** Fetch every active-player page without requesting stats. */
