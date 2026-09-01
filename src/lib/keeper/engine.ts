@@ -206,16 +206,20 @@ export function buildAllPicks(dataset: LeagueDataset): PickSlot[] {
       });
     }
   }
+  // Trades apply in order, so a pick can move through several owners and the
+  // last one wins. The seed records name only `from`, which is also the team
+  // the pick came from; in-app transfers name `originalOwner` explicitly
+  // because by then `from` is a later holder.
   for (const trade of dataset.pickTrades) {
     if (!byOwner.has(trade.from) || !byOwner.has(trade.to)) continue;
-    const pick = picks.find(
-      (p) => p.round === trade.round && p.originalOwner === trade.from,
-    );
+    const origin = trade.originalOwner ?? trade.from;
+    const pick = picks.find((p) => p.round === trade.round && p.originalOwner === origin);
     if (pick) {
       pick.currentOwner = trade.to;
       pick.viaTradeFrom = trade.from;
       pick.tradeNote = trade.tradeNote;
       pick.tradeDate = trade.date;
+      pick.tradeCount = (pick.tradeCount ?? 0) + 1;
     }
   }
   return picks.sort((a, b) => a.overall - b.overall);
@@ -355,8 +359,11 @@ export function resolveTeamKeepers(
         );
       } else if (pick.round < round) {
         bumped = true;
+        // Only giving away your OWN round-N pick makes this a traded bump. A
+        // pick you acquired and then passed on does not, because your own is
+        // still on the board.
         const tradedAway = dataset.pickTrades.some(
-          (t) => t.from === owner && t.round === round,
+          (t) => t.round === round && t.from === owner && (t.originalOwner ?? t.from) === owner,
         );
         bumpReason = sameTier && !tradedAway ? 'duplicate' : 'traded';
         used.add(pick.overall);

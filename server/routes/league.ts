@@ -14,7 +14,31 @@ import {
   buildDraftBoard,
   resolveTeamKeepers,
 } from '../../src/lib/keeper/engine.js';
-import type { LeagueDataset } from '../../src/lib/keeper/types.js';
+import type {
+  LeagueDataset,
+  PickRef,
+  PickTradeProposal,
+} from '../../src/lib/keeper/types.js';
+import {
+  canAnswer,
+  checkProposalAgainstState,
+  checkProposalShape,
+  datasetForState,
+  describeTrade,
+  expireStale,
+  expiresAtFrom,
+  inboxCount,
+  involves,
+  MAX_TRADE_NOTE,
+  previewProposal,
+  proposalInput,
+  proposalsOf,
+  touchesRef,
+  transfersForProposal,
+  transfersOf,
+  visibleProposals,
+  type ProposalInput,
+} from '../../src/lib/league/pickTrades.js';
 import {
   getState,
   mutateState,
@@ -133,12 +157,21 @@ function cleanKeeperSelections(value: unknown): KeeperSelection[] {
   return clean;
 }
 
+/**
+ * The keeper dataset as the league actually stands: commissioner overrides
+ * first, then every accepted pick transfer. Anything that reads pick ownership
+ * must go through here, or a traded pick shows up under the wrong team.
+ */
+function currentDataset(state: LeagueDynamicState, base: LeagueDataset = leagueDataset): LeagueDataset {
+  return datasetForState(applyOverrides(base, state.overrides), state);
+}
+
 function validateKeeperSelections(
   state: LeagueDynamicState,
   target: string,
   selections: KeeperSelection[],
 ): void {
-  const dataset = applyOverrides(leagueDataset, state.overrides);
+  const dataset = currentDataset(state);
   const validation = resolveTeamKeepers(dataset, target, selections);
   if (!validation.capOk) {
     throw new HttpError(
@@ -214,7 +247,9 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
   for (const [owner, sels] of Object.entries(state.keepers)) {
     keeperStatus[owner] = sels.length;
   }
+  const proposals = expireStale(proposalsOf(state), new Date().toISOString()).proposals;
   return {
+    pendingTrades: inboxCount(proposals, viewer.owner),
     draftAt: DRAFT_AT_ISO,
     revealed,
     keeperStatus,
@@ -239,7 +274,19 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
         ? { [viewer.owner]: result.state.keepers[viewer.owner] }
         : {};
   }
-  return { ...result, state: { ...result.state, keepers }, meta };
+  // Pending offers are between two members. Accepted trades are league news,
+  // so the ledger itself is never redacted.
+  const proposals = expireStale(proposalsOf(result.state), new Date().toISOString()).proposals;
+  return {
+    ...result,
+    state: {
+      ...result.state,
+      keepers,
+      pickTransfers: transfersOf(result.state),
+      pickTradeProposals: visibleProposals(proposals, viewer.owner, viewer.isCommissioner),
+    },
+    meta,
+  };
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -643,7 +690,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     if (draft.draft.startedAt === null) {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
-    const dataset = applyOverrides(draftPoolDataset, draft.overrides);
+    const dataset = currentDataset(draft, draftPoolDataset);
     const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
     if (!onClock) throw new HttpError(409, 'The draft is complete');
     if (onClock.pick.overall !== overallPick) {
@@ -701,7 +748,7 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
     if (draft.keepersRevealed !== true) {
       throw new HttpError(409, 'Reveal keeper names before starting the draft');
     }
-    const dataset = applyOverrides(leagueDataset, draft.overrides);
+    const dataset = currentDataset(draft);
     for (const team of dataset.teams) {
       const validation = resolveTeamKeepers(dataset, team.owner, draft.keepers[team.owner] ?? []);
       if (!validation.valid) {
@@ -1270,6 +1317,375 @@ router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
     next(err);
   }
 });
+
+// ─── Draft pick trades ───────────────────────────────────────────────────────
+//
+// Two members swap draft picks and nothing else. The proposer always comes from
+// the PIN, never from the body.
+//
+// Proposals and the accepted-transfer ledger both live in league_state rather
+// than in their own tables. That is deliberate: accepting a trade and entering
+// a draft pick then become the same single compare-and-swap write, so when both
+// land at the same moment exactly one wins and the loser fails cleanly. Split
+// across two tables there would be no way to promise that over the Neon HTTP
+// driver.
+
+/** What one write attempt decided. Held in an array so the type survives the await. */
+interface TradeOutcome {
+  proposal?: PickTradeProposal;
+  refusal?: { status: number; message: string; code?: string };
+}
+
+function parsePickRefs(value: unknown, label: string): PickRef[] {
+  if (!Array.isArray(value)) throw new HttpError(400, `${label} must be a list of picks`);
+  return value.map((raw) => {
+    const entry = (raw ?? {}) as Record<string, unknown>;
+    if (
+      typeof entry.round !== 'number'
+      || !Number.isInteger(entry.round)
+      || typeof entry.originalOwner !== 'string'
+      || entry.originalOwner === ''
+    ) {
+      throw new HttpError(400, `Each ${label} pick needs a round and the team it came from`);
+    }
+    return { round: entry.round, originalOwner: entry.originalOwner };
+  });
+}
+
+function sendOutcome(res: Response, outcome: TradeOutcome | undefined): boolean {
+  const refusal = outcome?.refusal;
+  if (!refusal) return false;
+  res.status(refusal.status).json({ error: refusal.message, code: refusal.code });
+  return true;
+}
+
+/** Every offer this member may see, with anything past its date already filed. */
+router.get('/pick-trades', requireAuth, async (_req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
+    const { state } = await getState();
+    const proposals = expireStale(proposalsOf(state), new Date().toISOString()).proposals;
+    const visible = visibleProposals(proposals, owner, isCommish);
+    res.json({
+      season: state.season,
+      proposals: visible,
+      transfers: transfersOf(state),
+      you: {
+        owner,
+        inbox: inboxCount(visible, owner),
+        sent: visible.filter((p) => p.status === 'pending' && p.proposer === owner).length,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * A no-write review of a trade: whether it is legal and what it does to both
+ * teams' keeper pick costs. Send `id` to review an offer that already exists,
+ * or a recipient plus two pick lists to try one out before sending it.
+ */
+router.post('/pick-trades/preview', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const { state } = await getState();
+
+    let input: ProposalInput;
+    if (typeof body.id === 'string') {
+      const proposal = proposalsOf(state).find((p) => p.id === body.id);
+      if (!proposal) throw new HttpError(404, 'No such offer');
+      if (!involves(proposal, owner)) {
+        throw new HttpError(403, 'That offer is between two other members');
+      }
+      input = proposalInput(proposal);
+    } else {
+      input = {
+        proposer: owner,
+        recipient: typeof body.recipient === 'string' ? body.recipient : '',
+        offer: parsePickRefs(body.offer, 'offer'),
+        request: parsePickRefs(body.request, 'request'),
+        note: '',
+      };
+    }
+
+    res.json(
+      previewProposal(currentDataset(state), state, input, {
+        owner,
+        isCommissioner: isCommish,
+        revealed: state.keepersRevealed === true,
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Send an offer. The proposer is whoever signed in. */
+router.post('/pick-trades', requireAuth, async (req, res, next) => {
+  try {
+    const proposer = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const input: ProposalInput = {
+      proposer,
+      recipient: typeof body.recipient === 'string' ? body.recipient : '',
+      offer: parsePickRefs(body.offer, 'offer'),
+      request: parsePickRefs(body.request, 'request'),
+      note: typeof body.note === 'string' ? body.note.trim().slice(0, MAX_TRADE_NOTE) : '',
+    };
+
+    const shape = checkProposalShape(leagueDataset, input);
+    if (!shape.ok) {
+      res.status(400).json({ error: shape.message, code: shape.reason });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const outcomes: TradeOutcome[] = [];
+    const result = await mutateState((draft) => {
+      outcomes.length = 0;
+      const check = checkProposalAgainstState(currentDataset(draft), draft, input);
+      if (!check.ok) {
+        outcomes.push({ refusal: { status: 409, message: check.message ?? '', code: check.reason } });
+        return;
+      }
+      // A member may shop the same pick to two teams at once. Whoever accepts
+      // first gets it, and the accept step files the rest.
+      const proposals = expireStale(proposalsOf(draft), now).proposals;
+      const proposal: PickTradeProposal = {
+        id: `trade-${draft.season}-${proposer.toLowerCase()}-${now.replace(/[-:.TZ]/g, '')}`,
+        season: draft.season,
+        proposer,
+        recipient: input.recipient,
+        offer: input.offer,
+        request: input.request,
+        note: input.note,
+        status: 'pending',
+        version: 1,
+        createdAt: now,
+        expiresAt: expiresAtFrom(now),
+      };
+      draft.pickTradeProposals = [...proposals, proposal];
+      outcomes.push({ proposal });
+    });
+
+    if (sendOutcome(res, outcomes[0])) return;
+    const proposal = outcomes[0]?.proposal;
+    if (!proposal) throw new HttpError(500, 'The offer could not be saved');
+    await appendAudit(proposer, 'pick-trade.proposed', {
+      proposalId: proposal.id,
+      recipient: proposal.recipient,
+      offer: proposal.offer,
+      request: proposal.request,
+    });
+    res.json({
+      proposal,
+      ...redactState(result, { owner: proposer, isCommissioner: isCommish }),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Accept an offer.
+ *
+ * Everything is rechecked inside the write: the version the member saw, who
+ * owns each pick right now, whether the draft has moved past them, and the
+ * keeper lock. If any of it fails the whole thing is refused. A trade never
+ * half happens.
+ */
+router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
+    const id = routeParam(req.params.id);
+    const expectedVersion = (req.body as { version?: unknown } | undefined)?.version;
+    if (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion)) {
+      throw new HttpError(400, 'version is required; open the offer again');
+    }
+
+    const now = new Date().toISOString();
+    const outcomes: TradeOutcome[] = [];
+    const result = await mutateState((draft) => {
+      outcomes.length = 0;
+      const proposals = expireStale(proposalsOf(draft), now).proposals;
+      draft.pickTradeProposals = proposals;
+      const index = proposals.findIndex((p) => p.id === id);
+      if (index === -1) {
+        outcomes.push({ refusal: { status: 404, message: 'No such offer' } });
+        return;
+      }
+      const proposal = proposals[index];
+      const allowed = canAnswer(proposal, owner, 'accept', isCommish);
+      if (!allowed.ok) {
+        outcomes.push({
+          refusal: {
+            status: allowed.reason === 'not-yours-to-answer' ? 403 : 409,
+            message: allowed.message ?? '',
+            code: allowed.reason,
+          },
+        });
+        return;
+      }
+      if (proposal.version !== expectedVersion) {
+        outcomes.push({
+          refusal: {
+            status: 409,
+            message: 'This offer changed since you opened it. Look at it again.',
+            code: 'stale-version',
+          },
+        });
+        return;
+      }
+
+      const input = proposalInput(proposal);
+      const check = checkProposalAgainstState(currentDataset(draft), draft, input);
+      if (!check.ok) {
+        // Something that can never come back, such as a pick that now belongs
+        // to a third team, files the offer instead of leaving it in the inbox.
+        if (check.fatal) {
+          const filed = [...proposals];
+          filed[index] = {
+            ...proposal,
+            status: 'invalidated',
+            version: proposal.version + 1,
+            resolvedAt: now,
+            reason: check.message,
+          };
+          draft.pickTradeProposals = filed;
+        }
+        outcomes.push({
+          refusal: { status: 409, message: check.message ?? '', code: check.reason },
+        });
+        return;
+      }
+
+      const moved = [...input.offer, ...input.request];
+      const accepted: PickTradeProposal = {
+        ...proposal,
+        status: 'accepted',
+        version: proposal.version + 1,
+        resolvedAt: now,
+        resolvedBy: owner,
+      };
+      draft.pickTransfers = [
+        ...transfersOf(draft),
+        ...transfersForProposal(input, now, proposal.id),
+      ];
+      draft.pickTradeProposals = proposals.map((p, i) => {
+        if (i === index) return accepted;
+        if (p.status !== 'pending') return p;
+        if (!moved.some((ref) => touchesRef(p, ref))) return p;
+        return {
+          ...p,
+          status: 'invalidated' as const,
+          version: p.version + 1,
+          resolvedAt: now,
+          reason: 'A pick in this offer went somewhere else.',
+        };
+      });
+      outcomes.push({ proposal: accepted });
+    });
+
+    if (sendOutcome(res, outcomes[0])) return;
+    const proposal = outcomes[0]?.proposal;
+    if (!proposal) throw new HttpError(500, 'The trade could not be saved');
+    await appendAudit(owner, 'pick-trade.accepted', {
+      proposalId: proposal.id,
+      proposer: proposal.proposer,
+      recipient: proposal.recipient,
+      offer: proposal.offer,
+      request: proposal.request,
+      acceptedAt: proposal.resolvedAt,
+      acceptedBy: owner,
+      summary: describeTrade(proposal),
+    });
+    res.json({
+      proposal,
+      ...redactState(result, { owner, isCommissioner: isCommish }),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Turn an offer down (recipient) or pull it back (proposer, or a commissioner
+ * clearing something stuck). Nothing is deleted; the record keeps its outcome.
+ */
+function settleRoute(action: 'reject' | 'cancel', auditAction: string) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const owner = res.locals.owner as string;
+      const isCommish = res.locals.isCommissioner === true;
+      const id = routeParam(req.params.id);
+      const now = new Date().toISOString();
+      const outcomes: TradeOutcome[] = [];
+
+      const result = await mutateState((draft) => {
+        outcomes.length = 0;
+        const proposals = expireStale(proposalsOf(draft), now).proposals;
+        draft.pickTradeProposals = proposals;
+        const index = proposals.findIndex((p) => p.id === id);
+        if (index === -1) {
+          outcomes.push({ refusal: { status: 404, message: 'No such offer' } });
+          return;
+        }
+        const proposal = proposals[index];
+        const allowed = canAnswer(proposal, owner, action, isCommish);
+        if (!allowed.ok) {
+          outcomes.push({
+            refusal: {
+              status: allowed.reason === 'not-yours-to-answer' ? 403 : 409,
+              message: allowed.message ?? '',
+              code: allowed.reason,
+            },
+          });
+          return;
+        }
+        const settled: PickTradeProposal = {
+          ...proposal,
+          status: action === 'reject' ? 'rejected' : 'cancelled',
+          version: proposal.version + 1,
+          resolvedAt: now,
+          resolvedBy: owner,
+          reason:
+            action === 'cancel' && isCommish && proposal.proposer !== owner
+              ? 'A commissioner cleared this offer.'
+              : undefined,
+        };
+        const next = [...proposals];
+        next[index] = settled;
+        draft.pickTradeProposals = next;
+        outcomes.push({ proposal: settled });
+      });
+
+      if (sendOutcome(res, outcomes[0])) return;
+      const proposal = outcomes[0]?.proposal;
+      if (!proposal) throw new HttpError(500, 'The offer could not be settled');
+      await appendAudit(owner, auditAction, {
+        proposalId: proposal.id,
+        proposer: proposal.proposer,
+        recipient: proposal.recipient,
+        byCommissioner: isCommish && proposal.proposer !== owner && proposal.recipient !== owner,
+      });
+      res.json({
+        proposal,
+        ...redactState(result, { owner, isCommissioner: isCommish }),
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+router.post('/pick-trades/:id/reject', requireAuth, settleRoute('reject', 'pick-trade.rejected'));
+router.post('/pick-trades/:id/cancel', requireAuth, settleRoute('cancel', 'pick-trade.cancelled'));
 
 router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
   const parsed = parseInt(String(req.query.limit ?? '50'), 10);

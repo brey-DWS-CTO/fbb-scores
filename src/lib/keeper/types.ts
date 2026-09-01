@@ -13,9 +13,18 @@ export interface TeamInfo {
 export interface PickTrade {
   date: string;
   round: number;
-  from: string; // owner giving up their own pick
+  from: string; // owner giving the pick up
   to: string; // owner receiving it
   tradeNote?: string;
+  /**
+   * Which team's own pick this is. Absent on the committed preseason seed,
+   * where `from` is always the original owner. In-app transfers set it, because
+   * a pick that has already moved once is no longer held by the team it came
+   * from, and `from` alone would then point at the wrong slot.
+   */
+  originalOwner?: string;
+  /** The accepted proposal that moved it, for provenance. */
+  proposalId?: string;
 }
 
 /** Human-readable trade summary: what each side RECEIVED. */
@@ -142,6 +151,56 @@ export interface LeagueDynamicState {
   };
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
+  /** Append-only ledger of accepted in-app pick transfers. Never rewritten. */
+  pickTransfers?: PickTransfer[];
+  /** Every member-to-member pick trade proposal, live and settled. */
+  pickTradeProposals?: PickTradeProposal[];
+}
+
+/* ---------- member-to-member pick trades ---------- */
+
+/** A pick's stable identity within a season: its round and the team it came from. */
+export interface PickRef {
+  round: number;
+  originalOwner: string;
+}
+
+/** One accepted move of one pick. Immutable once written. */
+export interface PickTransfer extends PickRef {
+  from: string;
+  to: string;
+  proposalId: string;
+  at: string;
+}
+
+export type PickTradeStatus =
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'cancelled'
+  | 'expired'
+  | 'invalidated';
+
+export interface PickTradeProposal {
+  id: string;
+  season: number;
+  proposer: string;
+  recipient: string;
+  /** Picks the proposer owned when the offer went out. */
+  offer: PickRef[];
+  /** Picks the recipient owned when the offer went out. */
+  request: PickRef[];
+  /** A message to the other member. It never decides what moves. */
+  note: string;
+  status: PickTradeStatus;
+  /** Bumped on every change, so a stale tab cannot accept an old offer. */
+  version: number;
+  createdAt: string;
+  expiresAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  /** Why it left the pending state, when that needs saying. */
+  reason?: string;
 }
 
 /* ---------- engine outputs ---------- */
@@ -155,6 +214,8 @@ export interface PickSlot {
   viaTradeFrom?: string; // set when currentOwner acquired this pick via trade
   tradeNote?: string; // the trade this pick moved in (for tap/hover provenance)
   tradeDate?: string;
+  /** How many times this pick has changed hands, seed trades included. */
+  tradeCount?: number;
 }
 
 export interface ResolvedKeeper {

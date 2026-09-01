@@ -20,6 +20,7 @@ import { neon } from '@neondatabase/serverless';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
+import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,13 @@ export interface LeagueDynamicState {
   };
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
+  /**
+   * Pick trades live here rather than in their own table so that accepting a
+   * trade and entering a draft pick are the same single write. That is what
+   * makes exactly one of them win when both land at once.
+   */
+  pickTransfers?: PickTransfer[];
+  pickTradeProposals?: PickTradeProposal[];
 }
 
 export interface AuditRow {
@@ -201,6 +209,8 @@ function defaultState(): LeagueDynamicState {
     keepersRevealed: false,
     draft: { picks: {}, startedAt: null },
     locks: { keepersLocked: false },
+    pickTransfers: [],
+    pickTradeProposals: [],
   };
 }
 
@@ -908,6 +918,11 @@ class FileBackend implements StoreBackend {
         playerPoolSnapshots: [],
         scheduleSnapshots: [],
         keeperScenarios: [],
+        // Omitting these once meant a fresh or unreadable file blew up on the
+        // first poll or rule book read.
+        rulebookDrafts: [],
+        rulebookVersions: [],
+        polls: [],
       };
     }
   }

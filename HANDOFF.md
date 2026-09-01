@@ -250,6 +250,24 @@ Required behavior:
 
 Test ownership races, double acceptance, cancellation versus acceptance, on-clock trades, stale tabs, traded-twice provenance, keeper-cost changes, locked-keeper rejection, authorization/privacy, and persistence across restarts. Accepted trade records are immutable; corrections must be compensating transfers with their own audit history.
 
+**Built.** `src/lib/league/pickTrades.ts` is the pure core: pick identity, the transfer ledger, validation, visibility, and the keeper preview. It calls the keeper engine for every cost figure and holds no rule math of its own.
+
+A pick is `(round, originalOwner)` forever. `PickTrade` gained an optional `originalOwner`, so `buildAllPicks` can replay the committed seed and then the ledger in order. That is what lets one pick pass through three owners and keep its chain. The seed and `league-2027-config.json` are untouched. `resolveTeamKeepers` now counts a traded-away bump only when the team gave up its **own** pick of that round, which a pick you acquired and passed on no longer triggers.
+
+Proposals and the ledger both live in `league_state`, not in their own tables. That is deliberate: accepting a trade and entering a draft pick become the same compare-and-swap write, so when they land together exactly one wins and the loser fails cleanly. Split across two tables there is no way to promise that over the Neon HTTP driver. Both backends therefore work through the existing `mutateState`.
+
+Routes: `GET /pick-trades`, `POST /pick-trades`, `POST /pick-trades/preview` (no write, takes an id or a whole draft offer), and `/:id/accept`, `/:id/reject`, `/:id/cancel`. The proposer always comes from the PIN. Accept rechecks the version the member saw, current ownership, draft state, and the keeper lock inside the write; anything that can never work again files the offer as `invalidated` instead of leaving it in the inbox, and accepting sweeps every other pending offer on a pick that just moved. Pending offers run out after seven days.
+
+Privacy: `redactState` filters proposals, so the polled `/state` leaks nothing. A pending offer goes to the two members only. A commissioner sees that one exists, stripped of its picks, which is all they need to clear it; they can never accept for a member. Accepted trades are league-visible and audited with both sides, the exact picks, the time, and who accepted.
+
+Keeper preview: each member sees the full before/after pick costs for their own team and a plain yes or no on whether the other team's keepers survive. Naming the other side's keeper rounds before the reveal would narrow down the player, so it is withheld until the commissioner reveals. After reveal, both sides show in full. A keeper's pick may still move while keepers are open, because the engine reprices it; once the draft starts a keeper cell is spent and cannot move.
+
+UI: `/trades` with a `TRADES` nav tab and a red badge counting offers waiting on you. Inbox, sent, and settled views, a pick selector grouped by the team a pick came from, the two-sided review with keeper costs and provenance, and a second tap to confirm before accepting. `src/components/league/TradesPage.tsx`; styles appended to `src/index.css`.
+
+45 tests in `tests/pick-trades.test.ts` and `tests/pick-trades-api.test.ts`. Fixed in passing: the file backend's fallback for an unreadable `.data/league-state.json` omitted `rulebookDrafts`, `rulebookVersions`, and `polls`, so a corrupt file crashed the first poll or rule book read.
+
+Not built: a compensating-transfer tool for corrections. The ledger is append-only and a correcting trade can be proposed by hand today, but there is no commissioner screen for it.
+
 ### 5. Build League History and the record book
 
 Create a league-history area backed by structured, versioned records rather than prose copied into the UI. At minimum, preserve each season's champion, runner-up, final standings/playoff finish, participating franchises, and the league's recognized high-score records. Keep the model extensible for regular-season champions, semifinalists, awards, and other commissioner-approved historical categories.

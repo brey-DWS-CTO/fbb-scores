@@ -10,6 +10,7 @@ import {
   type StateResponse,
 } from '../lib/league/api.js';
 import { applyOverrides } from '../lib/keeper/engine.js';
+import { datasetWithTransfers, transfersOf } from '../lib/league/pickTrades.js';
 import { leagueDataset } from '../lib/league/data.js';
 import { applyPlayerPoolToDataset } from '../lib/league/playerPool.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
@@ -54,7 +55,13 @@ export function useLeagueState(fast = false) {
 export function useLeagueData(fast = false) {
   const q = useLeagueState(fast);
   const overrides = q.state.overrides;
-  const dataset = useMemo(() => applyOverrides(leagueDataset, overrides), [overrides]);
+  // Accepted pick trades are layered on here, so every page that reads pick
+  // ownership through this hook sees the same board.
+  const transfers = q.state.pickTransfers;
+  const dataset = useMemo(
+    () => datasetWithTransfers(applyOverrides(leagueDataset, overrides), transfersOf({ pickTransfers: transfers })),
+    [overrides, transfers],
+  );
   return { ...q, dataset };
 }
 
