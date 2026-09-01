@@ -736,16 +736,16 @@ export default function TeamKeeperPage() {
           </div>
         )}
 
-      {/* ── Cap meter ──────────────────────────────────────────── */}
-      <section className="panel" style={{ padding: '14px 14px 12px', borderRadius: 10, marginBottom: 14 }}>
-        <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)', marginBottom: 8 }}>
-          SALARY CAP
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+      {/* ── Cap meter — one thin strip, like the COSTS pills ───── */}
+      <section className="panel" style={{ padding: '9px 12px 10px', borderRadius: 10, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}>
+          <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
+            SALARY CAP
+          </span>
           <span
             className={selectionsHidden ? undefined : result.capOk ? 'glow-teal' : 'glow-red'}
             style={{
-              fontSize: '2.6rem',
+              fontSize: '1.4rem',
               lineHeight: 1,
               fontWeight: 800,
               letterSpacing: '0.04em',
@@ -754,7 +754,7 @@ export default function TeamKeeperPage() {
           >
             {selectionsHidden ? '—' : result.capUsed.toFixed(1)}
           </span>
-          <span style={{ color: 'var(--text-mid)', fontSize: '1.05rem', fontWeight: 600 }}>
+          <span style={{ color: 'var(--text-mid)', fontSize: '0.85rem', fontWeight: 600 }}>
             / {result.capLimit} FPPG
           </span>
           {dirty && (
@@ -775,44 +775,7 @@ export default function TeamKeeperPage() {
             </span>
           )}
         </div>
-        <CapBar used={selectionsHidden ? 0 : result.capUsed} limit={result.capLimit} height={12} />
-        <div
-          style={{
-            borderTop: '1px dashed var(--panel-border)',
-            marginTop: 12,
-            paddingTop: 10,
-            display: 'grid',
-            gap: 6,
-          }}
-        >
-          <div
-            className={result.keepers.length > 0 && !result.capOk ? 'blink' : undefined}
-            style={{
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              fontStyle: 'italic',
-              lineHeight: 1.5,
-              textAlign: 'center',
-              color: statusColor,
-
-            }}
-          >
-            {selectionsHidden ? 'Saved keeper total is private.' : result.statusLine}
-          </div>
-          <div
-            style={{
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              fontStyle: 'italic',
-              lineHeight: 1.5,
-              textAlign: 'center',
-              color: pickColor,
-
-            }}
-          >
-            {selectionsHidden ? 'Browse the roster below to see every legal option.' : result.pickStatusLine}
-          </div>
-        </div>
+        <CapBar used={selectionsHidden ? 0 : result.capUsed} limit={result.capLimit} height={10} />
       </section>
 
       {/* ── Selected keepers ───────────────────────────────────── */}
@@ -1030,6 +993,35 @@ export default function TeamKeeperPage() {
               </Link>
             );
           })}
+        </div>
+      </section>
+
+      {/* ── Trash talk — the status lines live below WHO'S IN ──── */}
+      <section style={{ margin: '4px 0 14px', display: 'grid', gap: 6 }}>
+        <div
+          className={result.keepers.length > 0 && !result.capOk ? 'blink' : undefined}
+          style={{
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            fontStyle: 'italic',
+            lineHeight: 1.5,
+            textAlign: 'center',
+            color: statusColor,
+          }}
+        >
+          {selectionsHidden ? 'Saved keeper total is private.' : result.statusLine}
+        </div>
+        <div
+          style={{
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            fontStyle: 'italic',
+            lineHeight: 1.5,
+            textAlign: 'center',
+            color: pickColor,
+          }}
+        >
+          {selectionsHidden ? 'Browse the roster below to see every legal option.' : result.pickStatusLine}
         </div>
       </section>
 
