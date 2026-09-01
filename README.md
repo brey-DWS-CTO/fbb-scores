@@ -1,4 +1,4 @@
-# The Nerds League Hub (fbb-scores)
+# FBB Scores — The Nerds League Hub
 
 Companion app for The Nerds fantasy basketball league (ESPN league 100537, est. 2010):
 

@@ -282,6 +282,12 @@ body::before {
   white-space: nowrap;
   margin-right: 8px;
 }
+.top-nav-brand img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(255, 102, 0, 0.28));
+}
 .top-nav-links {
   display: flex;
   align-items: stretch;
@@ -632,23 +638,26 @@ html.theme-light .more-item.active { background: rgba(0, 128, 106, 0.08); }
 .identity-error { margin-top: 10px; color: var(--neon-red); font-size: 0.8rem; line-height: 1.4; }
 .identity-help { margin: 11px 0 0; color: var(--text-dim); font-size: 0.7rem; line-height: 1.45; }
 
-/* ─── Account sheet ──────────────────────────────────────────────────── */
+/* ─── Account menu ───────────────────────────────────────────────────── */
 .account-backdrop {
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-top: 40px;
-  background: rgba(0,0,0,0.78);
+  background: rgba(0,0,0,0.48);
 }
 .account-sheet {
-  width: min(100%, 500px);
-  max-height: calc(100vh - 40px);
-  padding: 22px 18px calc(22px + env(safe-area-inset-bottom));
+  position: fixed;
+  width: min(calc(100vw - 24px), 420px);
+  max-height: calc(100vh - 24px);
+  padding: 20px 18px;
   overflow-y: auto;
-  border-radius: 18px 18px 0 0;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.52);
+  animation: account-menu-in 0.16s ease-out;
+}
+@keyframes account-menu-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .account-sheet-header p { margin: 4px 0 0; color: var(--text-mid); font-size: 0.78rem; }
 .account-close {
@@ -678,6 +687,19 @@ html.theme-light .more-item.active { background: rgba(0, 128, 106, 0.08); }
 .account-switch { position: relative; z-index: 1; }
 .account-switch-separated { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--panel-border); }
 .account-switch-separated .identity-form { margin-top: 10px; }
+
+@media (max-width: 560px) {
+  .account-backdrop { background: rgba(0,0,0,0.7); }
+  .account-sheet {
+    top: 0 !important;
+    left: 0;
+    right: 0 !important;
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    padding-top: calc(18px + env(safe-area-inset-top));
+    border-radius: 0 0 18px 18px;
+  }
+}
 
 @media (max-width: 760px) {
   .splash-page { display: block; padding: 26px 16px 30px; overflow-y: auto; }

@@ -71,8 +71,8 @@ export default function AppNav() {
       <header className="top-nav">
         <div className="top-nav-inner">
           <NavLink to="/keepers" className="top-nav-brand hub-heading">
-            <span aria-hidden="true">🏀</span>
-            <span>The Nerds</span>
+            <img src="/logo.png" alt="" aria-hidden="true" />
+            <span>FBB Scores</span>
           </NavLink>
           <nav className="top-nav-links" aria-label="Main">
             {items.map((t) => (

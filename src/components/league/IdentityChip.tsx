@@ -8,6 +8,7 @@ export default function IdentityChip() {
   const { identity } = useIdentity();
   const { theme, setTheme } = useSettings();
   const [open, setOpen] = useState(false);
+  const [accountAnchor, setAccountAnchor] = useState<DOMRect | null>(null);
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -33,7 +34,10 @@ export default function IdentityChip() {
       </button>
       <button
         className="tap-btn"
-        onClick={() => setOpen(true)}
+        onClick={(event) => {
+          setAccountAnchor(event.currentTarget.getBoundingClientRect());
+          setOpen(true);
+        }}
         aria-label={identity ? `Open account menu for ${identity.owner}` : 'Sign in'}
         style={{
           display: 'inline-flex',
@@ -58,7 +62,12 @@ export default function IdentityChip() {
           <span>Who are you?</span>
         )}
       </button>
-      {open && <TeamPickerModal onClose={() => setOpen(false)} />}
+      {open && (
+        <TeamPickerModal
+          {...(accountAnchor ? { anchor: accountAnchor } : {})}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </span>
   );
 }

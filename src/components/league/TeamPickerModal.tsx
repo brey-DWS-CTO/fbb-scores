@@ -4,11 +4,12 @@ import { teamByOwner } from '../../lib/league/data.js';
 import TeamPickerForm from './TeamPickerForm.js';
 
 interface Props {
+  anchor?: DOMRect;
   onClose: () => void;
 }
 
-/** Account and sign-in bottom sheet. */
-export default function TeamPickerModal({ onClose }: Props) {
+/** Account dropdown anchored below the owner chip. */
+export default function TeamPickerModal({ anchor, onClose }: Props) {
   const { identity, signOut } = useIdentity();
   const navigate = useNavigate();
   const team = identity ? teamByOwner.get(identity.owner) : null;
@@ -23,6 +24,10 @@ export default function TeamPickerModal({ onClose }: Props) {
     <div className="account-backdrop" onClick={onClose}>
       <div
         className="panel account-sheet"
+        style={anchor ? {
+          top: Math.max(8, anchor.bottom + 8),
+          right: Math.max(8, window.innerWidth - anchor.right),
+        } : undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-sheet-title"

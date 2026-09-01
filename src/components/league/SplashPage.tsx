@@ -17,8 +17,8 @@ export default function SplashPage() {
 
       <div className="splash-shell">
         <header className="splash-hero">
-          <div className="splash-season">THE NERDS · SEASON {leagueDataset.season}</div>
-          <img className="splash-logo" src="/logo.png" alt="The Nerds fantasy basketball" />
+          <div className="splash-season">FBB SCORES · THE NERDS · SEASON {leagueDataset.season}</div>
+          <img className="splash-logo" src="/logo.png" alt="FBB Scores — The Nerds fantasy basketball league" />
           <h1>The home of the best fantasy basketball league on the planet.</h1>
           <p>Set your keepers, check the draft board, and search ALL the many rules.</p>
 
