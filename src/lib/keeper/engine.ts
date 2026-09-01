@@ -432,6 +432,7 @@ export function keeperCandidateError(
   owner: string,
   selections: KeeperSelection[],
   player: DatasetPlayer,
+  opts?: { allowOverCap?: boolean },
 ): string | null {
   if (selections.some((selection) => selection.playerKey === player.key)) {
     return 'Already selected';
@@ -444,7 +445,7 @@ export function keeperCandidateError(
     ...selections,
     { playerKey: player.key, playerName: player.name },
   ]);
-  if (!preview.capOk) {
+  if (!preview.capOk && !opts?.allowOverCap) {
     return `Over cap by ${(preview.capUsed - preview.capLimit).toFixed(1)} FPPG (${preview.capUsed.toFixed(1)}/${preview.capLimit.toFixed(1)})`;
   }
   return preview.errors[0] ?? null;

@@ -122,14 +122,19 @@ export default function AppNav() {
       {moreOpen && (
         <>
           <div className="more-backdrop" onClick={() => setMoreOpen(false)} />
-          <div className="more-sheet" role="dialog" aria-modal="true" aria-label="More pages">
-            <div className="more-sheet-head">
-              <span className="hub-heading more-sheet-title">More</span>
-              <button type="button" className="tap-btn more-sheet-close" onClick={() => setMoreOpen(false)}>
-                CLOSE
+          <div className="more-drawer" role="dialog" aria-modal="true" aria-label="More pages">
+            <div className="more-drawer-head">
+              <span className="hub-heading more-drawer-title">More</span>
+              <button
+                type="button"
+                className="tap-btn more-drawer-close"
+                aria-label="Close menu"
+                onClick={() => setMoreOpen(false)}
+              >
+                ✕
               </button>
             </div>
-            <div className="more-grid">
+            <div className="more-list">
               {secondary.map((t) => (
                 <NavLink
                   key={t.to}

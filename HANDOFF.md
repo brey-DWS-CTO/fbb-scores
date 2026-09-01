@@ -34,7 +34,7 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 
 **The one convention that matters most:** pure logic lives in `src/lib/league/*.ts`
 and is tested without a server or a browser. UI and server stay thin over it.
-Every feature above follows this, and it is why 342 tests run in ~10 seconds.
+Every feature above follows this, and it is why 372 tests run in ~10 seconds.
 
 ## Data conventions (do not break)
 
@@ -106,6 +106,16 @@ Owner access is also member-facing. The home page uses one owner dropdown, shows
   shipped controls that were fine on a laptop and unusable at 375px: a bordered
   button under all 246 rules, and nine bottom-nav tabs at 41px each when the
   minimum touch target is 44. Screenshot at 375px before calling anything done.
+- **The nav is four tabs plus MORE on a phone**, and a top bar on desktop
+  (`AppNav.tsx`, which replaced `BottomNav.tsx`). Apple's rule is five tabs; do
+  not add a sixth. A new destination goes behind MORE or inside an existing
+  section. `.bottom-nav-commish` no longer exists, so do not resurrect it.
+- **`src/index.css` is append-only by convention**: every feature adds its own
+  commented section at the end, which is why merge conflicts there are almost
+  always "keep both", never "pick one". The one exception is the final
+  **"Offsets around the two nav bars"** block, which must stay last in the file.
+  It beats the earlier `top: 0` sticky rules by cascade order, so its position
+  is load-bearing. Append above it.
 
 ## Verification baseline
 
@@ -117,7 +127,7 @@ npm run lint
 npm run build
 ```
 
-As of 2026-09-01: **342 tests pass**, lint is clean, the production build succeeds
+As of 2026-09-01: **372 tests pass**, lint is clean, the production build succeeds
 with one pre-existing non-blocking chunk-size warning. Local browser checks also pass for the mobile owner picker, owner-to-owner navigation, sticky projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, the `COMMISH` bottom tab, the Commish schedule snapshot status, no-write diff preview, and two-step acceptance control. The build still reports one non-blocking JavaScript chunk-size warning.
 
 `npm run check` runs the full local gate. During prelaunch, ship each complete user-visible batch instead of leaving it only on a local branch:
@@ -132,10 +142,15 @@ The ship command refuses a dirty tree or any branch other than `master`, runs te
 
 Nothing on the original list. What remains:
 
-1. **Set `ESPN_SEASON_ID=2027` in production and confirm the ESPN cookies still
-   work.** This blocks the real player-pool refresh, which blocks draft-day
-   readiness. The draft is **18 October 2026**. Nobody can test it without the
-   credentials, which live only in Vercel env.
+1. **Confirm the ESPN cookies still work.** `ESPN_SEASON_ID` is now `2027` and
+   `ESPN_LEAGUE_ID` is `100537`, both set in Vercel production and live since the
+   2026-09-01 deploy. What is still unproven is whether the stored cookies are
+   valid, and they expire. The check is one tap: Commish Mode, player pool,
+   refresh preview, which writes nothing. A player diff means good; an auth error
+   means the cookies need replacing in Vercel; an empty pool or wrong-season
+   error just means ESPN has not opened the 2027 league year yet, which is
+   expected this early. This blocks the real player-pool refresh, which blocks
+   draft-day readiness. The draft is **18 October 2026**.
 2. **Import real league history from ESPN.** The seam, preview, diff and
    immutable publish are built and tested against fixtures; only the live pull
    is untested. Start with season 16 (`espnSeasonId: 2026`), which is already on
@@ -368,7 +383,7 @@ Nothing merges quietly. `mergeSeasonImport` keeps the stored value and writes th
 
 Storage mirrors the rule book: `league_history_draft` and the immutable `league_history_versions` in Neon, mirrored in the file backend. Routes: `GET /history`, `/history/versions`, `/history/versions/:id` are public; `/history/draft` (GET/PUT/DELETE), `/history/import/preview`, `/history/import/apply`, and `/history/publish` are commissioner-only and audited. A preview writes nothing. Applying an import needs the previewed fingerprint and lands in the DRAFT only. Publishing needs the fingerprint and a **reason**, so a correction can never be silent. Closing a season is preview, apply, read, publish.
 
-UI: `/history` (public) has the season table with per-season sources and standings, titles by franchise, a sortable record leaderboard showing season, week, opponent, raw value and source, a "how solid is this" panel, and the revision list. `RecordTables.tsx` now reads published history, so Appendix B and `/league` show reviewed data. `HistoryAdmin.tsx` sits on `/admin`. No new bottom-nav tab; the record book links through, because nine tabs on a phone is already a lot.
+UI: `/history` (public) has the season table with per-season sources and standings, titles by franchise, a sortable record leaderboard showing season, week, opponent, raw value and source, a "how solid is this" panel, and the revision list. `RecordTables.tsx` now reads published history, so Appendix B and `/league` show reviewed data. `HistoryAdmin.tsx` sits on `/admin`. No new nav tab; the record book links through.
 
 **Not done: the live ESPN pull is untested.** `EspnClient.fetchSeasonHistory()` asks the modern endpoint and falls back to `/leagueHistory/{id}?seasonId=`, but no ESPN credentials exist outside Vercel, so it has never run against the real service. `POST /history/import/preview` without a `payload` returns 502 `espn-unavailable` on any machine without them. To finish: set ESPN credentials, preview season 16 (`espnSeasonId: 2026`) first because that one is already on file and any disagreement will show as a conflict, then work backwards. Expect the oldest seasons to return nothing.
 
@@ -376,4 +391,4 @@ UI: `/history` (public) has the season table with per-season sources and standin
 
 ### Later
 
-Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files) · **email on votes** (tell members when a vote opens, when the commissioner edits one, and when it closes; the app has no mail path yet).
+Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files) · **email on votes** (tell members when a vote opens, when the commissioner edits one, and when it closes; the app has no mail path yet) · **reskin to the handoff palette** (Brey liked the light, cool-neutral look of the handoff artifact: Fraunces headings, Public Sans body, indigo accent, blue-biased greys. Parked, not scheduled. It would touch every page, so treat it as its own project and keep the neon theme working until the swap is complete).

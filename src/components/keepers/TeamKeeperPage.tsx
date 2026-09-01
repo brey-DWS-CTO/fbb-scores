@@ -355,7 +355,7 @@ export default function TeamKeeperPage() {
   );
 
   const addKeeper = (p: DatasetPlayer) => {
-    if (keeperCandidateError(dataset, owner, selections, p)) return;
+    if (keeperCandidateError(dataset, owner, selections, p, { allowOverCap: true })) return;
     setDraftSel([...selections, { playerKey: p.key, playerName: p.name }]);
     if (selections.length + 1 >= dataset.maxKeepersPerTeam) setPickerOpen(false);
   };
@@ -373,8 +373,10 @@ export default function TeamKeeperPage() {
     addKeeper(p);
   };
 
+  // Over-cap picks stay tappable on purpose: the league deserves to see the
+  // YA FIRED banner. Saving is still blocked until the set is legal.
   const disabledReason = (p: DatasetPlayer): string | null => {
-    return keeperCandidateError(dataset, owner, selections, p);
+    return keeperCandidateError(dataset, owner, selections, p, { allowOverCap: true });
   };
 
   const comboMeta = (p: DatasetPlayer) => (
@@ -934,7 +936,7 @@ export default function TeamKeeperPage() {
           <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
             {projectionMode
               ? `Tap players to project ${owner}'s keepers. Only you can see these picks.`
-              : 'Tap a player to keep them. Choices that break the cap or another rule are greyed out.'}
+              : 'Tap a player to keep them. Rule-breakers are greyed out. Cap-breakers still tap, so you can see the damage.'}
           </div>
         )}
         {!canEdit && (
@@ -1047,7 +1049,11 @@ export default function TeamKeeperPage() {
                 <span style={{ color: 'var(--neon-teal)' }}>✓ {projectionMode ? 'Projection saved' : 'Keepers saved'}</span>
               ) : dirty ? (
                 <span style={{ color: result.valid ? 'var(--neon-yellow)' : 'var(--neon-red)' }}>
-                  {result.valid ? '● Unsaved changes' : 'Fix the blocked keeper choice'}
+                  {result.valid
+                    ? '● Unsaved changes'
+                    : !result.capOk
+                      ? 'Over the cap. Drop someone to save.'
+                      : 'Fix the blocked keeper choice'}
                 </span>
               ) : (
                 <span style={{ color: 'var(--text-dim)' }}>{projectionMode ? 'Private projection saved' : 'In sync with the league'}</span>
