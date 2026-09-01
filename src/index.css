@@ -689,8 +689,9 @@ body::before {
   .commish-schedule-link { align-items: stretch; flex-direction: column; }
   .commish-schedule-link a { justify-content: center; }
   .schedule-table-scroll { max-height: 62vh; }
-  .bottom-nav-commish .hub-heading { font-size: 0.5rem !important; letter-spacing: 0.06em; }
-  .bottom-nav-commish a { padding-inline: 1px !important; }
+  .bottom-nav-commish .hub-heading { font-size: 0.46rem !important; letter-spacing: 0.02em; }
+  .bottom-nav-commish a { padding-inline: 0 !important; }
+  .bottom-nav-commish span:first-child { font-size: 0.95rem !important; }
 }
 
 /* ─── Rule book ──────────────────────────────────────────────────────── */
@@ -1595,24 +1596,28 @@ body::before {
   letter-spacing: 0.09em;
 }
 
+/* One of these sits under all 246 rules, so it stays a faint affordance and
+   only steps forward on hover or keyboard focus. As a bordered button it
+   doubled the length of the book and buried the rules themselves. */
 .rules-propose {
-  margin-top: 5px;
-  min-height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  margin: 1px 0 0 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--text-ghost);
   font-family: inherit;
-  font-size: 0.54rem;
-  font-weight: 900;
+  font-size: 0.53rem;
+  font-weight: 800;
   letter-spacing: 0.07em;
 }
-.rules-propose:hover, .rules-propose:focus-visible {
-  border-color: var(--neon-purple);
+.rules-clause:hover .rules-propose,
+.rules-propose:hover,
+.rules-propose:focus-visible {
   color: var(--neon-purple);
   outline: none;
 }
+.rules-propose:focus-visible { text-decoration: underline; }
 
 .sign-block {
   display: flex;

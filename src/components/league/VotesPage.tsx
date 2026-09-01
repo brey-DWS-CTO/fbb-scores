@@ -369,7 +369,12 @@ export default function VotesPage() {
                 label={kind === 'change' ? 'Which rule would change?' : 'Where should it sit? (optional)'}
                 hint={
                   kind === 'change'
-                    ? 'Pick at least one rule. Everyone voting sees exactly what this touches.'
+                    // Reads as an unmet requirement if it says "pick at least
+                    // one" while one is already picked, which it usually is
+                    // when the vote started from a rule.
+                    ? affects.length === 0
+                      ? 'Pick the rule this would change.'
+                      : 'Everyone voting sees exactly which rules this touches.'
                     : 'Naming a rule tells the commissioner where the new one goes.'
                 }
                 max={kind === 'new-rule' ? 1 : undefined}
