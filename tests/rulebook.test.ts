@@ -7,6 +7,7 @@ import {
   formatHighScoreWhen,
   groupByArticle,
   highlight,
+  queryWords,
   rankedHighScores,
   referrersOf,
   refsIn,
@@ -124,12 +125,53 @@ test('search reads through a resolved reference, not the raw token', () => {
   const index = buildRulebookIndex(toyBook());
   assert.deepEqual(
     searchRulebook(index, 'Target').map((h) => h.entry.id),
-    ['b.one', 'a.two'].sort((a, b) =>
-      (index.byId.get(a)!.number > index.byId.get(b)!.number ? 1 : -1),
-    ),
-    'the clause holding the reference matches on the resolved title',
+    ['b.one', 'a.two'],
+    'the clause holding the reference matches on the resolved title, and the rule titled Target wins',
   );
   assert.equal(searchRulebook(index, '{{ref').length, 0, 'raw tokens are never searchable');
+});
+
+test('every word must match, in any order', () => {
+  const index = buildRulebookIndex(toyBook());
+  // "Second Thing" holds both words; nothing else holds "second" at all.
+  assert.deepEqual(
+    searchRulebook(index, 'thing second').map((h) => h.entry.id),
+    ['a.two'],
+    'word order does not matter',
+  );
+  assert.equal(
+    searchRulebook(index, 'second deeper').length,
+    0,
+    'no single rule holds both words, so nothing matches',
+  );
+  // A word must start a word in the rule, not sit anywhere inside one.
+  assert.equal(searchRulebook(index, 'eeper').length, 0);
+  assert.deepEqual(
+    searchRulebook(index, 'deep').map((h) => h.entry.id),
+    ['a.one.deep'],
+    'a half-typed word still finds the rule',
+  );
+});
+
+test('a query of nothing but filler finds nothing, not the whole book', () => {
+  assert.equal(searchRulebook(rulebookIndex2027, 'the').length, 0);
+  assert.equal(searchRulebook(rulebookIndex2027, 'of the').length, 0);
+  assert.deepEqual(queryWords('the keeper of the cap'), ['keeper', 'cap'], 'filler is dropped');
+  assert.deepEqual(queryWords('4.3 cap'), ['4.3', 'cap'], 'a rule number stays one word');
+  assert.deepEqual(queryWords('cap cap'), ['cap'], 'a repeated word counts once');
+});
+
+test('search ranks the best answer first and stays explainable', () => {
+  const index = buildRulebookIndex(toyBook());
+  // An exact number beats everything under it.
+  const numbers = searchRulebook(index, '1.1');
+  assert.equal(numbers[0].entry.id, 'a.one');
+  assert.ok(numbers[0].score > numbers[1].score, 'the exact number scores higher than the child');
+
+  // Scores only ever fall as you read down the list.
+  const ranked = searchRulebook(rulebookIndex2027, 'keeper');
+  const scores = ranked.map((h) => h.score);
+  assert.deepEqual(scores, [...scores].sort((a, b) => b - a), 'best first');
 });
 
 test('breadcrumbs name the ancestors that have titles', () => {
@@ -143,6 +185,22 @@ test('highlight splits on the match without losing any characters', () => {
   assert.deepEqual(segments.map((s) => s.hit), [true, false, true, false]);
   assert.equal(segments.map((s) => s.text).join(''), 'Keeper cap and keeper contracts');
   assert.deepEqual(highlight('no match here', 'zzz'), [{ text: 'no match here', hit: false }]);
+});
+
+test('highlight marks every word of the query, in any order', () => {
+  const marked = (text: string, query: string) =>
+    highlight(text, query).filter((s) => s.hit).map((s) => s.text);
+
+  assert.deepEqual(marked('Keeper Salary Cap', 'keeper cap'), ['Keeper', 'Cap']);
+  assert.deepEqual(marked('Keeper Salary Cap', 'cap keeper'), ['Keeper', 'Cap'], 'order free');
+  assert.equal(
+    highlight('Keeper Salary Cap', 'keeper cap').map((s) => s.text).join(''),
+    'Keeper Salary Cap',
+    'no character is lost',
+  );
+  assert.deepEqual(marked('the cap and the keeper', 'the cap'), ['cap'], 'filler is not marked');
+  assert.deepEqual(marked('Keeper cap', 'keep keeper'), ['Keeper'], 'overlapping runs merge');
+  assert.deepEqual(highlight('anything', ''), [{ text: 'anything', hit: false }]);
 });
 
 test('anchors are stable ids, not numbers', () => {
@@ -201,11 +259,34 @@ test('the commissioner rulings are present in the committed book', () => {
 test('searching the real book finds rules by number and by wording', () => {
   const capByNumber = searchRulebook(rulebookIndex2027, '4.3');
   assert.ok(capByNumber.some((h) => h.entry.id === 'keepers.cap'), 'number search finds the cap');
+  assert.equal(capByNumber[0].entry.id, 'keepers.cap', 'the rule itself leads its own branch');
 
   const kyle = searchRulebook(rulebookIndex2027, 'Kyle Rule');
-  assert.ok(kyle.some((h) => h.entry.id === 'keepers.picktrade.kyle'));
+  assert.equal(kyle[0].entry.id, 'keepers.picktrade.kyle');
 
   assert.equal(searchRulebook(rulebookIndex2027, 'qqqzzz').length, 0);
+});
+
+test('half a title in the wrong order still finds the rule, and finds it first', () => {
+  for (const query of ['keeper cap', 'cap keeper', 'KEEPER CAP', 'salary keeper']) {
+    const hits = searchRulebook(rulebookIndex2027, query);
+    assert.equal(hits[0].entry.id, 'keepers.cap', `"${query}" leads with 4.3 Keeper Salary Cap`);
+    assert.equal(hits[0].entry.number, '4.3');
+  }
+
+  // A title match beats a rule that only mentions the words in passing.
+  const salary = searchRulebook(rulebookIndex2027, 'salary cap');
+  assert.equal(salary[0].entry.id, 'keepers.cap');
+  assert.ok(
+    salary.length > 1 && salary[0].score > salary[salary.length - 1].score,
+    'passing mentions rank below the rule the words name',
+  );
+});
+
+test('search stays narrow enough to be useful on the real book', () => {
+  const all = rulebookIndex2027.entries.length;
+  const hits = searchRulebook(rulebookIndex2027, 'keeper cap');
+  assert.ok(hits.length > 0 && hits.length < all / 4, `two words return ${hits.length} of ${all}`);
 });
 
 // ─── Collapsible sections ──────────────────────────────────────────────────
