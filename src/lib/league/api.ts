@@ -6,6 +6,7 @@ import type {
   PlayerPoolSnapshot,
 } from './playerPool.js';
 import type { KeeperScenario } from './keeperScenario.js';
+import type { Rulebook } from './rulebook.js';
 import type {
   LeagueScheduleMapping,
   RawScheduleSource,
@@ -447,6 +448,56 @@ export async function fetchPins(
 
 export async function setPin(c: Credentials, owner: string, pin: string): Promise<void> {
   await axios.post(`/api/league/pins/${encodeURIComponent(owner)}`, { pin }, { headers: authHeaders(c) });
+}
+
+// ─── Rule book draft (commissioner only) ─────────────────────────────────────
+
+export interface RulebookDraftResponse {
+  book: Rulebook;
+  version: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  /** True when no draft is stored yet and this is the committed seed. */
+  seeded: boolean;
+}
+
+export async function fetchRulebookDraft(c: Credentials): Promise<RulebookDraftResponse> {
+  const { data } = await axios.get<RulebookDraftResponse>('/api/league/rulebook/draft', {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export interface RulebookSaveResponse {
+  version: number;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export async function saveRulebookDraft(
+  c: Credentials,
+  book: Rulebook,
+  expectedVersion: number,
+): Promise<RulebookSaveResponse> {
+  const { data } = await axios.put<RulebookSaveResponse>(
+    '/api/league/rulebook/draft',
+    { book, expectedVersion },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Throw the draft away and go back to the committed rule book. */
+export async function resetRulebookDraft(c: Credentials): Promise<RulebookDraftResponse> {
+  const { data } = await axios.delete<RulebookDraftResponse>('/api/league/rulebook/draft', {
+    headers: authHeaders(c),
+  });
+  return { ...data, updatedAt: null, updatedBy: null };
+}
+
+/** True when a save was refused because someone else saved first. */
+export function isStaleDraftError(e: unknown): boolean {
+  return axios.isAxiosError(e) && e.response?.status === 409;
 }
 
 export function apiErrorMessage(e: unknown): string {

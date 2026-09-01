@@ -943,7 +943,12 @@ body::before {
   .rules-search-bar,
   .rules-tools,
   .rules-result-count,
-  .rules-status { display: none !important; }
+  .rules-status,
+  .rules-draft-bar,
+  .rules-draft-off,
+  .rule-edit-bar,
+  .rule-edit-form,
+  .rules-article-editor { display: none !important; }
 
   .rules-page { width: auto; max-width: none; margin: 0; padding: 0; }
   .rules-print-head {
@@ -971,7 +976,7 @@ body::before {
   .rules-caret, .rules-article-count { display: none; }
   .rules-article-number { color: #000; margin-right: 8pt; }
 
-  .rules-clause { break-inside: avoid; margin-bottom: 5pt; }
+  .rules-clause { break-inside: avoid; margin-bottom: 5pt; border: 0 !important; padding: 0 !important; }
   .rules-clause-text {
     color: #000;
     font-size: 10pt;
@@ -1027,3 +1032,123 @@ body::before {
 .records-caption a { color: var(--neon-teal); }
 .records-table { width: 100%; }
 .records-num { text-align: right; }
+
+/* ─── Rule book draft mode (commissioner only) ───────────────────────── */
+.rules-draft-off { display: flex; margin-bottom: 10px; }
+.rules-draft-off .rules-tool { flex: 1; color: var(--neon-purple); border-color: rgba(204,0,255,0.45); }
+
+.rules-draft-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 9px;
+  margin-bottom: 8px;
+  border-radius: 9px;
+  border-color: rgba(204,0,255,0.65);
+}
+.rules-draft-status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 8px; }
+.rules-draft-tag { color: var(--neon-purple); font-size: 0.6rem; }
+.rules-draft-meta { color: var(--text-dim); font-size: 0.63rem; }
+.rules-draft-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.rules-draft-actions .rules-tool {
+  flex: 1 1 auto;
+  min-width: 62px;
+  min-height: 34px;
+  padding: 0 8px;
+  font-size: 0.58rem;
+}
+.rules-tool-primary { border-color: var(--neon-teal); color: var(--neon-teal); }
+.rules-tool:disabled { opacity: 0.4; }
+.rules-draft-problems {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--neon-red);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+.rules-draft-problems code { color: var(--text-mid); }
+.rules-draft-error { margin: 0; color: var(--neon-red); font-size: 0.7rem; line-height: 1.45; }
+.rules-draft-note { margin: 0; color: var(--text-dim); font-size: 0.7rem; }
+
+/* Give each rule breathing room while its controls are on screen. */
+.rules-page-editing .rules-body { gap: 12px; }
+.rules-page-editing .rules-clause {
+  padding: 7px 8px 6px;
+  border: 1px dashed var(--panel-border);
+  border-radius: 8px;
+}
+.rules-article-editor { margin-bottom: 4px; }
+
+.rule-edit-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.rule-edit-btn {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--chip-bg);
+  color: var(--text-mid);
+  font-family: inherit;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.rule-edit-btn:hover:not(:disabled), .rule-edit-btn:focus-visible:not(:disabled) {
+  border-color: var(--neon-purple);
+  color: var(--neon-purple);
+  outline: none;
+}
+.rule-edit-btn:disabled { opacity: 0.28; }
+.rule-edit-move { min-width: 30px; font-size: 0.72rem; }
+.rule-edit-btn-danger:hover:not(:disabled) { border-color: var(--neon-red); color: var(--neon-red); }
+
+.rule-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 7px;
+  padding: 10px;
+  border: 2px solid rgba(204,0,255,0.5);
+  border-radius: 9px;
+  background: var(--cell-bg);
+}
+.rule-edit-danger { border-color: rgba(255,34,34,0.55); }
+.rule-edit-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.rule-edit-input { min-height: 40px; padding: 0 10px; font-size: 0.85rem; font-family: inherit; }
+.rule-edit-textarea {
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+.rule-edit-hint { margin: 0; color: var(--text-dim); font-size: 0.66rem; line-height: 1.5; }
+.rule-edit-hint code { color: var(--neon-teal); }
+.rule-edit-warn { margin: 0; color: var(--neon-red); font-size: 0.68rem; line-height: 1.5; }
+.rule-edit-actions { display: flex; gap: 6px; }
+.rule-edit-save, .rule-edit-cancel, .rule-edit-delete {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 7px;
+  border: 2px solid var(--panel-border);
+  background: var(--chip-bg);
+  color: var(--text-mid);
+  font-family: inherit;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+.rule-edit-save { border-color: var(--neon-teal); color: var(--neon-teal); }
+.rule-edit-delete { border-color: var(--neon-red); color: var(--neon-red); }
+.rule-edit-delete:disabled { opacity: 0.35; }

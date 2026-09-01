@@ -35,9 +35,16 @@ import {
   DRAFT_AT_ISO,
   PlayerPoolAcceptError,
   ScheduleAcceptError,
+  RulebookSaveError,
+  getRulebookDraft,
+  saveRulebookDraft,
+  deleteRulebookDraft,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
+import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
+import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
+import type { Rulebook } from '../../src/lib/league/rulebook.js';
 import {
   FALLBACK_PLAYER_POOL,
   fetchEspnPlayerPoolCandidate,
@@ -835,6 +842,93 @@ router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) =
  * GET /api/league/audit?limit=50 — recent audit rows, newest first.
  * Commissioner only: rows contain keeper selections, which are secret pre-draft.
  */
+// ─── Rule book draft (commissioner only) ─────────────────────────────────────
+//
+// The client holds the whole book, applies pure tree edits locally, and PUTs
+// the result with the version it started from. One commissioner means there is
+// no need for per-operation endpoints; the version check is what stops a stale
+// tab from overwriting newer edits.
+
+const SEED_RULEBOOK = seedRulebook as unknown as Rulebook;
+const RULEBOOK_SEASON: number = SEED_RULEBOOK.season;
+
+/** Rough ceiling on a stored book, so a broken client cannot fill the table. */
+const MAX_RULEBOOK_BYTES = 2_000_000;
+
+router.get('/rulebook/draft', requireAuth, requireCommissioner, async (_req, res, next) => {
+  try {
+    const row = await getRulebookDraft(RULEBOOK_SEASON);
+    if (!row) {
+      // No draft yet: hand back the committed seed at version 0, so the first
+      // save creates version 1 and the editor has something to work on.
+      res.json({ book: SEED_RULEBOOK, version: 0, updatedAt: null, updatedBy: null, seeded: true });
+      return;
+    }
+    res.json({
+      book: row.book,
+      version: row.version,
+      updatedAt: row.updatedAt,
+      updatedBy: row.updatedBy,
+      seeded: false,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/rulebook/draft', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const body = req.body as { book?: unknown; expectedVersion?: unknown };
+    const expectedVersion = body.expectedVersion;
+    if (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
+      throw new HttpError(400, 'expectedVersion must be a whole number');
+    }
+    const book = body.book as Rulebook | undefined;
+    if (!book || typeof book !== 'object' || !Array.isArray(book.articles)) {
+      throw new HttpError(400, 'book must be a rule book document');
+    }
+    if (book.season !== RULEBOOK_SEASON) {
+      throw new HttpError(400, `book is for season ${String(book.season)}, expected ${RULEBOOK_SEASON}`);
+    }
+    if (JSON.stringify(book).length > MAX_RULEBOOK_BYTES) {
+      throw new HttpError(413, 'That rule book is too large to store');
+    }
+
+    // Structural problems are rejected here rather than stored and discovered
+    // at publish time. Broken references are the ones that matter most.
+    const problems = validateDraft(book);
+    if (problems.length) {
+      res.status(422).json({ error: 'The draft has problems that must be fixed', problems });
+      return;
+    }
+
+    const owner = res.locals.owner as string;
+    const saved = await saveRulebookDraft(RULEBOOK_SEASON, book, expectedVersion, owner);
+    await appendAudit(owner, 'rulebook-draft-save', {
+      version: saved.version,
+      articles: book.articles.length,
+    });
+    res.json({ version: saved.version, updatedAt: saved.updatedAt, updatedBy: saved.updatedBy });
+  } catch (err) {
+    if (err instanceof RulebookSaveError) {
+      res.status(409).json({ error: err.message, code: err.code, currentVersion: err.currentVersion });
+      return;
+    }
+    next(err);
+  }
+});
+
+router.delete('/rulebook/draft', requireAuth, requireCommissioner, async (_req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    await deleteRulebookDraft(RULEBOOK_SEASON);
+    await appendAudit(owner, 'rulebook-draft-reset', { season: RULEBOOK_SEASON });
+    res.json({ book: SEED_RULEBOOK, version: 0, seeded: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
   const parsed = parseInt(String(req.query.limit ?? '50'), 10);
   const limit = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 200) : 50;

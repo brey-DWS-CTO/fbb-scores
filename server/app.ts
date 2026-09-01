@@ -17,7 +17,10 @@ const app = express();
 
 // Allow all origins in development
 app.use(cors());
-app.use(express.json());
+// The rule book draft PUT sends the whole document, already ~87 KB and growing
+// as clauses are added. Express defaults to 100 KB, which would start rejecting
+// saves after a short editing session.
+app.use(express.json({ limit: '4mb' }));
 
 // Mount API routes
 app.use('/api', espnRoutes);

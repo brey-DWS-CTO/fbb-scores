@@ -99,6 +99,27 @@ export class PlayerPoolAcceptError extends Error {
   }
 }
 
+/** The commissioner's working copy of the rulebook, with a version for safe writes. */
+export interface RulebookDraftRow {
+  season: number;
+  /** A whole Rulebook document; the server never inspects its shape. */
+  book: unknown;
+  version: number;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export class RulebookSaveError extends Error {
+  code: string;
+  currentVersion?: number;
+  constructor(code: string, message: string, currentVersion?: number) {
+    super(message);
+    this.code = code;
+    this.currentVersion = currentVersion;
+    this.name = 'RulebookSaveError';
+  }
+}
+
 export class ScheduleAcceptError extends Error {
   reason: 'draft-started' | 'stale-base' | 'snapshot-conflict';
 
@@ -186,6 +207,15 @@ interface StoreBackend {
     acceptedAt: string,
     acceptedBy: string,
   ): Promise<MutateResult>;
+  getRulebookDraft(season: number): Promise<RulebookDraftRow | null>;
+  saveRulebookDraft(
+    season: number,
+    book: unknown,
+    expectedVersion: number,
+    savedAt: string,
+    savedBy: string,
+  ): Promise<RulebookDraftRow>;
+  deleteRulebookDraft(season: number): Promise<void>;
 }
 
 // ─── Neon Postgres backend ───────────────────────────────────────────────────
@@ -254,6 +284,13 @@ class NeonBackend implements StoreBackend {
       data jsonb not null,
       created_at timestamptz not null,
       created_by text not null
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS rulebook_draft (
+      season int primary key,
+      data jsonb not null,
+      version int not null default 0,
+      updated_at timestamptz not null default now(),
+      updated_by text not null
     )`;
     await this.sql`INSERT INTO league_state (id, data, version)
       VALUES (1, ${JSON.stringify(defaultState())}::jsonb, 0)
@@ -534,6 +571,72 @@ class NeonBackend implements StoreBackend {
     }
     throw new ScheduleAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
   }
+
+  async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data, version, updated_at, updated_by
+      FROM rulebook_draft WHERE season = ${season}`) as Array<{
+      data: unknown;
+      version: number;
+      updated_at: string | Date;
+      updated_by: string;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      season,
+      book: row.data,
+      version: row.version,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      updatedBy: row.updated_by,
+    };
+  }
+
+  async saveRulebookDraft(
+    season: number,
+    book: unknown,
+    expectedVersion: number,
+    savedAt: string,
+    savedBy: string,
+  ): Promise<RulebookDraftRow> {
+    await this.ensureInit();
+    // expectedVersion 0 means "there is no draft yet"; anything else must match
+    // the stored version, so a stale tab cannot silently overwrite newer edits.
+    const rows = (await this.sql`INSERT INTO rulebook_draft (season, data, version, updated_at, updated_by)
+      VALUES (${season}, ${JSON.stringify(book)}::jsonb, 1, ${savedAt}, ${savedBy})
+      ON CONFLICT (season) DO UPDATE
+        SET data = EXCLUDED.data,
+            version = rulebook_draft.version + 1,
+            updated_at = EXCLUDED.updated_at,
+            updated_by = EXCLUDED.updated_by
+        WHERE rulebook_draft.version = ${expectedVersion}
+      RETURNING version, updated_at, updated_by`) as Array<{
+      version: number;
+      updated_at: string | Date;
+      updated_by: string;
+    }>;
+    const saved = rows[0];
+    if (saved) {
+      return {
+        season,
+        book,
+        version: saved.version,
+        updatedAt: new Date(saved.updated_at).toISOString(),
+        updatedBy: saved.updated_by,
+      };
+    }
+    const current = await this.getRulebookDraft(season);
+    throw new RulebookSaveError(
+      'stale-version',
+      'Someone saved a newer draft. Reload before editing again.',
+      current?.version,
+    );
+  }
+
+  async deleteRulebookDraft(season: number): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM rulebook_draft WHERE season = ${season}`;
+  }
 }
 
 // ─── Local JSON file backend ─────────────────────────────────────────────────
@@ -553,6 +656,7 @@ interface FileDoc {
     selections: KeeperSelection[];
     updatedAt: string;
   }>;
+  rulebookDrafts: RulebookDraftRow[];
 }
 
 const MAX_FILE_AUDIT_ROWS = 1000;
@@ -595,6 +699,7 @@ class FileBackend implements StoreBackend {
         playerPoolSnapshots: Array.isArray(doc.playerPoolSnapshots) ? doc.playerPoolSnapshots : [],
         scheduleSnapshots: Array.isArray(doc.scheduleSnapshots) ? doc.scheduleSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
+        rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
       };
     } catch {
       return {
@@ -815,6 +920,52 @@ class FileBackend implements StoreBackend {
       return { state: doc.state, version: doc.version };
     });
   }
+
+  async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
+    await this.ensureInit();
+    const doc = this.readDoc();
+    return doc.rulebookDrafts.find((row) => row.season === season) ?? null;
+  }
+
+  async saveRulebookDraft(
+    season: number,
+    book: unknown,
+    expectedVersion: number,
+    savedAt: string,
+    savedBy: string,
+  ): Promise<RulebookDraftRow> {
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const existing = doc.rulebookDrafts.find((row) => row.season === season);
+      const currentVersion = existing?.version ?? 0;
+      if (currentVersion !== expectedVersion) {
+        throw new RulebookSaveError(
+          'stale-version',
+          'Someone saved a newer draft. Reload before editing again.',
+          currentVersion,
+        );
+      }
+      const row: RulebookDraftRow = {
+        season,
+        book,
+        version: currentVersion + 1,
+        updatedAt: savedAt,
+        updatedBy: savedBy,
+      };
+      if (existing) doc.rulebookDrafts[doc.rulebookDrafts.indexOf(existing)] = row;
+      else doc.rulebookDrafts.push(row);
+      this.writeDoc(doc);
+      return row;
+    });
+  }
+
+  async deleteRulebookDraft(season: number): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.rulebookDrafts = doc.rulebookDrafts.filter((row) => row.season !== season);
+      this.writeDoc(doc);
+    });
+  }
 }
 
 // ─── Backend selection (lazy singleton) ──────────────────────────────────────
@@ -971,6 +1122,29 @@ export async function acceptPlayerPoolSnapshot(
     acceptedAt,
     acceptedBy,
   );
+}
+
+export async function getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
+  return getBackend().getRulebookDraft(season);
+}
+
+export async function saveRulebookDraft(
+  season: number,
+  book: unknown,
+  expectedVersion: number,
+  savedBy: string,
+): Promise<RulebookDraftRow> {
+  return getBackend().saveRulebookDraft(
+    season,
+    book,
+    expectedVersion,
+    new Date().toISOString(),
+    savedBy,
+  );
+}
+
+export async function deleteRulebookDraft(season: number): Promise<void> {
+  return getBackend().deleteRulebookDraft(season);
 }
 
 export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {
