@@ -1,14 +1,58 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
+import RecordTables from './RecordTables.js';
 import { rulebook2027, rulebookIndex2027 } from '../../lib/league/rulebookData.js';
 import {
   anchorFor,
+  groupByArticle,
   highlight,
   resolveRefs,
   searchRulebook,
+  sectionIdFor,
   type RulebookEntry,
 } from '../../lib/league/rulebook.js';
+
+const COLLAPSE_KEY = 'nerds.rules.collapsed';
+
+/** Which sections the reader last had shut. Never fails on a blocked store. */
+function loadCollapsed(): string[] {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCollapsed(ids: string[]) {
+  try {
+    window.localStorage.setItem(COLLAPSE_KEY, JSON.stringify(ids));
+  } catch {
+    // A private window or blocked site data just means it does not persist.
+  }
+}
+
+/** The clause id a `#rule-...` anchor points at. */
+function clauseIdFromHash(hash: string): string | undefined {
+  if (!hash) return undefined;
+  const anchor = hash.replace(/^#/, '');
+  return anchor.startsWith('rule-') ? anchor.slice(5) : anchor;
+}
+
+/**
+ * Sections shut on load, minus the one holding a deep-linked rule. Resolving
+ * this up front means a shared link opens its section on the very first render,
+ * with no state write from an effect.
+ */
+function initialCollapsed(): Set<string> {
+  const shut = new Set(loadCollapsed());
+  const clauseId = clauseIdFromHash(window.location.hash);
+  const section = clauseId ? sectionIdFor(clauseId, rulebookIndex2027) : undefined;
+  if (section) shut.delete(section);
+  return shut;
+}
 
 /** Marks the matched run without dangerouslySetInnerHTML. */
 function Marked({ text, term }: { text: string; term: string }) {
@@ -106,6 +150,7 @@ function Clause({
 export default function RulesPage() {
   const [term, setTerm] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(initialCollapsed);
   const location = useLocation();
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -113,8 +158,24 @@ export default function RulesPage() {
     () => (term.trim() ? searchRulebook(rulebookIndex2027, term) : null),
     [term],
   );
+  const sections = useMemo(() => groupByArticle(rulebookIndex2027), []);
 
-  // Jump to a deep-linked rule once, after the page has painted.
+  const setCollapsedAnd = (next: Set<string>) => {
+    setCollapsed(next);
+    saveCollapsed([...next]);
+  };
+
+  const toggleSection = (id: string) => {
+    const next = new Set(collapsed);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setCollapsedAnd(next);
+  };
+
+  const allShut = collapsed.size >= sections.length;
+
+  // Jump to a deep-linked rule. Its section is already open, because
+  // initialCollapsed resolved the anchor before the first render.
   useEffect(() => {
     if (!location.hash) return;
     const target = document.getElementById(location.hash.slice(1));
@@ -140,6 +201,13 @@ export default function RulesPage() {
 
   return (
     <main className="rules-page">
+      <div className="rules-print-head" aria-hidden="true">
+        <h1>{rulebook2027.title}</h1>
+        <p>
+          {rulebook2027.season} season · Revision {rulebook2027.revision} ·{' '}
+          {rulebook2027.status === 'published' ? 'Published' : 'Working draft, not ratified'}
+        </p>
+      </div>
       <header className="rules-page-header">
         <div>
           <h1 className="hub-heading glow-teal">📖 RULE BOOK</h1>
@@ -178,6 +246,21 @@ export default function RulesPage() {
         )}
       </div>
 
+      <div className="rules-tools">
+        <button
+          type="button"
+          className="rules-tool tap-btn"
+          onClick={() =>
+            setCollapsedAnd(allShut ? new Set() : new Set(sections.map((s) => s.heading.id)))
+          }
+        >
+          {allShut ? 'OPEN ALL' : 'CLOSE ALL'}
+        </button>
+        <button type="button" className="rules-tool tap-btn" onClick={() => window.print()}>
+          PRINT / PDF
+        </button>
+      </div>
+
       {results && (
         <p className="rules-result-count">
           {results.length === 0
@@ -198,22 +281,51 @@ export default function RulesPage() {
                 breadcrumb={hit.breadcrumb}
               />
             ))
-          : rulebookIndex2027.entries.map((entry) =>
-              entry.isArticle ? (
-                <h2 key={entry.id} id={anchorFor(entry.id)} className="hub-heading rules-article">
-                  <span className="rules-article-number">{entry.number}</span>
-                  {entry.title}
-                </h2>
-              ) : (
-                <Clause
-                  key={entry.id}
-                  entry={entry}
-                  term={term}
-                  copied={copied === entry.id}
-                  onCopy={copyLink}
-                />
-              ),
-            )}
+          : sections.map((section) => {
+              const shut = collapsed.has(section.heading.id);
+              return (
+                <section key={section.heading.id} className="rules-section">
+                  <h2 id={anchorFor(section.heading.id)} className="rules-article">
+                    <button
+                      type="button"
+                      className="hub-heading rules-article-toggle tap-btn"
+                      onClick={() => toggleSection(section.heading.id)}
+                      aria-expanded={!shut}
+                      aria-controls={`section-${section.heading.id}`}
+                    >
+                      <span className="rules-caret" aria-hidden="true">
+                        {shut ? '▸' : '▾'}
+                      </span>
+                      <span className="rules-article-number">{section.heading.number}</span>
+                      <span className="rules-article-title">{section.heading.title}</span>
+                      <span className="rules-article-count">{section.clauses.length}</span>
+                    </button>
+                  </h2>
+                  <div
+                    id={`section-${section.heading.id}`}
+                    className={shut ? 'rules-section-body rules-shut' : 'rules-section-body'}
+                  >
+                    {/* Appendices carry their content on the heading itself. */}
+                    {section.heading.note && (
+                      <p className="rules-clause-text rules-section-note">
+                        <Marked text={section.heading.note} term={term} />
+                      </p>
+                    )}
+                    {section.heading.table && <ClauseTable entry={section.heading} term={term} />}
+                    {section.heading.id === 'appendix-b' && <RecordTables />}
+                    {section.clauses.map((entry) => (
+                      <Clause
+                        key={entry.id}
+                        entry={entry}
+                        term={term}
+                        copied={copied === entry.id}
+                        onCopy={copyLink}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
         {results && results.length === 0 && (
           <div className="panel rules-empty">
             Nothing found. Try a keyword like <em>keeper</em>, <em>waivers</em>, or a rule

@@ -5,6 +5,8 @@ import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 
 import IdentityChip from './IdentityChip.js';
+import RecordTables from './RecordTables.js';
+import ScoringTable from './ScoringTable.js';
 
 const th: CSSProperties = {
   padding: '4px 8px',
@@ -243,6 +245,14 @@ export default function LeaguePage() {
       </Section>
 
       {/* ── d. Account ─────────────────────────────────────────── */}
+      <Section title="SCORING SYSTEM" color="var(--neon-purple)">
+        <ScoringTable />
+      </Section>
+
+      <Section title="RECORD BOOK" color="var(--neon-teal)">
+        <RecordTables />
+      </Section>
+
       <Section title="ACCOUNT" color="var(--neon-yellow)">
         <div
           style={{

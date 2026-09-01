@@ -763,21 +763,60 @@ body::before {
   letter-spacing: 0.05em;
 }
 
-.rules-body { display: flex; flex-direction: column; gap: 7px; }
-.rules-article {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 22px 0 4px;
+.rules-tools { display: flex; gap: 8px; margin: 0 0 10px; }
+.rules-tool {
+  flex: 1 1 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--chip-bg);
+  color: var(--text-mid);
+  font-family: inherit;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+.rules-tool:hover, .rules-tool:focus-visible {
+  border-color: var(--neon-teal);
   color: var(--neon-teal);
-  font-size: 0.8rem;
-  border-bottom: 2px solid var(--panel-border);
-  padding-bottom: 8px;
+  outline: none;
+}
+
+.rules-body { display: flex; flex-direction: column; gap: 7px; }
+.rules-section { display: flex; flex-direction: column; gap: 7px; }
+.rules-section-body { display: flex; flex-direction: column; gap: 7px; }
+.rules-shut { display: none; }
+
+.rules-article {
+  margin: 15px 0 0;
   scroll-margin-top: 64px;
 }
-.rules-article:first-child { margin-top: 6px; }
+.rules-section:first-child .rules-article { margin-top: 4px; }
+.rules-article-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 2px 8px;
+  border: 0;
+  border-bottom: 2px solid var(--panel-border);
+  background: none;
+  color: var(--neon-teal);
+  font-size: 0.8rem;
+  text-align: left;
+}
+.rules-article-toggle:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 3px; }
+.rules-caret { color: var(--text-dim); font-size: 0.7rem; }
+.rules-article-title { flex: 1; }
 .rules-article-number {
   color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.rules-article-count {
+  color: var(--text-ghost);
+  font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -888,3 +927,103 @@ body::before {
   text-align: center;
 }
 .rules-empty em { color: var(--neon-teal); font-style: normal; font-weight: 800; }
+
+/* ─── Rule book, printed ─────────────────────────────────────────────── */
+.rules-print-head { display: none; }
+
+@media print {
+  /* Ink on paper: ignore the app's neon theme entirely. */
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    padding-bottom: 0 !important;
+  }
+  .bottom-nav,
+  .rules-page-header,
+  .rules-search-bar,
+  .rules-tools,
+  .rules-result-count,
+  .rules-status { display: none !important; }
+
+  .rules-page { width: auto; max-width: none; margin: 0; padding: 0; }
+  .rules-print-head {
+    display: block;
+    margin-bottom: 18pt;
+    border-bottom: 1pt solid #000;
+    padding-bottom: 8pt;
+  }
+  .rules-print-head h1 { margin: 0; font-size: 16pt; line-height: 1.3; }
+  .rules-print-head p { margin: 4pt 0 0; font-size: 9pt; color: #444; }
+
+  /* Everything prints, whatever the reader had collapsed on screen. */
+  .rules-shut { display: flex !important; }
+
+  .rules-body, .rules-section, .rules-section-body { display: block; }
+  .rules-article { margin: 14pt 0 6pt; break-after: avoid; break-inside: avoid; }
+  .rules-article-toggle {
+    display: block;
+    min-height: 0;
+    padding: 0 0 4pt;
+    border-bottom: 0.75pt solid #000;
+    color: #000;
+    font-size: 12pt;
+  }
+  .rules-caret, .rules-article-count { display: none; }
+  .rules-article-number { color: #000; margin-right: 8pt; }
+
+  .rules-clause { break-inside: avoid; margin-bottom: 5pt; }
+  .rules-clause-text {
+    color: #000;
+    font-size: 10pt;
+    line-height: 1.45;
+    orphans: 3;
+    widows: 3;
+  }
+  /* The number stays inline; it just stops looking like a button. */
+  .rules-number {
+    min-height: 0;
+    margin-right: 6pt;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #000;
+    font-size: 9.5pt;
+    font-weight: 700;
+  }
+  .rules-clause-title { color: #000; }
+  .rules-example-tag { border-color: #666; color: #333; background: none; }
+  .rules-mark { background: none; color: #000; font-weight: 700; }
+
+  .rules-section-note { font-style: italic; color: #333; }
+  .records-heading { color: #000; margin-top: 12pt; font-size: 11pt; }
+  .records-caption { color: #333; font-size: 8.5pt; }
+  .records-caption a { color: #000; text-decoration: none; }
+  .rules-table-wrap { overflow: visible; margin-left: 0; break-inside: avoid; }
+  .rules-table { font-size: 9pt; color: #000; width: 100%; }
+  .rules-table th, .rules-table td {
+    border: 0.5pt solid #666;
+    color: #000;
+    background: none;
+    white-space: normal;
+  }
+
+  @page { margin: 14mm; }
+}
+
+/* ─── Record & scoring tables (shared by /rules and /league) ─────────── */
+.records-block { display: flex; flex-direction: column; gap: 6px; }
+.records-heading {
+  margin: 14px 0 0;
+  color: var(--neon-teal);
+  font-size: 0.66rem;
+}
+.records-block > .records-heading:first-child { margin-top: 0; }
+.records-caption {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+.records-caption a { color: var(--neon-teal); }
+.records-table { width: 100%; }
+.records-num { text-align: right; }

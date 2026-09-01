@@ -4,11 +4,15 @@ import {
   anchorFor,
   breadcrumbFor,
   buildRulebookIndex,
+  formatHighScoreWhen,
+  groupByArticle,
   highlight,
+  rankedHighScores,
   referrersOf,
   refsIn,
   resolveRefs,
   searchRulebook,
+  sectionIdFor,
   type Rulebook,
 } from '../src/lib/league/rulebook.js';
 import { rulebook2027, rulebookIndex2027 } from '../src/lib/league/rulebookData.js';
@@ -33,6 +37,11 @@ function toyBook(): Rulebook {
       { id: 'beta', title: 'Beta', clauses: [{ id: 'b.one', title: 'Target', text: 'Here.' }] },
     ],
     appendices: [{ id: 'appx', label: 'Appendix A', title: 'Values' }],
+    records: {
+      highScores: { criteria: 'toy', complete: false, entries: [] },
+      champions: { complete: false, entries: [] },
+      formerMembers: [],
+    },
   };
 }
 
@@ -197,6 +206,96 @@ test('searching the real book finds rules by number and by wording', () => {
   assert.ok(kyle.some((h) => h.entry.id === 'keepers.picktrade.kyle'));
 
   assert.equal(searchRulebook(rulebookIndex2027, 'qqqzzz').length, 0);
+});
+
+// ─── Collapsible sections ──────────────────────────────────────────────────
+
+test('groups every clause under its own article, appendices included', () => {
+  const sections = groupByArticle(buildRulebookIndex(toyBook()));
+  assert.deepEqual(
+    sections.map((s) => [s.heading.id, s.clauses.map((c) => c.id)]),
+    [
+      ['alpha', ['a.one', 'a.one.deep', 'a.two']],
+      ['beta', ['b.one']],
+      ['appx', []],
+    ],
+  );
+});
+
+test('grouping keeps every clause, losing none to the section split', () => {
+  const sections = groupByArticle(rulebookIndex2027);
+  const grouped = sections.reduce((n, s) => n + s.clauses.length, 0);
+  const total = rulebookIndex2027.entries.filter((e) => !e.isArticle).length;
+  assert.equal(grouped, total);
+  assert.equal(sections.length, 12, '10 articles plus 2 appendices');
+  assert.deepEqual(
+    sections.slice(-2).map((s) => s.heading.id),
+    ['appendix-a', 'appendix-b'],
+  );
+});
+
+test('a deep link resolves to the section that must be opened for it', () => {
+  assert.equal(sectionIdFor('keepers.cap.value', rulebookIndex2027), 'keepers');
+  assert.equal(sectionIdFor('draft.order.p5to6', rulebookIndex2027), 'draft');
+  assert.equal(sectionIdFor('appendix-a', rulebookIndex2027), 'appendix-a');
+  assert.equal(sectionIdFor('no.such.rule', rulebookIndex2027), undefined);
+});
+
+// ─── Appendix B records ────────────────────────────────────────────────────
+
+test('high scores rank by total, fixing the docx ordering', () => {
+  const ranked = rankedHighScores(rulebook2027.records.highScores.entries);
+  const totals = ranked.map((r) => r.total);
+  assert.deepEqual(totals, [...totals].sort((a, b) => b - a), 'sorted high to low');
+
+  // The source listed Eric's 1241.6 at 13 and Aaron's 1243.0 at 14.
+  const aaron = ranked.find((r) => r.total === 1243.0)!;
+  const eric = ranked.find((r) => r.total === 1241.6)!;
+  assert.ok(aaron.rank < eric.rank, 'the bigger score ranks higher');
+  assert.equal(ranked[0].owner, 'Brey');
+  assert.equal(ranked[0].rank, 1);
+});
+
+test('equal totals share a rank and the next rank skips', () => {
+  const ranked = rankedHighScores([
+    { owner: 'A', season: 1, week: 1, total: 1300, source: 'test' },
+    { owner: 'B', season: 1, week: 2, total: 1200, source: 'test' },
+    { owner: 'C', season: 1, week: 3, total: 1200, source: 'test' },
+    { owner: 'D', season: 1, week: 4, total: 1100, source: 'test' },
+  ]);
+  assert.deepEqual(
+    ranked.map((r) => r.rank),
+    [1, 2, 2, 4],
+  );
+});
+
+test('an unknown week prints as a question mark, as the source had it', () => {
+  assert.equal(
+    formatHighScoreWhen({ owner: 'Aaron', season: 14, week: null, total: 1316.4, source: 'rulebook' }),
+    'S14W?',
+  );
+  assert.equal(
+    formatHighScoreWhen({ owner: 'Brey', season: 9, week: 10, total: 1421.6, source: 'rulebook' }),
+    'S9W10',
+  );
+});
+
+test('the champions record is complete through 2025-26', () => {
+  const { entries, complete } = rulebook2027.records.champions;
+  assert.equal(complete, true);
+  assert.equal(entries.length, 16);
+  const latest = entries.find((e) => e.season === 16)!;
+  assert.equal(latest.champion, 'Amy Shaug');
+  assert.equal(latest.runnerUp, 'Brey Funkhouser');
+  assert.equal(entries.filter((e) => e.champion === null).length, 0, 'no season left blank');
+});
+
+test('appendix A still carries the scoring table the league page reads', () => {
+  const appendixA = rulebook2027.appendices.find((a) => a.id === 'appendix-a')!;
+  assert.ok(appendixA.table, 'the table drives both /rules and /league');
+  assert.deepEqual(appendixA.table!.columns, ['Statistic', 'Value']);
+  assert.equal(appendixA.table!.rows.length, 14);
+  assert.deepEqual(appendixA.table!.rows.find((r) => r[0] === '5X5'), ['5X5', '55']);
 });
 
 test('every article and appendix in the book is reachable', () => {

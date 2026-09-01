@@ -46,6 +46,40 @@ export interface RulebookAppendix {
   table?: RulebookTable;
 }
 
+export interface HighScoreEntry {
+  owner: string;
+  season: number;
+  week: number | null;
+  total: number;
+  source: string;
+  verified?: boolean;
+  /** No longer in the league; shown with an asterisk, as the book does. */
+  former?: boolean;
+  note?: string;
+}
+
+export interface ChampionEntry {
+  season: number;
+  year: string;
+  champion: string | null;
+  runnerUp: string | null;
+  source: string;
+  note?: string;
+}
+
+export interface RulebookRecords {
+  highScores: {
+    criteria: string;
+    scoreBasis?: string;
+    scoreBasisNote?: string;
+    complete: boolean;
+    note?: string;
+    entries: HighScoreEntry[];
+  };
+  champions: { complete: boolean; entries: ChampionEntry[] };
+  formerMembers: string[];
+}
+
 export interface Rulebook {
   schemaVersion: number;
   season: number;
@@ -54,6 +88,7 @@ export interface Rulebook {
   title: string;
   articles: RulebookArticle[];
   appendices: RulebookAppendix[];
+  records: RulebookRecords;
 }
 
 /** One addressable line of the book, with its number worked out from position. */
@@ -259,4 +294,52 @@ export function highlight(text: string, query: string): TextSegment[] {
 /** Anchor id for a clause, used by `/rules#rule-<id>` deep links. */
 export function anchorFor(id: string): string {
   return `rule-${id}`;
+}
+
+export interface RulebookSection {
+  /** The article or appendix heading. */
+  heading: RulebookEntry;
+  /** Everything filed under it, in reading order. */
+  clauses: RulebookEntry[];
+}
+
+/** Split the flat index into collapsible sections, one per article or appendix. */
+export function groupByArticle(index: RulebookIndex): RulebookSection[] {
+  const sections: RulebookSection[] = [];
+  for (const entry of index.entries) {
+    if (entry.isArticle) sections.push({ heading: entry, clauses: [] });
+    else sections[sections.length - 1]?.clauses.push(entry);
+  }
+  return sections;
+}
+
+/** The article or appendix a clause belongs to, so a deep link can open it. */
+export function sectionIdFor(id: string, index: RulebookIndex): string | undefined {
+  return index.byId.get(id)?.articleId;
+}
+
+export interface RankedHighScore extends HighScoreEntry {
+  rank: number;
+}
+
+/**
+ * High scores ranked by total, highest first. Rank is never stored, which is
+ * how the docx ended up listing Eric's 1241.6 above Aaron's 1243.0. Equal
+ * totals share a rank, and the next rank skips accordingly.
+ */
+export function rankedHighScores(entries: HighScoreEntry[]): RankedHighScore[] {
+  const sorted = [...entries].sort((a, b) => b.total - a.total);
+  let lastTotal = Number.NaN;
+  let lastRank = 0;
+  return sorted.map((entry, i) => {
+    const rank = entry.total === lastTotal ? lastRank : i + 1;
+    lastTotal = entry.total;
+    lastRank = rank;
+    return { ...entry, rank };
+  });
+}
+
+/** "S14W8", or "S14W?" where the source never recorded the week. */
+export function formatHighScoreWhen(entry: HighScoreEntry): string {
+  return `S${entry.season}W${entry.week ?? '?'}`;
 }
