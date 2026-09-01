@@ -30,3 +30,73 @@ export function scheduleHeatLabel(heat: ScheduleHeat): string {
   if (heat === 'high') return 'highest';
   return 'even';
 }
+
+/* ------------------------------------------------------------------ */
+/* Column sorting                                                      */
+/* ------------------------------------------------------------------ */
+
+export type SortDirection = 'asc' | 'desc';
+
+/** Which column a table is sorted by, and which way. Null means source order. */
+export interface ColumnSort<Key> {
+  key: Key;
+  direction: SortDirection;
+}
+
+/**
+ * Tap the same header again to walk the cycle. Fewest first comes first
+ * because the commish opens this grid to hunt for light weeks.
+ */
+export function toggleColumnSort<Key>(
+  current: ColumnSort<Key> | null,
+  key: Key,
+): ColumnSort<Key> | null {
+  if (!current || current.key !== key) return { key, direction: 'asc' };
+  if (current.direction === 'asc') return { key, direction: 'desc' };
+  return null;
+}
+
+/** Sort rows by a number. Ties keep their source order, so the grid stays steady. */
+export function sortRowsByNumber<Row>(
+  rows: readonly Row[],
+  value: (row: Row) => number,
+  direction: SortDirection | null,
+): Row[] {
+  if (!direction) return [...rows];
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const gap = value(a.row) - value(b.row);
+      if (gap !== 0) return direction === 'asc' ? gap : -gap;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.row);
+}
+
+export function ariaSortValue(direction: SortDirection | null): 'ascending' | 'descending' | 'none' {
+  if (direction === 'asc') return 'ascending';
+  if (direction === 'desc') return 'descending';
+  return 'none';
+}
+
+export function sortDirectionLabel(direction: SortDirection): string {
+  return direction === 'asc' ? 'fewest first' : 'most first';
+}
+
+/** What the next tap on this header will do, for the button label. */
+export function nextSortLabel(direction: SortDirection | null): string {
+  if (direction === null) return 'sort fewest first';
+  if (direction === 'asc') return 'sort most first';
+  return 'clear the sort';
+}
+
+/** Narrow phone label for a league period, so the frozen column stays slim. */
+export function shortPeriodLabel(label: string): string {
+  const week = /^Week (\d+)$/.exec(label);
+  if (week) return `W${week[1]}`;
+  const playIn = /^Play-In (\d+)$/.exec(label);
+  if (playIn) return `PI ${playIn[1]}`;
+  const playoff = /^Playoff Round (\d+) · Week (\d+)$/.exec(label);
+  if (playoff) return `R${playoff[1]} W${playoff[2]}`;
+  return label;
+}

@@ -376,4 +376,4 @@ UI: `/history` (public) has the season table with per-season sources and standin
 
 ### Later
 
-Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files).
+Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files) · **email on votes** (tell members when a vote opens, when the commissioner edits one, and when it closes; the app has no mail path yet).
