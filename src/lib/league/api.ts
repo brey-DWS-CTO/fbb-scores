@@ -7,6 +7,7 @@ import type {
 } from './playerPool.js';
 import type { KeeperScenario } from './keeperScenario.js';
 import type { Rulebook } from './rulebook.js';
+import type { Poll } from './polls.js';
 import type {
   LeagueScheduleMapping,
   RawScheduleSource,
@@ -559,6 +560,56 @@ export async function publishRulebook(
   const { data } = await axios.post<PublishRulebookResponse>(
     '/api/league/rulebook/publish',
     { fingerprint, notes },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+// ─── Votes ───────────────────────────────────────────────────────────────────
+
+export interface PollsResponse {
+  polls: Poll[];
+  you: { owner: string; hasLaunched: boolean; canLaunch: boolean };
+}
+
+export async function fetchPolls(c: Credentials): Promise<PollsResponse> {
+  const { data } = await axios.get<PollsResponse>('/api/league/polls', {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function openPoll(
+  c: Credentials,
+  input: { title: string; detail: string; affects: string[] },
+): Promise<Poll> {
+  const { data } = await axios.post<Poll>('/api/league/polls', input, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function castPollVote(
+  c: Credentials,
+  pollId: string,
+  choice: 'yes' | 'no',
+): Promise<Poll> {
+  const { data } = await axios.post<Poll>(
+    `/api/league/polls/${encodeURIComponent(pollId)}/vote`,
+    { choice },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function closePollById(
+  c: Credentials,
+  pollId: string,
+  cancel = false,
+): Promise<Poll> {
+  const { data } = await axios.post<Poll>(
+    `/api/league/polls/${encodeURIComponent(pollId)}/close`,
+    { cancel },
     { headers: authHeaders(c) },
   );
   return data;

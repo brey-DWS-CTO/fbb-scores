@@ -6,6 +6,7 @@ const TABS = [
   { to: '/draft', label: 'DRAFT', icon: '🎯' },
   { to: '/teams', label: 'TEAMS', icon: '👥' },
   { to: '/rules', label: 'RULES', icon: '📖' },
+  { to: '/votes', label: 'VOTES', icon: '🗳' },
   { to: '/league', label: 'LEAGUE', icon: '🏀' },
 ];
 

@@ -202,7 +202,17 @@ Build order, each phase shippable on its own:
    Revision numbering: the seed is revision 14 and unpublished, so the first publish publishes 14 and each one after steps up by one.
 
    Still to build: a UI listing past versions and opening one. The three routes exist and are tested; nothing renders them yet. Publishing does **not** yet block on a prose/settings mismatch, because the settings panel from phase 2 is not built.
-4. **Votes.** `rulebook_polls` + `rulebook_votes`. A poll names affected clause ids and carries replacement text; voters snapshotted at open; one vote per team; threshold read from the clause (60%, 80% for draft style); the three-per-year and before-the-draft limits enforced. A passed poll creates an amendment draft, never rewrites a published rule. Blocked on the `open-quorum` ruling.
+4. **Votes. DONE.** `polls.ts` is the pure core: `tallyPoll`, `canLaunchPoll`, `canVote`, `castVote`, `closePoll`, `thresholdFor`, `describeTally`. **Passing needs 60% of ALL teams, so 6 of 10, and a team that never votes counts against** (commissioner ruling on rule 1.3). `needed` rounds up, so 60% of 9 is 6. `thresholdFor` reads the strictest `voteThreshold` among the clauses a poll touches, which makes a draft-style change need 80% by itself (rule 2.1.1). A poll is `decided` as soon as the remaining teams cannot change the outcome.
+
+   **Each member may launch one poll per season** (commissioner addition, 2026-08-31). A cancelled poll refunds the launch; a passed or failed one does not. Nothing can be launched after `DRAFT_AT_ISO` or once the draft starts.
+
+   `polls` table in Neon, mirrored in the file backend. Votes live inside the poll document, and `updatePoll` does a compare-and-swap retry loop so simultaneous voters cannot lose a vote (there is a test that fires six at once). Poll ids carry a full timestamp, not just the date: cancelling refunds the launch, and a date-only id collided on the same-day relaunch.
+
+   Routes: `GET /polls` (any member; also reports whether you still have your launch), `POST /polls`, `POST /polls/:id/vote`, `POST /polls/:id/close` (`{cancel:true}` to cancel). Closing is proposer-or-commissioner. All three write to the audit log. `/votes` renders it with a tally bar, and rule numbers resolve against the **published** book so they match what members read.
+
+   **A passed vote does not rewrite anything.** It is a mandate the commissioner then applies in the rule book draft and publishes. Still to build: turning a passed poll into a pre-filled amendment draft automatically.
+
+   **Conflict to resolve:** one launch per member means up to 10 polls a season, which contradicts rule 1.3.1 (max 3 per year) and 1.3.2 (commissioners choose the topics). Both need amending to match what the app now does.
 5. **Sign, print, records.** `rulebook_signatures` binding member, time, acknowledgement, version hash. PDF from the frozen version with signature status and amendment history. Appendix B and the front matter generate from league history records instead of prose. Overlaps feature 5; build the record tables once.
 
 Plan artifact with the full searchable defect ledger: https://claude.ai/code/artifact/f479f46f-7873-4ccc-b870-eb95bd3b1e64

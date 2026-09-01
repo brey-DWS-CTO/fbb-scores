@@ -121,6 +121,23 @@ export interface RulebookVersionRow {
   publishedBy: string;
 }
 
+/** A league poll, stored whole. Votes live inside it. */
+export interface PollRow {
+  id: string;
+  season: number;
+  data: unknown;
+  updatedAt: string;
+}
+
+export class PollWriteError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'PollWriteError';
+  }
+}
+
 export class RulebookPublishError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -241,6 +258,11 @@ interface StoreBackend {
   getLatestRulebookVersion(season: number): Promise<RulebookVersionRow | null>;
   getRulebookVersion(id: string): Promise<RulebookVersionRow | null>;
   listRulebookVersions(season: number): Promise<Array<Omit<RulebookVersionRow, 'book'>>>;
+  listPolls(season: number): Promise<unknown[]>;
+  getPoll(id: string): Promise<unknown | null>;
+  insertPoll(id: string, season: number, data: unknown, at: string): Promise<void>;
+  updatePoll(id: string, mutate: (current: unknown) => unknown): Promise<unknown>;
+  clearPollsForSeason(season: number): Promise<void>;
 }
 
 interface RawVersionRow {
@@ -346,6 +368,12 @@ class NeonBackend implements StoreBackend {
       data jsonb not null,
       created_at timestamptz not null,
       created_by text not null
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS polls (
+      id text primary key,
+      season int not null,
+      data jsonb not null,
+      updated_at timestamptz not null
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_versions (
       id text primary key,
@@ -749,6 +777,59 @@ class NeonBackend implements StoreBackend {
       ORDER BY published_at DESC, id DESC`) as RawVersionRow[];
     return rows.map((raw) => versionSummary(toVersionRow(raw)));
   }
+
+  async listPolls(season: number): Promise<unknown[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data FROM polls WHERE season = ${season}
+      ORDER BY updated_at DESC`) as Array<{ data: unknown }>;
+    return rows.map((r) => r.data);
+  }
+
+  async getPoll(id: string): Promise<unknown | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data FROM polls WHERE id = ${id}`) as Array<{
+      data: unknown;
+    }>;
+    return rows[0]?.data ?? null;
+  }
+
+  async insertPoll(id: string, season: number, data: unknown, at: string): Promise<void> {
+    await this.ensureInit();
+    const rows = (await this.sql`INSERT INTO polls (id, season, data, updated_at)
+      VALUES (${id}, ${season}, ${JSON.stringify(data)}::jsonb, ${at})
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id`) as Array<{ id: string }>;
+    if (!rows[0]) throw new PollWriteError('duplicate', 'That vote already exists');
+  }
+
+  /**
+   * Read, change, write, retrying if someone else wrote in between. Two members
+   * voting at the same moment must not lose one of the votes.
+   */
+  async updatePoll(id: string, mutate: (current: unknown) => unknown): Promise<unknown> {
+    await this.ensureInit();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const rows = (await this.sql`SELECT data, updated_at FROM polls WHERE id = ${id}`) as Array<{
+        data: unknown;
+        updated_at: string | Date;
+      }>;
+      const row = rows[0];
+      if (!row) throw new PollWriteError('not-found', 'No such vote');
+      const next = mutate(row.data);
+      const stamp = new Date(row.updated_at).toISOString();
+      const written = (await this.sql`UPDATE polls
+        SET data = ${JSON.stringify(next)}::jsonb, updated_at = now()
+        WHERE id = ${id} AND updated_at = ${stamp}
+        RETURNING id`) as Array<{ id: string }>;
+      if (written[0]) return next;
+    }
+    throw new PollWriteError('contention', 'Too many people voting at once; try again');
+  }
+
+  async clearPollsForSeason(season: number): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM polls WHERE season = ${season}`;
+  }
 }
 
 // ─── Local JSON file backend ─────────────────────────────────────────────────
@@ -770,6 +851,7 @@ interface FileDoc {
   }>;
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
+  polls: PollRow[];
 }
 
 const MAX_FILE_AUDIT_ROWS = 1000;
@@ -814,6 +896,7 @@ class FileBackend implements StoreBackend {
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
+        polls: Array.isArray(doc.polls) ? doc.polls : [],
       };
     } catch {
       return {
@@ -1118,6 +1201,50 @@ class FileBackend implements StoreBackend {
     await this.ensureInit();
     return this.sortedVersions(season).map(versionSummary);
   }
+
+  async listPolls(season: number): Promise<unknown[]> {
+    await this.ensureInit();
+    return this.readDoc()
+      .polls.filter((row) => row.season === season)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map((row) => row.data);
+  }
+
+  async getPoll(id: string): Promise<unknown | null> {
+    await this.ensureInit();
+    return this.readDoc().polls.find((row) => row.id === id)?.data ?? null;
+  }
+
+  async insertPoll(id: string, season: number, data: unknown, at: string): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (doc.polls.some((row) => row.id === id)) {
+        throw new PollWriteError('duplicate', 'That vote already exists');
+      }
+      doc.polls.push({ id, season, data: structuredClone(data), updatedAt: at });
+      this.writeDoc(doc);
+    });
+  }
+
+  async updatePoll(id: string, mutate: (current: unknown) => unknown): Promise<unknown> {
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const row = doc.polls.find((candidate) => candidate.id === id);
+      if (!row) throw new PollWriteError('not-found', 'No such vote');
+      row.data = mutate(row.data);
+      row.updatedAt = new Date().toISOString();
+      this.writeDoc(doc);
+      return row.data;
+    });
+  }
+
+  async clearPollsForSeason(season: number): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.polls = doc.polls.filter((row) => row.season !== season);
+      this.writeDoc(doc);
+    });
+  }
 }
 
 // ─── Backend selection (lazy singleton) ──────────────────────────────────────
@@ -1297,6 +1424,30 @@ export async function saveRulebookDraft(
 
 export async function deleteRulebookDraft(season: number): Promise<void> {
   return getBackend().deleteRulebookDraft(season);
+}
+
+export async function listPolls(season: number): Promise<unknown[]> {
+  return getBackend().listPolls(season);
+}
+
+export async function getPoll(id: string): Promise<unknown | null> {
+  return getBackend().getPoll(id);
+}
+
+export async function insertPoll(id: string, season: number, data: unknown): Promise<void> {
+  return getBackend().insertPoll(id, season, data, new Date().toISOString());
+}
+
+export async function updatePoll(
+  id: string,
+  mutate: (current: unknown) => unknown,
+): Promise<unknown> {
+  return getBackend().updatePoll(id, mutate);
+}
+
+/** Wipe a season's votes. Mirrors clearKeeperScenariosForSeason; used to reset a season. */
+export async function clearPollsForSeason(season: number): Promise<void> {
+  return getBackend().clearPollsForSeason(season);
 }
 
 export async function publishRulebookVersion(row: RulebookVersionRow): Promise<RulebookVersionRow> {

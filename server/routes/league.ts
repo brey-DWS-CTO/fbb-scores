@@ -44,9 +44,25 @@ import {
   getLatestRulebookVersion,
   getRulebookVersion,
   listRulebookVersions,
+  PollWriteError,
+  listPolls,
+  getPoll,
+  insertPoll,
+  updatePoll,
+  OWNERS,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
+import {
+  canLaunchPoll,
+  canVote,
+  castVote,
+  closePoll,
+  thresholdFor,
+  unknownClauses,
+  type Poll,
+  type VoteChoice,
+} from '../../src/lib/league/polls.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
 import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
@@ -1072,6 +1088,182 @@ router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, r
     });
   } catch (err) {
     if (err instanceof RulebookPublishError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
+// ─── Votes ───────────────────────────────────────────────────────────────────
+//
+// Each member may launch one vote a season (commissioner ruling 2026-08-31).
+// Passing needs 60% of ALL teams, so a team that never votes counts against.
+// A passed vote does not rewrite anything: it is a mandate the commissioner
+// then applies in the rule book draft.
+
+/** The book a poll's threshold is read from: published if there is one. */
+async function currentRulebook(): Promise<Rulebook> {
+  const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
+  return (latest?.book as Rulebook | undefined) ?? SEED_RULEBOOK;
+}
+
+async function seasonPolls(): Promise<Poll[]> {
+  return (await listPolls(RULEBOOK_SEASON)) as Poll[];
+}
+
+/** Everyone sees every vote. A league vote is not a secret ballot. */
+router.get('/polls', requireAuth, async (_req, res, next) => {
+  try {
+    const polls = await seasonPolls();
+    const owner = res.locals.owner as string;
+    const launched = polls.filter((p) => p.proposedBy === owner && p.status !== 'cancelled');
+    res.json({
+      polls,
+      you: { owner, hasLaunched: launched.length > 0, canLaunch: launched.length === 0 },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/polls', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = req.body as { title?: unknown; detail?: unknown; affects?: unknown };
+    const title = typeof body.title === 'string' ? body.title.trim().slice(0, 140) : '';
+    const detail = typeof body.detail === 'string' ? body.detail.trim().slice(0, 2000) : '';
+    const affects = Array.isArray(body.affects)
+      ? body.affects.filter((id): id is string => typeof id === 'string').slice(0, 40)
+      : [];
+
+    const state = await getState();
+    const check = canLaunchPoll({
+      owner,
+      members: OWNERS,
+      seasonPolls: await seasonPolls(),
+      title,
+      now: new Date(),
+      draftAt: new Date(DRAFT_AT_ISO),
+      draftStarted: state.state.draft.startedAt !== null,
+    });
+    if (!check.ok) {
+      res.status(409).json({ error: check.message, code: check.reason });
+      return;
+    }
+
+    const book = await currentRulebook();
+    const missing = unknownClauses(book, affects);
+    if (missing.length) {
+      throw new HttpError(400, `These rules are not in the book: ${missing.join(', ')}`);
+    }
+
+    const openedAt = new Date().toISOString();
+    // The full timestamp, not just the date: cancelling refunds the member's
+    // launch, and a date-only id would collide when they relaunch the same day.
+    const stamp = openedAt.replace(/[-:.TZ]/g, '');
+    const poll: Poll = {
+      id: `poll-${RULEBOOK_SEASON}-${owner.toLowerCase()}-${stamp}`,
+      season: RULEBOOK_SEASON,
+      title,
+      detail,
+      proposedBy: owner,
+      affects,
+      threshold: thresholdFor(book, affects),
+      // Frozen now, so a later roster change cannot move the goalposts.
+      eligibleVoters: [...OWNERS],
+      openedAt,
+      status: 'open',
+      votes: [],
+    };
+
+    await insertPoll(poll.id, RULEBOOK_SEASON, poll);
+    await appendAudit(owner, 'poll-open', { pollId: poll.id, title, affects });
+    res.json(poll);
+  } catch (err) {
+    if (err instanceof PollWriteError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
+router.post('/polls/:id/vote', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const choice = String((req.body as { choice?: unknown }).choice ?? '');
+    const id = String(req.params.id);
+
+    const existing = (await getPoll(id)) as Poll | null;
+    if (!existing) {
+      res.status(404).json({ error: 'No such vote' });
+      return;
+    }
+    const check = canVote(existing, owner, choice);
+    if (!check.ok) {
+      res.status(409).json({ error: check.message, code: check.reason });
+      return;
+    }
+
+    // Read-modify-write inside the store so two members voting at the same
+    // moment cannot lose one of the votes.
+    const at = new Date().toISOString();
+    const updated = (await updatePoll(id, (current) => {
+      const poll = current as Poll;
+      if (poll.status !== 'open') return poll;
+      return castVote(poll, owner, choice as VoteChoice, at);
+    })) as Poll;
+
+    await appendAudit(owner, 'poll-vote', { pollId: id, choice });
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof PollWriteError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
+/** The proposer or a commissioner closes it; the tally decides the outcome. */
+router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
+    const id = String(req.params.id);
+    const cancel = (req.body as { cancel?: unknown }).cancel === true;
+
+    const existing = (await getPoll(id)) as Poll | null;
+    if (!existing) {
+      res.status(404).json({ error: 'No such vote' });
+      return;
+    }
+    if (existing.proposedBy !== owner && !isCommish) {
+      res.status(403).json({ error: 'Only the member who started this vote, or a commissioner, can close it' });
+      return;
+    }
+    if (existing.status !== 'open') {
+      res.status(409).json({ error: 'That vote is already closed', code: 'not-open' });
+      return;
+    }
+
+    const at = new Date().toISOString();
+    const updated = (await updatePoll(id, (current) => {
+      const poll = current as Poll;
+      if (poll.status !== 'open') return poll;
+      return cancel
+        ? { ...poll, status: 'cancelled' as const, closedAt: at, closedBy: owner }
+        : closePoll(poll, owner, at);
+    })) as Poll;
+
+    await appendAudit(owner, cancel ? 'poll-cancel' : 'poll-close', {
+      pollId: id,
+      status: updated.status,
+    });
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof PollWriteError) {
       res.status(409).json({ error: err.message, code: err.code });
       return;
     }
