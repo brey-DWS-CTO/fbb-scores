@@ -27,6 +27,7 @@ export default function PublishPanel({
   draft,
   dirty,
   busy,
+  settingsToCheck,
   onPublish,
 }: {
   published: Rulebook;
@@ -34,10 +35,13 @@ export default function PublishPanel({
   /** True when there are edits that have not been saved to the draft yet. */
   dirty: boolean;
   busy: boolean;
+  /** Rules quoting a number the app does not use. Publishing needs a nod first. */
+  settingsToCheck: number;
   onPublish: (fingerprint: string, notes: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState('');
+  const [override, setOverride] = useState(false);
 
   const diff = useMemo(() => diffRulebooks(published, draft), [published, draft]);
   const fingerprint = useMemo(() => rulebookFingerprint(draft), [draft]);
@@ -116,6 +120,22 @@ export default function PublishPanel({
         />
       </label>
 
+      {settingsToCheck > 0 && (
+        <label className="publish-override">
+          <input
+            type="checkbox"
+            checked={override}
+            onChange={(e) => setOverride(e.target.checked)}
+          />
+          <span>
+            {settingsToCheck === 1
+              ? '1 rule names a number the app does not use'
+              : `${settingsToCheck} rules name a number the app does not use`}
+            . See the SETTINGS tab. Publish anyway.
+          </span>
+        </label>
+      )}
+
       <p className="rule-edit-hint">
         Publishing freezes this exact book as a new revision that everyone reads. It cannot be
         edited afterwards; a correction means publishing again.
@@ -125,7 +145,7 @@ export default function PublishPanel({
         <button
           type="button"
           className="rule-edit-save tap-btn"
-          disabled={busy || dirty}
+          disabled={busy || dirty || (settingsToCheck > 0 && !override)}
           onClick={() => onPublish(fingerprint, notes)}
         >
           {busy ? 'PUBLISHING...' : 'PUBLISH'}

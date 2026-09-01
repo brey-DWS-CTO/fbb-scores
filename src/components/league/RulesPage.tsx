@@ -4,7 +4,8 @@ import IdentityChip from './IdentityChip.js';
 import RecordTables from './RecordTables.js';
 import RuleEditMenu from './RuleEditMenu.js';
 import PublishPanel from './PublishPanel.js';
-import { useIdentity } from '../../hooks/useLeague.js';
+import RulebookAudit from './RulebookAudit.js';
+import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
   fetchPublishedRulebook,
@@ -28,6 +29,10 @@ import {
   type RulebookIndex,
 } from '../../lib/league/rulebook.js';
 import { addArticle, validateDraft } from '../../lib/league/rulebookEdit.js';
+import {
+  auditRulebookSettings,
+  settingsNeedingAttention,
+} from '../../lib/league/rulebookSettings.js';
 
 const COLLAPSE_KEY = 'nerds.rules.collapsed';
 const UNDO_DEPTH = 25;
@@ -174,6 +179,7 @@ function Clause({
 /** /rules — the league constitution, searchable, linkable, and editable. */
 export default function RulesPage() {
   const { identity } = useIdentity();
+  const { dataset } = useLeagueData();
   const isCommish = identity?.isCommissioner === true;
 
   const [term, setTerm] = useState('');
@@ -230,6 +236,13 @@ export default function RulesPage() {
   const sections = useMemo(() => groupByArticle(index), [index]);
   const results = useMemo(() => (term.trim() ? searchRulebook(index, term) : null), [term, index]);
   const problems = useMemo(() => (editing && draft ? validateDraft(draft) : []), [editing, draft]);
+  const settingsToCheck = useMemo(
+    () =>
+      editing && draft && dataset
+        ? settingsNeedingAttention(auditRulebookSettings(draft, dataset)).length
+        : 0,
+    [editing, draft, dataset],
+  );
 
   const setCollapsedAnd = (next: Set<string>) => {
     setCollapsed(next);
@@ -490,12 +503,14 @@ export default function RulesPage() {
                   {problems.length > 6 && <li>and {problems.length - 6} more</li>}
                 </ul>
               )}
+              {draft && <RulebookAudit book={draft} />}
               {problems.length === 0 && draft && (
                 <PublishPanel
                   published={publishedBook}
                   draft={draft}
                   dirty={dirty}
                   busy={busy}
+                  settingsToCheck={settingsToCheck}
                   onPublish={publish}
                 />
               )}
