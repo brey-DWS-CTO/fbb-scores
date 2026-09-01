@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { useIdentity } from '../../hooks/useLeague.js';
+import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 
 const TABS = [
   { to: '/keepers', label: 'KEEPERS', icon: '🔒' },
   { to: '/draft', label: 'DRAFT', icon: '🎯' },
   { to: '/teams', label: 'TEAMS', icon: '👥' },
+  { to: '/trades', label: 'TRADES', icon: '🔁' },
   { to: '/rules', label: 'RULES', icon: '📖' },
   { to: '/votes', label: 'VOTES', icon: '🗳' },
   { to: '/league', label: 'LEAGUE', icon: '🏀' },
@@ -12,6 +13,10 @@ const TABS = [
 
 export default function BottomNav() {
   const { identity } = useIdentity();
+  const { meta } = useLeagueState();
+  // Offers waiting on this member. The server counts them, so the badge cannot
+  // give away an offer between two other teams.
+  const pendingTrades = meta?.pendingTrades ?? 0;
   const tabs = identity?.isCommissioner
     ? [...TABS, { to: '/schedule', label: 'SCHEDULE', icon: '📅' }, { to: '/admin', label: 'COMMISH', icon: '👑' }]
     : TABS;
@@ -50,7 +55,14 @@ export default function BottomNav() {
             transition: 'color 0.15s',
           })}
         >
-          <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{t.icon}</span>
+          <span style={{ fontSize: '1.1rem', lineHeight: 1, position: 'relative' }}>
+            {t.icon}
+            {t.to === '/trades' && pendingTrades > 0 && (
+              <span className="nav-badge" aria-label={`${pendingTrades} offers waiting`}>
+                {pendingTrades}
+              </span>
+            )}
+          </span>
           <span className="hub-heading" style={{ fontSize: '0.62rem' }}>
             {t.label}
           </span>

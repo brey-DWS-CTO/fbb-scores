@@ -12,6 +12,7 @@ import AdminPage from './components/league/AdminPage.js'
 import SchedulePage from './components/league/SchedulePage.js'
 import RulesPage from './components/league/RulesPage.js'
 import VotesPage from './components/league/VotesPage.js'
+import TradesPage from './components/league/TradesPage.js'
 
 function App() {
   const location = useLocation()
@@ -51,6 +52,7 @@ function App() {
         <Route path="/league" element={<LeaguePage />} />
         <Route path="/rules" element={<RulesPage />} />
         <Route path="/votes" element={<VotesPage />} />
+        <Route path="/trades" element={<TradesPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/schedule" element={<SchedulePage />} />
         <Route path="*" element={<SplashPage />} />

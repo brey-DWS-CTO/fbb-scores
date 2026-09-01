@@ -1,5 +1,12 @@
 import axios from 'axios';
-import type { KeeperSelection, LeagueDynamicState } from '../keeper/types.js';
+import type {
+  KeeperSelection,
+  LeagueDynamicState,
+  PickRef,
+  PickTradeProposal,
+  PickTransfer,
+} from '../keeper/types.js';
+import type { TradePreview } from './pickTrades.js';
 import type {
   EspnPlayerPoolPlayer,
   PlayerPoolRefreshPreview,
@@ -17,6 +24,8 @@ import type {
 } from './schedule.js';
 
 export interface StateMeta {
+  /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
+  pendingTrades?: number;
   draftAt: string;
   revealed: boolean;
   /** Keeper counts per owner — always visible even while selections are secret. */
@@ -610,6 +619,85 @@ export async function closePollById(
   const { data } = await axios.post<Poll>(
     `/api/league/polls/${encodeURIComponent(pollId)}/close`,
     { cancel },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+// ─── Draft pick trades ───────────────────────────────────────────────────────
+
+export interface PickTradesResponse {
+  season: number;
+  proposals: PickTradeProposal[];
+  transfers: PickTransfer[];
+  you: { owner: string; inbox: number; sent: number };
+}
+
+export interface PickTradeDraft {
+  recipient: string;
+  offer: PickRef[];
+  request: PickRef[];
+  note: string;
+}
+
+export async function fetchPickTrades(c: Credentials): Promise<PickTradesResponse> {
+  const { data } = await axios.get<PickTradesResponse>('/api/league/pick-trades', {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+/** Review a trade without sending anything. Pass an id, or a whole draft offer. */
+export async function previewPickTrade(
+  c: Credentials,
+  input: { id: string } | Omit<PickTradeDraft, 'note'>,
+): Promise<TradePreview> {
+  const { data } = await axios.post<TradePreview>('/api/league/pick-trades/preview', input, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function sendPickTrade(
+  c: Credentials,
+  input: PickTradeDraft,
+): Promise<{ proposal: PickTradeProposal } & StateResponse> {
+  const { data } = await axios.post('/api/league/pick-trades', input, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function acceptPickTrade(
+  c: Credentials,
+  id: string,
+  version: number,
+): Promise<{ proposal: PickTradeProposal } & StateResponse> {
+  const { data } = await axios.post(
+    `/api/league/pick-trades/${encodeURIComponent(id)}/accept`,
+    { version },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function rejectPickTrade(
+  c: Credentials,
+  id: string,
+): Promise<{ proposal: PickTradeProposal } & StateResponse> {
+  const { data } = await axios.post(
+    `/api/league/pick-trades/${encodeURIComponent(id)}/reject`,
+    {},
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function cancelPickTrade(
+  c: Credentials,
+  id: string,
+): Promise<{ proposal: PickTradeProposal } & StateResponse> {
+  const { data } = await axios.post(
+    `/api/league/pick-trades/${encodeURIComponent(id)}/cancel`,
+    {},
     { headers: authHeaders(c) },
   );
   return data;
