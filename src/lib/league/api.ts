@@ -14,6 +14,13 @@ import type {
 } from './playerPool.js';
 import type { KeeperScenario } from './keeperScenario.js';
 import type { Rulebook } from './rulebook.js';
+import type {
+  HistoryConflict,
+  HistoryDiff,
+  HistoryProblem,
+  LeagueHistory,
+} from './history.js';
+import type { ImportProblem, TeamMapping } from './historyImport.js';
 import type { RulebookSignature } from './rulebookSignatures.js';
 import type { Poll, PollKind } from './polls.js';
 import type {
@@ -615,6 +622,140 @@ export async function publishRulebook(
   const { data } = await axios.post<PublishRulebookResponse>(
     '/api/league/rulebook/publish',
     { fingerprint, notes },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+// ─── League history (readable by anyone) ─────────────────────────────────────
+
+export interface PublishedHistoryResponse {
+  history: LeagueHistory;
+  versionId: string | null;
+  revision: number;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  notes: string;
+  reason: string;
+  published: boolean;
+}
+
+export async function fetchPublishedHistory(): Promise<PublishedHistoryResponse> {
+  const { data } = await axios.get<PublishedHistoryResponse>('/api/league/history');
+  return data;
+}
+
+export interface HistoryVersionSummary {
+  id: string;
+  season: number;
+  revision: number;
+  fingerprint: string;
+  notes: string;
+  reason: string;
+  publishedAt: string;
+  publishedBy: string;
+}
+
+export async function fetchHistoryVersions(): Promise<HistoryVersionSummary[]> {
+  const { data } = await axios.get<HistoryVersionSummary[]>('/api/league/history/versions');
+  return data;
+}
+
+export async function fetchHistoryVersion(
+  id: string,
+): Promise<HistoryVersionSummary & { history: LeagueHistory }> {
+  const { data } = await axios.get(`/api/league/history/versions/${encodeURIComponent(id)}`);
+  return data;
+}
+
+export interface HistoryDraftResponse {
+  history: LeagueHistory;
+  version: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  /** True when nothing is stored yet and this is the published or committed copy. */
+  seeded: boolean;
+}
+
+export async function fetchHistoryDraft(c: Credentials): Promise<HistoryDraftResponse> {
+  const { data } = await axios.get<HistoryDraftResponse>('/api/league/history/draft', {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function saveHistoryDraft(
+  c: Credentials,
+  history: LeagueHistory,
+  expectedVersion: number,
+): Promise<{ version: number; updatedAt: string; updatedBy: string }> {
+  const { data } = await axios.put(
+    '/api/league/history/draft',
+    { history, expectedVersion },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function resetHistoryDraft(c: Credentials): Promise<HistoryDraftResponse> {
+  const { data } = await axios.delete<HistoryDraftResponse>('/api/league/history/draft', {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export interface HistoryImportRequest {
+  seasonNumber: number;
+  espnSeasonId: number;
+  teamMap: TeamMapping[];
+  /** A pasted ESPN response. Left out, the server pulls the season live. */
+  payload?: unknown;
+}
+
+export interface HistoryImportPreviewResponse {
+  fingerprint: string;
+  blocked: boolean;
+  diff: HistoryDiff;
+  conflicts: HistoryConflict[];
+  problems: HistoryProblem[];
+  importProblems: ImportProblem[];
+  espnTeams: Array<{ espnTeamId: number; name: string; finalRank: number | null }>;
+  candidate: LeagueHistory;
+}
+
+/** No write. Shows what an ESPN season would change. */
+export async function previewHistoryImport(
+  c: Credentials,
+  request: HistoryImportRequest,
+): Promise<HistoryImportPreviewResponse> {
+  const { data } = await axios.post<HistoryImportPreviewResponse>(
+    '/api/league/history/import/preview',
+    request,
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Save the exact previewed import into the draft. Publishing is a second step. */
+export async function applyHistoryImport(
+  c: Credentials,
+  request: HistoryImportRequest & { fingerprint: string; expectedVersion: number },
+): Promise<{ version: number; changes: number; conflicts: HistoryConflict[] }> {
+  const { data } = await axios.post('/api/league/history/import/apply', request, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export async function publishHistory(
+  c: Credentials,
+  fingerprint: string,
+  reason: string,
+  notes: string,
+): Promise<{ versionId: string; revision: number; publishedAt: string; publishedBy: string }> {
+  const { data } = await axios.post(
+    '/api/league/history/publish',
+    { fingerprint, reason, notes },
     { headers: authHeaders(c) },
   );
   return data;
