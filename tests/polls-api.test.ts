@@ -74,6 +74,17 @@ const vote = (owner: string, id: string, choice: string) =>
     body: JSON.stringify({ choice }),
   });
 
+const editPoll = (
+  owner: string,
+  id: string,
+  input: { title?: string; detail?: string; affects?: string[] },
+) =>
+  request(`/api/league/polls/${id}/edit`, {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify(input),
+  });
+
 before(async () => {
   mkdirSync(tempParent, { recursive: true });
   tempRoot = mkdtempSync(path.join(tempParent, 'polls-api-'));
@@ -156,6 +167,31 @@ test('one vote per member per season', async () => {
   assert.equal((you.you as Record<string, unknown>).canLaunch, false);
   const amy = asRecord((await request('/api/league/polls', { headers: auth('Joel') })).body);
   assert.equal((amy.you as Record<string, unknown>).canLaunch, true);
+});
+
+test('the commissioner is not held to one vote a season', async () => {
+  assert.equal((await openPoll(commissioner, 'First commissioner vote')).status, 200);
+  assert.equal((await openPoll(commissioner, 'Second commissioner vote')).status, 200);
+  assert.equal((await openPoll(commissioner, 'Third commissioner vote')).status, 200);
+
+  const you = asRecord((await request('/api/league/polls', { headers: auth(commissioner) })).body)
+    .you as Record<string, unknown>;
+  assert.equal(you.canLaunch, true, 'the button never locks for the commissioner');
+  assert.equal(you.hasLaunched, true);
+  assert.equal(you.isCommissioner, true);
+
+  // A plain member is still capped at one.
+  assert.equal((await openPoll('Ryan', 'The one member vote')).status, 200);
+  assert.equal((await openPoll('Ryan', 'A second member vote')).status, 409);
+});
+
+test('the commissioner is still bound by the draft deadline', async () => {
+  await store.mutateState((draft) => {
+    draft.draft.startedAt = new Date().toISOString();
+  });
+  const blocked = await openPoll(commissioner, 'Too late');
+  assert.equal(blocked.status, 409);
+  assert.equal(asRecord(blocked.body).code, 'draft-started');
 });
 
 test('cancelling gives the member their launch back', async () => {
@@ -296,6 +332,174 @@ test('nonsense choices and unknown votes are refused', async () => {
   const poll = (await openPoll('Ryan')).body as Poll;
   assert.equal((await vote('Amy', poll.id, 'maybe')).status, 409);
   assert.equal((await vote('Amy', 'poll-nope', 'yes')).status, 404);
+});
+
+// ─── Editing an open vote ──────────────────────────────────────────────────
+
+test('the commissioner can rewrite an open vote', async () => {
+  const poll = (await openChange('Ryan', 'Raise the keeper cap')).body as Poll;
+  const saved = await editPoll(commissioner, poll.id, {
+    title: 'Raise the keeper cap to 80',
+    detail: 'A clearer case for it.',
+    affects: ['keepers.cap'],
+  });
+  assert.equal(saved.status, 200);
+  const after = saved.body as Poll;
+  assert.equal(after.title, 'Raise the keeper cap to 80');
+  assert.equal(after.detail, 'A clearer case for it.');
+  assert.equal(after.edits?.length, 1);
+  assert.deepEqual(after.edits?.[0].changed, ['title', 'detail']);
+  assert.equal(after.edits?.[0].by, commissioner);
+});
+
+test('no member can edit a vote, not even their own', async () => {
+  const poll = (await openChange('Ryan')).body as Poll;
+  const mine = await editPoll('Ryan', poll.id, {
+    title: 'Sneaking a new question in',
+    detail: 'x',
+    affects: ['keepers.cap'],
+  });
+  assert.equal(mine.status, 403);
+  const other = await editPoll('Amy', poll.id, {
+    title: 'Not mine either',
+    detail: 'x',
+    affects: ['keepers.cap'],
+  });
+  assert.equal(other.status, 403);
+
+  const stored = (await store.getPoll(poll.id)) as Poll;
+  assert.equal(stored.title, 'Change the keeper cap', 'nothing was written');
+  assert.equal(stored.edits, undefined);
+});
+
+test('changing what a vote asks clears the votes already cast', async () => {
+  const poll = (await openChange('Ryan', 'Raise the keeper cap')).body as Poll;
+  for (const owner of ['Ryan', 'Amy', 'Joel']) await vote(owner, poll.id, 'yes');
+  await vote('Derek', poll.id, 'no');
+
+  const saved = await editPoll(commissioner, poll.id, {
+    title: 'Scrap the keeper cap entirely',
+    detail: 'Because one is not enough.',
+    affects: ['keepers.cap'],
+  });
+  assert.equal(saved.status, 200);
+  const after = saved.body as Poll;
+  assert.deepEqual(after.votes, [], 'four answers to a different question');
+  assert.deepEqual(after.edits?.[0].changed, ['title']);
+  assert.equal(after.edits?.[0].votesCleared, 4);
+});
+
+test('changing only the why leaves the votes standing', async () => {
+  const poll = (await openChange('Ryan', 'Raise the keeper cap')).body as Poll;
+  for (const owner of ['Ryan', 'Amy', 'Joel']) await vote(owner, poll.id, 'yes');
+
+  const after = (
+    await editPoll(commissioner, poll.id, {
+      title: 'Raise the keeper cap',
+      detail: 'A sharper argument, same question.',
+      affects: ['keepers.cap'],
+    })
+  ).body as Poll;
+  assert.equal(after.votes.length, 3);
+  assert.deepEqual(after.edits?.[0].changed, ['detail']);
+  assert.equal(after.edits?.[0].votesCleared, 0);
+});
+
+test('naming a stricter rule moves the bar with it', async () => {
+  const poll = (await openChange('Ryan', 'Change something', ['format.size.change']))
+    .body as Poll;
+  assert.equal(poll.threshold, 60);
+  const after = (
+    await editPoll(commissioner, poll.id, {
+      title: 'Change something',
+      detail: 'Because one is not enough.',
+      affects: ['draft.serpentine.change'],
+    })
+  ).body as Poll;
+  assert.equal(after.threshold, 80, 'rule 2.1.1 needs 80%');
+  assert.deepEqual(after.affects, ['draft.serpentine.change']);
+});
+
+test('an edit cannot break the vote or name a rule that is not in the book', async () => {
+  const poll = (await openChange('Ryan')).body as Poll;
+  const blank = await editPoll(commissioner, poll.id, {
+    title: '   ',
+    detail: 'x',
+    affects: ['keepers.cap'],
+  });
+  assert.equal(blank.status, 409);
+  assert.equal(asRecord(blank.body).code, 'empty-title');
+
+  const bare = await editPoll(commissioner, poll.id, {
+    title: 'Still a change',
+    detail: 'x',
+    affects: [],
+  });
+  assert.equal(bare.status, 409);
+  assert.equal(asRecord(bare.body).code, 'change-needs-clause');
+
+  const ghost = await editPoll(commissioner, poll.id, {
+    title: 'Still a change',
+    detail: 'x',
+    affects: ['no.such.rule'],
+  });
+  assert.equal(ghost.status, 400);
+  assert.match(String(asRecord(ghost.body).error), /not in the book/);
+
+  const same = await editPoll(commissioner, poll.id, {
+    title: poll.title,
+    detail: poll.detail,
+    affects: poll.affects,
+  });
+  assert.equal(same.status, 409);
+  assert.equal(asRecord(same.body).code, 'no-change');
+});
+
+test('a closed vote cannot be edited', async () => {
+  const poll = (await openChange('Ryan')).body as Poll;
+  await request(`/api/league/polls/${poll.id}/close`, {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({}),
+  });
+  const late = await editPoll(commissioner, poll.id, {
+    title: 'Too late',
+    detail: 'x',
+    affects: ['keepers.cap'],
+  });
+  assert.equal(late.status, 409);
+  assert.equal(asRecord(late.body).code, 'not-open');
+});
+
+test('editing an unknown vote is a 404', async () => {
+  const missing = await editPoll(commissioner, 'poll-nope', {
+    title: 'Ghost',
+    detail: 'x',
+    affects: [],
+  });
+  assert.equal(missing.status, 404);
+});
+
+test('an edit is written to the audit log', async () => {
+  const poll = (await openChange('Ryan', 'Raise the keeper cap')).body as Poll;
+  await vote('Amy', poll.id, 'yes');
+  await editPoll(commissioner, poll.id, {
+    title: 'Scrap the keeper cap',
+    detail: 'Because one is not enough.',
+    affects: ['keepers.cap'],
+  });
+
+  const rows = (await request('/api/league/audit', { headers: auth(commissioner) })).body as Array<{
+    action: string;
+    owner: string;
+    detail: unknown;
+  }>;
+  const row = rows.find((r) => r.action === 'poll-edit');
+  assert.ok(row, 'the edit is on the record');
+  assert.equal(row.owner, commissioner);
+  const detail = asRecord(row.detail);
+  assert.deepEqual(detail.changed, ['title']);
+  assert.equal(detail.votesCleared, 1);
 });
 
 // ─── Closing ───────────────────────────────────────────────────────────────

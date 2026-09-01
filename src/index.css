@@ -1810,3 +1810,25 @@ body::before {
 .rules-number { font-size: 0.76rem; }
 .rules-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 2px 22px; }
 .rules-number-open { border-color: var(--neon-purple); color: var(--neon-purple); }
+
+/* ─── Commissioner edits of an open vote ──────────────────────────────── */
+
+/* An edit is shown, never implied. The list sits above the tally so a member
+   reads that the wording moved before they read the count. */
+.vote-edits {
+  margin: 0;
+  padding-left: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.vote-edits li {
+  color: var(--neon-yellow);
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+.vote-edits li::marker { color: var(--text-ghost); }
+
+.vote-edit-form { margin: 2px 0; }
+/* Live warning that saving throws away the votes already cast. */
+.vote-edit-warn { color: var(--neon-orange); font-weight: 700; }

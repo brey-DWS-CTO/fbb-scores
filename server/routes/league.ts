@@ -81,13 +81,17 @@ import {
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 import {
+  canEditPoll,
   canLaunchPoll,
   canVote,
   castVote,
   closePoll,
+  editPoll,
+  pollEditChanges,
   thresholdFor,
   unknownClauses,
   type Poll,
+  type PollEditInput,
   type PollKind,
   type VoteChoice,
 } from '../../src/lib/league/polls.js';
@@ -1248,10 +1252,11 @@ router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, r
 
 // ─── Votes ───────────────────────────────────────────────────────────────────
 //
-// Each member may launch one vote a season (commissioner ruling 2026-08-31).
-// Passing needs 60% of ALL teams, so a team that never votes counts against.
-// A passed vote does not rewrite anything: it is a mandate the commissioner
-// then applies in the rule book draft.
+// Each member may launch one vote a season (commissioner ruling 2026-08-31);
+// the commissioner is exempt from that count and nobody is exempt from the
+// draft deadline. Passing needs 60% of ALL teams, so a team that never votes
+// counts against. A passed vote does not rewrite anything: it is a mandate the
+// commissioner then applies in the rule book draft.
 
 /** The book a poll's threshold is read from: published if there is one. */
 async function currentRulebook(): Promise<Rulebook> {
@@ -1298,26 +1303,44 @@ router.get('/polls', requireAuth, async (_req, res, next) => {
   try {
     const polls = await seasonPolls();
     const owner = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
     const launched = polls.filter((p) => p.proposedBy === owner && p.status !== 'cancelled');
     res.json({
       polls,
-      you: { owner, hasLaunched: launched.length > 0, canLaunch: launched.length === 0 },
+      you: {
+        owner,
+        isCommissioner: isCommish,
+        hasLaunched: launched.length > 0,
+        // The commissioner's launch is never used up, so the button never locks.
+        canLaunch: isCommish || launched.length === 0,
+      },
     });
   } catch (err) {
     next(err);
   }
 });
 
+/** The words of a vote, trimmed and capped, from a create or edit body. */
+function pollWords(body: { title?: unknown; detail?: unknown; affects?: unknown }): {
+  title: string;
+  detail: string;
+  affects: string[];
+} {
+  return {
+    title: typeof body.title === 'string' ? body.title.trim().slice(0, 140) : '',
+    detail: typeof body.detail === 'string' ? body.detail.trim().slice(0, 2000) : '',
+    affects: Array.isArray(body.affects)
+      ? body.affects.filter((id): id is string => typeof id === 'string').slice(0, 40)
+      : [],
+  };
+}
+
 router.post('/polls', requireAuth, async (req, res, next) => {
   try {
     const owner = res.locals.owner as string;
     const body = req.body as { kind?: unknown; title?: unknown; detail?: unknown; affects?: unknown };
     const kind = typeof body.kind === 'string' ? body.kind : '';
-    const title = typeof body.title === 'string' ? body.title.trim().slice(0, 140) : '';
-    const detail = typeof body.detail === 'string' ? body.detail.trim().slice(0, 2000) : '';
-    const affects = Array.isArray(body.affects)
-      ? body.affects.filter((id): id is string => typeof id === 'string').slice(0, 40)
-      : [];
+    const { title, detail, affects } = pollWords(body);
 
     const state = await getState();
     const check = canLaunchPoll({
@@ -1330,6 +1353,7 @@ router.post('/polls', requireAuth, async (req, res, next) => {
       now: new Date(),
       draftAt: new Date(DRAFT_AT_ISO),
       draftStarted: state.state.draft.startedAt !== null,
+      isCommissioner: res.locals.isCommissioner === true,
     });
     if (!check.ok) {
       res.status(409).json({ error: check.message, code: check.reason });
@@ -1365,6 +1389,68 @@ router.post('/polls', requireAuth, async (req, res, next) => {
     await insertPoll(poll.id, RULEBOOK_SEASON, poll);
     await appendAudit(owner, 'poll-open', { pollId: poll.id, kind, title, affects });
     res.json(poll);
+  } catch (err) {
+    if (err instanceof PollWriteError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
+/**
+ * POST /polls/:id/edit — the commissioner rewrites an open vote.
+ *
+ * Commissioner only, even for a vote they started themselves: the league is
+ * voting on the words as they stand. Changing the title or the rules it names
+ * changes the question, so the pure core clears the votes already cast and the
+ * poll records the edit either way.
+ */
+router.post('/polls/:id/edit', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const id = String(req.params.id);
+    const existing = (await getPoll(id)) as Poll | null;
+    if (!existing) {
+      res.status(404).json({ error: 'No such vote' });
+      return;
+    }
+
+    const { title, detail, affects } = pollWords(
+      req.body as { title?: unknown; detail?: unknown; affects?: unknown },
+    );
+    const book = await currentRulebook();
+    const missing = unknownClauses(book, affects);
+    if (missing.length) {
+      throw new HttpError(400, `These rules are not in the book: ${missing.join(', ')}`);
+    }
+
+    // Naming different rules can move the bar, so the threshold is read again.
+    const next: PollEditInput = { title, detail, affects, threshold: thresholdFor(book, affects) };
+    const check = canEditPoll({ poll: existing, isCommissioner: true, next });
+    if (!check.ok) {
+      res.status(409).json({ error: check.message, code: check.reason });
+      return;
+    }
+
+    const at = new Date().toISOString();
+    const updated = (await updatePoll(id, (current) => {
+      const poll = current as Poll;
+      // It could have closed between the check and this write. Leave it alone.
+      if (poll.status !== 'open') return poll;
+      return editPoll(poll, next, owner, at);
+    })) as Poll;
+
+    const applied = updated.edits?.[updated.edits.length - 1];
+    await appendAudit(owner, 'poll-edit', {
+      pollId: id,
+      changed: applied?.changed ?? pollEditChanges(existing, next),
+      votesCleared: applied?.votesCleared ?? 0,
+      title,
+      affects,
+      threshold: next.threshold,
+    });
+    res.json(updated);
   } catch (err) {
     if (err instanceof PollWriteError) {
       res.status(409).json({ error: err.message, code: err.code });

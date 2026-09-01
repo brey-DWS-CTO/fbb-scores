@@ -624,7 +624,7 @@ export async function publishRulebook(
 
 export interface PollsResponse {
   polls: Poll[];
-  you: { owner: string; hasLaunched: boolean; canLaunch: boolean };
+  you: { owner: string; isCommissioner: boolean; hasLaunched: boolean; canLaunch: boolean };
 }
 
 export async function fetchPolls(c: Credentials): Promise<PollsResponse> {
@@ -641,6 +641,20 @@ export async function openPoll(
   const { data } = await axios.post<Poll>('/api/league/polls', input, {
     headers: authHeaders(c),
   });
+  return data;
+}
+
+/** Commissioner only: rewrite an open vote. */
+export async function editPollById(
+  c: Credentials,
+  pollId: string,
+  input: { title: string; detail: string; affects: string[] },
+): Promise<Poll> {
+  const { data } = await axios.post<Poll>(
+    `/api/league/polls/${encodeURIComponent(pollId)}/edit`,
+    input,
+    { headers: authHeaders(c) },
+  );
   return data;
 }
 
