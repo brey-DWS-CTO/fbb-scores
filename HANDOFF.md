@@ -26,6 +26,7 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 | League state API | `server/routes/league.ts` + `server/lib/leagueStore.ts` | keepers, scenarios, draft picks, player-pool and schedule snapshots, locks, PINs, overrides, audit log |
 | Client state | `src/hooks/useLeague.ts` | `useLeagueData()` = polled state + overrides-applied dataset |
 | Pages | `src/components/{keepers,draft,league}/` | Splash `/`, worksheet `/keepers/:owner`, board `/draft` (+`/draft/tv`), `/teams`, `/league`, `/rules`, `/votes`, `/trades`, `/history`, `/admin`, `/schedule` |
+| Navigation | `src/components/league/AppNav.tsx` | ≥840px: top bar, no bottom bar. Phones: 4 tabs (Keepers, Draft, Teams, Trades) + a MORE sheet holding the rest. Sticky offsets that depend on the bars live at the END of `index.css` and must stay last. |
 | Rule book | `src/lib/league/rulebook*.ts` | `rulebook.ts` numbering/search, `rulebookEdit.ts` tree edits, `rulebookDiff.ts` diff + fingerprint, `rulebookSettings.ts` prose-vs-app audit, `rulebookSignatures.ts`, `rulebookAmendment.ts` |
 | Votes | `src/lib/league/polls.ts` | Tally, thresholds, launch quota. 60% of ALL teams; silence counts against |
 | Pick trades | `src/lib/league/pickTrades.ts` | Pick identity `(round, originalOwner)`; ownership = committed seed replayed, then an append-only ledger |

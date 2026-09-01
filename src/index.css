@@ -217,6 +217,180 @@ body::before {
 .tap-btn { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
 .tap-btn:active { transform: scale(0.97); }
 
+/* ─── App navigation ─────────────────────────────────────────────────── */
+/* Phones get a five-slot bottom bar (four pages + MORE); desktop gets a
+   sticky top bar with every page and no bottom bar at all. */
+.app-shell-nav { padding-bottom: 64px; }
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  background: var(--nav-bg);
+  border-top: 2px solid var(--panel-border);
+  backdrop-filter: blur(8px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bottom-nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0 10px;
+  min-height: 48px;
+  text-decoration: none;
+  color: var(--text-mid);
+  border: none;
+  border-top: 2px solid transparent;
+  margin-top: -2px;
+  background: transparent;
+  transition: color 0.15s;
+}
+.bottom-nav-tab.active { color: var(--neon-teal); border-top-color: var(--neon-teal); }
+.bottom-nav-icon { font-size: 1.1rem; line-height: 1; position: relative; }
+.bottom-nav-label { font-size: 0.62rem; }
+
+.top-nav {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--nav-bg);
+  border-bottom: 2px solid var(--panel-border);
+  backdrop-filter: blur(8px);
+}
+.top-nav-inner {
+  max-width: 1140px;
+  height: 52px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+}
+.top-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--neon-teal);
+  text-decoration: none;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+.top-nav-links {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.top-nav-links::-webkit-scrollbar { display: none; }
+.top-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  height: 52px;
+  color: var(--text-mid);
+  text-decoration: none;
+  font-size: 0.66rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.top-nav-link:hover { color: var(--text-hi); }
+.top-nav-link.active { color: var(--neon-teal); border-bottom-color: var(--neon-teal); }
+.nav-pill {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--neon-red);
+  color: var(--dark-bg);
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 16px;
+  text-align: center;
+}
+
+@media (min-width: 840px) {
+  .top-nav { display: block; }
+  .bottom-nav { display: none; }
+  .app-shell-nav { padding-bottom: 0; }
+}
+/* Narrow desktop: 10 commissioner links must fit without a hidden scroll. */
+@media (min-width: 840px) and (max-width: 1099px) {
+  .top-nav-brand span:last-child { display: none; }
+  .top-nav-link { padding: 0 8px; font-size: 0.6rem; }
+}
+
+/* MORE sheet (phones) */
+.more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(0, 0, 0, 0.6);
+}
+.more-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  background: var(--panel-bg);
+  border-top: 2px solid var(--panel-border);
+  border-radius: 18px 18px 0 0;
+  padding: 12px 14px calc(16px + env(safe-area-inset-bottom));
+  animation: sheet-up 0.18s ease-out;
+}
+@keyframes sheet-up {
+  from { transform: translateY(28px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.more-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.more-sheet-title { color: var(--text-dim); font-size: 0.66rem; }
+.more-sheet-close {
+  background: transparent;
+  border: 2px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--text-mid);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  padding: 6px 14px;
+}
+.more-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 2px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--chip-bg);
+  color: var(--text-hi);
+  text-decoration: none;
+}
+.more-item.active { border-color: var(--neon-teal); color: var(--neon-teal); }
+.more-item-icon { font-size: 1.05rem; line-height: 1; }
+.more-item-label { font-size: 0.68rem; }
+
 /* ─── Owner access ───────────────────────────────────────────────────── */
 .splash-page {
   position: relative;
@@ -689,9 +863,6 @@ body::before {
   .commish-schedule-link { align-items: stretch; flex-direction: column; }
   .commish-schedule-link a { justify-content: center; }
   .schedule-table-scroll { max-height: 62vh; }
-  .bottom-nav-commish .hub-heading { font-size: 0.46rem !important; letter-spacing: 0.02em; }
-  .bottom-nav-commish a { padding-inline: 0 !important; }
-  .bottom-nav-commish span:first-child { font-size: 0.95rem !important; }
 }
 
 /* ─── Rule book ──────────────────────────────────────────────────────── */
@@ -961,6 +1132,9 @@ body::before {
     padding-bottom: 0 !important;
   }
   .bottom-nav,
+  .top-nav,
+  .more-backdrop,
+  .more-sheet,
   .rules-page-header,
   .rules-search-bar,
   .rules-tools,
@@ -1920,3 +2094,16 @@ body::before {
 .history-preview { margin-top: 12px; }
 .history-admin-error { margin-top: 10px; color: var(--neon-red); font-size: 0.76rem; }
 .history-admin-notice { margin-top: 10px; color: var(--neon-teal); font-size: 0.76rem; }
+
+/* ─── Offsets around the two nav bars ────────────────────────────────── */
+/* Last in the file on purpose: these must beat the base top:0 rules above. */
+.keeper-browse-banner { position: sticky; top: 8px; }
+.keeper-save-dock { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); }
+.draft-round-head { position: sticky; top: 0; }
+@media (min-width: 840px) {
+  .rules-search-bar, .rules-draft-bar { top: 52px; }
+  .rules-article, .rules-clause { scroll-margin-top: 118px; }
+  .keeper-browse-banner { top: 60px; }
+  .keeper-save-dock { bottom: 12px; }
+  .draft-round-head { top: 52px; }
+}

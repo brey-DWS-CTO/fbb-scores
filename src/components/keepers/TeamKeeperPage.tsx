@@ -591,10 +591,8 @@ export default function TeamKeeperPage() {
       {/* ── Access banners ─────────────────────────────────────── */}
       {projectionMode && browseBannerOpen && (
         <div
-          className="panel"
+          className="panel keeper-browse-banner"
           style={{
-            position: 'sticky',
-            top: 8,
             zIndex: 45,
             border: '2px dashed var(--neon-purple)',
             borderRadius: 10,
@@ -1025,7 +1023,7 @@ export default function TeamKeeperPage() {
 
       {/* ── Sticky save bar ────────────────────────────────────── */}
       {canEdit && (
-        <div style={{ position: 'sticky', bottom: 'calc(64px + env(safe-area-inset-bottom))', zIndex: 30 }}>
+        <div className="keeper-save-dock" style={{ zIndex: 30 }}>
           <div
             className="panel"
             style={{

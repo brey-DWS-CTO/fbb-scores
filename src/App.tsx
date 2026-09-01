@@ -1,6 +1,6 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import { sandboxActive } from './lib/league/api.js'
-import BottomNav from './components/league/BottomNav.js'
+import AppNav from './components/league/AppNav.js'
 import SplashPage from './components/league/SplashPage.js'
 import KeepersPage from './components/keepers/KeepersPage.js'
 import TeamKeeperPage from './components/keepers/TeamKeeperPage.js'
@@ -23,7 +23,10 @@ function App() {
   const sandbox = sandboxActive()
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--dark-bg)', paddingBottom: bareMode ? 0 : 64 }}>
+    <div
+      className={bareMode ? undefined : 'app-shell-nav'}
+      style={{ minHeight: '100vh', backgroundColor: 'var(--dark-bg)' }}
+    >
       {sandbox && (
         <Link
           to="/admin"
@@ -43,6 +46,7 @@ function App() {
           🧪 TEST MODE — sandbox only, nothing is saved · tap to exit in Commish Mode
         </Link>
       )}
+      {!bareMode && <AppNav />}
       <Routes>
         <Route path="/" element={<SplashPage />} />
         <Route path="/keepers" element={<KeepersPage />} />
@@ -59,7 +63,6 @@ function App() {
         <Route path="/schedule" element={<SchedulePage />} />
         <Route path="*" element={<SplashPage />} />
       </Routes>
-      {!bareMode && <BottomNav />}
     </div>
   )
 }

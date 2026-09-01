@@ -575,10 +575,8 @@ export default function DraftPage() {
         rounds.map((r) => (
           <section key={r}>
             <div
-              className="hub-heading"
+              className="hub-heading draft-round-head"
               style={{
-                position: 'sticky',
-                top: 0,
                 zIndex: 20,
                 background: 'rgba(10,10,15,0.96)',
                 backdropFilter: 'blur(4px)',
