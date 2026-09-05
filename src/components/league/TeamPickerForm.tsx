@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { useIdentity } from '../../hooks/useLeague.js';
 import {
@@ -45,10 +45,15 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
   const needsRepeat = isFirstTime || changing;
   const ready = owner !== '' && pin.length >= 4 && (!needsRepeat || pin2.length >= 4);
   const emailReady = email.trim().length > 3 && email.includes('@');
+  const sendingRef = useRef(false);
 
   const sendLink = async (event?: FormEvent) => {
     event?.preventDefault();
-    if (!emailReady || linkBusy) return;
+    // A double tap fires twice before the busy flag has re-rendered, which
+    // sends two links and burns two of the three tries in the window. A ref
+    // is true the instant it is set, so the second tap finds it.
+    if (!emailReady || linkBusy || sendingRef.current) return;
+    sendingRef.current = true;
     const address = email.trim();
     setLinkBusy(true);
     setLinkError(null);
@@ -63,6 +68,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
           : `Too many tries. Wait ${wait} seconds, then ask again.`,
       );
     } finally {
+      sendingRef.current = false;
       setLinkBusy(false);
     }
   };
