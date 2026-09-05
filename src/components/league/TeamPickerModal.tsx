@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { teamByOwner } from '../../lib/league/data.js';
 import TeamPickerForm from './TeamPickerForm.js';
+import SetPinPanel from './SetPinPanel.js';
 
 interface Props {
   anchor?: DOMRect;
@@ -45,6 +46,8 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
             ×
           </button>
         </div>
+
+        {identity && <SetPinPanel />}
 
         {identity && (
           <button className="tap-btn account-signout" type="button" onClick={logout}>
