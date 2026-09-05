@@ -3,15 +3,19 @@ import { useIdentity } from '../../hooks/useLeague.js';
 import { useSettings } from '../../hooks/useSettings.js';
 import TeamPickerModal from './TeamPickerModal.js';
 
-/** "Signed in as" chip + theme toggle — lives top-right on every page. */
-export default function IdentityChip() {
+interface Props {
+  placement?: 'page' | 'nav';
+}
+
+/** "Signed in as" chip + theme toggle. Desktop uses the global nav placement. */
+export default function IdentityChip({ placement = 'page' }: Props) {
   const { identity } = useIdentity();
   const { theme, setTheme } = useSettings();
   const [open, setOpen] = useState(false);
   const [accountAnchor, setAccountAnchor] = useState<DOMRect | null>(null);
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <span className={`identity-chip identity-chip-${placement}`}>
       <button
         className="tap-btn"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

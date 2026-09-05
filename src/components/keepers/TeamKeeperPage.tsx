@@ -470,9 +470,10 @@ export default function TeamKeeperPage() {
   const hasApiFallback = rosterPlayers.some((p) => !p.stats2026 && p.api2026);
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '16px 12px 8px' }}>
+    <div className="keeper-page" style={{ maxWidth: 720, margin: '0 auto', padding: '16px 12px 8px' }}>
       {/* ── Header ─────────────────────────────────────────────── */}
       <div
+        className="keeper-page-header"
         style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -484,6 +485,7 @@ export default function TeamKeeperPage() {
         <div style={{ minWidth: 0 }}>
           {isCommish && (
             <Link
+              className="keeper-page-back"
               to="/admin"
               style={{
                 color: 'var(--text-mid)',

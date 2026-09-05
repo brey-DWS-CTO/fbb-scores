@@ -105,7 +105,7 @@ export default function RecordTables() {
               <th>Member</th>
               <th className="records-num">Titles</th>
               <th className="records-num">Runner-up</th>
-              <th className="records-num">On file</th>
+              <th className="records-num">Finals</th>
             </tr>
           </thead>
           <tbody>
@@ -117,7 +117,7 @@ export default function RecordTables() {
                 </td>
                 <td className="records-num">{row.titles}</td>
                 <td className="records-num">{row.runnerUps}</td>
-                <td className="records-num">{row.seasonsPlayed}</td>
+                <td className="records-num">{row.titles + row.runnerUps}</td>
               </tr>
             ))}
           </tbody>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
+import IdentityChip from './IdentityChip.js';
 
 type NavItem = {
   to: string;
@@ -25,6 +26,16 @@ const NAV: NavItem[] = [
   { to: '/admin', label: 'COMMISH', icon: '👑', commishOnly: true },
 ];
 
+const DESKTOP_STANDALONE = ['/keepers', '/draft', '/teams', '/trades'];
+
+type MenuId = 'league' | 'rules' | 'commish';
+
+const MENU_GROUPS: Array<{ id: MenuId; label: string; routes: string[] }> = [
+  { id: 'league', label: 'LEAGUE', routes: ['/league', '/history'] },
+  { id: 'rules', label: 'RULES', routes: ['/rules', '/votes'] },
+  { id: 'commish', label: 'COMMISH', routes: ['/admin', '/schedule'] },
+];
+
 function TradeBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
@@ -41,6 +52,9 @@ export default function AppNav() {
   // The sheet is open only for the path it was opened on, so navigating
   // anywhere closes it without an effect.
   const [moreAnchor, setMoreAnchor] = useState<string | null>(null);
+  const [desktopAnchor, setDesktopAnchor] = useState<{ id: MenuId; key: string } | null>(null);
+  const desktopMenu = desktopAnchor?.key === location.key ? desktopAnchor.id : null;
+  const setDesktopMenu = (id: MenuId | null) => setDesktopAnchor(id ? { id, key: location.key } : null);
   const moreOpen = moreAnchor === location.pathname;
   const setMoreOpen = (open: boolean) => setMoreAnchor(open ? location.pathname : null);
 
@@ -52,6 +66,7 @@ export default function AppNav() {
   const primary = items.filter((t) => t.primary);
   const secondary = items.filter((t) => !t.primary);
   const moreActive = secondary.some((t) => location.pathname.startsWith(t.to));
+  const standalone = items.filter((t) => DESKTOP_STANDALONE.includes(t.to));
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -66,6 +81,18 @@ export default function AppNav() {
     };
   }, [moreOpen]);
 
+  useEffect(() => {
+    if (!desktopMenu) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        document.getElementById(`nav-trigger-${desktopMenu}`)?.focus();
+        setDesktopAnchor(null);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [desktopMenu]);
+
   return (
     <>
       <header className="top-nav">
@@ -75,7 +102,7 @@ export default function AppNav() {
             <span>FBB Scores</span>
           </NavLink>
           <nav className="top-nav-links" aria-label="Main">
-            {items.map((t) => (
+            {standalone.map((t) => (
               <NavLink
                 key={t.to}
                 to={t.to}
@@ -89,9 +116,53 @@ export default function AppNav() {
                 )}
               </NavLink>
             ))}
+            {MENU_GROUPS.map((group) => {
+              const groupItems = items.filter((item) => group.routes.includes(item.to));
+              if (groupItems.length === 0) return null;
+              const open = desktopMenu === group.id;
+              const active = groupItems.some((item) => location.pathname.startsWith(item.to));
+              return (
+                <div className="top-nav-group" key={group.id}>
+                  <button
+                    type="button"
+                    className={active || open ? 'top-nav-link top-nav-trigger hub-heading active' : 'top-nav-link top-nav-trigger hub-heading'}
+                    aria-expanded={open}
+                    id={`nav-trigger-${group.id}`}
+                    aria-controls={`nav-links-${group.id}`}
+                    onClick={() => setDesktopMenu(open ? null : group.id)}
+                  >
+                    {group.label}
+                    <span className="top-nav-chevron" aria-hidden="true">▾</span>
+                  </button>
+                  {open && (
+                    <div className="top-nav-menu" id={`nav-links-${group.id}`}>
+                      {groupItems.map((item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          className={({ isActive }) => (isActive ? 'top-nav-menu-item active' : 'top-nav-menu-item')}
+                          onClick={() => setDesktopMenu(null)}
+                        >
+                          <span className="top-nav-menu-icon" aria-hidden="true">{item.icon}</span>
+                          <span>
+                            <strong>{item.label === 'LEAGUE' ? 'LEAGUE HQ' : item.label === 'RULES' ? 'RULEBOOK' : item.label}</strong>
+                            <small>{item.to === '/league' ? 'Scoring, records, and league info' : item.to === '/history' ? 'Seasons, champions, and records' : item.to === '/rules' ? 'Read and search the constitution' : item.to === '/votes' ? 'Proposals and league decisions' : item.to === '/admin' ? 'Draft and keeper controls' : 'NBA weeks and playoff grid'}</small>
+                          </span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </nav>
+          <div className="top-nav-account">
+            <IdentityChip placement="nav" />
+          </div>
         </div>
       </header>
+
+      {desktopMenu && <button className="desktop-nav-backdrop" type="button" aria-label="Close navigation menu" onClick={() => setDesktopMenu(null)} />}
 
       <nav className="bottom-nav" aria-label="Main">
         {primary.map((t) => (
@@ -135,17 +206,26 @@ export default function AppNav() {
               </button>
             </div>
             <div className="more-list">
-              {secondary.map((t) => (
-                <NavLink
-                  key={t.to}
-                  to={t.to}
-                  className={({ isActive }) => (isActive ? 'more-item active' : 'more-item')}
-                  onClick={() => setMoreOpen(false)}
-                >
-                  <span className="more-item-icon" aria-hidden="true">{t.icon}</span>
-                  <span className="hub-heading more-item-label">{t.label}</span>
-                </NavLink>
-              ))}
+              {MENU_GROUPS.map((group) => {
+                const groupItems = secondary.filter((item) => group.routes.includes(item.to));
+                if (groupItems.length === 0) return null;
+                return (
+                  <section className="more-section" key={group.id} aria-labelledby={`more-${group.id}`}>
+                    <h2 className="more-section-title hub-heading" id={`more-${group.id}`}>{group.label}</h2>
+                    {groupItems.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className={({ isActive }) => (isActive ? 'more-item active' : 'more-item')}
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        <span className="more-item-icon" aria-hidden="true">{item.icon}</span>
+                        <span className="hub-heading more-item-label">{item.label === 'LEAGUE' ? 'LEAGUE HQ' : item.label === 'RULES' ? 'RULEBOOK' : item.label}</span>
+                      </NavLink>
+                    ))}
+                  </section>
+                );
+              })}
             </div>
           </div>
         </>

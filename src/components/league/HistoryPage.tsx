@@ -32,16 +32,18 @@ function SortHeader({
   sort,
   onSort,
   numeric,
+  className,
 }: {
   label: string;
   columnKey: RecordSortKey;
   sort: SortState;
   onSort: (key: RecordSortKey) => void;
   numeric?: boolean;
+  className?: string;
 }) {
   const active = sort.key === columnKey;
   return (
-    <th className={numeric ? 'records-num' : undefined}>
+    <th className={[numeric ? 'records-num' : '', className ?? ''].filter(Boolean).join(' ') || undefined}>
       <button
         type="button"
         className={active ? 'history-sort history-sort-on' : 'history-sort'}
@@ -84,6 +86,16 @@ export default function HistoryPage() {
     () => new Map(history.seasons.map((season) => [season.seasonNumber, season.label])),
     [history.seasons],
   );
+  const seasonEndYear = useMemo(
+    () =>
+      new Map(
+        history.seasons.map((season) => {
+          const endingYear = season.label.match(/\d{4}$/)?.[0];
+          return [season.seasonNumber, endingYear ?? season.label];
+        }),
+      ),
+    [history.seasons],
+  );
 
   const onSort = (key: RecordSortKey) =>
     setSort((current) =>
@@ -105,14 +117,14 @@ export default function HistoryPage() {
       <section className="panel history-panel">
         <div className="hub-heading history-heading">SEASON BY SEASON</div>
         <div className="rules-table-wrap">
-          <table className="rules-table records-table">
+          <table className="rules-table records-table history-responsive-table history-season-table">
             <thead>
               <tr>
                 <th>#</th>
                 <th>Year</th>
                 <th>Champion</th>
                 <th>Runner-up</th>
-                <th>Source</th>
+                <th className="history-season-source">Source</th>
               </tr>
             </thead>
             <tbody>
@@ -128,7 +140,7 @@ export default function HistoryPage() {
                     <td>{row.season.label}</td>
                     <td>{row.champion?.ownerName ?? 'Unknown'}</td>
                     <td>{row.runnerUp?.ownerName ?? 'Unknown'}</td>
-                    <td>{SOURCE_LABEL[row.season.source.provenance] ?? row.season.source.provenance}</td>
+                    <td className="history-season-source">{SOURCE_LABEL[row.season.source.provenance] ?? row.season.source.provenance}</td>
                   </tr>,
                   open ? (
                     <tr key={`${row.season.id}-detail`}>
@@ -166,14 +178,14 @@ export default function HistoryPage() {
       <section className="panel history-panel">
         <div className="hub-heading history-heading">TITLES BY FRANCHISE</div>
         <div className="rules-table-wrap">
-          <table className="rules-table records-table">
+          <table className="rules-table records-table history-responsive-table history-title-table">
             <thead>
               <tr>
                 <th>Franchise</th>
                 <th className="records-num">Titles</th>
                 <th className="records-num">Runner-up</th>
-                <th className="records-num">On file</th>
-                <th className="records-num">Last title</th>
+                <th className="records-num">Finals</th>
+                <th className="records-num">Last championship</th>
               </tr>
             </thead>
             <tbody>
@@ -185,16 +197,18 @@ export default function HistoryPage() {
                   </td>
                   <td className="records-num">{row.titles}</td>
                   <td className="records-num">{row.runnerUps}</td>
-                  <td className="records-num">{row.seasonsPlayed}</td>
-                  <td className="records-num">{row.lastTitleSeason ?? '—'}</td>
+                  <td className="records-num">{row.titles + row.runnerUps}</td>
+                  <td className="records-num">
+                    {row.lastTitleSeason === null ? '—' : (seasonEndYear.get(row.lastTitleSeason) ?? row.lastTitleSeason)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="records-caption">
-          * No longer in the league. A franchise keeps its record when the owner changes. On file
-          counts the seasons with a recorded finish, which so far means reaching the final.
+          * No longer in the league. A franchise keeps its record when the owner changes. Finals
+          means titles plus runner-up finishes.
         </p>
       </section>
 
@@ -204,17 +218,16 @@ export default function HistoryPage() {
           {category?.criteria}. {category?.basisNote}
         </p>
         <div className="rules-table-wrap">
-          <table className="rules-table records-table">
+          <table className="rules-table records-table history-responsive-table history-record-table">
             <thead>
               <tr>
                 <SortHeader label="#" columnKey="rank" sort={sort} onSort={onSort} />
                 <SortHeader label="Owner" columnKey="owner" sort={sort} onSort={onSort} />
                 <SortHeader label="Season" columnKey="season" sort={sort} onSort={onSort} />
                 <SortHeader label="Week" columnKey="period" sort={sort} onSort={onSort} />
-                <th>Opponent</th>
                 <SortHeader label="Points" columnKey="value" sort={sort} onSort={onSort} numeric />
-                <th>Basis</th>
-                <SortHeader label="Source" columnKey="source" sort={sort} onSort={onSort} />
+                <th className="history-record-secondary">Basis</th>
+                <SortHeader label="Source" columnKey="source" sort={sort} onSort={onSort} className="history-record-secondary" />
               </tr>
             </thead>
             <tbody>
@@ -224,13 +237,19 @@ export default function HistoryPage() {
                   <td>
                     {entry.ownerName}
                     {entry.franchiseId && franchises.get(entry.franchiseId)?.active === false ? '*' : ''}
+                    <details className="history-record-detail">
+                      <summary>Details</summary>
+                      <div>Opponent: {entry.opponentName ?? 'unknown'}</div>
+                      <div>Basis: {entry.basis}</div>
+                      <div>Source: {SOURCE_LABEL[entry.source.provenance] ?? entry.source.provenance}</div>
+                      <div>{entry.source.reference}</div>
+                    </details>
                   </td>
                   <td>{seasonLabel.get(entry.seasonNumber) ?? entry.seasonNumber}</td>
                   <td>{entry.period ?? 'unknown'}</td>
-                  <td>{entry.opponentName ?? 'unknown'}</td>
                   <td className="records-num">{entry.value.toFixed(1)}</td>
-                  <td>{entry.basis}</td>
-                  <td>{SOURCE_LABEL[entry.source.provenance] ?? entry.source.provenance}</td>
+                  <td className="history-record-secondary">{entry.basis}</td>
+                  <td className="history-record-secondary">{SOURCE_LABEL[entry.source.provenance] ?? entry.source.provenance}</td>
                 </tr>
               ))}
             </tbody>
