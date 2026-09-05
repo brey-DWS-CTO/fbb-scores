@@ -46,6 +46,7 @@ import {
   verifySession,
   getOwnerEmails,
   setOwnerEmail,
+  issueLoginToken,
   getPins,
   setPin,
   getPinStatus,
@@ -92,6 +93,9 @@ import {
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
+import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
+import { sendLoginLink } from '../lib/mailer.js';
+import { appOrigin } from './auth.js';
 import {
   canEditPoll,
   canLaunchPoll,
@@ -976,6 +980,44 @@ router.post('/emails/:owner', requireAuth, requireCommissioner, async (req, res)
     target,
   });
   res.json(await getOwnerEmails());
+});
+
+/**
+ * POST /api/league/emails/:owner/send-link — send that member their sign-in
+ * link (commissioner only).
+ *
+ * The link goes to their address, never to whoever pressed the button, so
+ * this cannot be used to sign in as somebody else. It exists so the
+ * commissioner can prove mail reaches all ten before telling the league to
+ * expect it.
+ */
+router.post('/emails/:owner/send-link', requireAuth, requireCommissioner, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  if (!isKnownOwner(target)) {
+    res.status(404).json({ error: `Unknown owner: ${target}` });
+    return;
+  }
+  const row = (await getOwnerEmails()).find((entry) => entry.owner === target);
+  if (!row || row.email === '') {
+    res.status(400).json({ error: `${target} has no address saved yet` });
+    return;
+  }
+  const issued = await issueLoginToken(row.email, new Date());
+  if (!issued.ok || !issued.token) {
+    res.status(429).json({
+      error: issued.reason ?? 'That address has had too many links. Wait a few minutes.',
+      retryAfterSeconds: issued.retryAfterSeconds,
+    });
+    return;
+  }
+  const link = `${appOrigin(req)}/sign-in/${encodeURIComponent(issued.token)}`;
+  const sent = await sendLoginLink(row.email, link, LINK_TTL_MINUTES);
+  if (!sent.ok) {
+    res.status(502).json({ error: sent.error ?? 'Could not send the email' });
+    return;
+  }
+  await appendAudit(res.locals.owner as string, 'email.link-sent', { target });
+  res.json({ sent: true, logged: sent.logged === true });
 });
 
 /**

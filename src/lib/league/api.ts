@@ -550,6 +550,18 @@ export async function saveOwnerEmail(
   return data;
 }
 
+/**
+ * Send one member their sign-in link. It goes to their inbox, not yours, so
+ * this checks that mail reaches them rather than letting you in as them.
+ */
+export async function sendOwnerLink(c: Credentials, owner: string): Promise<void> {
+  await axios.post(
+    `/api/league/emails/${encodeURIComponent(owner)}/send-link`,
+    {},
+    { headers: authHeaders(c) },
+  );
+}
+
 /** Seconds to wait after too many link requests. Null when that wasn't it. */
 export function retryAfterSeconds(e: unknown): number | null {
   if (!axios.isAxiosError(e) || e.response?.status !== 429) return null;

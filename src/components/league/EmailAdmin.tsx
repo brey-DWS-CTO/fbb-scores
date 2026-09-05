@@ -5,6 +5,7 @@ import {
   apiErrorMessage,
   fetchOwnerEmails,
   saveOwnerEmail,
+  sendOwnerLink,
   type OwnerEmail,
 } from '../../lib/league/api.js';
 
@@ -28,6 +29,7 @@ export default function EmailAdmin() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +54,25 @@ export default function EmailAdmin() {
       setRows(list);
       setDrafts(Object.fromEntries(list.map((row) => [row.owner, row.email])));
       setSaved(owner);
+    } catch (caught) {
+      setError(apiErrorMessage(caught));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * Fire that member's sign-in link at their own inbox. It is the only way to
+   * check an address reaches somebody without asking them to try, and it is
+   * safe because the link lands in their mail, not the commissioner's.
+   */
+  const sendLink = async (owner: string) => {
+    setBusy(owner);
+    setError(null);
+    setSent(null);
+    try {
+      await sendOwnerLink(identity, owner);
+      setSent(owner);
     } catch (caught) {
       setError(apiErrorMessage(caught));
     } finally {
@@ -99,6 +120,11 @@ export default function EmailAdmin() {
                       SAVED
                     </span>
                   )}
+                  {sent === owner && (
+                    <span style={{ color: 'var(--neon-teal)', fontSize: '0.6rem', fontWeight: 800 }}>
+                      LINK SENT
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input
@@ -134,6 +160,26 @@ export default function EmailAdmin() {
                     }}
                   >
                     {busy === owner ? '…' : 'SAVE'}
+                  </button>
+                  <button
+                    className="tap-btn"
+                    type="button"
+                    onClick={() => void sendLink(owner)}
+                    disabled={busy !== null || dirty || !row?.email}
+                    title={dirty ? 'Save the address first' : `Send ${owner} a sign-in link`}
+                    style={{
+                      minHeight: 44,
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: '2px solid var(--panel-border)',
+                      background: 'transparent',
+                      color: !dirty && row?.email ? 'var(--text-mid)' : 'var(--text-ghost)',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    LINK
                   </button>
                 </div>
               </div>

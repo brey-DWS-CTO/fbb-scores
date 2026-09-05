@@ -31,7 +31,7 @@ const router = Router();
  * no idea what host made the request. The request origin is the local
  * fallback.
  */
-function appOrigin(req: Request): string {
+export function appOrigin(req: Request): string {
   const configured = process.env.PUBLIC_APP_URL;
   if (configured) return configured.replace(/\/+$/, '');
   const origin = req.header('origin');
