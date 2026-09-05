@@ -26,7 +26,7 @@ Vite 7 + React 19 SPA · Express 5 (`server/app.ts`, wrapped by `api/index.ts` o
 | League state API | `server/routes/league.ts` + `server/lib/leagueStore.ts` | keepers, scenarios, draft picks, player-pool and schedule snapshots, locks, PINs, overrides, audit log |
 | Client state | `src/hooks/useLeague.ts` | `useLeagueData()` = polled state + overrides-applied dataset |
 | Pages | `src/components/{keepers,draft,league}/` | Splash `/`, worksheet `/keepers/:owner`, board `/draft` (+`/draft/tv`), `/teams`, `/league`, `/rules`, `/votes`, `/trades`, `/history`, `/admin`, `/schedule` |
-| Navigation | `src/components/league/AppNav.tsx` | ≥840px: top bar, no bottom bar. Phones: 4 tabs (Keepers, Draft, Teams, Trades) + a MORE sheet holding the rest. Sticky offsets that depend on the bars live at the END of `index.css` and must stay last. |
+| Navigation | `src/components/league/AppNav.tsx` | ≥840px: 64px top bar with account controls and League/Rules/Commish dropdowns. Phones: 4 tabs (Keepers, Draft, Teams, Trades) + a grouped MORE sheet. Keeper headers stick while the roster scrolls. History tables fit phones; record details retain provenance. Sticky offsets that depend on the bars live at the END of `index.css` and must stay last. |
 | Rule book | `src/lib/league/rulebook*.ts` | `rulebook.ts` numbering/search, `rulebookEdit.ts` tree edits, `rulebookDiff.ts` diff + fingerprint, `rulebookSettings.ts` prose-vs-app audit, `rulebookSignatures.ts`, `rulebookAmendment.ts` |
 | Votes | `src/lib/league/polls.ts` | Tally, thresholds, launch quota. 60% of ALL teams; silence counts against |
 | Pick trades | `src/lib/league/pickTrades.ts` | Pick identity `(round, originalOwner)`; ownership = committed seed replayed, then an append-only ledger |
@@ -166,7 +166,26 @@ Nothing on the original list. What remains:
 5. **Season-average freeze, around March 2027**, before ESPN pollutes the
    averages with post-fantasy-season games. Miss it and next year's keeper tiers
    are wrong. Nothing enforces this date.
-6. Email notification when a vote opens. Asked for, not built.
+6. **Email through Resend.** No mail path exists yet. Build it as one small
+   service, `src/lib/league/notify.ts` plus a server sender, so every message
+   goes out the same way and is testable without sending. First cut:
+
+   - **Trade offers.** A member gets mail when an offer arrives, and when the
+     other side accepts, rejects, or cancels.
+   - **Keeper deadline.** A reminder at set intervals before the keeper lock,
+     naming the date, and only to owners who have not submitted.
+   - **Draft day.** A countdown reminder before **Sun Oct 18, 2026, 2:00 PM PT**,
+     plus an on-the-clock note during the draft.
+   - **Votes.** Mail when a poll opens, when the commissioner edits it, and when
+     it closes. Already asked for.
+   - **Rulebook.** Mail when a new revision publishes, asking for a signature.
+
+   Needs: an email column per owner (nothing stores one today), a per-member
+   on/off list, `RESEND_API_KEY` in Vercel, a verified sending domain under
+   `dowhatsolutions.com`, and an unsubscribe link. Send from the server only,
+   never from the browser. Log every send in the audit trail, and make sends
+   idempotent so a retry cannot mail the league twice. Local development should
+   write mail to a file instead of sending.
 
 ### Scope note: this app augments ESPN, it does not replace it
 
@@ -391,4 +410,4 @@ UI: `/history` (public) has the season table with per-season sources and standin
 
 ### Later
 
-Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files) · **email on votes** (tell members when a vote opens, when the commissioner edits one, and when it closes; the app has no mail path yet) · **reskin to the handoff palette** (Brey liked the light, cool-neutral look of the handoff artifact: Fraunces headings, Public Sans body, indigo accent, blue-biased greys. Parked, not scheduled. It would touch every page, so treat it as its own project and keep the neon theme working until the swap is complete).
+Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files) · **reskin to the handoff palette** (Brey liked the light, cool-neutral look of the handoff artifact: Fraunces headings, Public Sans body, indigo accent, blue-biased greys. Parked, not scheduled. It would touch every page, so treat it as its own project and keep the neon theme working until the swap is complete).
