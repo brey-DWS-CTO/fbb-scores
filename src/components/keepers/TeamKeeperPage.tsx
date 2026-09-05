@@ -16,8 +16,10 @@ import {
   useKeeperScenario,
   useLeagueData,
 } from '../../hooks/useLeague.js';
+import { usePostseasonGames, type PostseasonGames } from '../../hooks/usePostseasonGames.js';
 import IdentityChip from '../league/IdentityChip.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
+import PostseasonTag from '../league/PostseasonTag.js';
 import { CapBar, LockBanner, RoundChip, SourceBadge } from './keeperUi.js';
 
 const selKey = (sels: KeeperSelection[]) => sels.map((s) => `${s.playerKey}~${s.playerName}`).join('|');
@@ -29,6 +31,7 @@ function RosterRow({
   selected,
   canEdit,
   reason,
+  postseason,
   tapThrough,
   onTap,
 }: {
@@ -37,6 +40,8 @@ function RosterRow({
   selected: boolean;
   canEdit: boolean;
   reason: string | null;
+  /** Commissioner only. Null for everyone else, and for a player with no team. */
+  postseason: PostseasonGames | null;
   /** Blocked only by the cap: keep the greyed look but let the tap land. */
   tapThrough?: boolean;
   onTap: () => void;
@@ -105,6 +110,9 @@ function RosterRow({
               <SourceBadge info={p.keeper} compact />
             </span>
           )}
+          {/* Last, so the phone wraps this before it wraps the keeper price.
+              The first three children stay pinned to one line either way. */}
+          <PostseasonTag games={postseason} />
         </div>
         {!selected && reason && (
           <div style={{ color: 'var(--neon-red)', fontSize: '0.68rem', marginTop: 2 }}>{reason}</div>
@@ -310,6 +318,7 @@ export default function TeamKeeperPage() {
   const { identity } = useIdentity();
   const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
+  const postseasonGames = usePostseasonGames();
 
   const serverSelections = useMemo(() => state.keepers[owner] ?? [], [state.keepers, owner]);
   const isCommish = identity?.isCommissioner ?? false;
@@ -981,6 +990,7 @@ export default function TeamKeeperPage() {
               selected={selections.some((x) => x.playerKey === p.key)}
               canEdit={canEdit}
               reason={disabledReason(p)}
+              postseason={postseasonGames(p.proTeam)}
               tapThrough={overCapTapThrough(p)}
               onTap={() => toggleKeeper(p)}
             />

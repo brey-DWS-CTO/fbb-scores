@@ -5,6 +5,7 @@ import {
   DEFAULT_2027_LEAGUE_MAPPING,
   NBA_TEAMS,
   buildLeagueSchedule,
+  nbaTeamIdForProTeam,
   normalizeNbaTeamCode,
   normalizeScheduleSource,
   summarizeAllTeamSchedules,
@@ -197,5 +198,54 @@ test('reconciles every team from league periods through the two unused NBA weeks
     assert.equal(summary.regular.total + summary.postseasonTotal + unusedGames, 82, summary.teamCode);
     assert.equal(summary.playoffs.round1 + summary.playoffs.round2, summary.playoffs.total, summary.teamCode);
     assert.equal(summary.playIn.total + summary.playoffs.total, summary.postseasonTotal, summary.teamCode);
+  }
+});
+
+/**
+ * Every NBA team code a player can carry in the league data, and the ESPN team
+ * ID it must resolve to. Written out by hand so a bad join fails here instead
+ * of putting another team's postseason beside a player's name.
+ */
+const PRO_TEAM_CODES: ReadonlyArray<readonly [string, number]> = [
+  ['Atl', 1], ['Bkn', 17], ['Bos', 2], ['Cha', 30], ['Chi', 4],
+  ['Cle', 5], ['Dal', 6], ['Den', 7], ['Det', 8], ['GS', 9],
+  ['Hou', 10], ['Ind', 11], ['LAC', 12], ['LAL', 13], ['Mem', 29],
+  ['Mia', 14], ['Mil', 15], ['Min', 16], ['NY', 18], ['Nor', 3],
+  ['OKC', 25], ['Orl', 19], ['Phi', 20], ['Pho', 21], ['Por', 22],
+  ['SA', 24], ['Sac', 23], ['Tor', 28], ['Utah', 26], ['Wsh', 27],
+];
+
+test('resolves every player NBA team code to its ESPN team ID', () => {
+  assert.equal(PRO_TEAM_CODES.length, NBA_TEAMS.length);
+
+  for (const [proTeam, expected] of PRO_TEAM_CODES) {
+    assert.equal(nbaTeamIdForProTeam(proTeam), expected, proTeam);
+  }
+
+  const resolved = new Set(PRO_TEAM_CODES.map(([proTeam]) => nbaTeamIdForProTeam(proTeam)));
+  assert.equal(resolved.size, NBA_TEAMS.length);
+  for (const team of NBA_TEAMS) {
+    assert.ok(resolved.has(team.espnId), team.code);
+  }
+});
+
+test('resolves a free agent and any unknown team code to null', () => {
+  assert.equal(nbaTeamIdForProTeam('FA'), null);
+  assert.equal(nbaTeamIdForProTeam('fa'), null);
+  assert.equal(nbaTeamIdForProTeam(''), null);
+  assert.equal(nbaTeamIdForProTeam('   '), null);
+  assert.equal(nbaTeamIdForProTeam('SEA'), null);
+  assert.equal(nbaTeamIdForProTeam('Kansas City'), null);
+});
+
+test('finds a postseason summary for every team a player code resolves to', () => {
+  const periods = buildLeagueSchedule(normalizeScheduleSource(source));
+  const byTeamId = new Map(summarizeAllTeamSchedules(periods).map((entry) => [entry.teamId, entry]));
+
+  for (const [proTeam, expected] of PRO_TEAM_CODES) {
+    const summary = byTeamId.get(expected);
+    assert.ok(summary, proTeam);
+    assert.equal(nbaTeamIdForProTeam(proTeam), summary.teamId, proTeam);
+    assert.ok(summary.playIn.total > 0 && summary.playoffs.total > 0, proTeam);
   }
 });

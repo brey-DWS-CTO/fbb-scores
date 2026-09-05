@@ -140,10 +140,18 @@ export const NBA_TEAMS: readonly NbaTeam[] = [
 const TEAM_ID_BY_CODE = new Map(NBA_TEAMS.map((team) => [team.code, team.espnId]));
 const TEAM_CODE_BY_ID = new Map(NBA_TEAMS.map((team) => [team.espnId, team.code]));
 
+// Basketball Monster writes NOR and PHO. ESPN writes a player's team its own
+// way again: GS, NY, SA, Utah, Wsh. Both spellings land on the same team here
+// so a player never has to be matched to a schedule by hand.
 const TEAM_CODE_ALIASES: Readonly<Record<string, string>> = {
+  GS: 'GSW',
   NO: 'NOP',
   NOR: 'NOP',
+  NY: 'NYK',
   PHO: 'PHX',
+  SA: 'SAS',
+  UTAH: 'UTA',
+  WSH: 'WAS',
 };
 
 const ALL_STAR_BREAK_START = '2027-02-19';
@@ -222,6 +230,18 @@ function addDays(value: string, days: number): string {
 export function normalizeNbaTeamCode(value: string): string {
   const upper = value.trim().toUpperCase();
   return TEAM_CODE_ALIASES[upper] ?? upper;
+}
+
+/**
+ * The ESPN team code carried on a player, turned into an ESPN NBA team ID.
+ *
+ * Returns null for a free agent and for anything else that does not resolve.
+ * Every join between a player and a schedule runs through here, and a wrong
+ * answer would put another team's postseason next to a player's name, so the
+ * miss has to be visible to the caller instead of guessed at.
+ */
+export function nbaTeamIdForProTeam(proTeam: string): number | null {
+  return TEAM_ID_BY_CODE.get(normalizeNbaTeamCode(proTeam)) ?? null;
 }
 
 export function normalizeScheduleSource(raw: unknown, status: ScheduleSourceStatus = 'provisional'): ScheduleSnapshot {

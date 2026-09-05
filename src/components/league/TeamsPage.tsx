@@ -4,13 +4,16 @@ import type { BoardCell } from '../../lib/keeper/types.js';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import { usePostseasonGames, type PostseasonGamesLookup } from '../../hooks/usePostseasonGames.js';
 import { positionColor, cellDisplay } from '../draft/boardUtils.js';
 import IdentityChip from './IdentityChip.js';
+import PostseasonTag from './PostseasonTag.js';
 
 /** /teams — everyone's 2027 roster as it forms from keepers + draft picks. */
 export default function TeamsPage() {
   const { state, meta, dataset } = useLeagueData(true);
   const { identity } = useIdentity();
+  const postseasonGames = usePostseasonGames();
   const [selected, setSelected] = useState<string | null>(null);
 
   const owner = selected ?? identity?.owner ?? OWNERS[0];
@@ -126,7 +129,7 @@ export default function TeamsPage() {
         )}
 
         {filled.map((c) => (
-          <RosterLine key={c.pick.overall} cell={c} />
+          <RosterLine key={c.pick.overall} cell={c} postseasonGames={postseasonGames} />
         ))}
 
         {upcoming.length > 0 && (
@@ -160,10 +163,17 @@ export default function TeamsPage() {
   );
 }
 
-function RosterLine({ cell }: { cell: BoardCell }) {
+function RosterLine({
+  cell,
+  postseasonGames,
+}: {
+  cell: BoardCell;
+  postseasonGames: PostseasonGamesLookup;
+}) {
   const d = cellDisplay(cell);
   if (!d) return null;
   const color = positionColor(d.positions);
+  const postseason = d.proTeam ? postseasonGames(d.proTeam) : null;
   return (
     <div
       style={{
@@ -183,6 +193,13 @@ function RosterLine({ cell }: { cell: BoardCell }) {
         <div style={{ fontSize: '0.72rem', fontWeight: 700, color }}>
           {d.positions[0] ?? ''}
           {d.proTeam && <span style={{ color: 'var(--text-mid)', fontWeight: 600 }}> · {d.proTeam.toUpperCase()}</span>}
+          {postseason && (
+            /* The dot carries the tag's colour, not the position colour. */
+            <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>
+              {' · '}
+              <PostseasonTag games={postseason} />
+            </span>
+          )}
         </div>
       </div>
       <div style={{ flexShrink: 0, textAlign: 'right' }}>
