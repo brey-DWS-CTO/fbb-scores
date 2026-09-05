@@ -4,6 +4,8 @@ import type { BoardCell, DatasetPlayer } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
 import { apiErrorMessage, clearDraftPick, submitDraftPick } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity } from '../../hooks/useLeague.js';
+import { usePostseasonGames } from '../../hooks/usePostseasonGames.js';
+import PostseasonTag from '../league/PostseasonTag.js';
 import { POSITION_ORDER, positionTheme } from './boardUtils.js';
 
 function SheetShell({
@@ -99,6 +101,7 @@ type PositionFilter = 'ALL' | (typeof POSITION_ORDER)[number];
 export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
+  const postseasonGames = usePostseasonGames();
   const [chosen, setChosen] = useState<DatasetPlayer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -303,6 +306,7 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
             )}
             {filtered.map((player) => {
               const theme = positionTheme(player.positions);
+              const postseason = postseasonGames(player.proTeam);
               return (
                 <button
                   key={player.key}
@@ -345,6 +349,12 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
                     <span style={{ display: 'block', marginTop: 3, color: 'var(--text-mid)', fontSize: '0.76rem' }}>
                       <strong style={{ color: theme.color }}>{player.positions.join(' / ') || '—'}</strong>
                       {' · '}{player.proTeam.toUpperCase()}
+                      {postseason && (
+                        <>
+                          {' · '}
+                          <PostseasonTag games={postseason} />
+                        </>
+                      )}
                     </span>
                   </span>
                   <span
