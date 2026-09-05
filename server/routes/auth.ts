@@ -66,6 +66,12 @@ router.post('/request-link', async (req: Request, res: Response) => {
       res.status(502).json({ error: sent.error ?? 'Could not send the email' });
       return;
     }
+    // Deployed with no mail key, the link only reaches a log nobody reads. Say
+    // so rather than telling someone to check an inbox that will stay empty.
+    if (sent.logged === true && process.env.VERCEL) {
+      res.status(503).json({ error: 'Sign-in by email is not switched on yet. Use a PIN for now.' });
+      return;
+    }
     res.json({ sent: true, logged: sent.logged === true });
   } catch (err) {
     console.error('[auth] request-link failed:', err instanceof Error ? err.message : err);
