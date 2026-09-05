@@ -43,6 +43,9 @@ import {
   getState,
   mutateState,
   verifyPin,
+  verifySession,
+  getOwnerEmails,
+  setOwnerEmail,
   getPins,
   setPin,
   getPinStatus,
@@ -225,15 +228,33 @@ function validateKeeperSelections(
 
 // ─── Auth middleware ─────────────────────────────────────────────────────────
 
+/**
+ * Two ways in while the league changes over: an emailed sign-in link, which
+ * leaves a session, or the old owner and PIN pair. PINs go once everyone has
+ * used a link at least once, and not a day before the draft.
+ */
 async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const session = req.header('x-session');
   const owner = req.header('x-owner');
   const pin = req.header('x-pin');
-  if (!owner || !pin) {
-    res.status(401).json({ error: 'Missing x-owner / x-pin headers' });
+  if (!session && (!owner || !pin)) {
+    res.status(401).json({ error: 'Sign in to do that' });
     return;
   }
   try {
-    const result = await verifyPin(owner, pin);
+    if (session) {
+      const check = await verifySession(session, new Date());
+      if (!check.ok || !check.owner) {
+        res.status(401).json({ error: 'Your sign-in has expired' });
+        return;
+      }
+      res.locals.owner = check.owner;
+      res.locals.isCommissioner = check.isCommissioner === true;
+      res.locals.mustChangePin = false;
+      next();
+      return;
+    }
+    const result = await verifyPin(owner as string, pin as string);
     if (!result.ok) {
       res.status(401).json({ error: 'Invalid owner or PIN' });
       return;
@@ -267,8 +288,20 @@ interface Viewer {
   isCommissioner: boolean;
 }
 
-/** Best-effort identity from optional x-owner/x-pin headers (never throws). */
+/** Best-effort identity from an optional session or PIN header (never throws). */
 async function optionalViewer(req: Request): Promise<Viewer> {
+  const session = req.header('x-session');
+  if (session) {
+    try {
+      const check = await verifySession(session, new Date());
+      if (check.ok && check.owner) {
+        return { owner: check.owner, isCommissioner: check.isCommissioner === true };
+      }
+    } catch {
+      return { owner: null, isCommissioner: false };
+    }
+    return { owner: null, isCommissioner: false };
+  }
   const owner = req.header('x-owner');
   const pin = req.header('x-pin');
   if (!owner || !pin) return { owner: null, isCommissioner: false };
@@ -910,6 +943,39 @@ router.post('/claim-pin', async (req, res) => {
   }
   await appendAudit(owner, 'pin.claimed', { owner });
   res.json({ ok: true });
+});
+
+/**
+ * GET /api/league/emails — every owner and the address their sign-in link
+ * goes to (commissioner only). An address that has never been used to sign in
+ * shows as unconfirmed, which is how the commissioner spots a typo.
+ */
+router.get('/emails', requireAuth, requireCommissioner, async (_req, res) => {
+  res.json(await getOwnerEmails());
+});
+
+/**
+ * POST /api/league/emails/:owner — set or clear an owner's address
+ * (commissioner only). Body: { email: string }, or "" to clear it.
+ */
+router.post('/emails/:owner', requireAuth, requireCommissioner, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const body = (req.body ?? {}) as { email?: unknown };
+  if (typeof body.email !== 'string') {
+    res.status(400).json({ error: 'email must be text, or "" to clear it' });
+    return;
+  }
+  const result = await setOwnerEmail(target, body.email);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error ?? 'Could not save that address' });
+    return;
+  }
+  // The address is not a secret, but it is somebody's personal data. The audit
+  // trail records that it changed, not what it changed to.
+  await appendAudit(res.locals.owner as string, body.email === '' ? 'email.cleared' : 'email.set', {
+    target,
+  });
+  res.json(await getOwnerEmails());
 });
 
 /**

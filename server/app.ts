@@ -10,6 +10,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import authRoutes from './routes/auth.js';
 import espnRoutes from './routes/espn.js';
 import leagueRoutes from './routes/league.js';
 
@@ -24,6 +25,7 @@ app.use(express.json({ limit: '4mb' }));
 
 // Mount API routes
 app.use('/api', espnRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/league', leagueRoutes);
 
 export default app;

@@ -13,10 +13,22 @@
  * first sign-in (claimPin). Commissioner status always comes from that config
  * file, never from storage.
  */
+import crypto from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { neon } from '@neondatabase/serverless';
+import {
+  canRequestLink,
+  emailTakenBy,
+  isExpired,
+  isValidEmail,
+  linkExpiresAt,
+  normalizeEmail,
+  ownerForEmail,
+  sessionExpiresAt,
+  LINK_WINDOW_MINUTES,
+} from '../../src/lib/league/auth.js';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
@@ -145,6 +157,43 @@ export interface PollRow {
   season: number;
   data: unknown;
   updatedAt: string;
+}
+
+/**
+ * An owner's email address, used to decide who a sign-in link belongs to.
+ *
+ * The address never decides what a member can do. It only maps to the owner
+ * name, which is what every permission in this app is keyed on. Emails live
+ * here and not in the committed league config, which ships to the browser.
+ */
+export interface OwnerEmailRow {
+  owner: string;
+  email: string;
+  /** Null until the member has signed in with that address at least once. */
+  confirmedAt: string | null;
+}
+
+/**
+ * A pending sign-in link.
+ *
+ * Only the hash is stored. Someone who reads the table cannot sign in with
+ * what they find there, and a link works once.
+ */
+export interface LoginTokenRow {
+  tokenHash: string;
+  email: string;
+  owner: string;
+  issuedAt: string;
+  expiresAt: string;
+}
+
+/** A signed-in device. Same rule: the hash is stored, never the token. */
+export interface SessionRow {
+  tokenHash: string;
+  owner: string;
+  email: string;
+  issuedAt: string;
+  expiresAt: string;
 }
 
 export class PollWriteError extends Error {
@@ -291,6 +340,18 @@ interface StoreBackend {
   getPin(owner: string): Promise<string | null>;
   getPins(): Promise<Array<{ owner: string; pin: string }>>;
   setPin(owner: string, pin: string): Promise<void>;
+  getOwnerEmails(): Promise<OwnerEmailRow[]>;
+  setOwnerEmail(owner: string, email: string, confirmedAt: string | null): Promise<void>;
+  createLoginToken(row: LoginTokenRow): Promise<void>;
+  /** Deletes the row as it reads it, so a link cannot be used twice. */
+  takeLoginToken(tokenHash: string): Promise<LoginTokenRow | null>;
+  /** Issue times of links sent to this address since the given moment. */
+  recentLoginTokens(email: string, since: string): Promise<string[]>;
+  createSession(row: SessionRow): Promise<void>;
+  getSession(tokenHash: string): Promise<SessionRow | null>;
+  deleteSession(tokenHash: string): Promise<void>;
+  deleteSessionsForOwner(owner: string): Promise<void>;
+  purgeExpiredAuth(now: string): Promise<void>;
   appendAudit(owner: string | null, action: string, detail: unknown): Promise<void>;
   readAudit(limit: number): Promise<AuditRow[]>;
   getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null>;
@@ -446,6 +507,29 @@ class NeonBackend implements StoreBackend {
     await this.sql`CREATE TABLE IF NOT EXISTS pins (
       owner text primary key,
       pin text not null
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS owner_emails (
+      owner text primary key,
+      email text not null,
+      confirmed_at timestamptz
+    )`;
+    await this.sql`CREATE UNIQUE INDEX IF NOT EXISTS owner_emails_email
+      ON owner_emails (lower(email))`;
+    await this.sql`CREATE TABLE IF NOT EXISTS login_tokens (
+      token_hash text primary key,
+      email text not null,
+      owner text not null,
+      issued_at timestamptz not null,
+      expires_at timestamptz not null
+    )`;
+    await this.sql`CREATE INDEX IF NOT EXISTS login_tokens_email
+      ON login_tokens (lower(email), issued_at)`;
+    await this.sql`CREATE TABLE IF NOT EXISTS sessions (
+      token_hash text primary key,
+      owner text not null,
+      email text not null,
+      issued_at timestamptz not null,
+      expires_at timestamptz not null
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS audit (
       id bigserial primary key,
@@ -647,6 +731,107 @@ class NeonBackend implements StoreBackend {
     await this.ensureInit();
     await this.sql`INSERT INTO pins (owner, pin) VALUES (${owner}, ${pin})
       ON CONFLICT (owner) DO UPDATE SET pin = EXCLUDED.pin`;
+  }
+
+  async getOwnerEmails(): Promise<OwnerEmailRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, email, confirmed_at FROM owner_emails`) as Array<{
+      owner: string;
+      email: string;
+      confirmed_at: string | Date | null;
+    }>;
+    return rows.map((r) => ({
+      owner: r.owner,
+      email: r.email,
+      confirmedAt: r.confirmed_at === null ? null : new Date(r.confirmed_at).toISOString(),
+    }));
+  }
+
+  async setOwnerEmail(owner: string, email: string, confirmedAt: string | null): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO owner_emails (owner, email, confirmed_at)
+      VALUES (${owner}, ${email}, ${confirmedAt})
+      ON CONFLICT (owner) DO UPDATE
+        SET email = EXCLUDED.email, confirmed_at = EXCLUDED.confirmed_at`;
+  }
+
+  async createLoginToken(row: LoginTokenRow): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO login_tokens (token_hash, email, owner, issued_at, expires_at)
+      VALUES (${row.tokenHash}, ${row.email}, ${row.owner}, ${row.issuedAt}, ${row.expiresAt})`;
+  }
+
+  async takeLoginToken(tokenHash: string): Promise<LoginTokenRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`DELETE FROM login_tokens WHERE token_hash = ${tokenHash}
+      RETURNING token_hash, email, owner, issued_at, expires_at`) as Array<{
+      token_hash: string;
+      email: string;
+      owner: string;
+      issued_at: string | Date;
+      expires_at: string | Date;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      tokenHash: row.token_hash,
+      email: row.email,
+      owner: row.owner,
+      issuedAt: new Date(row.issued_at).toISOString(),
+      expiresAt: new Date(row.expires_at).toISOString(),
+    };
+  }
+
+  async recentLoginTokens(email: string, since: string): Promise<string[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT issued_at FROM login_tokens
+      WHERE lower(email) = lower(${email}) AND issued_at >= ${since}`) as Array<{
+      issued_at: string | Date;
+    }>;
+    return rows.map((r) => new Date(r.issued_at).toISOString());
+  }
+
+  async createSession(row: SessionRow): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO sessions (token_hash, owner, email, issued_at, expires_at)
+      VALUES (${row.tokenHash}, ${row.owner}, ${row.email}, ${row.issuedAt}, ${row.expiresAt})`;
+  }
+
+  async getSession(tokenHash: string): Promise<SessionRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT token_hash, owner, email, issued_at, expires_at
+      FROM sessions WHERE token_hash = ${tokenHash}`) as Array<{
+      token_hash: string;
+      owner: string;
+      email: string;
+      issued_at: string | Date;
+      expires_at: string | Date;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      tokenHash: row.token_hash,
+      owner: row.owner,
+      email: row.email,
+      issuedAt: new Date(row.issued_at).toISOString(),
+      expiresAt: new Date(row.expires_at).toISOString(),
+    };
+  }
+
+  async deleteSession(tokenHash: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM sessions WHERE token_hash = ${tokenHash}`;
+  }
+
+  async deleteSessionsForOwner(owner: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM sessions WHERE owner = ${owner}`;
+  }
+
+  async purgeExpiredAuth(now: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM login_tokens WHERE expires_at < ${now}`;
+    await this.sql`DELETE FROM sessions WHERE expires_at < ${now}`;
   }
 
   async appendAudit(owner: string | null, action: string, detail: unknown): Promise<void> {
@@ -1147,6 +1332,9 @@ interface FileDoc {
   historyDrafts: LeagueHistoryDraftRow[];
   historyVersions: LeagueHistoryVersionRow[];
   polls: PollRow[];
+  ownerEmails: OwnerEmailRow[];
+  loginTokens: LoginTokenRow[];
+  sessions: SessionRow[];
 }
 
 /** Every list a fresh document starts with. */
@@ -1166,6 +1354,9 @@ function emptyDoc(): FileDoc {
     historyDrafts: [],
     historyVersions: [],
     polls: [],
+    ownerEmails: [],
+    loginTokens: [],
+    sessions: [],
   };
 }
 
@@ -1216,6 +1407,9 @@ class FileBackend implements StoreBackend {
         historyDrafts: Array.isArray(doc.historyDrafts) ? doc.historyDrafts : [],
         historyVersions: Array.isArray(doc.historyVersions) ? doc.historyVersions : [],
         polls: Array.isArray(doc.polls) ? doc.polls : [],
+        ownerEmails: Array.isArray(doc.ownerEmails) ? doc.ownerEmails : [],
+        loginTokens: Array.isArray(doc.loginTokens) ? doc.loginTokens : [],
+        sessions: Array.isArray(doc.sessions) ? doc.sessions : [],
       };
     } catch {
       // A missing or unreadable file starts empty. Every list must be present,
@@ -1329,6 +1523,95 @@ class FileBackend implements StoreBackend {
     await this.enqueueWrite(() => {
       const doc = this.readDoc();
       doc.pins[owner] = pin;
+      this.writeDoc(doc);
+    });
+  }
+
+  async getOwnerEmails(): Promise<OwnerEmailRow[]> {
+    await this.ensureInit();
+    return this.readDoc().ownerEmails.map((row) => ({ ...row }));
+  }
+
+  async setOwnerEmail(owner: string, email: string, confirmedAt: string | null): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const rest = doc.ownerEmails.filter((row) => row.owner !== owner);
+      doc.ownerEmails = [...rest, { owner, email, confirmedAt }];
+      this.writeDoc(doc);
+    });
+  }
+
+  async createLoginToken(row: LoginTokenRow): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.loginTokens = [...doc.loginTokens, { ...row }];
+      this.writeDoc(doc);
+    });
+  }
+
+  async takeLoginToken(tokenHash: string): Promise<LoginTokenRow | null> {
+    await this.ensureInit();
+    let taken: LoginTokenRow | null = null;
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const found = doc.loginTokens.find((row) => row.tokenHash === tokenHash) ?? null;
+      if (!found) return;
+      taken = { ...found };
+      doc.loginTokens = doc.loginTokens.filter((row) => row.tokenHash !== tokenHash);
+      this.writeDoc(doc);
+    });
+    return taken;
+  }
+
+  async recentLoginTokens(email: string, since: string): Promise<string[]> {
+    await this.ensureInit();
+    const wanted = email.toLowerCase();
+    return this.readDoc()
+      .loginTokens.filter((row) => row.email.toLowerCase() === wanted && row.issuedAt >= since)
+      .map((row) => row.issuedAt);
+  }
+
+  async createSession(row: SessionRow): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.sessions = [...doc.sessions, { ...row }];
+      this.writeDoc(doc);
+    });
+  }
+
+  async getSession(tokenHash: string): Promise<SessionRow | null> {
+    await this.ensureInit();
+    const found = this.readDoc().sessions.find((row) => row.tokenHash === tokenHash);
+    return found ? { ...found } : null;
+  }
+
+  async deleteSession(tokenHash: string): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.sessions = doc.sessions.filter((row) => row.tokenHash !== tokenHash);
+      this.writeDoc(doc);
+    });
+  }
+
+  async deleteSessionsForOwner(owner: string): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.sessions = doc.sessions.filter((row) => row.owner !== owner);
+      this.writeDoc(doc);
+    });
+  }
+
+  async purgeExpiredAuth(now: string): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.loginTokens = doc.loginTokens.filter((row) => row.expiresAt >= now);
+      doc.sessions = doc.sessions.filter((row) => row.expiresAt >= now);
       this.writeDoc(doc);
     });
   }
@@ -1719,6 +2002,200 @@ export async function clearKeeperScenario(season: number, viewer: string): Promi
 
 export async function clearKeeperScenariosForSeason(season: number): Promise<void> {
   return getBackend().clearKeeperScenariosForSeason(season);
+}
+
+// ─── Sign-in links and sessions ──────────────────────────────────────────────
+
+/**
+ * Tokens are stored as a hash, so reading the table gives nobody a way in.
+ * SHA-256 is right here because the input is 32 random bytes, not a password
+ * someone could guess.
+ */
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function newToken(): string {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+/**
+ * The state poll asks who you are every few seconds. Without this, every tick
+ * would be a database read for all ten members at once.
+ */
+const SESSION_CACHE_MS = 20_000;
+const sessionCache = new Map<string, { row: SessionRow; readAt: number }>();
+
+export async function getOwnerEmails(): Promise<OwnerEmailRow[]> {
+  const rows = await getBackend().getOwnerEmails();
+  const byOwner = new Map(rows.map((row) => [row.owner, row]));
+  return OWNERS.map((owner) => byOwner.get(owner) ?? { owner, email: '', confirmedAt: null });
+}
+
+/**
+ * The commissioner records an address for a member. Saving a new address drops
+ * that member's sessions, so a mistyped or reassigned address cannot leave
+ * someone signed in as the wrong person.
+ */
+export async function setOwnerEmail(
+  owner: string,
+  email: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isKnownOwner(owner)) return { ok: false, error: `Unknown owner: ${owner}` };
+  const clean = normalizeEmail(email);
+  if (clean !== '' && !isValidEmail(clean)) {
+    return { ok: false, error: 'That does not look like an email address' };
+  }
+  const rows = await getBackend().getOwnerEmails();
+  const taken = clean === '' ? null : emailTakenBy(rows, clean, owner);
+  if (taken !== null) return { ok: false, error: `${taken} already uses that address` };
+  await getBackend().setOwnerEmail(owner, clean, null);
+  await getBackend().deleteSessionsForOwner(owner);
+  for (const [key, entry] of sessionCache) {
+    if (entry.row.owner === owner) sessionCache.delete(key);
+  }
+  return { ok: true };
+}
+
+export interface LinkIssue {
+  ok: boolean;
+  /** Present only when a link should be sent. Never logged, never stored raw. */
+  token?: string;
+  owner?: string;
+  email?: string;
+  expiresAt?: string;
+  reason?: string;
+  retryAfterSeconds?: number;
+}
+
+/**
+ * Mint a sign-in link for an address.
+ *
+ * An address nobody owns returns ok with no token. The caller answers the same
+ * either way, so the sign-in page cannot be used to find out who is in the
+ * league.
+ */
+export async function issueLoginToken(email: string, now: Date): Promise<LinkIssue> {
+  const clean = normalizeEmail(email);
+  if (!isValidEmail(clean)) return { ok: false, reason: 'That does not look like an email address' };
+
+  const since = new Date(now.getTime() - LINK_WINDOW_MINUTES * 60_000).toISOString();
+  const recent = await getBackend().recentLoginTokens(clean, since);
+  const decision = canRequestLink(recent, now);
+  if (!decision.ok) {
+    return { ok: false, reason: decision.reason, retryAfterSeconds: decision.retryAfterSeconds };
+  }
+
+  const owner = ownerForEmail(await getBackend().getOwnerEmails(), clean);
+  if (owner === null) return { ok: true };
+
+  const token = newToken();
+  const expiresAt = linkExpiresAt(now);
+  await getBackend().createLoginToken({
+    tokenHash: hashToken(token),
+    email: clean,
+    owner,
+    issuedAt: now.toISOString(),
+    expiresAt,
+  });
+  return { ok: true, token, owner, email: clean, expiresAt };
+}
+
+export interface SessionIssue {
+  ok: boolean;
+  session?: string;
+  owner?: string;
+  email?: string;
+  isCommissioner?: boolean;
+  expiresAt?: string;
+  error?: string;
+}
+
+/** Spend a link and hand back a session. The link dies whether or not it worked. */
+export async function consumeLoginToken(token: string, now: Date): Promise<SessionIssue> {
+  if (typeof token !== 'string' || token === '') {
+    return { ok: false, error: 'That sign-in link is not valid' };
+  }
+  const row = await getBackend().takeLoginToken(hashToken(token));
+  if (row === null) return { ok: false, error: 'That sign-in link has already been used' };
+  if (isExpired(row.expiresAt, now)) {
+    return { ok: false, error: 'That sign-in link has expired. Ask for a new one.' };
+  }
+  if (!isKnownOwner(row.owner)) return { ok: false, error: 'That team is no longer in the league' };
+
+  const session = newToken();
+  const expiresAt = sessionExpiresAt(now);
+  await getBackend().createSession({
+    tokenHash: hashToken(session),
+    owner: row.owner,
+    email: row.email,
+    issuedAt: now.toISOString(),
+    expiresAt,
+  });
+  // First successful sign-in is what confirms the address really reaches them.
+  await getBackend().setOwnerEmail(row.owner, row.email, now.toISOString());
+  return {
+    ok: true,
+    session,
+    owner: row.owner,
+    email: row.email,
+    isCommissioner: isCommissionerOwner(row.owner),
+    expiresAt,
+  };
+}
+
+export interface SessionCheck {
+  ok: boolean;
+  owner?: string;
+  email?: string;
+  isCommissioner?: boolean;
+}
+
+export async function verifySession(token: string, now: Date): Promise<SessionCheck> {
+  if (typeof token !== 'string' || token === '') return { ok: false };
+  const key = hashToken(token);
+
+  const cached = sessionCache.get(key);
+  if (cached && now.getTime() - cached.readAt < SESSION_CACHE_MS) {
+    if (isExpired(cached.row.expiresAt, now)) {
+      sessionCache.delete(key);
+      return { ok: false };
+    }
+    return {
+      ok: true,
+      owner: cached.row.owner,
+      email: cached.row.email,
+      isCommissioner: isCommissionerOwner(cached.row.owner),
+    };
+  }
+
+  const row = await getBackend().getSession(key);
+  if (row === null) return { ok: false };
+  if (isExpired(row.expiresAt, now)) {
+    await getBackend().deleteSession(key);
+    sessionCache.delete(key);
+    return { ok: false };
+  }
+  if (!isKnownOwner(row.owner)) return { ok: false };
+  sessionCache.set(key, { row, readAt: now.getTime() });
+  return {
+    ok: true,
+    owner: row.owner,
+    email: row.email,
+    isCommissioner: isCommissionerOwner(row.owner),
+  };
+}
+
+export async function endSession(token: string): Promise<void> {
+  if (typeof token !== 'string' || token === '') return;
+  const key = hashToken(token);
+  sessionCache.delete(key);
+  await getBackend().deleteSession(key);
+}
+
+/** Housekeeping. Cheap enough to run on the sign-in routes. */
+export async function purgeExpiredAuth(now: Date): Promise<void> {
+  await getBackend().purgeExpiredAuth(now.toISOString());
 }
 
 /**
