@@ -58,7 +58,10 @@ export interface StateResponse {
 
 export interface Credentials {
   owner: string;
-  pin: string;
+  /** Old PIN sign-in. Kept until every owner has used an emailed link once. */
+  pin?: string;
+  /** Token from an emailed sign-in link. Preferred when we have one. */
+  session?: string;
 }
 
 export interface PlayerPoolCandidateInput {
@@ -96,7 +99,10 @@ export interface SchedulePreviewResponse {
   preview: ScheduleRefreshPreview;
 }
 
-const authHeaders = (c: Credentials) => ({ 'x-owner': c.owner, 'x-pin': c.pin });
+/* The server takes either header pair. A session wins when we have one, so a
+ * phone that has used a link stops sending the PIN around. */
+const authHeaders = (c: Credentials): Record<string, string> =>
+  c.session ? { 'x-session': c.session } : { 'x-owner': c.owner, 'x-pin': c.pin ?? '' };
 
 /* ── Commissioner TEST MODE (sandbox) ────────────────────────────────────────
  * While active, keeper/draft reads and writes stay entirely in localStorage —
@@ -466,6 +472,89 @@ export async function fetchPins(
 
 export async function setPin(c: Credentials, owner: string, pin: string): Promise<void> {
   await axios.post(`/api/league/pins/${encodeURIComponent(owner)}`, { pin }, { headers: authHeaders(c) });
+}
+
+// ─── Sign-in links ───────────────────────────────────────────────────────────
+
+export interface LoginLinkResult {
+  sent: boolean;
+  /** The server wrote the link to its log instead of mailing it. */
+  logged?: boolean;
+}
+
+/**
+ * Ask for a sign-in link. The server answers the same way whether or not the
+ * address belongs to an owner, so this never tells a stranger who is in the
+ * league. Nothing here means the link is on its way.
+ */
+export async function requestLoginLink(email: string): Promise<LoginLinkResult> {
+  const { data } = await axios.post<LoginLinkResult>('/api/auth/request-link', { email });
+  return data;
+}
+
+export interface LoginSession {
+  session: string;
+  owner: string;
+  email: string;
+  isCommissioner: boolean;
+  expiresAt: string;
+}
+
+/** Trade the token out of an emailed link for a session. Works once. */
+export async function consumeLoginToken(token: string): Promise<LoginSession> {
+  const { data } = await axios.post<LoginSession>('/api/auth/consume', { token });
+  return data;
+}
+
+export interface MeResponse {
+  owner: string;
+  email: string;
+  isCommissioner: boolean;
+}
+
+/** Who the server thinks we are. Throws 401 once a session has run out. */
+export async function fetchMe(c: Credentials): Promise<MeResponse> {
+  const { data } = await axios.get<MeResponse>('/api/auth/me', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Kill the session on the server. A PIN sign-in has nothing to kill. */
+export async function signOutServer(c: Credentials): Promise<void> {
+  await axios.post('/api/auth/sign-out', {}, { headers: authHeaders(c) });
+}
+
+export interface OwnerEmail {
+  owner: string;
+  /** Empty when nobody has set an address for this owner yet. */
+  email: string;
+  /** When the owner last used a link. Null means the address is untested. */
+  confirmedAt: string | null;
+}
+
+export async function fetchOwnerEmails(c: Credentials): Promise<OwnerEmail[]> {
+  const { data } = await axios.get<OwnerEmail[]>('/api/league/emails', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Save one owner's address. The server hands back the whole list again. */
+export async function saveOwnerEmail(
+  c: Credentials,
+  owner: string,
+  email: string,
+): Promise<OwnerEmail[]> {
+  const { data } = await axios.post<OwnerEmail[]>(
+    `/api/league/emails/${encodeURIComponent(owner)}`,
+    { email },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Seconds to wait after too many link requests. Null when that wasn't it. */
+export function retryAfterSeconds(e: unknown): number | null {
+  if (!axios.isAxiosError(e) || e.response?.status !== 429) return null;
+  const data = e.response.data as { retryAfterSeconds?: number } | undefined;
+  return typeof data?.retryAfterSeconds === 'number' ? data.retryAfterSeconds : null;
 }
 
 // ─── Rule book draft (commissioner only) ─────────────────────────────────────
