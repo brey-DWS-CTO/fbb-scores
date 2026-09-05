@@ -55,8 +55,11 @@ router.post('/request-link', async (req: Request, res: Response) => {
       });
       return;
     }
-    // No token means the address belongs to nobody. Answer as if it did.
+    // No token means the address belongs to nobody. Answer as if it did, but
+    // say so in the log: silence here is the hardest thing to tell apart from
+    // mail that was sent and never arrived. The address itself stays out.
     if (!issued.token || !issued.email) {
+      console.log('[auth] no owner has that address, nothing sent');
       res.json({ sent: true });
       return;
     }

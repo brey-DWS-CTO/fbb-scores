@@ -74,6 +74,10 @@ export async function sendLoginLink(
       console.error(`[auth] Resend refused the send: ${res.status} ${detail.slice(0, 200)}`);
       return { ok: false, error: `Mail service returned ${res.status}` };
     }
+    // The id is the thread to pull in the Resend dashboard when someone says
+    // the mail never came. It identifies the message, not the person.
+    const accepted = (await res.json()) as { id?: string };
+    console.log(`[auth] Resend accepted the send, id ${accepted.id ?? 'unknown'}`);
     return { ok: true };
   } catch (err) {
     console.error('[auth] Resend request failed:', err instanceof Error ? err.message : err);
