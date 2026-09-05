@@ -51,6 +51,25 @@ const DEFAULT_POSITION: Record<number, string> = {
   5: 'C',
 };
 
+/**
+ * A short, safe description of what ESPN sent back, for error messages.
+ *
+ * Keys only for objects, a clipped head for HTML or text. Never the cookies,
+ * which live in the request, not the response.
+ */
+function describeBody(data: unknown): string {
+  if (data === null || data === undefined) return 'empty body';
+  if (typeof data === 'string') return `text body starts: ${data.slice(0, 120).replace(/\s+/g, ' ')}`;
+  if (Array.isArray(data)) return `array body, ${data.length} entries`;
+  if (typeof data === 'object') {
+    const keys = Object.keys(data as Record<string, unknown>).slice(0, 12);
+    const messages = (data as { messages?: unknown }).messages;
+    const detail = Array.isArray(messages) ? ` messages: ${messages.join('; ').slice(0, 160)}` : '';
+    return `object body, keys: ${keys.join(', ')}.${detail}`;
+  }
+  return `${typeof data} body`;
+}
+
 export class EspnClient {
   private http: AxiosInstance;
 
@@ -109,9 +128,12 @@ export class EspnClient {
           typeof res.data === 'string' ||
           (res.data && typeof res.data === 'object' && !('scoringPeriodId' in res.data))
         ) {
+          // Say what came back. Without this the message blames the cookies for
+          // every shape ESPN can return, including a season that is not open yet.
           throw new Error(
             'ESPN authentication failed — cookies are invalid or expired. ' +
-            'Refresh your espn_s2 and SWID cookies from fantasy.espn.com and update .env.',
+            'Refresh your espn_s2 and SWID cookies from fantasy.espn.com and update .env. ' +
+            `[status ${res.status}, ${describeBody(res.data)}]`,
           );
         }
         return res;
@@ -119,7 +141,14 @@ export class EspnClient {
       (error) => {
         if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 302)) {
           throw new Error(
-            'ESPN authentication failed — check that ESPN_S2 and ESPN_SWID cookies are valid.',
+            'ESPN authentication failed — check that ESPN_S2 and ESPN_SWID cookies are valid. ' +
+            `[status ${error.response?.status}, ${describeBody(error.response?.data)}]`,
+          );
+        }
+        if (axios.isAxiosError(error) && error.response) {
+          throw new Error(
+            `ESPN request failed with status ${error.response.status}. ` +
+            `${describeBody(error.response.data)}`,
           );
         }
         throw error;
