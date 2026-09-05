@@ -14,18 +14,22 @@ import {
   type PickTradesResponse,
 } from '../../lib/league/api.js';
 import {
+  assetOrigin,
   describeRef,
-  describeTrade,
   groupPicksByOrigin,
   MAX_PICKS_PER_SIDE,
   MAX_TRADE_NOTE,
+  ordinal,
   pickRefKey,
+  pickTitle,
   sameRef,
   STATUS_LABEL,
   tradablePicksFor,
+  tradeSidesFor,
   type PickRef,
   type PickTradeProposal,
   type TradablePick,
+  type TradeAsset,
   type TradePreview,
 } from '../../lib/league/pickTrades.js';
 
@@ -33,9 +37,6 @@ type Tab = 'inbox' | 'sent' | 'done';
 
 const formatDay = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-const refList = (refs: PickRef[]) =>
-  refs.length === 0 ? 'hidden' : refs.map((ref) => describeRef(ref)).join(', ');
 
 /* ------------------------------------------------------------------ */
 /* Pick selector                                                       */
@@ -95,6 +96,109 @@ function PickPicker({
 }
 
 /* ------------------------------------------------------------------ */
+/* One row per pick                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A round number on its own is ambiguous: a pick's identity is its round plus
+ * the team it came from. So every row names both, and says which way it goes.
+ */
+function AssetRow({
+  asset,
+  season,
+  incoming,
+}: {
+  asset: TradeAsset;
+  season: number;
+  incoming: boolean;
+}) {
+  return (
+    <li className="trade-asset">
+      <span className="trade-asset-badge" aria-hidden="true">
+        <span className="trade-asset-round">{ordinal(asset.ref.round)}</span>
+        <span className="trade-asset-year">{season}</span>
+      </span>
+      <span className="trade-asset-text">
+        <strong className="trade-asset-title">{pickTitle(asset.ref)}</strong>
+        <span className="trade-asset-origin">{assetOrigin(asset)}</span>
+        <span className="trade-asset-dir">
+          <span className="trade-asset-arrow" aria-hidden="true">
+            {incoming ? '←' : '→'}
+          </span>
+          {incoming ? `From ${asset.from}` : `To ${asset.to}`}
+        </span>
+      </span>
+    </li>
+  );
+}
+
+function TradeColumn({
+  heading,
+  assets,
+  season,
+  incoming,
+}: {
+  heading: string;
+  assets: TradeAsset[];
+  season: number;
+  incoming: boolean;
+}) {
+  return (
+    <div className={incoming ? 'trade-side trade-side-in' : 'trade-side trade-side-out'}>
+      <span className="trade-side-head">{heading}</span>
+      {assets.length === 0 ? (
+        <p className="trade-side-empty">Picks hidden</p>
+      ) : (
+        <ul className="trade-assets">
+          {assets.map((asset) => (
+            <AssetRow
+              key={pickRefKey(asset.ref)}
+              asset={asset}
+              season={season}
+              incoming={incoming}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Both columns, always from the reader's seat. Set `named` when the reader is
+ * not the member looking at the screen, so the headings say whose seat it is.
+ */
+function TradeSummary({
+  proposal,
+  reader,
+  season,
+  named = false,
+}: {
+  proposal: Pick<PickTradeProposal, 'proposer' | 'recipient' | 'offer' | 'request'>;
+  reader: string;
+  season: number;
+  named?: boolean;
+}) {
+  const sides = tradeSidesFor(proposal, reader);
+  return (
+    <div className="trade-sides">
+      <TradeColumn
+        heading={named ? `${reader} receives` : 'Receives'}
+        assets={sides.receives}
+        season={season}
+        incoming
+      />
+      <TradeColumn
+        heading={named ? `${reader} sends` : 'Sends'}
+        assets={sides.sends}
+        season={season}
+        incoming={false}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Two-sided review                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -104,25 +208,24 @@ function ReviewPanel({
   get,
   giver,
   taker,
+  reader,
+  season,
 }: {
   preview: TradePreview;
   give: PickRef[];
   get: PickRef[];
   giver: string;
   taker: string;
+  reader: string;
+  season: number;
 }) {
   return (
     <div className="trade-review">
-      <div className="trade-sides">
-        <div className="trade-side">
-          <span className="trade-side-head">{giver} gives</span>
-          <span className="trade-side-picks">{refList(give)}</span>
-        </div>
-        <div className="trade-side">
-          <span className="trade-side-head">{taker} gives</span>
-          <span className="trade-side-picks">{refList(get)}</span>
-        </div>
-      </div>
+      <TradeSummary
+        proposal={{ proposer: giver, recipient: taker, offer: give, request: get }}
+        reader={reader}
+        season={season}
+      />
 
       {!preview.check.ok && <p className="trade-block">{preview.check.message}</p>}
 
@@ -196,6 +299,10 @@ function TradeCard({
   const pending = proposal.status === 'pending';
   const mine = proposal.proposer === owner;
   const theirs = proposal.recipient === owner;
+  // A settled trade is league news, so someone outside it can be reading. Show
+  // that trade from the proposer's seat and say whose seat it is.
+  const inIt = mine || theirs;
+  const reader = inIt ? owner : proposal.proposer;
 
   // Rechecked on the server at accept time; this is just what the member reads.
   useEffect(() => {
@@ -222,11 +329,12 @@ function TradeCard({
         </span>
       </div>
 
-      <p className="trade-line">{describeTrade(proposal)}</p>
-      <p className="trade-sub">
-        {proposal.proposer} gives {refList(proposal.offer)} · {proposal.recipient} gives{' '}
-        {refList(proposal.request)}
-      </p>
+      <TradeSummary
+        proposal={proposal}
+        reader={reader}
+        season={proposal.season}
+        named={!inIt}
+      />
       {proposal.note && <p className="trade-note">&ldquo;{proposal.note}&rdquo;</p>}
       {proposal.reason && <p className="trade-reason">{proposal.reason}</p>}
       {proposal.status === 'accepted' && proposal.resolvedAt && (
@@ -252,6 +360,8 @@ function TradeCard({
           get={proposal.request}
           giver={proposal.proposer}
           taker={proposal.recipient}
+          reader={reader}
+          season={proposal.season}
         />
       )}
 
@@ -487,6 +597,8 @@ export default function TradesPage() {
               get={get}
               giver={owner}
               taker={partner}
+              reader={owner}
+              season={dataset.season}
             />
           )}
 

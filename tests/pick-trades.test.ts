@@ -8,6 +8,7 @@ import type {
   PickTransfer,
 } from '../src/lib/keeper/types.ts';
 import {
+  assetOrigin,
   canAnswer,
   checkProposalAgainstState,
   checkProposalShape,
@@ -16,9 +17,12 @@ import {
   expireStale,
   expiresAtFrom,
   inboxCount,
+  ordinal,
+  pickTitle,
   previewProposal,
   provenanceFor,
   tradablePicksFor,
+  tradeSidesFor,
   transfersForProposal,
   visibleProposals,
   type PickTradeProposal,
@@ -423,4 +427,58 @@ test('a trade reads back as picks, never as free text', () => {
     'R3 for R2',
   );
   assert.equal(describeTrade(proposal({ offer: [], request: [] })), 'Picks hidden');
+});
+
+test('a round on its own is ambiguous, so each row names the pick in full', () => {
+  assert.equal(ordinal(1), '1st');
+  assert.equal(ordinal(2), '2nd');
+  assert.equal(ordinal(3), '3rd');
+  assert.equal(ordinal(4), '4th');
+  assert.equal(ordinal(11), '11th');
+  assert.equal(ordinal(12), '12th');
+  assert.equal(ordinal(13), '13th');
+  assert.equal(ordinal(14), '14th');
+  assert.equal(pickTitle({ round: 1, originalOwner: 'Kyle' }), '1st Round Pick');
+  assert.equal(pickTitle({ round: 3, originalOwner: 'Amy' }), '3rd Round Pick');
+
+  assert.equal(
+    assetOrigin({ ref: { round: 1, originalOwner: 'Kyle' }, from: 'Kyle', to: 'Amy' }),
+    "Kyle's own pick",
+  );
+  assert.equal(
+    assetOrigin({ ref: { round: 1, originalOwner: 'Derek' }, from: 'Kyle', to: 'Amy' }),
+    "Originally Derek's",
+  );
+});
+
+test('each side of a trade reads from the seat of whoever is looking', () => {
+  const offered = proposal({
+    offer: [{ round: 1, originalOwner: 'Amy' }, { round: 6, originalOwner: 'Derek' }],
+    request: [{ round: 1, originalOwner: 'Kyle' }],
+  });
+
+  const forProposer = tradeSidesFor(offered, 'Amy');
+  assert.deepEqual(forProposer.receives, [
+    { ref: { round: 1, originalOwner: 'Kyle' }, from: 'Kyle', to: 'Amy' },
+  ]);
+  assert.equal(forProposer.sends.length, 2);
+  assert.ok(forProposer.sends.every((asset) => asset.from === 'Amy' && asset.to === 'Kyle'));
+
+  // The same trade from the other seat is the mirror image.
+  const forRecipient = tradeSidesFor(offered, 'Kyle');
+  assert.deepEqual(forRecipient.receives, forProposer.sends);
+  assert.deepEqual(forRecipient.sends, forProposer.receives);
+
+  // Two first round picks in one trade are different assets. Each keeps its own
+  // original owner, which is the whole reason a row names it.
+  assert.equal(forProposer.receives[0]?.ref.originalOwner, 'Kyle');
+  assert.equal(forProposer.sends[0]?.ref.originalOwner, 'Amy');
+
+  // A member outside the trade reads it from the proposer's seat.
+  assert.deepEqual(tradeSidesFor(offered, 'Ryan'), forProposer);
+});
+
+test('a stripped offer leaves both columns with nothing to show', () => {
+  const sides = tradeSidesFor(proposal({ offer: [], request: [] }), 'Amy');
+  assert.deepEqual(sides, { receives: [], sends: [] });
 });

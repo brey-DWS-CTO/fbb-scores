@@ -2477,6 +2477,73 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
 .account-pin-row .identity-submit { min-height: 44px; padding: 0 16px; flex-shrink: 0; }
 .account-pin-done { margin: 8px 0 0; color: var(--neon-teal); font-size: 0.75rem; }
 .account-pin-error { margin: 8px 0 0; color: var(--neon-red); font-size: 0.75rem; }
+/* ─── A trade, one row per pick ──────────────────────────────────────── */
+/* Teal is what comes in, purple is what goes out, on both columns and rows. */
+.trade-side-in { border-left-color: var(--neon-teal); }
+.trade-side-out { border-left-color: var(--neon-purple); }
+.trade-side-empty { margin: 2px 0 0; color: var(--text-dim); font-size: 0.72rem; }
+
+.trade-assets {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.trade-asset {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+}
+.trade-asset-badge {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 2px solid var(--panel-border);
+  border-radius: 9px;
+  background: var(--cell-bg);
+}
+.trade-side-in .trade-asset-badge { border-color: var(--neon-teal); }
+.trade-side-out .trade-asset-badge { border-color: var(--neon-purple); }
+.trade-asset-round {
+  color: var(--text-hi);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.trade-asset-year {
+  color: var(--text-dim);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.trade-asset-text { display: flex; flex-direction: column; min-width: 0; }
+.trade-asset-title { color: var(--text-hi); font-size: 0.78rem; font-weight: 800; line-height: 1.3; }
+.trade-asset-origin { color: var(--text-mid); font-size: 0.66rem; line-height: 1.35; }
+.trade-asset-dir {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+.trade-side-in .trade-asset-dir { color: var(--neon-teal); }
+.trade-side-out .trade-asset-dir { color: var(--neon-purple); }
+.trade-asset-arrow { margin-right: 3px; }
+
+/* One column on a phone. The headings stay, so the direction never guesses. */
+@media (max-width: 560px) {
+  .trade-sides { flex-direction: column; }
+  .trade-side { flex: 1 1 auto; }
+}
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

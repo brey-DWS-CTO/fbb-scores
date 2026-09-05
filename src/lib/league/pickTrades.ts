@@ -67,6 +67,73 @@ export function refOf(pick: PickSlot): PickRef {
 }
 
 /* ------------------------------------------------------------------ */
+/* One row per pick                                                    */
+/* ------------------------------------------------------------------ */
+
+const ORDINAL_SUFFIX = ['th', 'st', 'nd', 'rd'];
+
+/** 1 becomes "1st", 2 "2nd", 11 "11th", 14 "14th". */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : (ORDINAL_SUFFIX[n % 10] ?? 'th');
+  return `${n}${suffix}`;
+}
+
+/** "1st Round Pick". The title of one row. */
+export function pickTitle(ref: PickRef): string {
+  return `${ordinal(ref.round)} Round Pick`;
+}
+
+/** One pick on the move, with both ends named. */
+export interface TradeAsset {
+  ref: PickRef;
+  /** The member handing this pick over. */
+  from: string;
+  /** The member getting it. */
+  to: string;
+}
+
+/** Which team the pick started with. The line under the title. */
+export function assetOrigin(asset: TradeAsset): string {
+  return asset.ref.originalOwner === asset.from
+    ? `${asset.from}'s own pick`
+    : `Originally ${asset.ref.originalOwner}'s`;
+}
+
+export interface TradeSides {
+  /** Picks coming to the reader. */
+  receives: TradeAsset[];
+  /** Picks leaving the reader. */
+  sends: TradeAsset[];
+}
+
+/**
+ * The two columns of a trade as one reader sees them.
+ *
+ * The offer moves proposer to recipient and the request moves recipient to
+ * proposer, so the columns swap depending on who is reading. Anyone outside
+ * the trade reads it from the proposer's seat.
+ */
+export function tradeSidesFor(
+  proposal: Pick<PickTradeProposal, 'proposer' | 'recipient' | 'offer' | 'request'>,
+  reader: string,
+): TradeSides {
+  const offer = proposal.offer.map((ref) => ({
+    ref,
+    from: proposal.proposer,
+    to: proposal.recipient,
+  }));
+  const request = proposal.request.map((ref) => ({
+    ref,
+    from: proposal.recipient,
+    to: proposal.proposer,
+  }));
+  return reader === proposal.recipient
+    ? { receives: offer, sends: request }
+    : { receives: request, sends: offer };
+}
+
+/* ------------------------------------------------------------------ */
 /* Reading state safely                                                */
 /* ------------------------------------------------------------------ */
 
