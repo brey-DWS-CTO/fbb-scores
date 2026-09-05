@@ -2,6 +2,7 @@ import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import { sandboxActive } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
 import SplashPage from './components/league/SplashPage.js'
+import SignInLinkPage from './components/league/SignInLinkPage.js'
 import KeepersPage from './components/keepers/KeepersPage.js'
 import TeamKeeperPage from './components/keepers/TeamKeeperPage.js'
 import DraftPage from './components/draft/DraftPage.js'
@@ -17,8 +18,11 @@ import TradesPage from './components/league/TradesPage.js'
 
 function App() {
   const location = useLocation()
+  // The sign-in link page is bare too: nobody is signed in to navigate with.
   const bareMode =
-    location.pathname.startsWith('/draft/tv') || location.pathname === '/'
+    location.pathname.startsWith('/draft/tv') ||
+    location.pathname.startsWith('/sign-in/') ||
+    location.pathname === '/'
 
   const sandbox = sandboxActive()
 
@@ -49,6 +53,7 @@ function App() {
       {!bareMode && <AppNav />}
       <Routes>
         <Route path="/" element={<SplashPage />} />
+        <Route path="/sign-in/:token" element={<SignInLinkPage />} />
         <Route path="/keepers" element={<KeepersPage />} />
         <Route path="/keepers/:owner" element={<TeamKeeperPage />} />
         <Route path="/draft" element={<DraftPage />} />

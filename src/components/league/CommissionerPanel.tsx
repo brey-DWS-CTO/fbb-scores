@@ -9,6 +9,7 @@ import {
   setPin,
 } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import EmailAdmin from './EmailAdmin.js';
 
 const btnOutline = (color: string): CSSProperties => ({
   minHeight: 44,
@@ -178,7 +179,10 @@ export default function CommissionerPanel() {
         )}
       </div>
 
-      {/* PINs */}
+      {/* Sign-in emails */}
+      <EmailAdmin />
+
+      {/* PINs — still here, and still needed until everyone has used a link */}
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
         {!pinsOpen ? (
           <button

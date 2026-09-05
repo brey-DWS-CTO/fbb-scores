@@ -6,8 +6,10 @@ import {
   fetchPlayerPool,
   fetchPublishedHistory,
   sandboxActive,
+  signOutServer,
   verifyPin,
   type Credentials,
+  type LoginSession,
   type StateResponse,
 } from '../lib/league/api.js';
 import { applyOverrides } from '../lib/keeper/engine.js';
@@ -153,8 +155,15 @@ const ID_KEY = 'fbb-identity';
 
 export interface Identity extends Credentials {
   isCommissioner: boolean;
+  /** The address the link went to. Only set on a link sign-in. */
+  email?: string;
 }
 
+/**
+ * A phone signed in on the old build stored an owner and a PIN and no session.
+ * We read it back as is and keep using the PIN, so nobody gets thrown out the
+ * day links land. Their next link sign-in writes the session over the top.
+ */
 function loadIdentity(): Identity | null {
   try {
     const raw = localStorage.getItem(ID_KEY);
@@ -165,13 +174,22 @@ function loadIdentity(): Identity | null {
   return null;
 }
 
+function storeIdentity(id: Identity): void {
+  try {
+    localStorage.setItem(ID_KEY, JSON.stringify(id));
+  } catch {
+    /* ignore */
+  }
+}
+
 let listeners: Array<() => void> = [];
 function notify() {
   for (const l of listeners) l();
 }
 
 /**
- * Device identity: which owner this phone belongs to + their PIN.
+ * Device identity: which owner this phone belongs to, plus the session from
+ * their sign-in link or, on older phones, their PIN.
  * Stored in localStorage, verified against the server on sign-in.
  */
 export function useIdentity() {
@@ -194,17 +212,29 @@ export function useIdentity() {
     // Temporary PIN: valid, but the caller must run the change-PIN step first
     if (res.mustChangePin) return { ok: false, mustChangePin: true };
     const id: Identity = { owner, pin, isCommissioner: res.isCommissioner };
-    try {
-      localStorage.setItem(ID_KEY, JSON.stringify(id));
-    } catch {
-      /* ignore */
-    }
+    storeIdentity(id);
     setIdentityState(id);
     notify();
     return { ok: true };
   }, []);
 
-  const signOut = useCallback(() => {
+  /** Sign in from a used link. The server has already checked the token. */
+  const signInWithSession = useCallback((result: LoginSession) => {
+    const id: Identity = {
+      owner: result.owner,
+      session: result.session,
+      email: result.email,
+      isCommissioner: result.isCommissioner,
+    };
+    storeIdentity(id);
+    setIdentityState(id);
+    notify();
+  }, []);
+
+  const signOut = useCallback(async () => {
+    const current = loadIdentity();
+    // Drop the local copy first. If the server call hangs or fails, this phone
+    // is still signed out, which is the whole point of tapping the button.
     try {
       localStorage.removeItem(ID_KEY);
     } catch {
@@ -212,7 +242,15 @@ export function useIdentity() {
     }
     setIdentityState(null);
     notify();
+    // A PIN sign-in has no session for the server to throw away.
+    if (current?.session) {
+      try {
+        await signOutServer(current);
+      } catch {
+        /* ignore */
+      }
+    }
   }, []);
 
-  return { identity, signIn, signOut };
+  return { identity, signIn, signInWithSession, signOut };
 }
