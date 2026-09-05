@@ -76,12 +76,27 @@ function RosterRow({
           {selected && '✓ '}
           {p.name}
         </div>
-        <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="roster-stats" style={{ color: 'var(--text-mid)', fontSize: '0.72rem', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>{p.positions.join('/')}</span>
           {s && (
             <span>
               {s.avg.toFixed(1)}
               {apiFallback ? '°' : ''} avg · {s.gp}gp
+            </span>
+          )}
+          {/* Contract years read here, beside the average, instead of stacking
+              a second line under the round chip. */}
+          {c && (
+            <span
+              className="roster-years"
+              style={{
+                fontSize: '0.62rem',
+                letterSpacing: '0.04em',
+                color: expired ? 'var(--neon-red)' : 'var(--text-dim)',
+                fontWeight: expired ? 700 : 400,
+              }}
+            >
+              {expired ? 'EXPIRED' : `thru ${c.lastKeepableSeason}`}
             </span>
           )}
           {effDiff && (
@@ -97,11 +112,6 @@ function RosterRow({
       </div>
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
         {p.keeper.round !== null && <RoundChip round={p.keeper.round} />}
-        {c && (
-          <span style={{ fontSize: '0.65rem', color: expired ? 'var(--neon-red)' : 'var(--text-mid)', fontWeight: expired ? 700 : 400 }}>
-            {expired ? 'EXPIRED' : `thru ${c.lastKeepableSeason}`}
-          </span>
-        )}
       </div>
       {tappable && !looksBlocked && (
         <span
@@ -166,8 +176,17 @@ function KeeperCard({
             <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--neon-teal)' }}>
               {fmt1(k.effectiveAvg)}
             </span>
-            <span style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>FPPG</span>
-            {p && <SourceBadge info={p.keeper} compact />}
+            {k.contract && (
+              <span className="keeper-card-years" style={{ color: 'var(--text-dim)', fontSize: '0.62rem', letterSpacing: '0.04em' }}>
+                thru {k.contract.lastKeepableSeason}
+              </span>
+            )}
+            <span className="keeper-card-fppg" style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>FPPG</span>
+            {p && (
+              <span className="keeper-card-badge">
+                <SourceBadge info={p.keeper} compact />
+              </span>
+            )}
           </div>
         </div>
         {canEdit && (
@@ -756,9 +775,9 @@ export default function TeamKeeperPage() {
         )}
 
       {/* ── Cap meter — one thin strip, like the COSTS pills ───── */}
-      {/* On a phone this only pins itself once a keeper is picked. With none
-          selected there is nothing worth covering the roster with. */}
-      <div className={result.keepers.length > 0 ? 'keeper-selection-dock is-live' : 'keeper-selection-dock'}>
+      {/* The strip is the only thing worth pinning. The picks scroll away with
+          everything else. */}
+      <div className="keeper-selection-dock">
       <section className="panel" style={{ padding: '9px 12px 10px', borderRadius: 10, marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}>
           <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
@@ -813,6 +832,7 @@ export default function TeamKeeperPage() {
           {selectionsHidden ? 'Saved keeper total is private.' : result.statusLine}
         </div>
       </section>
+      </div>
 
       {/* ── Selected keepers ───────────────────────────────────── */}
       <section className={result.keepers.length === 0 && !selectionsHidden ? 'keeper-selected keeper-selected-empty' : 'keeper-selected'} style={{ marginBottom: 14 }}>
@@ -933,7 +953,6 @@ export default function TeamKeeperPage() {
       </section>
 
       {/* ── Full roster (tap a player to keep them) ────────────── */}
-      </div>
       <section className="panel" style={{ padding: '12px 0 4px', borderRadius: 10, marginBottom: 14 }}>
         <div
           className="hub-heading"
