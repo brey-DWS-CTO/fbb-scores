@@ -122,12 +122,20 @@ export class EspnClient {
     // Intercept auth errors with a clear message
     this.http.interceptors.response.use(
       (res) => {
-        // ESPN redirects to www.espn.com/fantasy/ when cookies are invalid
-        if (
-          res.status === 302 ||
-          typeof res.data === 'string' ||
-          (res.data && typeof res.data === 'object' && !('scoringPeriodId' in res.data))
-        ) {
+        // ESPN redirects to www.espn.com/fantasy/ when cookies are invalid.
+        //
+        // A signed-out answer is a redirect or an HTML page. A signed-in answer
+        // is JSON, and which keys it carries depends on the view: the player
+        // pool comes back under `players`, the scoreboard under
+        // `scoringPeriodId`. Demanding `scoringPeriodId` of every view called
+        // the player pool a login failure. `leagueHistory` needed its own
+        // client for the same reason.
+        const body = res.data as Record<string, unknown> | null;
+        const looksSignedIn = Boolean(
+          body && typeof body === 'object'
+          && ('scoringPeriodId' in body || 'players' in body || 'teams' in body || 'id' in body),
+        );
+        if (res.status === 302 || typeof res.data === 'string' || !looksSignedIn) {
           // Say what came back. Without this the message blames the cookies for
           // every shape ESPN can return, including a season that is not open yet.
           throw new Error(
