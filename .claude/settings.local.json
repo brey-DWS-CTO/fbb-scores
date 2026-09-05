@@ -103,7 +103,10 @@
       "Bash(export:*)",
       "Bash(for:*)",
       "Bash(kill:*)",
-      "WebFetch"
+      "WebFetch",
+      "mcp__plugin_vercel_vercel__get_deployment",
+      "mcp__plugin_vercel_vercel__get_project",
+      "mcp__plugin_vercel_vercel__get_runtime_logs"
     ]
   }
 }
