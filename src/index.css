@@ -2278,7 +2278,7 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
   gap: 8px;
 }
 .identity-chip-nav { display: none; }
-.desktop-nav-backdrop { display: none; }
+
 
 .more-section + .more-section {
   margin-top: 14px;
@@ -2291,134 +2291,57 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
   font-size: 0.56rem;
 }
 
-@media (min-width: 840px) {
-  .top-nav { z-index: 160; }
+@media screen and (min-width: 840px) {
+  .app-shell-nav { padding-left: 216px; }
+  .top-nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 216px;
+    z-index: 160;
+    border-bottom: 0;
+    border-right: 1px solid var(--panel-border);
+  }
   .top-nav-inner {
-    max-width: 1280px;
-    height: 64px;
-    gap: 14px;
+    height: 100%;
+    padding: 18px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 22px;
   }
-  .top-nav-brand {
-    flex: 0 0 auto;
-    margin-right: 4px;
-    font-size: 0.72rem;
-  }
+  .top-nav-brand { margin: 0; font-size: 0.65rem; }
+  .top-nav-brand span:last-child { display: inline; }
   .top-nav-brand img { width: 48px; height: 48px; }
   .top-nav-links {
     flex: 1 1 auto;
-    justify-content: center;
-    margin-left: 0;
-    overflow: visible;
+    min-height: 0;
+    flex-direction: column;
+    margin: 0;
+    gap: 5px;
+    overflow-y: auto;
   }
   .top-nav-link {
-    height: 64px;
-    padding-inline: 12px;
+    flex-shrink: 0;
+    height: 44px;
+    padding: 0 12px;
+    gap: 12px;
+    margin: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 0.64rem;
   }
-  .top-nav-group { position: relative; }
-  .top-nav-trigger {
-    border-left: 0;
-    border-right: 0;
-    border-top: 0;
-    background: transparent;
-    cursor: pointer;
-  }
-  .top-nav-chevron {
-    margin-left: 6px;
-    font-size: 0.58rem;
-    opacity: 0.65;
-    transition: transform 0.15s ease;
-  }
-  .top-nav-trigger[aria-expanded='true'] .top-nav-chevron { transform: rotate(180deg); }
-  .top-nav-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 50%;
-    z-index: 170;
-    width: 290px;
-    padding: 8px;
-    border: 2px solid var(--panel-border);
-    border-radius: 14px;
-    background: var(--panel-bg);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.55);
-    transform: translateX(-50%);
-  }
-  .top-nav-menu::before {
-    content: '';
-    position: absolute;
-    top: -7px;
-    left: 50%;
-    width: 12px;
-    height: 12px;
-    border-left: 2px solid var(--panel-border);
-    border-top: 2px solid var(--panel-border);
-    background: var(--panel-bg);
-    transform: translateX(-50%) rotate(45deg);
-  }
-  .top-nav-menu-item {
-    position: relative;
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    align-items: center;
-    gap: 10px;
-    padding: 11px 10px;
-    border-radius: 9px;
-    color: var(--text-body);
-    text-decoration: none;
-  }
-  .top-nav-menu-item:hover,
-  .top-nav-menu-item.active { background: rgba(0,255,204,0.07); }
-  .top-nav-menu-item.active strong { color: var(--neon-teal); }
-  .top-nav-menu-icon {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--panel-border);
-    border-radius: 9px;
-    background: var(--cell-bg);
-    font-size: 1rem;
-  }
-  .top-nav-menu-item strong,
-  .top-nav-menu-item small { display: block; }
-  .top-nav-menu-item strong {
-    color: var(--text-hi);
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-  }
-  .top-nav-menu-item small {
-    margin-top: 2px;
-    color: var(--text-dim);
-    font-size: 0.62rem;
-    line-height: 1.35;
+  .top-nav-link:hover { background: var(--cell-bg); }
+  .top-nav-link.active {
+    border-color: var(--neon-teal);
+    background: rgba(0,255,204,0.06);
   }
   .top-nav-account {
-    flex: 0 0 auto;
-    padding-left: 14px;
-    border-left: 1px solid var(--panel-border);
+    padding-top: 16px;
+    border-top: 1px solid var(--panel-border);
   }
-  .identity-chip-nav { display: inline-flex; }
+  .identity-chip-nav { display: inline-flex; flex-wrap: wrap; }
   .identity-chip-page { display: none !important; }
-  .desktop-nav-backdrop {
-    display: block;
-    position: fixed;
-    inset: 64px 0 0;
-    z-index: 150;
-    border: 0;
-    background: rgba(0,0,0,0.28);
-    cursor: default;
-  }
 }
-
-@media (min-width: 840px) and (max-width: 1099px) {
-  .top-nav-inner { gap: 6px; padding-inline: 10px; }
-  .top-nav-brand span:last-child { display: none; }
-  .top-nav-link { padding-inline: 7px; font-size: 0.58rem; }
-  .top-nav-account { padding-left: 8px; }
-}
-
-/* Mobile keeper context stays reachable between the fixed app nav and the
-   scrolling roster. The back action is part of the same sticky surface. */
-@media (max-width: 839px) {
+/* Keep the owner and back action visible while the roster scrolls. */
   .keeper-page-header {
     position: sticky;
     top: 0;
@@ -2436,7 +2359,6 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
     font-weight: 800;
   }
   .keeper-page-header h1 { margin-top: 1px !important; }
-}
 
 /* History tables should read like compact data, not a desktop spreadsheet
    trapped inside a phone. Secondary provenance stays in the expandable detail. */
@@ -2482,13 +2404,30 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
-.keeper-browse-banner { position: sticky; top: 8px; }
+.keeper-browse-banner { position: static; }
+@media (max-width: 839px) {
+  .keeper-empty-slot,
+  .keeper-selected-empty { display: none; }
+}
+.keeper-selection-dock {
+  position: sticky;
+  top: var(--keeper-header-height, 100px);
+  z-index: 60;
+  background: var(--dark-bg);
+  max-height: 48dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 6px 0 1px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--panel-border);
+}
 .keeper-save-dock { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); }
 .draft-round-head { position: sticky; top: 0; }
 @media (min-width: 840px) {
-  .rules-search-bar, .rules-draft-bar { top: 64px; }
-  .rules-article, .rules-clause { scroll-margin-top: 130px; }
-  .keeper-browse-banner { top: 72px; }
+  .rules-search-bar, .rules-draft-bar { top: 0; }
+  .rules-article, .rules-clause { scroll-margin-top: 66px; }
+  .keeper-page-header { top: 0; }
   .keeper-save-dock { bottom: 12px; }
-  .draft-round-head { top: 64px; }
+  .draft-round-head { top: 0; }
 }

@@ -267,6 +267,16 @@ function KeeperCard({
 
 /** /keepers/:owner — one team's keeper worksheet (the old Excel sheet, but alive). */
 export default function TeamKeeperPage() {
+  const headerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => header.parentElement?.style.setProperty('--keeper-header-height', `${header.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
   const params = useParams();
   const owner = params.owner ?? '';
   const team = teamByOwner.get(owner);
@@ -474,6 +484,7 @@ export default function TeamKeeperPage() {
       {/* ── Header ─────────────────────────────────────────────── */}
       <div
         className="keeper-page-header"
+        ref={headerRef}
         style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -739,6 +750,7 @@ export default function TeamKeeperPage() {
         )}
 
       {/* ── Cap meter — one thin strip, like the COSTS pills ───── */}
+      <div className="keeper-selection-dock">
       <section className="panel" style={{ padding: '9px 12px 10px', borderRadius: 10, marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}>
           <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
@@ -795,7 +807,7 @@ export default function TeamKeeperPage() {
       </section>
 
       {/* ── Selected keepers ───────────────────────────────────── */}
-      <section style={{ marginBottom: 14 }}>
+      <section className={result.keepers.length === 0 && !selectionsHidden ? 'keeper-selected keeper-selected-empty' : 'keeper-selected'} style={{ marginBottom: 14 }}>
         <div className="hub-heading" style={{ fontSize: '0.6rem', color: 'var(--neon-purple)', marginBottom: 8 }}>
           {selectionsHidden
             ? `KEEPER PICKS (${hiddenSelectionCount} HIDDEN)`
@@ -835,7 +847,7 @@ export default function TeamKeeperPage() {
             i === 0 && pickerOpen && canEdit ? (
               <div
                 key="inline-picker"
-                className="panel"
+                className="panel keeper-empty-slot"
                 style={{ padding: '12px 14px 6px', borderRadius: 10, overflow: 'visible' }}
               >
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
@@ -889,7 +901,7 @@ export default function TeamKeeperPage() {
             ) : (
               <button
                 key={`empty-${i}`}
-                className={canEdit ? 'tap-btn' : undefined}
+                className={canEdit ? 'tap-btn keeper-empty-slot' : 'keeper-empty-slot'}
                 onClick={() => canEdit && setPickerOpen(true)}
                 disabled={!canEdit}
                 style={{
@@ -913,6 +925,7 @@ export default function TeamKeeperPage() {
       </section>
 
       {/* ── Full roster (tap a player to keep them) ────────────── */}
+      </div>
       <section className="panel" style={{ padding: '12px 0 4px', borderRadius: 10, marginBottom: 14 }}>
         <div
           className="hub-heading"
@@ -1037,7 +1050,7 @@ export default function TeamKeeperPage() {
               display: 'flex',
               alignItems: 'center',
               gap: 10,
-              padding: '10px 12px',
+              padding: '4px 10px',
               borderRadius: 12,
               borderColor: saveError
                 ? 'var(--neon-red)'
@@ -1069,8 +1082,9 @@ export default function TeamKeeperPage() {
               onClick={doSave}
               disabled={!dirty || saving || !result.valid}
               style={{
-                minHeight: 44,
-                padding: '0 18px',
+                minHeight: 32,
+                padding: '0 12px',
+                fontSize: '0.7rem',
                 borderRadius: 10,
                 border: 'none',
                 fontWeight: 800,

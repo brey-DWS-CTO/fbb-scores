@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { teamByOwner } from '../../lib/league/data.js';
 import TeamPickerForm from './TeamPickerForm.js';
@@ -8,7 +9,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** Account dropdown anchored below the owner chip. */
+/** Account panel opens toward the available space beside the owner chip. */
 export default function TeamPickerModal({ anchor, onClose }: Props) {
   const { identity, signOut } = useIdentity();
   const navigate = useNavigate();
@@ -20,13 +21,14 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
     navigate('/');
   };
 
-  return (
+  return createPortal(
     <div className="account-backdrop" onClick={onClose}>
       <div
         className="panel account-sheet"
         style={anchor ? {
-          top: Math.max(8, anchor.bottom + 8),
-          right: Math.max(8, window.innerWidth - anchor.right),
+          top: anchor.top > window.innerHeight / 2 ? 'auto' : Math.max(8, anchor.bottom + 8),
+          bottom: anchor.top > window.innerHeight / 2 ? Math.max(8, window.innerHeight - anchor.top + 8) : 'auto',
+          right: Math.min(Math.max(8, window.innerWidth - anchor.right), Math.max(8, window.innerWidth - 432)),
         } : undefined}
         role="dialog"
         aria-modal="true"
@@ -55,6 +57,6 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
           <TeamPickerForm onDone={onClose} />
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
