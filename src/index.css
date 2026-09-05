@@ -2546,6 +2546,69 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
   white-space: nowrap;
 }
 
+/* ─── Acting as another owner ────────────────────────────────────────── */
+/* Loud on purpose. Forgetting whose seat you are in is how a commissioner
+   saves keepers to the wrong team. */
+.acting-banner {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-bottom: 2px solid var(--neon-purple);
+  background: rgba(160, 60, 255, 0.16);
+  backdrop-filter: blur(6px);
+}
+.acting-banner-text {
+  color: var(--text-hi);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+.acting-banner-text strong { color: var(--neon-purple); }
+.acting-banner-stop {
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 2px solid var(--neon-purple);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--neon-purple);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.act-as-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.act-as-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--cell-bg);
+  text-align: left;
+}
+.act-as-name { color: var(--text-hi); font-size: 0.78rem; font-weight: 800; }
+.act-as-team {
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

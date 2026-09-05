@@ -9,6 +9,7 @@ import {
   setPin,
 } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import ActAsPanel from './ActAsPanel.js';
 import EmailAdmin from './EmailAdmin.js';
 
 const btnOutline = (color: string): CSSProperties => ({
@@ -180,6 +181,7 @@ export default function CommissionerPanel() {
       </div>
 
       {/* Sign-in emails */}
+      <ActAsPanel />
       <EmailAdmin />
 
       {/* PINs — still here, and still needed until everyone has used a link */}

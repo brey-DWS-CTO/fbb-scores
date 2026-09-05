@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import { sandboxActive } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
+import ActingAsBanner from './components/league/ActingAsBanner.js';
 import SplashPage from './components/league/SplashPage.js'
 import SignInLinkPage from './components/league/SignInLinkPage.js'
 import KeepersPage from './components/keepers/KeepersPage.js'
@@ -51,6 +52,7 @@ function App() {
         </Link>
       )}
       {!bareMode && <AppNav />}
+      <ActingAsBanner />
       <Routes>
         <Route path="/" element={<SplashPage />} />
         <Route path="/sign-in/:token" element={<SignInLinkPage />} />
