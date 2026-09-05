@@ -103,15 +103,12 @@ function PickPicker({
  * A round number on its own is ambiguous: a pick's identity is its round plus
  * the team it came from. So every row names both, and says which way it goes.
  */
-function AssetRow({
-  asset,
-  season,
-  incoming,
-}: {
-  asset: TradeAsset;
-  season: number;
-  incoming: boolean;
-}) {
+/**
+ * A trade has two sides and the heading already names them, so a "from Kyle"
+ * line under every row only repeats what the column and the card header said.
+ * Direction is carried by the heading and the colour down the edge.
+ */
+function AssetRow({ asset, season }: { asset: TradeAsset; season: number }) {
   return (
     <li className="trade-asset">
       <span className="trade-asset-badge" aria-hidden="true">
@@ -121,12 +118,6 @@ function AssetRow({
       <span className="trade-asset-text">
         <strong className="trade-asset-title">{pickTitle(asset.ref)}</strong>
         <span className="trade-asset-origin">{assetOrigin(asset)}</span>
-        <span className="trade-asset-dir">
-          <span className="trade-asset-arrow" aria-hidden="true">
-            {incoming ? '←' : '→'}
-          </span>
-          {incoming ? `From ${asset.from}` : `To ${asset.to}`}
-        </span>
       </span>
     </li>
   );
@@ -151,12 +142,7 @@ function TradeColumn({
       ) : (
         <ul className="trade-assets">
           {assets.map((asset) => (
-            <AssetRow
-              key={pickRefKey(asset.ref)}
-              asset={asset}
-              season={season}
-              incoming={incoming}
-            />
+            <AssetRow key={pickRefKey(asset.ref)} asset={asset} season={season} />
           ))}
         </ul>
       )}

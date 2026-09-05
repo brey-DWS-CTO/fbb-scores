@@ -2528,16 +2528,6 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
 .trade-asset-text { display: flex; flex-direction: column; min-width: 0; }
 .trade-asset-title { color: var(--text-hi); font-size: 0.78rem; font-weight: 800; line-height: 1.3; }
 .trade-asset-origin { color: var(--text-mid); font-size: 0.66rem; line-height: 1.35; }
-.trade-asset-dir {
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1.35;
-  text-transform: uppercase;
-}
-.trade-side-in .trade-asset-dir { color: var(--neon-teal); }
-.trade-side-out .trade-asset-dir { color: var(--neon-purple); }
-.trade-asset-arrow { margin-right: 3px; }
 
 /* One column on a phone. The headings stay, so the direction never guesses. */
 @media (max-width: 560px) {
