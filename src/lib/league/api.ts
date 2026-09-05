@@ -550,6 +550,24 @@ export async function saveOwnerEmail(
   return data;
 }
 
+export interface ActAsSession extends LoginSession {
+  impersonatedBy: string;
+}
+
+/**
+ * Take another owner's seat, commissioner only. The session it hands back
+ * carries only what that owner can do, and every write through it names both
+ * people in the audit log.
+ */
+export async function actAsOwner(c: Credentials, owner: string): Promise<ActAsSession> {
+  const { data } = await axios.post<ActAsSession>(
+    `/api/league/act-as/${encodeURIComponent(owner)}`,
+    {},
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
 /**
  * Send one member their sign-in link. It goes to their inbox, not yours, so
  * this checks that mail reaches them rather than letting you in as them.

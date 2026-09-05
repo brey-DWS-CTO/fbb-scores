@@ -266,6 +266,73 @@ test('changing an address drops that owner sessions', async () => {
   assert.equal(after.status, 401, 'a reassigned address must not leave the old device signed in');
 });
 
+// ─── Acting as another member ────────────────────────────────────────────────
+
+const actAs = (target: string, headers: Record<string, string>) =>
+  request(`/api/league/act-as/${target}`, { method: 'POST', headers });
+
+test('only the commissioner may act as someone else', async () => {
+  assert.equal((await actAs('Amy', auth('Joel'))).status, 403);
+  assert.equal((await actAs('Amy', { 'content-type': 'application/json' })).status, 401);
+});
+
+test('the commissioner takes a member seat and gets only their rights', async () => {
+  const started = await actAs('Joel', auth(commissioner));
+  assert.equal(started.status, 200);
+  const row = asRecord(started.body);
+  assert.equal(row.owner, 'Joel');
+  assert.equal(row.isCommissioner, false, 'acting as a member must not carry commissioner rights');
+  assert.equal(row.impersonatedBy, commissioner);
+
+  const key = row.session as string;
+  const me = await request('/api/auth/me', { headers: session(key) });
+  assert.equal(asRecord(me.body).owner, 'Joel');
+
+  const asJoel = await request('/api/league/keepers/Joel', {
+    method: 'PUT',
+    headers: session(key),
+    body: JSON.stringify({ selections: [] }),
+  });
+  assert.equal(asJoel.status, 200, 'can do what Joel can do');
+
+  const asAmy = await request('/api/league/keepers/Amy', {
+    method: 'PUT',
+    headers: session(key),
+    body: JSON.stringify({ selections: [] }),
+  });
+  assert.equal(asAmy.status, 403, 'and no more than that');
+
+  const commishWork = await request('/api/league/emails', { headers: session(key) });
+  assert.equal(commishWork.status, 403, 'the seat does not carry the badge back');
+});
+
+test('the audit log names both people', async () => {
+  const started = await actAs('Joel', auth(commissioner));
+  const key = asRecord(started.body).session as string;
+  await request('/api/league/keepers/Joel', {
+    method: 'PUT',
+    headers: session(key),
+    body: JSON.stringify({ selections: [] }),
+  });
+  const log = await request('/api/league/audit', { headers: auth(commissioner) });
+  const rows = log.body as Array<{ owner: string | null; action: string }>;
+  const entry = rows.find((r) => r.action === 'keepers.set' && r.owner?.includes('as Joel'));
+  assert.ok(entry, `expected an entry naming both, saw: ${rows.slice(0, 5).map((r) => r.owner).join(', ')}`);
+  assert.equal(entry?.owner, `${commissioner} as Joel`);
+});
+
+test('acting as yourself, or as nobody, is refused', async () => {
+  assert.equal((await actAs(commissioner, auth(commissioner))).status, 400);
+  assert.equal((await actAs('Nobody', auth(commissioner))).status, 400);
+});
+
+test('a member seat cannot be used to take another seat', async () => {
+  const started = await actAs('Joel', auth(commissioner));
+  const key = asRecord(started.body).session as string;
+  const again = await actAs('Amy', session(key));
+  assert.equal(again.status, 403, 'no chaining');
+});
+
 // ─── Rate limiting ───────────────────────────────────────────────────────────
 
 test('a fourth link in the window is refused with a wait', async () => {

@@ -47,6 +47,7 @@ import {
   getOwnerEmails,
   setOwnerEmail,
   issueLoginToken,
+  startImpersonation,
   getPins,
   setPin,
   getPinStatus,
@@ -255,6 +256,7 @@ async function requireAuth(req: Request, res: Response, next: NextFunction): Pro
       res.locals.owner = check.owner;
       res.locals.isCommissioner = check.isCommissioner === true;
       res.locals.mustChangePin = false;
+      res.locals.actingBy = check.impersonatedBy ?? null;
       next();
       return;
     }
@@ -270,6 +272,19 @@ async function requireAuth(req: Request, res: Response, next: NextFunction): Pro
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * Who to blame in the audit log.
+ *
+ * When the commissioner is acting as someone else, both names go in. Without
+ * this, impersonation would quietly destroy the one thing the log is for:
+ * answering who actually did it.
+ */
+function actor(res: Response): string {
+  const owner = res.locals.owner as string;
+  const by = res.locals.actingBy as string | null | undefined;
+  return by ? `${by} as ${owner}` : owner;
 }
 
 /** Must run after requireAuth in the middleware chain. */
@@ -460,7 +475,7 @@ router.post('/schedule/accept', requireAuth, requireCommissioner, async (req, re
     acceptedAt,
     acceptedBy,
   );
-  await appendAudit(acceptedBy, 'schedule.accepted', {
+  await appendAudit(actor(res), 'schedule.accepted', {
     snapshotId: snapshot.id,
     baseSnapshotId: snapshot.baseSnapshotId,
     status: snapshot.status,
@@ -558,7 +573,7 @@ router.post('/player-pool/accept', requireAuth, requireCommissioner, async (req,
     acceptedAt,
     acceptedBy,
   );
-  await appendAudit(acceptedBy, 'player_pool.accepted', {
+  await appendAudit(actor(res), 'player_pool.accepted', {
     snapshotId: snapshot.id,
     baseSnapshotId: snapshot.baseSnapshotId,
     sourceSeason: snapshot.sourceSeason,
@@ -601,7 +616,7 @@ router.post('/change-pin', requireAuth, async (req, res) => {
   }
   const owner = res.locals.owner as string;
   await setPin(owner, pin, false);
-  await appendAudit(owner, 'pin.changed', { owner });
+  await appendAudit(actor(res), 'pin.changed', { owner });
   res.json({ ok: true });
 });
 
@@ -708,7 +723,7 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
     validateKeeperSelections(draft, target, clean);
     draft.keepers[target] = clean;
   });
-  await appendAudit(authedOwner, 'keepers.set', { target, selections: clean });
+  await appendAudit(actor(res), 'keepers.set', { target, selections: clean });
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
 });
 
@@ -726,7 +741,7 @@ router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, 
     draft.keepersRevealed = revealed;
   });
   if (revealed) await clearKeeperScenariosForSeason(result.state.season);
-  await appendAudit(res.locals.owner as string, revealed ? 'keepers.revealed' : 'keepers.hidden', {
+  await appendAudit(actor(res), revealed ? 'keepers.revealed' : 'keepers.hidden', {
     revealed,
   });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
@@ -788,7 +803,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       timestamp,
     };
   });
-  await appendAudit(authedOwner, 'draft.pick', {
+  await appendAudit(actor(res), 'draft.pick', {
     overallPick,
     playerKey: player.key,
     playerName: player.name,
@@ -811,7 +826,7 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
   const result = await mutateState((draft) => {
     delete draft.draft.picks[String(overallPick)];
   });
-  await appendAudit(res.locals.owner as string, 'draft.pick_cleared', { overallPick });
+  await appendAudit(actor(res), 'draft.pick_cleared', { overallPick });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
@@ -837,7 +852,7 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
       draft.draft.startedAt = new Date().toISOString();
     }
   });
-  await appendAudit(res.locals.owner as string, 'draft.started', null);
+  await appendAudit(actor(res), 'draft.started', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
@@ -851,7 +866,7 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
     draft.draft.startedAt = null;
     draft.draft.playerPoolSnapshotId = null;
   });
-  await appendAudit(res.locals.owner as string, 'draft.reset', null);
+  await appendAudit(actor(res), 'draft.reset', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
@@ -868,7 +883,7 @@ router.post('/locks', requireAuth, requireCommissioner, async (req, res) => {
   const result = await mutateState((draft) => {
     draft.locks.keepersLocked = keepersLocked;
   });
-  await appendAudit(res.locals.owner as string, 'locks.set', { keepersLocked });
+  await appendAudit(actor(res), 'locks.set', { keepersLocked });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
@@ -909,7 +924,7 @@ router.post('/overrides', requireAuth, requireCommissioner, async (req, res) => 
       else rounds[key] = val;
     }
   });
-  await appendAudit(res.locals.owner as string, 'overrides.set', {
+  await appendAudit(actor(res), 'overrides.set', {
     cap: body.cap,
     playerRounds: Object.fromEntries(roundEntries),
   });
@@ -945,8 +960,35 @@ router.post('/claim-pin', async (req, res) => {
     res.status(409).json({ error: result.error ?? 'PIN already claimed' });
     return;
   }
-  await appendAudit(owner, 'pin.claimed', { owner });
+  await appendAudit(actor(res), 'pin.claimed', { owner });
   res.json({ ok: true });
+});
+
+/**
+ * POST /api/league/act-as/:owner — sign in as another member (commissioner
+ * only).
+ *
+ * The session it hands back is that member's, and carries only what they can
+ * do. It lapses in hours, and every write through it names both people in the
+ * audit log, so the log still answers who actually did it.
+ */
+router.post('/act-as/:owner', requireAuth, requireCommissioner, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const commissioner = res.locals.owner as string;
+  const result = await startImpersonation(commissioner, target, new Date());
+  if (!result.ok) {
+    res.status(400).json({ error: result.error ?? 'Could not act as that owner' });
+    return;
+  }
+  await appendAudit(commissioner, 'act-as.started', { target });
+  res.json({
+    session: result.session,
+    owner: result.owner,
+    email: result.email,
+    isCommissioner: result.isCommissioner === true,
+    expiresAt: result.expiresAt,
+    impersonatedBy: commissioner,
+  });
 });
 
 /**
@@ -976,7 +1018,7 @@ router.post('/emails/:owner', requireAuth, requireCommissioner, async (req, res)
   }
   // The address is not a secret, but it is somebody's personal data. The audit
   // trail records that it changed, not what it changed to.
-  await appendAudit(res.locals.owner as string, body.email === '' ? 'email.cleared' : 'email.set', {
+  await appendAudit(actor(res), body.email === '' ? 'email.cleared' : 'email.set', {
     target,
   });
   res.json(await getOwnerEmails());
@@ -1016,7 +1058,7 @@ router.post('/emails/:owner/send-link', requireAuth, requireCommissioner, async 
     res.status(502).json({ error: sent.error ?? 'Could not send the email' });
     return;
   }
-  await appendAudit(res.locals.owner as string, 'email.link-sent', { target });
+  await appendAudit(actor(res), 'email.link-sent', { target });
   res.json({ sent: true, logged: sent.logged === true });
 });
 
@@ -1047,7 +1089,7 @@ router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) =
   // temp: true assigns a temporary PIN the owner must replace on first login
   await setPin(target, pin, body.temp === true);
   // Deliberately do not log the PIN value in the audit trail
-  await appendAudit(res.locals.owner as string, pin === '' ? 'pin.cleared' : 'pin.set', {
+  await appendAudit(actor(res), pin === '' ? 'pin.cleared' : 'pin.set', {
     target,
     temp: body.temp === true,
   });
@@ -1120,7 +1162,7 @@ router.put('/rulebook/draft', requireAuth, requireCommissioner, async (req, res,
 
     const owner = res.locals.owner as string;
     const saved = await saveRulebookDraft(RULEBOOK_SEASON, book, expectedVersion, owner);
-    await appendAudit(owner, 'rulebook-draft-save', {
+    await appendAudit(actor(res), 'rulebook-draft-save', {
       version: saved.version,
       articles: book.articles.length,
     });
@@ -1136,9 +1178,8 @@ router.put('/rulebook/draft', requireAuth, requireCommissioner, async (req, res,
 
 router.delete('/rulebook/draft', requireAuth, requireCommissioner, async (_req, res, next) => {
   try {
-    const owner = res.locals.owner as string;
     await deleteRulebookDraft(RULEBOOK_SEASON);
-    await appendAudit(owner, 'rulebook-draft-reset', { season: RULEBOOK_SEASON });
+    await appendAudit(actor(res), 'rulebook-draft-reset', { season: RULEBOOK_SEASON });
     res.json({ book: SEED_RULEBOOK, version: 0, seeded: true });
   } catch (err) {
     next(err);
@@ -1272,7 +1313,7 @@ router.post('/rulebook/sign', requireAuth, async (req, res, next) => {
       signedAt: new Date().toISOString(),
     });
     await insertRulebookSignature(signature);
-    await appendAudit(owner, 'rulebook-sign', { versionId, revision: signature.revision });
+    await appendAudit(actor(res), 'rulebook-sign', { versionId, revision: signature.revision });
 
     const after = signatureStatus(OWNERS, [...signatures, signature], versionId);
     res.json({
@@ -1359,7 +1400,7 @@ router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, r
     // the poll is what ties a vote to the revision that carried it.
     const carried = await stampSeededPolls(saved.id, revision, publishedAt);
 
-    await appendAudit(owner, 'rulebook-publish', {
+    await appendAudit(actor(res), 'rulebook-publish', {
       versionId: saved.id,
       revision,
       notes,
@@ -1519,7 +1560,7 @@ router.post('/polls', requireAuth, async (req, res, next) => {
     };
 
     await insertPoll(poll.id, RULEBOOK_SEASON, poll);
-    await appendAudit(owner, 'poll-open', { pollId: poll.id, kind, title, affects });
+    await appendAudit(actor(res), 'poll-open', { pollId: poll.id, kind, title, affects });
     res.json(poll);
   } catch (err) {
     if (err instanceof PollWriteError) {
@@ -1574,7 +1615,7 @@ router.post('/polls/:id/edit', requireAuth, requireCommissioner, async (req, res
     })) as Poll;
 
     const applied = updated.edits?.[updated.edits.length - 1];
-    await appendAudit(owner, 'poll-edit', {
+    await appendAudit(actor(res), 'poll-edit', {
       pollId: id,
       changed: applied?.changed ?? pollEditChanges(existing, next),
       votesCleared: applied?.votesCleared ?? 0,
@@ -1618,7 +1659,7 @@ router.post('/polls/:id/vote', requireAuth, async (req, res, next) => {
       return castVote(poll, owner, choice as VoteChoice, at);
     })) as Poll;
 
-    await appendAudit(owner, 'poll-vote', { pollId: id, choice });
+    await appendAudit(actor(res), 'poll-vote', { pollId: id, choice });
     res.json(updated);
   } catch (err) {
     if (err instanceof PollWriteError) {
@@ -1660,7 +1701,7 @@ router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
         : closePoll(poll, owner, at);
     })) as Poll;
 
-    await appendAudit(owner, cancel ? 'poll-cancel' : 'poll-close', {
+    await appendAudit(actor(res), cancel ? 'poll-cancel' : 'poll-close', {
       pollId: id,
       status: updated.status,
     });
@@ -1832,7 +1873,7 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
     if (sendOutcome(res, outcomes[0])) return;
     const proposal = outcomes[0]?.proposal;
     if (!proposal) throw new HttpError(500, 'The offer could not be saved');
-    await appendAudit(proposer, 'pick-trade.proposed', {
+    await appendAudit(actor(res), 'pick-trade.proposed', {
       proposalId: proposal.id,
       recipient: proposal.recipient,
       offer: proposal.offer,
@@ -1890,7 +1931,7 @@ router.post('/polls/:id/amend', requireAuth, requireCommissioner, async (req, re
       const row = current as Poll;
       return { ...row, seededAt: at, seededBy: owner };
     });
-    await appendAudit(owner, 'poll-amend', {
+    await appendAudit(actor(res), 'poll-amend', {
       pollId: id,
       draftVersion: saved.version,
       focusIds: seeded.focusIds,
@@ -2023,7 +2064,7 @@ router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
     if (sendOutcome(res, outcomes[0])) return;
     const proposal = outcomes[0]?.proposal;
     if (!proposal) throw new HttpError(500, 'The trade could not be saved');
-    await appendAudit(owner, 'pick-trade.accepted', {
+    await appendAudit(actor(res), 'pick-trade.accepted', {
       proposalId: proposal.id,
       proposer: proposal.proposer,
       recipient: proposal.recipient,
@@ -2096,7 +2137,7 @@ function settleRoute(action: 'reject' | 'cancel', auditAction: string) {
       if (sendOutcome(res, outcomes[0])) return;
       const proposal = outcomes[0]?.proposal;
       if (!proposal) throw new HttpError(500, 'The offer could not be settled');
-      await appendAudit(owner, auditAction, {
+      await appendAudit(actor(res), auditAction, {
         proposalId: proposal.id,
         proposer: proposal.proposer,
         recipient: proposal.recipient,
@@ -2172,7 +2213,7 @@ router.put('/history/draft', requireAuth, requireCommissioner, async (req, res, 
 
     const owner = res.locals.owner as string;
     const saved = await saveHistoryDraft(HISTORY_SEASON, history, body.expectedVersion, owner);
-    await appendAudit(owner, 'history-draft-save', {
+    await appendAudit(actor(res), 'history-draft-save', {
       version: saved.version,
       seasons: history.seasons.length,
       records: history.records.length,
@@ -2189,9 +2230,8 @@ router.put('/history/draft', requireAuth, requireCommissioner, async (req, res, 
 
 router.delete('/history/draft', requireAuth, requireCommissioner, async (_req, res, next) => {
   try {
-    const owner = res.locals.owner as string;
     await deleteHistoryDraft(HISTORY_SEASON);
-    await appendAudit(owner, 'history-draft-reset', { season: HISTORY_SEASON });
+    await appendAudit(actor(res), 'history-draft-reset', { season: HISTORY_SEASON });
     res.json(await resolveHistoryDraft());
   } catch (err) {
     next(err);
@@ -2311,7 +2351,7 @@ router.post('/history/import/apply', requireAuth, requireCommissioner, async (re
       body.expectedVersion,
       owner,
     );
-    await appendAudit(owner, 'history-import', {
+    await appendAudit(actor(res), 'history-import', {
       seasonNumber: request.seasonNumber,
       espnSeasonId: request.espnSeasonId,
       live,
@@ -2395,7 +2435,7 @@ router.post('/history/publish', requireAuth, requireCommissioner, async (req, re
       publishedBy: owner,
     });
 
-    await appendAudit(owner, 'history-publish', {
+    await appendAudit(actor(res), 'history-publish', {
       versionId: saved.id,
       revision,
       reason,

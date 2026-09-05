@@ -6,6 +6,8 @@ import {
   fetchPlayerPool,
   fetchPublishedHistory,
   sandboxActive,
+  actAsOwner,
+  apiErrorMessage,
   signOutServer,
   verifyPin,
   type Credentials,
@@ -152,11 +154,15 @@ export function useApplyStateResponse() {
 /* ------------------------------------------------------------------ */
 
 const ID_KEY = 'fbb-identity';
+/** Where the commissioner's own identity waits while they act as someone else. */
+const REAL_ID_KEY = 'fbb-identity-real';
 
 export interface Identity extends Credentials {
   isCommissioner: boolean;
   /** The address the link went to. Only set on a link sign-in. */
   email?: string;
+  /** The commissioner behind this seat, when they are acting as this owner. */
+  impersonatedBy?: string;
 }
 
 /**
@@ -231,12 +237,71 @@ export function useIdentity() {
     notify();
   }, []);
 
+  /**
+   * Take another owner's seat. The commissioner's own identity is parked, not
+   * thrown away, so stopping is one tap and never needs another sign-in link.
+   */
+  const actAs = useCallback(async (target: string): Promise<{ ok: boolean; error?: string }> => {
+    const current = loadIdentity();
+    if (!current?.isCommissioner) return { ok: false, error: 'Commissioner access required' };
+    try {
+      const result = await actAsOwner(current, target);
+      try {
+        localStorage.setItem(REAL_ID_KEY, JSON.stringify(current));
+      } catch {
+        /* a phone with no storage still gets the seat, it just cannot park */
+      }
+      const id: Identity = {
+        owner: result.owner,
+        session: result.session,
+        email: result.email,
+        isCommissioner: result.isCommissioner,
+        impersonatedBy: result.impersonatedBy,
+      };
+      storeIdentity(id);
+      setIdentityState(id);
+      notify();
+      return { ok: true };
+    } catch (caught) {
+      return { ok: false, error: apiErrorMessage(caught) };
+    }
+  }, []);
+
+  /** Give the seat back and become yourself again. */
+  const stopActingAs = useCallback(() => {
+    let real: Identity | null = null;
+    try {
+      const raw = localStorage.getItem(REAL_ID_KEY);
+      if (raw) real = JSON.parse(raw) as Identity;
+      localStorage.removeItem(REAL_ID_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (real) {
+      storeIdentity(real);
+      setIdentityState(real);
+    } else {
+      // Nothing parked. Signing out is the honest fallback: better a fresh
+      // sign-in than leaving somebody stuck in another owner's seat.
+      try {
+        localStorage.removeItem(ID_KEY);
+      } catch {
+        /* ignore */
+      }
+      setIdentityState(null);
+    }
+    notify();
+  }, []);
+
   const signOut = useCallback(async () => {
     const current = loadIdentity();
     // Drop the local copy first. If the server call hangs or fails, this phone
     // is still signed out, which is the whole point of tapping the button.
     try {
       localStorage.removeItem(ID_KEY);
+      // Signing out while acting as someone else must not strand the parked
+      // identity for the next person to pick up.
+      localStorage.removeItem(REAL_ID_KEY);
     } catch {
       /* ignore */
     }
@@ -252,5 +317,5 @@ export function useIdentity() {
     }
   }, []);
 
-  return { identity, signIn, signInWithSession, signOut };
+  return { identity, signIn, signInWithSession, signOut, actAs, stopActingAs };
 }

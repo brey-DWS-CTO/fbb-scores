@@ -194,6 +194,13 @@ export interface SessionRow {
   email: string;
   issuedAt: string;
   expiresAt: string;
+  /**
+   * The commissioner behind this session, when they are acting as someone
+   * else. Null for a normal sign-in. Everything written through such a
+   * session names both people in the audit log, so "who actually did this"
+   * always has an answer.
+   */
+  impersonatedBy?: string | null;
 }
 
 export class PollWriteError extends Error {
@@ -531,6 +538,8 @@ class NeonBackend implements StoreBackend {
       issued_at timestamptz not null,
       expires_at timestamptz not null
     )`;
+    // Added after the first sessions shipped, so it has to be a separate step.
+    await this.sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS impersonated_by text`;
     await this.sql`CREATE TABLE IF NOT EXISTS audit (
       id bigserial primary key,
       ts timestamptz not null default now(),
@@ -793,19 +802,21 @@ class NeonBackend implements StoreBackend {
 
   async createSession(row: SessionRow): Promise<void> {
     await this.ensureInit();
-    await this.sql`INSERT INTO sessions (token_hash, owner, email, issued_at, expires_at)
-      VALUES (${row.tokenHash}, ${row.owner}, ${row.email}, ${row.issuedAt}, ${row.expiresAt})`;
+    await this.sql`INSERT INTO sessions (token_hash, owner, email, issued_at, expires_at, impersonated_by)
+      VALUES (${row.tokenHash}, ${row.owner}, ${row.email}, ${row.issuedAt}, ${row.expiresAt},
+        ${row.impersonatedBy ?? null})`;
   }
 
   async getSession(tokenHash: string): Promise<SessionRow | null> {
     await this.ensureInit();
-    const rows = (await this.sql`SELECT token_hash, owner, email, issued_at, expires_at
+    const rows = (await this.sql`SELECT token_hash, owner, email, issued_at, expires_at, impersonated_by
       FROM sessions WHERE token_hash = ${tokenHash}`) as Array<{
       token_hash: string;
       owner: string;
       email: string;
       issued_at: string | Date;
       expires_at: string | Date;
+      impersonated_by: string | null;
     }>;
     const row = rows[0];
     if (!row) return null;
@@ -815,6 +826,7 @@ class NeonBackend implements StoreBackend {
       email: row.email,
       issuedAt: new Date(row.issued_at).toISOString(),
       expiresAt: new Date(row.expires_at).toISOString(),
+      impersonatedBy: row.impersonated_by,
     };
   }
 
@@ -2144,11 +2156,56 @@ export async function consumeLoginToken(token: string, now: Date): Promise<Sessi
   };
 }
 
+/** How long the commissioner stays in someone else's seat before it lapses. */
+const IMPERSONATION_HOURS = 8;
+
+/**
+ * Sign the commissioner in as another owner.
+ *
+ * The session it returns is that owner's session in every way that matters:
+ * it grants exactly what they can do and nothing more, so acting as a member
+ * never carries commissioner rights along with it. Both names are recorded,
+ * and it lapses in hours rather than the usual month, because this is
+ * something you do for a minute, not a season.
+ */
+export async function startImpersonation(
+  commissioner: string,
+  target: string,
+  now: Date,
+): Promise<SessionIssue> {
+  if (!isCommissionerOwner(commissioner)) return { ok: false, error: 'Commissioner access required' };
+  if (!isKnownOwner(target)) return { ok: false, error: `Unknown owner: ${target}` };
+  if (target === commissioner) return { ok: false, error: 'You are already yourself' };
+
+  const emails = await getBackend().getOwnerEmails();
+  const email = emails.find((row) => row.owner === target)?.email ?? '';
+  const session = newToken();
+  const expiresAt = new Date(now.getTime() + IMPERSONATION_HOURS * 3600_000).toISOString();
+  await getBackend().createSession({
+    tokenHash: hashToken(session),
+    owner: target,
+    email,
+    issuedAt: now.toISOString(),
+    expiresAt,
+    impersonatedBy: commissioner,
+  });
+  return {
+    ok: true,
+    session,
+    owner: target,
+    email,
+    isCommissioner: isCommissionerOwner(target),
+    expiresAt,
+  };
+}
+
 export interface SessionCheck {
   ok: boolean;
   owner?: string;
   email?: string;
   isCommissioner?: boolean;
+  /** Set when a commissioner is acting as this owner. */
+  impersonatedBy?: string | null;
 }
 
 export async function verifySession(token: string, now: Date): Promise<SessionCheck> {
@@ -2166,6 +2223,7 @@ export async function verifySession(token: string, now: Date): Promise<SessionCh
       owner: cached.row.owner,
       email: cached.row.email,
       isCommissioner: isCommissionerOwner(cached.row.owner),
+      impersonatedBy: cached.row.impersonatedBy ?? null,
     };
   }
 
@@ -2183,6 +2241,7 @@ export async function verifySession(token: string, now: Date): Promise<SessionCh
     owner: row.owner,
     email: row.email,
     isCommissioner: isCommissionerOwner(row.owner),
+    impersonatedBy: row.impersonatedBy ?? null,
   };
 }
 
