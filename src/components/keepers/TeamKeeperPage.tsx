@@ -137,7 +137,7 @@ function KeeperCard({
   const name = p?.name ?? k.selection.playerName;
   return (
     <div
-      className="panel"
+      className="panel keeper-card"
       style={{
         padding: '9px 12px 10px',
         borderRadius: 10,
@@ -148,13 +148,13 @@ function KeeperCard({
     >
       {projected && (
         <div
-          className="hub-heading"
+          className="hub-heading keeper-card-tag"
           style={{ color: 'var(--neon-purple)', fontSize: '0.58rem', marginBottom: 5 }}
         >
           PROJECTED · PRIVATE TO YOU
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="keeper-card-main" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-max)' }}>{name}</div>
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 2, color: 'var(--text-mid)', fontSize: '0.72rem' }}>
@@ -195,6 +195,7 @@ function KeeperCard({
       {/* the price tag — the single most important number on the card */}
       {k.round !== null && (
         <div
+          className="keeper-card-cost"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -223,7 +224,11 @@ function KeeperCard({
         </div>
       )}
 
+      {/* Only draw the divider when there is something under it. On a phone the
+          contract line is hidden, so an unconditional block left an empty box. */}
+      {(k.bumped || k.contract || k.errors.length > 0) && (
       <div
+        className="keeper-card-notes"
         style={{
           borderTop: '1px solid var(--panel-border)',
           marginTop: 8,
@@ -241,7 +246,7 @@ function KeeperCard({
           </div>
         )}
         {k.contract && (
-          <div style={{ color: 'var(--text-body)' }}>
+          <div className="keeper-card-contract" style={{ color: 'var(--text-body)' }}>
             <span style={{ color: 'var(--text-dim)', fontSize: '0.68rem', letterSpacing: '0.08em' }}>CONTRACT </span>
             {k.contract.isNew ? (
               <>
@@ -261,6 +266,7 @@ function KeeperCard({
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
@@ -750,7 +756,9 @@ export default function TeamKeeperPage() {
         )}
 
       {/* ── Cap meter — one thin strip, like the COSTS pills ───── */}
-      <div className="keeper-selection-dock">
+      {/* On a phone this only pins itself once a keeper is picked. With none
+          selected there is nothing worth covering the roster with. */}
+      <div className={result.keepers.length > 0 ? 'keeper-selection-dock is-live' : 'keeper-selection-dock'}>
       <section className="panel" style={{ padding: '9px 12px 10px', borderRadius: 10, marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}>
           <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>

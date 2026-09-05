@@ -2409,18 +2409,73 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
   .keeper-empty-slot,
   .keeper-selected-empty { display: none; }
 }
+/* The cap meter and the picks. It pins above the roster only once a keeper is
+   in, so an empty sheet gives the whole screen to the player list. */
 .keeper-selection-dock {
+  background: var(--dark-bg);
+  padding: 6px 0 1px;
+  margin-bottom: 14px;
+}
+.keeper-selection-dock.is-live {
   position: sticky;
   top: var(--keeper-header-height, 100px);
   z-index: 60;
-  background: var(--dark-bg);
-  max-height: 48dvh;
+  max-height: 38dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding: 6px 0 1px;
-  margin-bottom: 14px;
   border-bottom: 1px solid var(--panel-border);
+}
+
+/* Pinned, a card is a reminder, not a record: one line, name and cost. The
+   full card with contract and provenance still reads in the roster below. */
+@media (max-width: 839px) {
+  .keeper-selection-dock.is-live .keeper-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 8px;
+    padding: 6px 8px 6px 10px;
+  }
+  /* The name block and the remove button become cells of the card itself, so
+     the cost pill can sit between them instead of on its own line. */
+  .keeper-selection-dock.is-live .keeper-card-main { display: contents !important; }
+  .keeper-selection-dock.is-live .keeper-card-main > div { grid-column: 1; grid-row: 1; }
+  .keeper-selection-dock.is-live .keeper-card-main > button {
+    grid-column: 3;
+    grid-row: 1;
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .keeper-selection-dock.is-live .keeper-card-tag,
+  .keeper-selection-dock.is-live .keeper-card-contract { display: none; }
+  /* Keep the stats on one line: team, position, average. The FPPG label and
+     the source badge are two taps away in the roster. */
+  .keeper-selection-dock.is-live .keeper-card-main > div > div:nth-child(2) > :nth-child(n+3) {
+    display: none !important;
+  }
+  .keeper-selection-dock.is-live .keeper-card-cost {
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: 0 !important;
+    padding: 3px 8px !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+  }
+  .keeper-selection-dock.is-live .keeper-card-cost > .hub-heading,
+  .keeper-selection-dock.is-live .keeper-card-cost > span:nth-child(3) { display: none; }
+  .keeper-selection-dock.is-live .keeper-card-cost > span:nth-child(2) {
+    font-size: 0.85rem !important;
+  }
+  .keeper-selection-dock.is-live .keeper-card-notes {
+    grid-column: 1 / -1;
+    margin-top: 6px !important;
+    padding-top: 5px !important;
+  }
+  /* Nothing left under the divider once the contract line is hidden. */
+  .keeper-selection-dock.is-live .keeper-card-notes:not(:has(> *:not(.keeper-card-contract))) {
+    display: none !important;
+  }
 }
 .keeper-save-dock { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); }
 .draft-round-head { position: sticky; top: 0; }
