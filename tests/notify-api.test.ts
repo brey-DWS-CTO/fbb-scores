@@ -310,7 +310,17 @@ test('the right secret runs the clock, and each reminder goes out once', async (
   process.env.CRON_SECRET = 'open-sesame';
   const first = await tick({ authorization: 'Bearer open-sesame' });
   assert.equal(first.status, 200);
-  const run = asRecord(first.body) as { due: number; sent: number };
+  const run = asRecord(first.body) as {
+    due: number;
+    sent: number;
+    teamNames: { changed: number; error?: string };
+  };
+  // The same tick refreshes team names. There is no ESPN to reach in a test,
+  // so that half fails, which is the case that matters: a name refresh must
+  // never cost the league a keeper warning.
+  assert.ok(run.teamNames, 'the run says what the name refresh did');
+  assert.equal(run.teamNames.changed, 0, 'no names moved');
+  assert.ok(run.teamNames.error, 'and it says why');
   // Three owners have addresses, none has saved a keeper: the week warning
   // for all three, plus both keeper warnings for all three.
   assert.equal(run.due, 9);

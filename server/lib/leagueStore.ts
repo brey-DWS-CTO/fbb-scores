@@ -83,6 +83,12 @@ export interface LeagueDynamicState {
     acceptedAt?: string;
     acceptedBy?: string;
   };
+  /**
+   * Team names as ESPN last reported them, owner to name. Live data, so it
+   * lives here and not in the committed config. Missing means nobody has run
+   * the refresh yet and the committed name still stands.
+   */
+  teamNames?: Record<string, string>;
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
   /**

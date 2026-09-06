@@ -36,9 +36,11 @@ const pins = {
 };
 
 type StoreModule = typeof import('../server/lib/leagueStore.ts');
+type TeamNameModule = typeof import('../server/lib/teamNameService.ts');
 
 let tempRoot = '';
 let store: StoreModule;
+let teamNames: TeamNameModule;
 let server: Server;
 let baseUrl = '';
 
@@ -63,6 +65,8 @@ async function replaceState(next: LeagueDynamicState): Promise<void> {
     else delete draft.playerPool;
     if (next.schedule) draft.schedule = structuredClone(next.schedule);
     else delete draft.schedule;
+    if (next.teamNames) draft.teamNames = structuredClone(next.teamNames);
+    else delete draft.teamNames;
     delete draft.overrides;
   });
 }
@@ -125,11 +129,16 @@ before(async () => {
 
   const appUrl = pathToFileURL(path.join(tempRoot, 'server', 'app.ts')).href;
   const storeUrl = pathToFileURL(path.join(tempRoot, 'server', 'lib', 'leagueStore.ts')).href;
-  const [{ default: app }, storeModule] = await Promise.all([
+  const teamNamesUrl = pathToFileURL(
+    path.join(tempRoot, 'server', 'lib', 'teamNameService.ts'),
+  ).href;
+  const [{ default: app }, storeModule, teamNameModule] = await Promise.all([
     import(appUrl),
     import(storeUrl) as Promise<StoreModule>,
+    import(teamNamesUrl) as Promise<TeamNameModule>,
   ]);
   store = storeModule;
+  teamNames = teamNameModule;
   for (const [owner, pin] of Object.entries(pins)) {
     await store.setPin(owner, pin);
   }
@@ -824,4 +833,112 @@ test('rejects an unprotected committed player removed from the pinned pool', asy
   });
   assert.equal(rejected.status, 400);
   assert.match(String(rejected.body.error), /Unknown player/);
+});
+
+// ─── Team names ──────────────────────────────────────────────────────────────
+
+function renamedTeamCandidate(name = 'Team Clown Baby') {
+  const renamed = dataset.teams[0];
+  assert.ok(renamed);
+  return {
+    candidate: {
+      sourceSeason: 2026,
+      fetchedAt: '2026-09-05T12:00:00.000Z',
+      teams: dataset.teams.map((team) => ({
+        espnTeamId: team.espnTeamId,
+        name: team.espnTeamId === renamed.espnTeamId ? name : `  ${team.espnTeamName} `,
+        ownerName: team.fullName,
+      })),
+    },
+    renamed,
+  };
+}
+
+async function teamNameFingerprint(candidate: unknown): Promise<string> {
+  const { state } = await store.getState();
+  return teamNames.prepareTeamNameCandidate(
+    state,
+    teamNames.parseTeamNameCandidate(candidate),
+  ).fingerprint;
+}
+
+test('lets only the commissioner fetch or save team names', async () => {
+  const fetchPreview = await request('/api/league/team-names/fetch-preview', {
+    method: 'POST',
+    headers: auth('Joel'),
+    body: JSON.stringify({}),
+  });
+  assert.equal(fetchPreview.status, 403);
+
+  const { candidate } = renamedTeamCandidate();
+  const fingerprint = await teamNameFingerprint(candidate);
+  const anonymous = await request('/api/league/team-names/accept', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...candidate, fingerprint }),
+  });
+  assert.equal(anonymous.status, 401);
+
+  const member = await request('/api/league/team-names/accept', {
+    method: 'POST',
+    headers: auth('Joel'),
+    body: JSON.stringify({ ...candidate, fingerprint }),
+  });
+  assert.equal(member.status, 403);
+  assert.equal((await store.getState()).state.teamNames, undefined);
+});
+
+test('accepting a rename changes the name GET /state reports', async () => {
+  const { candidate, renamed } = renamedTeamCandidate();
+  const fingerprint = await teamNameFingerprint(candidate);
+
+  const before = await request('/api/league/state');
+  assert.equal((before.body.state as LeagueDynamicState).teamNames, undefined);
+
+  const accepted = await request('/api/league/team-names/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({ ...candidate, fingerprint }),
+  });
+  assert.equal(accepted.status, 200);
+
+  const after = await request('/api/league/state');
+  const stored = (after.body.state as LeagueDynamicState).teamNames ?? {};
+  assert.equal(stored[renamed.owner], 'Team Clown Baby');
+  for (const team of dataset.teams) {
+    if (team.owner === renamed.owner) continue;
+    assert.equal(stored[team.owner], team.espnTeamName);
+  }
+
+  const audit = await store.readAudit(5);
+  assert.equal(audit[0]?.action, 'team_names.accepted');
+});
+
+test('refuses names nobody previewed and a fetch that changed nothing', async () => {
+  const { candidate } = renamedTeamCandidate();
+  const stale = await request('/api/league/team-names/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({ ...candidate, fingerprint: 'sha256:not-the-one' }),
+  });
+  assert.equal(stale.status, 409);
+  assert.match(String(stale.body.error), /fetch them again/);
+  assert.equal((await store.getState()).state.teamNames, undefined);
+
+  const unchanged = {
+    sourceSeason: 2026,
+    fetchedAt: '2026-09-05T12:00:00.000Z',
+    teams: dataset.teams.map((team) => ({
+      espnTeamId: team.espnTeamId,
+      name: `${team.espnTeamName}  `,
+      ownerName: team.fullName,
+    })),
+  };
+  const quiet = await request('/api/league/team-names/accept', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({ ...unchanged, fingerprint: await teamNameFingerprint(unchanged) }),
+  });
+  assert.equal(quiet.status, 409);
+  assert.match(String(quiet.body.error), /Nothing changed/);
 });

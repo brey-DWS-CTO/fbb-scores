@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
-import { OWNERS, teamByOwner } from '../../lib/league/data.js';
+import { OWNERS } from '../../lib/league/data.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { usePostseasonGames, type PostseasonGamesLookup } from '../../hooks/usePostseasonGames.js';
+import { useTeamName } from '../../hooks/useTeamNames.js';
 import { positionColor, cellDisplay } from '../draft/boardUtils.js';
 import IdentityChip from './IdentityChip.js';
 import PostseasonTag from './PostseasonTag.js';
@@ -13,11 +14,11 @@ import PostseasonTag from './PostseasonTag.js';
 export default function TeamsPage() {
   const { state, meta, dataset } = useLeagueData(true);
   const { identity } = useIdentity();
+  const teamName = useTeamName();
   const postseasonGames = usePostseasonGames();
   const [selected, setSelected] = useState<string | null>(null);
 
   const owner = selected ?? identity?.owner ?? OWNERS[0];
-  const team = teamByOwner.get(owner);
   const index = Math.max(0, OWNERS.indexOf(owner));
 
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
@@ -72,7 +73,7 @@ export default function TeamsPage() {
           >
             {OWNERS.map((o) => (
               <option key={o} value={o}>
-                {o} · {teamByOwner.get(o)?.espnTeamName ?? ''}
+                {o} · {teamName(o)}
               </option>
             ))}
           </select>
@@ -93,7 +94,7 @@ export default function TeamsPage() {
         <div style={{ padding: '0 14px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-max)' }}>{owner}</div>
-            <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>{team?.espnTeamName}</div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>{teamName(owner)}</div>
           </div>
           <Link
             to={`/keepers/${encodeURIComponent(owner)}`}

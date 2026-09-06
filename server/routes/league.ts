@@ -162,6 +162,11 @@ import {
   prepareScheduleCandidate,
   resolveCurrentSchedule,
 } from '../lib/scheduleService.js';
+import {
+  fetchEspnTeamNameCandidate,
+  parseTeamNameCandidate,
+  prepareTeamNameCandidate,
+} from '../lib/teamNameService.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -599,6 +604,70 @@ router.post('/player-pool/accept', requireAuth, requireCommissioner, async (req,
   res.json({
     ...redactState(result, { owner: acceptedBy, isCommissioner: true }),
     snapshot,
+  });
+});
+
+/**
+ * POST /api/league/team-names/fetch-preview — read the team names ESPN has
+ * right now and show what would change. Writes nothing.
+ */
+router.post('/team-names/fetch-preview', requireAuth, requireCommissioner, async (_req, res) => {
+  const candidate = await fetchEspnTeamNameCandidate();
+  const { state } = await getState();
+  const prepared = prepareTeamNameCandidate(state, candidate);
+  res.json({
+    candidate,
+    fingerprint: prepared.fingerprint,
+    preview: prepared.preview,
+  });
+});
+
+/**
+ * POST /api/league/team-names/accept — store the exact names that were
+ * previewed. The fingerprint has to still match, so a stale tab cannot write
+ * names nobody looked at.
+ */
+router.post('/team-names/accept', requireAuth, requireCommissioner, async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof body.fingerprint !== 'string' || body.fingerprint === '') {
+    res.status(400).json({ error: 'fingerprint is required' });
+    return;
+  }
+
+  let candidate;
+  try {
+    candidate = parseTeamNameCandidate(body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid team names' });
+    return;
+  }
+
+  const { state } = await getState();
+  const prepared = prepareTeamNameCandidate(state, candidate);
+  if (body.fingerprint !== prepared.fingerprint) {
+    res.status(409).json({ error: 'The names changed since the preview; fetch them again' });
+    return;
+  }
+  if (prepared.preview.changes.length === 0) {
+    res.status(409).json({ error: 'Nothing changed, so nothing was saved' });
+    return;
+  }
+
+  const owner = res.locals.owner as string;
+  const result = await mutateState((draft) => {
+    draft.teamNames = { ...prepared.preview.nextNames };
+  });
+  await appendAudit(actor(res), 'team_names.accepted', {
+    sourceSeason: candidate.sourceSeason,
+    fetchedAt: candidate.fetchedAt,
+    changed: prepared.preview.changes.length,
+    unchanged: prepared.preview.unchanged.length,
+    missing: prepared.preview.missing.length,
+    unknownEspnTeamIds: prepared.preview.unknownEspnTeamIds.length,
+  });
+  res.json({
+    ...redactState(result, { owner, isCommissioner: true }),
+    preview: prepared.preview,
   });
 });
 

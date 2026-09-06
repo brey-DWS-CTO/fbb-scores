@@ -161,6 +161,12 @@ export interface LeagueDynamicState {
     acceptedAt?: string;
     acceptedBy?: string;
   };
+  /**
+   * Team names as ESPN last reported them, owner to name. People rename their
+   * team whenever they like, so the committed name goes stale. Read it through
+   * teamNameOf() in src/lib/league/teamNames.ts, never bare.
+   */
+  teamNames?: Record<string, string>;
   locks: { keepersLocked: boolean };
   overrides?: LeagueOverrides;
   /** Append-only ledger of accepted in-app pick transfers. Never rewritten. */

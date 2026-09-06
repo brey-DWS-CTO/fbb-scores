@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { OWNERS, teamByOwner } from '../../lib/league/data.js';
+import { OWNERS } from '../../lib/league/data.js';
 import { useIdentity } from '../../hooks/useLeague.js';
+import { useTeamName } from '../../hooks/useTeamNames.js';
 
 /**
  * Sign in as another owner, commissioner only.
@@ -12,6 +13,7 @@ import { useIdentity } from '../../hooks/useLeague.js';
  */
 export default function ActAsPanel() {
   const { identity, actAs } = useIdentity();
+  const teamName = useTeamName();
   const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function ActAsPanel() {
             onClick={() => void take(owner)}
           >
             <span className="act-as-name">{busy === owner ? '…' : owner}</span>
-            <span className="act-as-team">{teamByOwner.get(owner)?.espnTeamName ?? ''}</span>
+            <span className="act-as-team">{teamName(owner)}</span>
           </button>
         ))}
       </div>
