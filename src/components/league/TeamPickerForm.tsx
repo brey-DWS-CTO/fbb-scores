@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
 import { useIdentity } from '../../hooks/useLeague.js';
+import { useTeamName } from '../../hooks/useTeamNames.js';
 import {
   changePin,
   claimPin,
@@ -17,6 +18,7 @@ import {
  */
 export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
   const { signIn } = useIdentity();
+  const teamName = useTeamName();
   const [email, setEmail] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState(false);
@@ -181,11 +183,10 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
             >
               <option value="">Select your name…</option>
               {OWNERS.map((candidate) => {
-                const candidateTeam = teamByOwner.get(candidate);
                 const isNew = claimed !== null && claimed[candidate] === false;
                 return (
                   <option key={candidate} value={candidate}>
-                    {candidate} · {candidateTeam?.espnTeamName}{isNew ? ' · NEW' : ''}
+                    {candidate} · {teamName(candidate)}{isNew ? ' · NEW' : ''}
                   </option>
                 );
               })}
@@ -196,7 +197,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
             <div className="identity-team-card">
               <div>
                 <strong>{team.owner}</strong>
-                <span>{team.espnTeamName}</span>
+                <span>{teamName(team.owner)}</span>
               </div>
               <div className="identity-draft-slot">
                 <span>DRAFT</span>

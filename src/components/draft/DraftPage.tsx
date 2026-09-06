@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
-import { teamByOwner } from '../../lib/league/data.js';
 import {
   useApplyStateResponse,
   useDraftData,
@@ -16,6 +15,7 @@ import {
   stateWithKeeperScenario,
 } from '../../lib/league/keeperScenario.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
+import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
@@ -184,6 +184,7 @@ function PickRow({
 export default function DraftPage() {
   const { state, meta, dataset, playerPoolQuery } = useDraftData(true);
   const { identity } = useIdentity();
+  const teamName = useTeamName();
   const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
   const [view, setView] = useState<'list' | 'grid'>('list');
@@ -414,7 +415,7 @@ export default function DraftPage() {
               {onClock.pick.currentOwner.toUpperCase()}
             </div>
             <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
-              {teamByOwner.get(onClock.pick.currentOwner)?.espnTeamName}
+              {teamName(onClock.pick.currentOwner)}
             </div>
             <div style={{ color: 'var(--text-soft)' }}>
               Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall

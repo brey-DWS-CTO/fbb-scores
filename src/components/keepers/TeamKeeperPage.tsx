@@ -17,6 +17,7 @@ import {
   useLeagueData,
 } from '../../hooks/useLeague.js';
 import { usePostseasonGames, type PostseasonGames } from '../../hooks/usePostseasonGames.js';
+import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
 import PostseasonTag from '../league/PostseasonTag.js';
@@ -320,6 +321,7 @@ export default function TeamKeeperPage() {
   const team = teamByOwner.get(owner);
 
   const { state, isLoading, meta, dataset } = useLeagueData();
+  const teamName = useTeamName();
   const { identity } = useIdentity();
   const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
@@ -555,7 +557,7 @@ export default function TeamKeeperPage() {
           >
             {owner.toUpperCase()}
           </h1>
-          <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem' }}>{team.espnTeamName}</div>
+          <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem' }}>{teamName(owner)}</div>
         </div>
         <div style={{ flexShrink: 0, paddingTop: 4 }}>
           <IdentityChip />

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
-import { teamByOwner } from '../../lib/league/data.js';
+import { useTeamName } from '../../hooks/useTeamNames.js';
 import TeamPickerForm from './TeamPickerForm.js';
 import SetPinPanel from './SetPinPanel.js';
 
@@ -14,7 +14,8 @@ interface Props {
 export default function TeamPickerModal({ anchor, onClose }: Props) {
   const { identity, signOut } = useIdentity();
   const navigate = useNavigate();
-  const team = identity ? teamByOwner.get(identity.owner) : null;
+  const teamName = useTeamName();
+  const team = teamName(identity?.owner);
 
   const logout = () => {
     signOut();
@@ -40,7 +41,7 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
           <div>
             <div className="splash-step">{identity ? 'YOUR ACCOUNT' : 'OWNER ACCESS'}</div>
             <h2 id="account-sheet-title">{identity ? identity.owner : 'Who are you?'}</h2>
-            {team && <p>{team.espnTeamName}</p>}
+            {team && <p>{team}</p>}
           </div>
           <button className="tap-btn account-close" type="button" onClick={onClose} aria-label="Close account menu">
             ×

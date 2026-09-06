@@ -2618,6 +2618,43 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
 }
 .trade-history-line strong { font-variant-numeric: tabular-nums; }
 
+/* ─── Team name refresh (commissioner) ───────────────────────────────── */
+.team-name-diff {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.team-name-diff li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  font-size: 0.76rem;
+}
+.team-name-owner {
+  grid-column: 1 / -1;
+  color: var(--text-hi);
+  font-weight: 800;
+}
+.team-name-before {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+.team-name-arrow {
+  color: var(--neon-teal);
+}
+.team-name-after {
+  color: var(--neon-teal);
+  font-weight: 700;
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

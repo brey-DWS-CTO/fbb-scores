@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import type { EspnLeagueResponse } from '../../types/index.js';
 import type { EspnPlayerPoolPlayer } from '../league/playerPool.js';
+import type { EspnTeamName } from '../league/teamNames.js';
 import { NBA_TEAM_ABBREV } from './calculations.js';
 
 const ESPN_BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba';
@@ -33,6 +34,23 @@ interface EspnKonaPlayerEntry {
 interface EspnKonaResponse {
   scoringPeriodId: number;
   players?: EspnKonaPlayerEntry[];
+}
+
+/** What the `mTeam` view answers with. Only the naming fields matter here. */
+interface EspnTeamViewResponse {
+  teams?: Array<{
+    id?: number;
+    name?: string;
+    location?: string;
+    nickname?: string;
+    owners?: string[];
+  }>;
+  members?: Array<{
+    id?: string;
+    displayName?: string;
+    firstName?: string;
+    lastName?: string;
+  }>;
 }
 
 const ELIGIBLE_SLOT_POSITION: Record<number, string> = {
@@ -285,6 +303,47 @@ export class EspnClient {
     });
     if (Array.isArray(data)) return data[0] ?? null;
     return data ?? null;
+  }
+
+  /**
+   * Every team's ID, current name and owner, from the `mTeam` view.
+   *
+   * One small read of the thing being asked about. The scoreboard carries the
+   * same names inside its matchups, but it also drags in rosters, settings and
+   * live scores, and it only names the teams that play this week.
+   *
+   * ESPN answers with `name` on modern seasons and with `location` plus
+   * `nickname` on older ones, so both are read.
+   */
+  async fetchTeamNames(): Promise<EspnTeamName[]> {
+    const { data } = await this.http.get<EspnTeamViewResponse>('', {
+      params: { view: 'mTeam', _: Date.now() },
+      paramsSerializer: { indexes: null },
+    });
+
+    const memberById = new Map<string, string>();
+    for (const member of data.members ?? []) {
+      if (!member.id) continue;
+      const display = member.displayName?.trim()
+        || `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim();
+      if (display) memberById.set(member.id, display);
+    }
+
+    const teams: EspnTeamName[] = [];
+    for (const team of data.teams ?? []) {
+      if (!Number.isInteger(team.id) || (team.id ?? 0) <= 0) continue;
+      const name = team.name?.trim()
+        || `${team.location ?? ''} ${team.nickname ?? ''}`.trim();
+      if (!name) continue;
+      const firstOwner = team.owners?.[0];
+      teams.push({
+        espnTeamId: team.id as number,
+        name,
+        ownerName: (firstOwner ? memberById.get(firstOwner) : undefined) ?? '',
+      });
+    }
+    if (teams.length === 0) throw new Error('ESPN returned no teams');
+    return teams;
   }
 
   /** Fetch every active-player page without requesting stats. */

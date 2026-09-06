@@ -30,6 +30,7 @@ import type {
   ScheduleSourceStatus,
   StoredScheduleSnapshot,
 } from './schedule.js';
+import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
@@ -79,6 +80,18 @@ export interface PlayerPoolPreviewResponse {
 
 export interface FetchedPlayerPoolPreviewResponse extends PlayerPoolPreviewResponse {
   candidate: PlayerPoolCandidateInput;
+}
+
+export interface TeamNameCandidateInput {
+  sourceSeason: number;
+  fetchedAt: string;
+  teams: EspnTeamName[];
+}
+
+export interface TeamNamePreviewResponse {
+  candidate: TeamNameCandidateInput;
+  fingerprint: string;
+  preview: TeamNameRefreshPreview;
 }
 
 export interface KeeperScenarioResponse {
@@ -486,6 +499,29 @@ export async function acceptPlayerPool(
       expectedCurrentSnapshotId: preview.currentSnapshotId,
       fingerprint: preview.fingerprint,
     },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Ask ESPN what every team is called now. Writes nothing. */
+export async function fetchEspnTeamNamePreview(
+  c: Credentials,
+): Promise<TeamNamePreviewResponse> {
+  const { data } = await axios.post('/api/league/team-names/fetch-preview', {}, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+/** Store the exact names that were previewed. */
+export async function acceptTeamNames(
+  c: Credentials,
+  preview: TeamNamePreviewResponse,
+): Promise<StateResponse & { preview: TeamNameRefreshPreview }> {
+  const { data } = await axios.post(
+    '/api/league/team-names/accept',
+    { ...preview.candidate, fingerprint: preview.fingerprint },
     { headers: authHeaders(c) },
   );
   return data;
