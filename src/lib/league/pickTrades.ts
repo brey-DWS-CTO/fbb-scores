@@ -26,6 +26,7 @@ import {
   buildDraftBoard,
   pickLabel,
   resolveTeamKeepers,
+  slotFor,
   KEEPER_ROUNDS,
 } from '../keeper/engine.js';
 import type {
@@ -163,9 +164,50 @@ export function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
-/** "1st Round Pick". The title of one row. */
+/** "1st Round Pick". Used when the slot cannot be worked out. */
 export function pickTitle(ref: PickRef): string {
   return `${ordinal(ref.round)} Round Pick`;
+}
+
+/** Teams, their draft order, and which draft that order belongs to. */
+export type DraftOrder = Pick<LeagueDataset, 'teams' | 'season'>;
+
+/**
+ * Where a pick sits inside its round.
+ *
+ * A `PickRef` carries the draft, the round and the team the pick came from, so
+ * the slot has to be worked out. The draft snakes: in odd rounds the slot is
+ * the original owner's draft position, in even rounds it is that position
+ * mirrored, so position 1 picks last. Trades never move a pick's slot, only who
+ * holds it.
+ *
+ * This is the same sum `buildAllPicks` does, and a test pins the two together
+ * over every pick in the league. Null when the team is not in this league, and
+ * null for a later draft, whose order does not exist yet.
+ */
+export function pickSlotFor(dataset: DraftOrder, ref: StoredPickRef): number | null {
+  if (pickSeason(ref, dataset.season) !== dataset.season) return null;
+  const team = dataset.teams.find((t) => t.owner === ref.originalOwner);
+  return team ? slotFor(ref.round, team.draftPosition, dataset.teams.length) : null;
+}
+
+/** True when this pick belongs to a draft that has not been ordered yet. */
+function isFuturePick(dataset: DraftOrder, ref: StoredPickRef): boolean {
+  return pickSeason(ref, dataset.season) !== dataset.season;
+}
+
+/** "1.9", or "Round 5, Oct 2027 draft" when that draft has no order yet. */
+export function exactPickLabel(dataset: DraftOrder, ref: StoredPickRef): string {
+  if (isFuturePick(dataset, ref)) return futurePickLabel(withSeason(ref, dataset.season));
+  const slot = pickSlotFor(dataset, ref);
+  return slot === null ? `R${ref.round}` : `${ref.round}.${slot}`;
+}
+
+/** "Pick 1.9". The title of one row. */
+export function exactPickTitle(dataset: DraftOrder, ref: StoredPickRef): string {
+  if (isFuturePick(dataset, ref)) return futurePickLabel(withSeason(ref, dataset.season));
+  const slot = pickSlotFor(dataset, ref);
+  return slot === null ? pickTitle(withSeason(ref, dataset.season)) : `Pick ${ref.round}.${slot}`;
 }
 
 /** One pick on the move, with both ends named. */
@@ -1092,11 +1134,23 @@ function summarise(
 /* Summaries for lists                                                 */
 /* ------------------------------------------------------------------ */
 
-/** "R3, R9 for R4" — what each side gives, in a line. */
-export function describeTrade(proposal: PickTradeProposal): string {
+/**
+ * "2.1, 9.10 for 2.6". What each side gives, in a line.
+ *
+ * Plain text, no markup: the server puts this straight into a trade
+ * notification and the audit log.
+ *
+ * A round on its own is ambiguous. Two teams swapping second rounders both read
+ * "R2", so the line said nothing. With the dataset each pick gets its exact
+ * number. Without one, fall back to naming the team the pick came from, which
+ * is the other half of a pick's identity. Callers that can reach the dataset
+ * should pass it.
+ */
+export function describeTrade(proposal: PickTradeProposal, dataset?: DraftOrder): string {
   if (proposal.offer.length === 0 && proposal.request.length === 0) return 'Picks hidden';
-  const side = (refs: PickRef[]) =>
-    refs.map((ref) => describeRef(ref)).join(', ');
+  const name = (ref: PickRef) =>
+    dataset ? exactPickLabel(dataset, ref) : `R${ref.round} from ${ref.originalOwner}`;
+  const side = (refs: PickRef[]) => refs.map(name).join(', ');
   return `${side(proposal.offer)} for ${side(proposal.request)}`;
 }
 

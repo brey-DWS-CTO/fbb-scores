@@ -16,6 +16,8 @@ import {
   describeTrade,
   draftCalendarYear,
   draftYearLabel,
+  exactPickLabel,
+  exactPickTitle,
   expireStale,
   expiresAtFrom,
   futurePickLabel,
@@ -23,9 +25,11 @@ import {
   ordinal,
   pickRefKey,
   pickSeason,
+  pickSlotFor,
   pickTitle,
   previewProposal,
   proposalsOf,
+  refOf,
   provenanceFor,
   sameRef,
   seasonPicks,
@@ -472,12 +476,39 @@ test('an accepted offer writes one ledger row per pick, both ways', () => {
   assert.ok(rows.every((row) => row.proposalId === 'trade-x'));
 });
 
-test('a trade reads back as picks, never as free text', () => {
-  assert.equal(describeTrade(proposal()), 'R7 for R7');
+test('a trade reads back as the exact picks, never as free text', () => {
+  // A round on its own says nothing. Amy drafts 10th and Kyle 5th, and the
+  // odd rounds run in draft order.
+  assert.equal(describeTrade(proposal(), dataset), '7.10 for 7.5');
   assert.equal(
-    describeTrade(proposal({ offer: [ref(3, 'Derek')] })),
-    'R3 for R7',
+    describeTrade(proposal({ offer: [ref(3, 'Derek')] }), dataset),
+    '3.8 for 7.5',
   );
+  assert.equal(
+    describeTrade(
+      proposal({ offer: [ref(2, 'Amy'), ref(9, 'Brey')] }),
+      dataset,
+    ),
+    '2.1, 9.9 for 7.5',
+  );
+  assert.equal(describeTrade(proposal({ offer: [], request: [] }), dataset), 'Picks hidden');
+});
+
+test('a pick in a draft with no order yet reads as a round and a year', () => {
+  assert.equal(
+    describeTrade(
+      proposal({ offer: [ref(5, 'Amy', NEXT)], request: [ref(5, 'Kyle', NEXT)] }),
+      dataset,
+    ),
+    'Round 5, Oct 2027 draft for Round 5, Oct 2027 draft',
+  );
+  assert.equal(pickSlotFor(dataset, ref(5, 'Amy', NEXT)), null, 'no slot to give');
+});
+
+test('without a dataset the summary still says which pick is which', () => {
+  // The server calls this with the proposal alone. It can no longer print the
+  // same words for two different picks.
+  assert.equal(describeTrade(proposal()), 'R7 from Amy for R7 from Kyle');
   assert.equal(describeTrade(proposal({ offer: [], request: [] })), 'Picks hidden');
 });
 
@@ -501,6 +532,64 @@ test('a round on its own is ambiguous, so each row names the pick in full', () =
     assetOrigin({ ref: ref(1, 'Derek'), from: 'Kyle', to: 'Amy' }),
     "Originally Derek's",
   );
+});
+
+/* ─── The exact pick behind a trade row ────────────────────────────────── */
+
+test('the draft snakes, so an even round mirrors the draft order', () => {
+  // Joel picks 1st, Kyle 5th, Brey 9th, Amy 10th.
+  assert.equal(pickSlotFor(dataset, { round: 1, originalOwner: 'Joel' }), 1);
+  assert.equal(pickSlotFor(dataset, { round: 1, originalOwner: 'Brey' }), 9);
+  assert.equal(pickSlotFor(dataset, { round: 1, originalOwner: 'Amy' }), 10);
+
+  // Round 2 runs the other way: 10th becomes 1st, 1st becomes 10th.
+  assert.equal(pickSlotFor(dataset, { round: 2, originalOwner: 'Joel' }), 10);
+  assert.equal(pickSlotFor(dataset, { round: 2, originalOwner: 'Kyle' }), 6);
+  assert.equal(pickSlotFor(dataset, { round: 2, originalOwner: 'Amy' }), 1);
+
+  // Odd rounds all read the same as round 1.
+  assert.equal(pickSlotFor(dataset, { round: 7, originalOwner: 'Brey' }), 9);
+  assert.equal(pickSlotFor(dataset, { round: 8, originalOwner: 'Brey' }), 2);
+
+  assert.equal(pickSlotFor(dataset, { round: 1, originalOwner: 'Nobody' }), null);
+});
+
+test('a trade row shows the same pick number as the draft board', () => {
+  // The proof. Every pick in the league, derived from a round plus the team it
+  // came from, against the number the board itself hands out.
+  const picks = buildAllPicks(dataset);
+  assert.ok(picks.length > 100, 'the board has picks to check');
+  for (const pick of picks) {
+    assert.equal(
+      exactPickLabel(dataset, refOf(pick)),
+      pickLabel(pick),
+      `pick ${pick.round} from ${pick.originalOwner}`,
+    );
+  }
+});
+
+test('trading a pick moves who holds it, never where it sits', () => {
+  const moved = datasetWithTransfers(dataset, [transfer(1, 'Brey', 'Brey', 'Kyle')]);
+  const ref = { round: 1, originalOwner: 'Brey' };
+  assert.equal(ownerOf(moved, 1, 'Brey'), 'Kyle');
+  assert.equal(exactPickLabel(moved, ref), '1.9');
+  assert.equal(exactPickLabel(dataset, ref), '1.9');
+});
+
+test('a trade row names the exact pick, not just the round', () => {
+  assert.equal(exactPickTitle(dataset, { round: 1, originalOwner: 'Brey' }), 'Pick 1.9');
+  assert.equal(exactPickTitle(dataset, { round: 1, originalOwner: 'Kyle' }), 'Pick 1.5');
+  assert.equal(exactPickTitle(dataset, { round: 7, originalOwner: 'Aaron' }), 'Pick 7.7');
+
+  // Two first rounders in one trade must never read the same.
+  assert.notEqual(
+    exactPickTitle(dataset, { round: 1, originalOwner: 'Kyle' }),
+    exactPickTitle(dataset, { round: 1, originalOwner: 'Derek' }),
+  );
+
+  // A team the league does not know still gets a title, just a vaguer one.
+  assert.equal(exactPickTitle(dataset, { round: 3, originalOwner: 'Nobody' }), '3rd Round Pick');
+  assert.equal(exactPickLabel(dataset, { round: 3, originalOwner: 'Nobody' }), 'R3');
 });
 
 test('each side of a trade reads from the seat of whoever is looking', () => {
