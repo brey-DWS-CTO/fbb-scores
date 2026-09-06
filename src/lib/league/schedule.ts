@@ -76,6 +76,23 @@ export interface TeamScheduleSummary {
   postseasonTotal: number;
 }
 
+export interface ScheduleTrendPoint {
+  leagueWeek: number;
+  label: string;
+  value: number;
+}
+
+export interface ScheduleTrend {
+  points: ScheduleTrendPoint[];
+  min: number;
+  max: number;
+  average: number;
+  /** The week that holds the most games. Null when there is nothing to chart. */
+  peak: ScheduleTrendPoint | null;
+  /** The week that holds the fewest games. Null when there is nothing to chart. */
+  trough: ScheduleTrendPoint | null;
+}
+
 export interface StoredScheduleSnapshot extends ScheduleSnapshot {
   id: string;
   createdAt: string;
@@ -461,4 +478,50 @@ export function summarizeTeamSchedule(periods: readonly LeagueSchedulePeriod[], 
 
 export function summarizeAllTeamSchedules(periods: readonly LeagueSchedulePeriod[]): TeamScheduleSummary[] {
   return NBA_TEAMS.map((team) => summarizeTeamSchedule(periods, team.espnId));
+}
+
+/**
+ * Games per league period, ready to chart.
+ *
+ * Pass a team ID for that team's own count. Pass null for the league average
+ * per team, which is the number the grid's AVG column already shows, so the
+ * chart and the column can never disagree.
+ */
+export function buildScheduleTrend(
+  periods: readonly LeagueSchedulePeriod[],
+  teamId: number | null,
+): ScheduleTrend {
+  if (teamId !== null && !TEAM_CODE_BY_ID.has(teamId)) {
+    throw new Error(`Unknown ESPN NBA team ID: ${teamId}`);
+  }
+
+  const points = [...periods]
+    .sort((a, b) => a.leagueWeek - b.leagueWeek)
+    .map((period): ScheduleTrendPoint => ({
+      leagueWeek: period.leagueWeek,
+      label: period.label,
+      value: teamId === null
+        ? sum(Object.values(period.gamesByTeamId)) / NBA_TEAMS.length
+        : period.gamesByTeamId[teamId] ?? 0,
+    }));
+  if (points.length === 0) {
+    return { points, min: 0, max: 0, average: 0, peak: null, trough: null };
+  }
+
+  // Ties keep the earlier week, so the labels stay put as the commish sorts.
+  let peak = points[0];
+  let trough = points[0];
+  for (const point of points) {
+    if (point.value > peak.value) peak = point;
+    if (point.value < trough.value) trough = point;
+  }
+
+  return {
+    points,
+    min: trough.value,
+    max: peak.value,
+    average: sum(points.map((point) => point.value)) / points.length,
+    peak,
+    trough,
+  };
 }

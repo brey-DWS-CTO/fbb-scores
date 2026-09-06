@@ -5,6 +5,7 @@ import {
   DEFAULT_2027_LEAGUE_MAPPING,
   NBA_TEAMS,
   buildLeagueSchedule,
+  buildScheduleTrend,
   nbaTeamIdForProTeam,
   normalizeNbaTeamCode,
   normalizeScheduleSource,
@@ -199,6 +200,73 @@ test('reconciles every team from league periods through the two unused NBA weeks
     assert.equal(summary.playoffs.round1 + summary.playoffs.round2, summary.playoffs.total, summary.teamCode);
     assert.equal(summary.playIn.total + summary.playoffs.total, summary.postseasonTotal, summary.teamCode);
   }
+});
+
+test('charts one point per league period, in week order', () => {
+  const periods = buildLeagueSchedule(normalizeScheduleSource(source));
+  const trend = buildScheduleTrend([...periods].reverse(), null);
+
+  assert.equal(trend.points.length, 22);
+  assert.deepEqual(
+    trend.points.map((point) => point.leagueWeek),
+    Array.from({ length: 22 }, (_, index) => index + 1),
+  );
+  assert.equal(trend.points[0].label, 'Week 1');
+  assert.equal(trend.points[21].label, 'Playoff Round 2 · Week 2');
+});
+
+test('charts a team by its own games and the league by the average', () => {
+  const periods = buildLeagueSchedule(normalizeScheduleSource(source));
+  const boston = buildScheduleTrend(periods, 2);
+  const league = buildScheduleTrend(periods, null);
+
+  for (const point of boston.points) {
+    const period = periods.find((entry) => entry.leagueWeek === point.leagueWeek);
+    assert.equal(point.value, period?.gamesByTeamId[2]);
+    assert.ok(Number.isInteger(point.value));
+  }
+  for (const point of league.points) {
+    const period = periods.find((entry) => entry.leagueWeek === point.leagueWeek);
+    const total = Object.values(period!.gamesByTeamId).reduce((sum, games) => sum + games, 0);
+    // The grid's AVG column divides the same way, so the two can never disagree.
+    assert.equal(point.value, total / 30);
+  }
+});
+
+test('reports the high, the low and the average for the chart scale', () => {
+  const periods = buildLeagueSchedule(normalizeScheduleSource(source));
+  const trend = buildScheduleTrend(periods, 2);
+  const values = trend.points.map((point) => point.value);
+
+  assert.equal(trend.max, Math.max(...values));
+  assert.equal(trend.min, Math.min(...values));
+  assert.equal(trend.peak?.value, trend.max);
+  assert.equal(trend.trough?.value, trend.min);
+  assert.ok(Math.abs(trend.average - values.reduce((sum, value) => sum + value, 0) / 22) < 1e-9);
+  assert.ok(trend.min <= trend.average && trend.average <= trend.max);
+});
+
+test('keeps the earliest week when the high or the low ties', () => {
+  const periods = buildLeagueSchedule(normalizeScheduleSource(source));
+  const trend = buildScheduleTrend(periods, 2);
+  const firstPeak = trend.points.find((point) => point.value === trend.max);
+  const firstTrough = trend.points.find((point) => point.value === trend.min);
+
+  assert.equal(trend.peak?.leagueWeek, firstPeak?.leagueWeek);
+  assert.equal(trend.trough?.leagueWeek, firstTrough?.leagueWeek);
+});
+
+test('refuses an unknown team and copes with no periods', () => {
+  const periods = buildLeagueSchedule(normalizeScheduleSource(source));
+  assert.throws(() => buildScheduleTrend(periods, 99), /Unknown ESPN NBA team ID/);
+  assert.deepEqual(buildScheduleTrend([], null), {
+    points: [],
+    min: 0,
+    max: 0,
+    average: 0,
+    peak: null,
+    trough: null,
+  });
 });
 
 /**

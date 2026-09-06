@@ -4,11 +4,13 @@ import rawSchedule from '../../data/source/basketball-monster-schedule-2027.json
 import {
   DEFAULT_2027_LEAGUE_MAPPING,
   NBA_TEAMS,
+  buildScheduleTrend,
   summarizeAllTeamSchedules,
   type LeagueScheduleMapping,
   type LeagueSchedulePeriod,
   type RawScheduleSource,
 } from '../../lib/league/schedule.js';
+import ScheduleTrendChart from './ScheduleTrendChart.js';
 import {
   leagueSchedule2027,
   scheduleSnapshot2027,
@@ -39,6 +41,8 @@ import {
 import NavIcon from './NavIcon.js';
 
 type View = 'periods' | 'postseason';
+/** The grid sorts on an NBA team ID, or on the average games column. */
+type PeriodSortKey = number | 'average';
 
 const POSTSEASON_HEADERS = [
   'PI 1',
@@ -131,7 +135,7 @@ export default function ScheduleAdmin() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>('periods');
   // Grid sort keys on the NBA team id; the postseason table sorts on a column index.
-  const [periodSort, setPeriodSort] = useState<ColumnSort<number> | null>(null);
+  const [periodSort, setPeriodSort] = useState<ColumnSort<PeriodSortKey> | null>(null);
   const [summarySort, setSummarySort] = useState<ColumnSort<number> | null>(null);
   const [preview, setPreview] = useState<SchedulePreviewResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -166,18 +170,27 @@ export default function ScheduleAdmin() {
   // The colour scale reads every total, so it holds whatever order the rows are in.
   const periodTotals = useMemo(() => periodRows.map((row) => row.total), [periodRows]);
   const sortedPeriodRows = useMemo(
-    () => (periodSort
-      ? sortRowsByNumber(
+    () => {
+      if (!periodSort) return periodRows;
+      const key = periodSort.key;
+      return sortRowsByNumber(
         periodRows,
-        (row) => row.period.gamesByTeamId[periodSort.key],
+        // The average is the total over 30 teams, so both sort the same way.
+        (row) => (key === 'average' ? row.total : row.period.gamesByTeamId[key]),
         periodSort.direction,
-      )
-      : periodRows),
+      );
+    },
     [periodRows, periodSort],
   );
-  const sortedTeamCode = periodSort
-    ? teams.find((team) => team.espnId === periodSort.key)?.code ?? null
-    : null;
+  const sortedTeamId = periodSort && typeof periodSort.key === 'number' ? periodSort.key : null;
+  const sortedTeamCode = sortedTeamId === null
+    ? null
+    : teams.find((team) => team.espnId === sortedTeamId)?.code ?? null;
+  // The chart follows the grid: a sorted team, or the league otherwise.
+  const trend = useMemo(
+    () => buildScheduleTrend(leaguePeriods, sortedTeamCode ? sortedTeamId : null),
+    [leaguePeriods, sortedTeamCode, sortedTeamId],
+  );
   const postseasonRows = useMemo(
     () => teams.flatMap((team) => {
       const summary = summaryByTeamId.get(team.espnId);
@@ -433,27 +446,12 @@ export default function ScheduleAdmin() {
           ))}
         </div>
 
-        <div className="schedule-legend" aria-label="Schedule game-count colors">
-          <span>GAMES PER TEAM</span>
-          {[
-            [2, 'LOW'],
-            [3, 'LIGHT'],
-            [4, 'HEAVY'],
-            [5, 'MAX'],
-          ].map(([games, label]) => (
-            <span key={games}>
-              <b className={`schedule-heat-${gameCountHeat(Number(games))}`}>{games}</b>
-              {label}
-            </span>
-          ))}
-        </div>
-
         <div className="schedule-sort-bar" aria-live="polite">
           {view === 'periods' ? (
-            periodSort && sortedTeamCode ? (
+            periodSort ? (
               <>
                 <span className="schedule-sort-state">
-                  Sorted by <b>{sortedTeamCode}</b>, {sortDirectionLabel(periodSort.direction)}
+                  Sorted by <b>{sortedTeamCode ?? 'AVG'}</b>, {sortDirectionLabel(periodSort.direction)}
                 </span>
                 <button
                   className="tap-btn schedule-sort-reset"
@@ -465,7 +463,7 @@ export default function ScheduleAdmin() {
               </>
             ) : (
               <span className="schedule-sort-hint">
-                In schedule order. Tap a team code to sort its games.
+                In schedule order. Tap a team code or AVG to sort it.
               </span>
             )
           ) : summarySort ? (
@@ -487,6 +485,13 @@ export default function ScheduleAdmin() {
             </span>
           )}
         </div>
+
+        {view === 'periods' && (
+          <ScheduleTrendChart
+            trend={trend}
+            subject={sortedTeamCode ?? 'LEAGUE AVERAGE'}
+          />
+        )}
 
         <div className="schedule-table-scroll" role="region" aria-label={view === 'periods' ? 'League schedule by period' : 'Postseason schedule totals'} tabIndex={0}>
           {view === 'periods' ? (
@@ -514,7 +519,12 @@ export default function ScheduleAdmin() {
                     <span className="schedule-head-long">TEAM-GAMES</span>
                     <span className="schedule-head-short" aria-hidden="true">TOT</span>
                   </th>
-                  <th className="schedule-total-head" scope="col">AVG</th>
+                  <SortHeader
+                    className="schedule-total-head"
+                    long="AVG"
+                    direction={periodSort?.key === 'average' ? periodSort.direction : null}
+                    onSort={() => setPeriodSort((current) => toggleColumnSort(current, 'average'))}
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -542,7 +552,7 @@ export default function ScheduleAdmin() {
                           )}
                         </span>
                         <span className="schedule-period-meta">
-                          {compactDateRange(period)} · WK {period.sourceNbaWeeks.join('+')}
+                          {compactDateRange(period)}
                         </span>
                       </td>
                       <td className="schedule-date-cell">{dateRange(period)}</td>
@@ -550,11 +560,10 @@ export default function ScheduleAdmin() {
                       {teams.map((team) => {
                         const games = period.gamesByTeamId[team.espnId];
                         const heat = gameCountHeat(games);
-                        const active = periodSort?.key === team.espnId;
                         return (
                           <td
                             key={team.espnId}
-                            className={`schedule-game-cell schedule-heat-${heat}${active ? ' schedule-col-active' : ''}`}
+                            className={`schedule-game-cell schedule-heat-${heat}`}
                             aria-label={`${team.code}, ${period.label}: ${games} games, ${scheduleHeatLabel(heat)}`}
                             title={`${team.code}: ${games} games`}
                           >
@@ -597,11 +606,10 @@ export default function ScheduleAdmin() {
                     <td className="schedule-sticky-team">{row.team.code}</td>
                     {row.values.map((value, column) => {
                       const heat = relativeScheduleHeat(value, postseasonColumns[column]);
-                      const active = summarySort?.key === column;
                       return (
                         <td
                           key={POSTSEASON_HEADERS[column]}
-                          className={`schedule-summary-cell schedule-heat-${heat}${active ? ' schedule-col-active' : ''}`}
+                          className={`schedule-summary-cell schedule-heat-${heat}`}
                           aria-label={`${row.team.code} ${POSTSEASON_HEADERS[column]}: ${value}, ${scheduleHeatLabel(heat)}`}
                         >
                           {value}
