@@ -7,6 +7,7 @@ import {
   type TeamNamePreviewResponse,
 } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity } from '../../hooks/useLeague.js';
+import NavIcon from './NavIcon.js';
 
 function formatTime(value: string): string {
   return new Date(value).toLocaleString([], {
@@ -88,7 +89,8 @@ export default function TeamNameAdmin() {
       )}
       {error && (
         <div role="alert" style={{ color: 'var(--neon-red)', fontSize: '0.78rem', marginTop: 10 }}>
-          ⚠ {error}
+          <NavIcon name="warning" size={14} className="icon-in-heading" />
+          {error}
         </div>
       )}
 

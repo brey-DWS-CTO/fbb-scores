@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { PlayerKeeperInfo } from '../../lib/keeper/types.js';
+import NavIcon from '../league/NavIcon.js';
 
 const chipBase: CSSProperties = {
   display: 'inline-block',
@@ -93,8 +94,18 @@ export function LockBanner() {
         textAlign: 'center',
       }}
     >
-      <span className="hub-heading glow-red" style={{ fontSize: '0.6rem', color: 'var(--neon-red)' }}>
-        🔒 KEEPERS ARE LOCKED
+      <span
+        className="hub-heading glow-red"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: '0.6rem',
+          color: 'var(--neon-red)',
+        }}
+      >
+        <NavIcon name="lock" size={14} />
+        KEEPERS ARE LOCKED
       </span>
     </div>
   );

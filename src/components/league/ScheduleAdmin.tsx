@@ -36,6 +36,7 @@ import {
   type ColumnSort,
   type SortDirection,
 } from './scheduleUi.js';
+import NavIcon from './NavIcon.js';
 
 type View = 'periods' | 'postseason';
 
@@ -303,7 +304,8 @@ export default function ScheduleAdmin() {
         )}
         {error && (
           <div role="alert" style={{ color: 'var(--neon-red)', fontSize: '0.78rem', marginTop: 10 }}>
-            ⚠ {error}
+            <NavIcon name="warning" size={14} className="icon-in-heading" />
+            {error}
           </div>
         )}
 
@@ -528,10 +530,16 @@ export default function ScheduleAdmin() {
                     <tr key={period.leagueWeek} className={breakClass || undefined}>
                       <td className="schedule-sticky-period" style={{ color: phaseColor(period) }}>
                         <span className="schedule-period-long">
-                          {period.label}{period.combinesAllStarBreak ? ' ★' : ''}
+                          {period.label}
+                          {period.combinesAllStarBreak && (
+                            <NavIcon name="star" size={12} label="Long ESPN period" className="icon-after-heading" />
+                          )}
                         </span>
                         <span className="schedule-period-short" aria-hidden="true">
-                          {shortPeriodLabel(period.label)}{period.combinesAllStarBreak ? ' ★' : ''}
+                          {shortPeriodLabel(period.label)}
+                          {period.combinesAllStarBreak && (
+                            <NavIcon name="star" size={12} className="icon-after-heading" />
+                          )}
                         </span>
                         <span className="schedule-period-meta">
                           {compactDateRange(period)} · WK {period.sourceNbaWeeks.join('+')}
@@ -612,7 +620,8 @@ export default function ScheduleAdmin() {
         </p>
 
         <div style={{ marginTop: 9, color: 'var(--text-dim)', fontSize: '0.68rem' }}>
-          ★ Long ESPN period. A later refresh must create and accept a new snapshot after the NBA Cup schedule settles.
+          <NavIcon name="star" size={12} className="icon-in-heading" />
+          Long ESPN period. A later refresh must create and accept a new snapshot after the NBA Cup schedule settles.
         </div>
       </div>
     </section>

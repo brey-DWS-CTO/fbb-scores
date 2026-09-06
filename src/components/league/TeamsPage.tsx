@@ -8,6 +8,7 @@ import { usePostseasonGames, type PostseasonGamesLookup } from '../../hooks/useP
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import { positionColor, cellDisplay } from '../draft/boardUtils.js';
 import IdentityChip from './IdentityChip.js';
+import NavIcon from './NavIcon.js';
 import PostseasonTag from './PostseasonTag.js';
 
 /** /teams — everyone's 2027 roster as it forms from keepers + draft picks. */
@@ -130,7 +131,8 @@ export default function TeamsPage() {
 
         {hiddenKeepers > 0 && (
           <div style={{ margin: '0 14px 10px', color: 'var(--neon-purple)', fontSize: '0.8rem', fontWeight: 700 }}>
-            🔒 {hiddenKeepers} keeper{hiddenKeepers > 1 ? 's' : ''} in. Names stay hidden until the commish reveals them.
+            <NavIcon name="lock" size={14} className="icon-in-heading" />
+            {hiddenKeepers} keeper{hiddenKeepers > 1 ? 's' : ''} in. Names stay hidden until the commish reveals them.
           </div>
         )}
 
@@ -199,7 +201,7 @@ function RosterLine({
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-hi)' }}>
-          {d.isKeeper && '🔒 '}
+          {d.isKeeper && <NavIcon name="lock" size={13} label="Keeper" className="icon-in-heading" />}
           {d.name}
         </div>
         <div style={{ fontSize: '0.72rem', fontWeight: 700, color }}>

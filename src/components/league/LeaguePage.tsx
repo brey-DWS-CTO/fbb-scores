@@ -5,6 +5,7 @@ import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 
 import IdentityChip from './IdentityChip.js';
+import NavIcon from './NavIcon.js';
 import RecordTables from './RecordTables.js';
 import ScoringTable from './ScoringTable.js';
 
@@ -229,7 +230,7 @@ export default function LeaguePage() {
                                 fontWeight: 600,
                               }}
                             >
-                              {isPick ? '🎯 ' : ''}
+                              {isPick && <NavIcon name="target" size={13} className="icon-in-heading" />}
                               {item}
                             </span>
                           );

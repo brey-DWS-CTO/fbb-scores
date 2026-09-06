@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { useSettings } from '../../hooks/useSettings.js';
+import NavIcon from './NavIcon.js';
 import TeamPickerModal from './TeamPickerModal.js';
 
 interface Props {
@@ -34,7 +35,7 @@ export default function IdentityChip({ placement = 'page' }: Props) {
           justifyContent: 'center',
         }}
       >
-        {theme === 'dark' ? '☀️' : '🌙'}
+        <NavIcon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
       </button>
       <button
         className="tap-btn"
@@ -59,7 +60,7 @@ export default function IdentityChip({ placement = 'page' }: Props) {
         {identity ? (
           <>
             <span>{identity.owner}</span>
-            {identity.isCommissioner && <span title="Commish">👑</span>}
+            {identity.isCommissioner && <NavIcon name="crown" size={15} label="Commish" />}
             <span aria-hidden="true" style={{ fontSize: '0.65rem', opacity: 0.75 }}>▼</span>
           </>
         ) : (

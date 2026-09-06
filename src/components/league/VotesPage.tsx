@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
+import NavIcon from './NavIcon.js';
 import RulePicker from './RulePicker.js';
 import { useIdentity } from '../../hooks/useLeague.js';
 import {
@@ -441,7 +442,10 @@ export default function VotesPage() {
     <main className="rules-page">
       <header className="rules-page-header">
         <div>
-          <h1 className="hub-heading glow-purple">🗳 VOTES</h1>
+          <h1 className="hub-heading glow-purple">
+            <NavIcon name="ballot" size={18} className="icon-in-heading" />
+            VOTES
+          </h1>
           <p>{thresholdLine}</p>
         </div>
         <IdentityChip />

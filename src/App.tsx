@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
 import { sandboxActive } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
+import NavIcon from './components/league/NavIcon.js'
 import ActingAsBanner from './components/league/ActingAsBanner.js';
 import SplashPage from './components/league/SplashPage.js'
 import SignInLinkPage from './components/league/SignInLinkPage.js'
@@ -48,7 +49,8 @@ function App() {
             textDecoration: 'none',
           }}
         >
-          🧪 TEST MODE — sandbox only, nothing is saved · tap to exit in Commish Mode
+          <NavIcon name="flask" size={14} className="icon-in-heading" />
+          TEST MODE. Sandbox only, nothing is saved. Tap to exit in Commish Mode.
         </Link>
       )}
       {!bareMode && <AppNav />}
