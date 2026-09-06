@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import EarlierTrades from './EarlierTrades.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
@@ -434,8 +435,25 @@ export default function TradesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [composing, setComposing] = useState(false);
-  const [partner, setPartner] = useState('');
+  // The Teams page sends you here with somebody already in mind. Opening the
+  // composer on the right person saves the one step everybody would repeat.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const asked = searchParams.get('with') ?? '';
+  // Only open on a real owner who is not you, so a hand-typed or stale link
+  // cannot land somebody in a trade with themselves.
+  const askedFor = OWNERS.includes(asked) && asked !== identity?.owner ? asked : '';
+
+  const [composing, setComposing] = useState(askedFor !== '');
+  const [partner, setPartner] = useState(askedFor);
+
+  // Spend the parameter once. Leaving it in the address bar would reopen the
+  // composer on every back and refresh, long after the offer went out.
+  useEffect(() => {
+    if (!searchParams.has('with')) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('with');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [give, setGive] = useState<PickRef[]>([]);
   const [get, setGet] = useState<PickRef[]>([]);
   const [note, setNote] = useState('');

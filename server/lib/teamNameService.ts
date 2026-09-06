@@ -11,9 +11,10 @@ import {
   normalizeTeamName,
   previewTeamNameRefresh,
   type EspnTeamName,
+  type TeamNameChange,
   type TeamNameRefreshPreview,
 } from '../../src/lib/league/teamNames.js';
-import type { LeagueDynamicState } from './leagueStore.js';
+import { appendAudit, getState, mutateState, type LeagueDynamicState } from './leagueStore.js';
 
 const dataset = rawDataset as unknown as LeagueDataset;
 const MAX_TEAMS = 40;
@@ -21,6 +22,11 @@ const MAX_NAME_LENGTH = 200;
 
 /** The ESPN season the live league runs in, when the environment names one. */
 const DEFAULT_ESPN_SEASON = 2026;
+
+export interface TeamNameRefreshResult {
+  changed: number;
+  changes: TeamNameChange[];
+}
 
 export interface TeamNameCandidate {
   sourceSeason: number;
@@ -145,4 +151,37 @@ export function prepareTeamNameCandidate(
 ): PreparedTeamNameCandidate {
   const preview = previewTeamNameRefresh(dataset.teams, candidate.teams, state.teamNames);
   return { preview, fingerprint: fingerprint(preview) };
+}
+
+/**
+ * Refresh the names on a clock, with nobody watching.
+ *
+ * This one writes without asking, which the player pool refresh would never
+ * do. The difference is what the data decides. A frozen player pool decides
+ * who can be drafted, so a person has to look at it. A team name decides
+ * nothing: ESPN is simply where the name lives, and somebody renaming their
+ * team is not a thing the commissioner should have to approve at 2am.
+ *
+ * Every failure is the caller's to swallow. Nothing here is worth interrupting
+ * a reminder run for.
+ */
+export async function refreshTeamNamesNow(): Promise<TeamNameRefreshResult> {
+  const candidate = await fetchEspnTeamNameCandidate();
+  const { state } = await getState();
+  const prepared = prepareTeamNameCandidate(state, candidate);
+  if (prepared.preview.changes.length === 0) return { changed: 0, changes: [] };
+
+  await mutateState((draft) => {
+    draft.teamNames = { ...prepared.preview.nextNames };
+  });
+  // A team name is not personal data, and this is the only trail for "when did
+  // that change". Silent when nothing moved, so an hourly job stays quiet.
+  for (const change of prepared.preview.changes) {
+    console.log(`[teams] ${change.owner}: ${change.before} -> ${change.after}`);
+  }
+  await appendAudit(null, 'team_names.refreshed', {
+    by: 'clock',
+    changes: prepared.preview.changes,
+  });
+  return { changed: prepared.preview.changes.length, changes: prepared.preview.changes };
 }

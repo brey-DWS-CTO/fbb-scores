@@ -19,6 +19,7 @@ export default function TeamsPage() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const owner = selected ?? identity?.owner ?? OWNERS[0];
+  const index = Math.max(0, OWNERS.indexOf(owner));
 
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
   const cells = useMemo(
@@ -50,42 +51,42 @@ export default function TeamsPage() {
         <IdentityChip />
       </div>
 
-      {/* owner chips */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 6,
-          overflowX: 'auto',
-          paddingBottom: 8,
-          marginBottom: 12,
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        {OWNERS.map((o) => {
-          const active = o === owner;
-          const n = meta?.keeperStatus[o] ?? 0;
-          return (
-            <button
-              key={o}
-              className="tap-btn"
-              onClick={() => setSelected(o)}
-              style={{
-                flexShrink: 0,
-                minHeight: 40,
-                padding: '0 14px',
-                borderRadius: 999,
-                border: `2px solid ${active ? 'var(--neon-blue)' : 'var(--panel-border)'}`,
-                background: active ? 'rgba(0,170,255,0.12)' : 'transparent',
-                color: active ? 'var(--neon-blue)' : 'var(--text-body)',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-              }}
-            >
-              {o}
-              {n > 0 && <span style={{ marginLeft: 5, fontSize: '0.7rem' }}>·{n}</span>}
-            </button>
-          );
-        })}
+      {/* Team picker. Ten teams do not fit across a phone, and a strip you have
+          to swipe hides whoever is off the edge. A native picker opens the
+          phone's own wheel, and the arrows step to the next team without
+          opening anything. */}
+      <div className="team-switch">
+        <button
+          className="tap-btn team-switch-arrow"
+          type="button"
+          onClick={() => setSelected(OWNERS[(index - 1 + OWNERS.length) % OWNERS.length])}
+          aria-label="Previous team"
+        >
+          &#8249;
+        </button>
+        <div className="team-switch-picker">
+          <select
+            className="team-switch-select"
+            value={owner}
+            onChange={(event) => setSelected(event.target.value)}
+            aria-label="Pick a team"
+          >
+            {OWNERS.map((o) => (
+              <option key={o} value={o}>
+                {o} · {teamName(o)}
+              </option>
+            ))}
+          </select>
+          <span className="team-switch-caret" aria-hidden="true">&#9662;</span>
+        </div>
+        <button
+          className="tap-btn team-switch-arrow"
+          type="button"
+          onClick={() => setSelected(OWNERS[(index + 1) % OWNERS.length])}
+          aria-label="Next team"
+        >
+          &#8250;
+        </button>
       </div>
 
       {/* roster panel */}
@@ -116,6 +117,16 @@ export default function TeamsPage() {
             {keeperAction}
           </Link>
         </div>
+
+        {/* Looking at someone's picks is exactly when you want to ask for one,
+            so the offer starts here instead of sending you off to find them. */}
+        {identity && owner !== identity.owner && (
+          <div style={{ padding: '0 14px 10px' }}>
+            <Link className="tap-btn team-trade-btn" to={`/trades?with=${encodeURIComponent(owner)}`}>
+              &#8646; TRADE WITH {owner.toUpperCase()}
+            </Link>
+          </div>
+        )}
 
         {hiddenKeepers > 0 && (
           <div style={{ margin: '0 14px 10px', color: 'var(--neon-purple)', fontSize: '0.8rem', fontWeight: 700 }}>
