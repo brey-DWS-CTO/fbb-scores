@@ -2677,6 +2677,16 @@
       "ruling": "Commissioner opened rounds 11 to 14 for trading on 2026-09-05, ahead of the wording. The book needs a vote to catch up: change keepers.picktrade.rounds to say rounds 3 through 14. Until that passes, the app is the looser of the two.",
       "ruledBy": "commissioner",
       "ruledAt": "2026-09-05"
+    },
+    {
+      "id": "picktrade-offseason-firsts",
+      "type": "settings",
+      "severity": "medium",
+      "status": "open",
+      "summary": "The rule book protects 1st and 2nd round picks outright (keepers.picktrade.rounds.protected). The app now lets them trade in the offseason, before the draft starts, and protects them again once it is under way.",
+      "ruling": "Commissioner opened the 1st and 2nd for offseason trading on 2026-09-06. The book needs a vote to catch up: keepers.picktrade.rounds.protected should say the 1st and 2nd are protected once the draft has started, not always. Note the book already allows changing this clause by 60% vote. Keepers are still safe either way: once keepers are locked, a trade that would leave a team unable to pay for one is refused on the keeper, not on the round.",
+      "ruledBy": "commissioner",
+      "ruledAt": "2026-09-06"
     }
   ]
 }

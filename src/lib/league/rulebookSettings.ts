@@ -76,7 +76,7 @@ export function buildSettingsRegistry(dataset: LeagueDataset): Map<string, Setti
     {
       key: 'picktrade.tradableRounds',
       label: 'Rounds that can be traded',
-      value: `3-${dataset.draftRounds}`,
+      value: `1-${dataset.draftRounds} in the offseason, 3-${dataset.draftRounds} once the draft starts`,
       source: 'Commissioner ruling, ahead of the rule book',
     },
   ];

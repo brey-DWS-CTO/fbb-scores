@@ -466,8 +466,24 @@ export function seasonPicksFor(
 export type PickBlock = 'drafted' | 'keeper' | 'round-protected';
 
 /** True when the rule book lets this round be traded at all. */
-export function isTradeableRound(dataset: LeagueDataset, round: number): boolean {
-  return round >= FIRST_TRADEABLE_ROUND && round <= lastTradeableRound(dataset);
+/**
+ * Whether a round can move.
+ *
+ * In the offseason, before the draft has started, everything moves, 1st and
+ * 2nd included. Once the draft is under way the 1st and 2nd are protected
+ * again, because from then on a keeper is paid for out of a round and a team
+ * that traded its top picks away could be left unable to pay.
+ *
+ * The rule book still says rounds 3 to 10 flat. The app is ahead of it on
+ * purpose: see issues `picktrade-late-rounds` and `picktrade-offseason-firsts`.
+ */
+export function isTradeableRound(
+  dataset: LeagueDataset,
+  round: number,
+  offseason = false,
+): boolean {
+  const first = offseason ? 1 : FIRST_TRADEABLE_ROUND;
+  return round >= first && round <= lastTradeableRound(dataset);
 }
 
 export interface TradablePick {
@@ -528,7 +544,7 @@ function blockFor(
 ): PickBlock | undefined {
   if (drafted) return 'drafted';
   if (draftLive && holdsKeeper) return 'keeper';
-  if (!isTradeableRound(dataset, round)) return 'round-protected';
+  if (!isTradeableRound(dataset, round, !draftLive)) return 'round-protected';
   return undefined;
 }
 
@@ -564,7 +580,8 @@ export function tradableSeasonPicksFor(
     }));
   }
   return seasonPicksFor(dataset, season, owner).map((pick) => {
-    const blockedBy: PickBlock | undefined = isTradeableRound(dataset, pick.ref.round)
+    // A later draft is by definition not under way, so its rounds all move.
+    const blockedBy: PickBlock | undefined = isTradeableRound(dataset, pick.ref.round, true)
       ? undefined
       : 'round-protected';
     return { ...pick, tradable: blockedBy === undefined, blockedBy, onClock: false };
@@ -655,7 +672,11 @@ export function proposalSeason(input: ProposalInput): number | null {
  * and 2nd rounds off limits, and rounds past the keeper tiers were never
  * tradeable. One proposal names one draft, because only one is ever open.
  */
-export function checkProposalShape(dataset: LeagueDataset, input: ProposalInput): TradeCheck {
+export function checkProposalShape(
+  dataset: LeagueDataset,
+  input: ProposalInput,
+  offseason = false,
+): TradeCheck {
   const owners = new Set(dataset.teams.map((t) => t.owner));
   if (!owners.has(input.proposer) || !owners.has(input.recipient)) {
     return refuse('unknown-owner', 'That team is not in this league.');
@@ -684,10 +705,11 @@ export function checkProposalShape(dataset: LeagueDataset, input: ProposalInput)
     ) {
       return refuse('unknown-pick', 'One of those picks does not exist.');
     }
-    if (!isTradeableRound(dataset, ref.round)) {
+    if (!isTradeableRound(dataset, ref.round, offseason)) {
       return refuse(
         'round-protected',
-        `Only rounds ${FIRST_TRADEABLE_ROUND} to ${lastTradeableRound(dataset)} can be traded.`,
+        `Only rounds ${FIRST_TRADEABLE_ROUND} to ${lastTradeableRound(dataset)} can be traded `
+        + 'once the draft has started.',
       );
     }
     if (seen.has(pickRefKey(ref))) {
@@ -795,7 +817,9 @@ export function checkProposalAgainstState(
   state: LeagueDynamicState,
   input: ProposalInput,
 ): TradeCheck {
-  const shape = checkProposalShape(dataset, input);
+  // This one has the state, so it works the offseason out rather than being
+  // told. It is the check that actually guards the write.
+  const shape = checkProposalShape(dataset, input, state.draft.startedAt === null);
   if (!shape.ok) return shape;
 
   const season = proposalSeason(input) as number;

@@ -595,7 +595,7 @@ test('the preview reports how a trade changes keeper pick costs', async () => {
   assert.equal(bryan?.detailed, false, 'the other side stays secret before the reveal');
 });
 
-test('the 1st round pick a keeper needs cannot be offered at all', async () => {
+test('a 1st can be offered in the offseason, and the keeper repriced', async () => {
   const player = dataset.players.find(
     (candidate) =>
       candidate.fantasyTeam === 'Amy' && candidate.keeper.eligible && candidate.keeper.round === 1,
@@ -608,10 +608,12 @@ test('the 1st round pick a keeper needs cannot be offered at all', async () => {
     body: JSON.stringify({ selections: [{ playerKey: player.key, playerName: player.name }] }),
   });
 
-  const blocked = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
-  assert.equal(blocked.status, 400);
-  assert.equal(asRecord(blocked.body).code, 'round-protected');
-  assert.equal(await ownerOfPick(1, 'Amy'), 'Amy');
+  // Before the draft starts everything moves, 1st included. Amy keeps a
+  // round-1 player, so the keeper is not blocked, it just costs her next pick
+  // instead. Nothing is final until keepers lock, so she can change her mind.
+  const offered = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(offered.status, 200, 'the offseason lets a 1st move');
+  assert.equal(await ownerOfPick(1, 'Amy'), 'Amy', 'and nothing moves until it is taken');
 });
 
 /* ─── Privacy and commissioner support ─────────────────────────────────── */

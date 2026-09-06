@@ -169,16 +169,20 @@ test('before the draft every pick a team holds in a tradeable round can move', (
   const picks = tradablePicksFor(dataset, state(), 'Amy');
   assert.equal(picks.length, dataset.draftRounds, 'every pick is still listed');
   for (const entry of picks) {
-    const allowed = entry.ref.round >= 3 && entry.ref.round <= dataset.draftRounds;
+    // No draft has started in this fixture, so it is the offseason: all move.
+    const allowed = entry.ref.round >= 1 && entry.ref.round <= dataset.draftRounds;
     assert.equal(entry.tradable, allowed, `round ${entry.ref.round}`);
     if (!allowed) assert.equal(entry.blockedBy, 'round-protected');
   }
 });
 
-test('the 1st and 2nd rounds never move, whoever asks', () => {
+test('the 1st and 2nd move in the offseason but not once the draft is on', () => {
   for (const round of [1, 2]) {
-    const check = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }));
-    assert.equal(check.reason, 'round-protected');
+    const offseason = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), true);
+    assert.notEqual(offseason.reason, 'round-protected', `round ${round} moves before the draft`);
+
+    const live = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), false);
+    assert.equal(live.reason, 'round-protected', `round ${round} is protected once it starts`);
   }
 });
 
@@ -370,10 +374,10 @@ test('keeper names stay hidden from the other side before the reveal', () => {
   assert.ok(kyle.summary.length > 0, 'the other side still gets a plain answer');
 });
 
-test('a round-1 keeper cannot be stranded, because the 1st never moves', () => {
-  // The only pick that pays for a round-1 keeper is the round-1 pick, and the
-  // rule book keeps that off the table. Trying it is refused on the round, not
-  // on the keeper.
+test('a locked round-1 keeper cannot be stranded by trading the 1st', () => {
+  // The 1st moves in the offseason now, so the round rule no longer stops
+  // this. What stops it is the keeper: once keepers are locked, a trade that
+  // would leave somebody unable to pay for one is refused.
   const player = dataset.players.find(
     (candidate) =>
       candidate.fantasyTeam === 'Amy' && candidate.keeper.eligible && candidate.keeper.round === 1,
@@ -393,7 +397,7 @@ test('a round-1 keeper cannot be stranded, because the 1st never moves', () => {
     input({ offer: [ref(1, 'Amy')], request: [ref(7, 'Kyle')] }),
   );
   assert.equal(check.ok, false);
-  assert.equal(check.reason, 'round-protected');
+  assert.equal(check.reason, 'keeper-broken');
 
   // A trade of picks she may trade leaves the keeper intact and goes through.
   assert.equal(checkProposalAgainstState(dataset, locked, input()).ok, true);
@@ -729,7 +733,7 @@ test('next season every team owns its own rounds again, with no slot', () => {
 
   const amy = tradableSeasonPicksFor(dataset, state(), 'Amy', NEXT);
   assert.equal(amy.length, dataset.draftRounds);
-  assert.equal(amy.filter((pick) => pick.tradable).length, 12, 'rounds 3 to 14');
+  assert.equal(amy.filter((pick) => pick.tradable).length, 14, 'a later draft has not started, so all move');
   assert.equal(amy.find((pick) => pick.ref.round === 5)?.label, `Round 5, Oct ${NEXT - 1} draft`);
 });
 
