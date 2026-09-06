@@ -16,8 +16,31 @@ afternoon, not a note in a log.
    `feat/<short-name>`.
 2. Commit there.
 3. `git push -u origin <branch>` then `gh pr create --fill`.
-4. Vercel builds a preview for the branch. Check the change on it.
-5. Merge to master. Merging is what deploys production.
+4. Check the change on localhost. See the note below on previews.
+5. Merge the pull request.
+6. Deploy production as its own step (see below).
+
+### Deploying is a separate step, for now
+
+The Vercel project has **no GitHub link**. Pushing does not build a preview,
+and merging does not deploy. Every deployment so far has come from the CLI.
+
+So after merging, production is still running the old code until somebody
+deploys it:
+
+```bash
+ALLOW_MASTER=1 npm run ship
+```
+
+That is the honest state of things, not the intended one. **Connect the
+project to GitHub** and this gets better in every way: a preview per branch to
+check a change on a real phone, and production deploying itself on merge. It
+needs the Vercel GitHub app authorised on `brey-DWS-CTO/fbb-scores`, which
+only the repo owner can do, in a browser. `vercel git connect` fails until
+then.
+
+Once it is connected, delete this section and put the deploy back where it
+belongs: merging.
 
 Two things are blocked in the primary checkout by
 `.claude/hooks/guard_master.py`, wired up in `.claude/settings.json`:
