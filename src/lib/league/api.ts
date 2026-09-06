@@ -386,12 +386,40 @@ export async function startDraft(c: Credentials): Promise<StateResponse> {
   return data;
 }
 
+/**
+ * Call the draft finished. This is what opens next season's picks for trading,
+ * so the commissioner does it once the last pick is in.
+ */
+export async function closeDraft(c: Credentials): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      if (!s.draft.closedAt) s.draft.closedAt = new Date().toISOString();
+    });
+  }
+  const { data } = await axios.post('/api/league/draft/close', {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** Undo closing the draft. A mistake must not cost anybody a trade window. */
+export async function reopenDraft(c: Credentials): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.draft.closedAt = null;
+    });
+  }
+  const { data } = await axios.post('/api/league/draft/reopen', {}, { headers: authHeaders(c) });
+  return data;
+}
+
 export async function resetDraft(c: Credentials): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       s.draft.picks = {};
       s.draft.startedAt = null;
+      s.draft.closedAt = null;
       s.draft.playerPoolSnapshotId = null;
     });
   }
@@ -969,6 +997,10 @@ export async function closePollById(
 
 export interface PickTradesResponse {
   season: number;
+  /** The one draft whose picks can move right now. */
+  tradeableSeason: number;
+  /** When the commissioner closed the draft, which is what opens next season. */
+  draftClosedAt: string | null;
   proposals: PickTradeProposal[];
   transfers: PickTransfer[];
   you: { owner: string; inbox: number; sent: number };

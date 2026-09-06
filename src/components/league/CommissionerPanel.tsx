@@ -2,12 +2,15 @@ import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import {
   apiErrorMessage,
+  closeDraft,
   fetchPins,
+  reopenDraft,
   resetDraft,
   setKeeperVisibility,
   setLocks,
   setPin,
 } from '../../lib/league/api.js';
+import { draftYearLabel, tradeableSeason } from '../../lib/league/pickTrades.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import ActAsPanel from './ActAsPanel.js';
 import EmailAdmin from './EmailAdmin.js';
@@ -25,7 +28,7 @@ const btnOutline = (color: string): CSSProperties => ({
 
 /** Lock keepers, PIN management, draft reset, TV link — commissioner only. */
 export default function CommissionerPanel() {
-  const { state, meta } = useLeagueData();
+  const { state, meta, dataset } = useLeagueData();
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
 
@@ -35,11 +38,13 @@ export default function CommissionerPanel() {
   const [pinsOpen, setPinsOpen] = useState(false);
   const [pinArm, setPinArm] = useState<string | null>(null);
   const [resetArmed, setResetArmed] = useState(false);
+  const [closeArmed, setCloseArmed] = useState(false);
   const [revealArmed, setRevealArmed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [commishError, setCommishError] = useState<string | null>(null);
 
   const locked = state.locks.keepersLocked;
+  const closed = Boolean(state.draft.closedAt);
   const revealed = meta?.revealed ?? (state.keepersRevealed === true);
   if (!identity?.isCommissioner) return null;
 
@@ -88,6 +93,18 @@ export default function CommissionerPanel() {
       applyState(await resetDraft(identity));
     });
   };
+
+  const doCloseDraft = () => {
+    setCloseArmed(false);
+    void run('close', async () => {
+      applyState(await closeDraft(identity));
+    });
+  };
+
+  const doReopenDraft = () =>
+    void run('close', async () => {
+      applyState(await reopenDraft(identity));
+    });
 
   return (
     <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
@@ -267,6 +284,67 @@ export default function CommissionerPanel() {
               ))}
             </div>
           </>
+        )}
+      </div>
+
+      {/* Close the draft — this is what opens next season's pick trades */}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
+        <div style={{ fontWeight: 700, color: closed ? 'var(--neon-teal)' : 'var(--text-max)' }}>
+          Draft is {closed ? 'FINISHED' : 'ON'}
+        </div>
+        <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginBottom: 8 }}>
+          Teams can trade {draftYearLabel(tradeableSeason(state, dataset))} picks.
+        </div>
+        {closed ? (
+          <button
+            className="tap-btn"
+            onClick={doReopenDraft}
+            disabled={busy !== null}
+            style={btnOutline('var(--neon-yellow)')}
+          >
+            {busy === 'close' ? '…' : 'REOPEN THE DRAFT'}
+          </button>
+        ) : !closeArmed ? (
+          <button
+            className="tap-btn"
+            onClick={() => setCloseArmed(true)}
+            disabled={busy !== null || state.draft.startedAt === null}
+            style={btnOutline('var(--neon-teal)')}
+          >
+            CLOSE THE DRAFT
+          </button>
+        ) : (
+          <div>
+            <div style={{ color: 'var(--neon-yellow)', fontSize: '0.78rem', marginBottom: 8 }}>
+              This ends trading for {draftYearLabel(dataset.season)} picks and opens{' '}
+              {draftYearLabel(dataset.season + 1)} picks. You can undo it.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="tap-btn"
+                onClick={doCloseDraft}
+                disabled={busy !== null}
+                style={{
+                  minHeight: 44,
+                  padding: '0 16px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'var(--neon-teal)',
+                  color: '#001a14',
+                  fontWeight: 800,
+                }}
+              >
+                {busy === 'close' ? 'CLOSING…' : 'YES — IT IS DONE'}
+              </button>
+              <button
+                className="tap-btn"
+                onClick={() => setCloseArmed(false)}
+                style={btnOutline('var(--panel-border)')}
+              >
+                <span style={{ color: 'var(--text-mid)' }}>CANCEL</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
