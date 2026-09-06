@@ -235,6 +235,9 @@ test('an accepted trade is league news and appears in the audit log', async () =
   assert.equal(entry.detail.recipient, 'Kyle');
   assert.ok(entry.detail.acceptedAt);
   assert.deepEqual(entry.detail.offer, [ref(2, 'Amy')]);
+  // The summary is the line a person reads. "R2 for R4" names two different
+  // picks the same way, so it has to carry the exact number.
+  assert.match(String(entry.detail.summary), /^\d+\.\d+ for \d+\.\d+$/);
 });
 
 test('only the recipient can accept, and the commissioner cannot accept for them', async () => {

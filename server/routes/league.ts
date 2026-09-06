@@ -2072,7 +2072,9 @@ router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
       request: proposal.request,
       acceptedAt: proposal.resolvedAt,
       acceptedBy: owner,
-      summary: describeTrade(proposal),
+      // Draft positions decide a pick's slot and never move, so the base
+      // dataset is enough to name the exact picks here.
+      summary: describeTrade(proposal, leagueDataset),
     });
     res.json({
       proposal,
