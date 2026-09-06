@@ -10,9 +10,14 @@ import { leagueDataset } from '../../lib/league/data.js';
  */
 export default function SignInLinkPage() {
   const { token } = useParams<{ token: string }>();
-  const { signInWithSession } = useIdentity();
+  const { identity, signInWithSession } = useIdentity();
   const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whoever this phone was already signed in as when the page opened. Pressing
+  // back lands here again with a token that has been spent, and telling
+  // somebody who is signed in that their link is dead reads as being thrown
+  // out. It is not: the session is untouched.
+  const alreadyIn = useRef(identity !== null);
 
   // A link works once. React runs this effect twice in development, and the
   // second run would burn the token and make a good link look dead.
@@ -26,7 +31,15 @@ export default function SignInLinkPage() {
         signInWithSession(result);
         setSignedIn(true);
       })
-      .catch((caught: unknown) => setError(apiErrorMessage(caught)));
+      .catch((caught: unknown) => {
+        // A spent token in the hands of somebody already signed in is the back
+        // button, not a problem. Send them on instead of scaring them.
+        if (alreadyIn.current) {
+          setSignedIn(true);
+          return;
+        }
+        setError(apiErrorMessage(caught));
+      });
   }, [token, signInWithSession]);
 
   // Home sends a signed-in owner straight on to their keeper worksheet.
@@ -61,7 +74,7 @@ export default function SignInLinkPage() {
                 Links run out after 15 minutes and work once. Ask for a fresh one.
               </p>
               <Link className="tap-btn identity-submit identity-link-btn" to="/">
-                BACK TO SIGN IN
+                GET A NEW LINK
               </Link>
             </div>
           ) : (
