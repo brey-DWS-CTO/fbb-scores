@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
 import { leagueDataset, OWNERS } from '../../lib/league/data.js';
+import NavIcon from '../league/NavIcon.js';
 import { cellDisplay, positionTheme } from './boardUtils.js';
 
 interface Props {
@@ -235,13 +236,18 @@ function GridCell({
             top: 1,
             right: 3,
             display: 'inline-flex',
+            alignItems: 'center',
             gap: 2,
             fontSize: tv ? 'clamp(7px, 0.75vw, 11px)' : 9,
             lineHeight: 1.4,
           }}
         >
           {traded && <span style={{ color: 'var(--neon-yellow)' }}>▲</span>}
-          {d?.isKeeper && <span style={{ opacity: 0.9 }}>🔒</span>}
+          {d?.isKeeper && (
+            <span style={{ opacity: 0.9, display: 'inline-flex' }}>
+              <NavIcon name="lock" size={tv ? 12 : 11} label="Keeper" />
+            </span>
+          )}
         </span>
       )}
       {d ? (

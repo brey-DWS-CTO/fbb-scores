@@ -7,6 +7,7 @@ import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/u
 import PlayerCombobox from './PlayerCombobox.js';
 import CommissionerPanel from './CommissionerPanel.js';
 import IdentityChip from './IdentityChip.js';
+import NavIcon from './NavIcon.js';
 import PlayerPoolAdmin from './PlayerPoolAdmin.js';
 import TeamNameAdmin from './TeamNameAdmin.js';
 import HistoryAdmin from './HistoryAdmin.js';
@@ -102,7 +103,8 @@ export default function AdminPage() {
           className="hub-heading glow-yellow"
           style={{ fontSize: '0.85rem', color: 'var(--neon-yellow)', margin: 0, lineHeight: 1.6 }}
         >
-          👑 COMMISH MODE
+          <NavIcon name="crown" size={16} className="icon-in-heading" />
+          COMMISH MODE
         </h1>
         <IdentityChip />
       </div>
@@ -110,7 +112,10 @@ export default function AdminPage() {
         Tier + cap tweaks live here. Changes apply league-wide instantly and are audit-logged.
       </div>
       {error && (
-        <div style={{ color: 'var(--neon-red)', fontSize: '0.82rem', marginBottom: 12 }}>⚠ {error}</div>
+        <div style={{ color: 'var(--neon-red)', fontSize: '0.82rem', marginBottom: 12 }}>
+          <NavIcon name="warning" size={15} className="icon-in-heading" />
+          {error}
+        </div>
       )}
 
       <CommissionerPanel />
@@ -123,7 +128,10 @@ export default function AdminPage() {
 
       <section className="panel commish-schedule-link">
         <div>
-          <div className="hub-heading">📅 SCHEDULE</div>
+          <div className="hub-heading">
+            <NavIcon name="calendar" size={14} className="icon-in-heading" />
+            SCHEDULE
+          </div>
           <p>Review the 2027 NBA grid, Play-In weeks, playoff totals, and accepted snapshots.</p>
         </div>
         <Link className="tap-btn" to="/schedule">OPEN SCHEDULE →</Link>
@@ -140,7 +148,8 @@ export default function AdminPage() {
         }}
       >
         <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)', marginBottom: 6 }}>
-          🧪 TEST MODE
+          <NavIcon name="flask" size={13} className="icon-in-heading" />
+          TEST MODE
         </div>
         <div style={{ color: 'var(--text-mid)', fontSize: '0.75rem', marginBottom: 10 }}>
           A sandbox copy of the league, only on this device: fill in anyone's keepers, start the
@@ -543,7 +552,19 @@ export default function AdminPage() {
                       </span>
                     )}
                     {overridden && (
-                      <span style={{ color: 'var(--neon-yellow)', fontSize: '0.65rem', flexShrink: 0 }}>✎ override</span>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          color: 'var(--neon-yellow)',
+                          fontSize: '0.65rem',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <NavIcon name="pencil" size={12} />
+                        override
+                      </span>
                     )}
                   </span>
                   <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-body)', flexShrink: 0 }}>

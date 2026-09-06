@@ -2782,6 +2782,32 @@ th.schedule-col-active {
 }
 .schedule-trend-summary b { color: var(--neon-orange); }
 
+/* ─── Drawn icons in place of emoji ─────────────────────────────────── */
+/* Every icon is an SVG from NavIcon, so a line that used to hold an emoji
+   now needs to line the icon up with its words. */
+.nav-icon {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.splash-feature-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* An icon that opens a heading or a line of running text. Tailwind's reset
+   makes every svg a block, so these have to go back to inline, and the
+   negative vertical-align keeps the words on their own baseline. */
+.icon-in-heading {
+  display: inline-block;
+  margin-right: 0.42em;
+  vertical-align: -0.16em;
+}
+.icon-after-heading {
+  display: inline-block;
+  margin-left: 0.42em;
+  vertical-align: -0.16em;
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

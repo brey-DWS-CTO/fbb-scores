@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
+import NavIcon from './NavIcon.js';
 import EarlierTrades from './EarlierTrades.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { OWNERS } from '../../lib/league/data.js';
@@ -553,7 +554,10 @@ export default function TradesPage() {
     <main className="rules-page">
       <header className="rules-page-header">
         <div>
-          <h1 className="hub-heading glow-yellow">🔁 PICK TRADES</h1>
+          <h1 className="hub-heading glow-yellow">
+            <NavIcon name="swap" size={18} className="icon-in-heading" />
+            PICK TRADES
+          </h1>
           <p>Swap draft picks with one other team. Picks only, nothing else.</p>
         </div>
         <IdentityChip />

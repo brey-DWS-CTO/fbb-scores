@@ -17,6 +17,7 @@ import {
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
+import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
@@ -143,7 +144,10 @@ function PickRow({
         )}
         {cell.keeper && d ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: '#fff', fontWeight: 700 }}>🔒 {d.name}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#fff', fontWeight: 700 }}>
+              <NavIcon name="lock" size={14} label="Keeper" />
+              {d.name}
+            </span>
             <span
               style={{
                 color: d.color,
@@ -300,7 +304,8 @@ export default function DraftPage() {
             fontWeight: 700,
           }}
         >
-          📺 TV
+          <NavIcon name="tv" size={15} className="icon-in-heading" />
+          TV
         </Link>
       </div>
 
@@ -352,7 +357,8 @@ export default function DraftPage() {
             </div>
             {meta && (
               <div style={{ color: 'var(--text-soft)', margin: '8px 0', fontSize: '0.9rem' }}>
-                🗓️ <strong>{formatDraftAt(meta.draftAt)}</strong>
+                <NavIcon name="calendar" size={16} className="icon-in-heading" />
+                <strong>{formatDraftAt(meta.draftAt)}</strong>
               </div>
             )}
             <div style={{ margin: '12px 0 4px' }}>
@@ -449,7 +455,8 @@ export default function DraftPage() {
             className="hub-heading glow-yellow"
             style={{ fontSize: '0.9rem', color: 'var(--neon-yellow)', textAlign: 'center', padding: '10px 0' }}
           >
-            DRAFT COMPLETE 🏆
+            DRAFT COMPLETE
+            <NavIcon name="trophy" size={17} className="icon-after-heading" />
           </div>
         )}
       </div>

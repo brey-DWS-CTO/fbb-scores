@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
+import NavIcon from './NavIcon.js';
 import ScheduleAdmin from './ScheduleAdmin.js';
 
 /** /schedule — commissioner-only NBA schedule workspace. */
@@ -27,7 +28,10 @@ export default function SchedulePage() {
       <header className="schedule-page-header">
         <div>
           <Link className="schedule-back-link" to="/admin">← COMMISH MODE</Link>
-          <h1 className="hub-heading glow-orange">📅 SCHEDULE</h1>
+          <h1 className="hub-heading glow-orange">
+            <NavIcon name="calendar" size={18} className="icon-in-heading" />
+            SCHEDULE
+          </h1>
           <p>NBA games by fantasy period, plus Play-In and playoff totals.</p>
         </div>
         <IdentityChip />

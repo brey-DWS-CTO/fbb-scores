@@ -5,6 +5,7 @@ import { useDraftData } from '../../hooks/useLeague.js';
 import { sandboxActive } from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
+import NavIcon from '../league/NavIcon.js';
 import BoardGrid from './BoardGrid.js';
 import { recentPicks } from './boardUtils.js';
 
@@ -136,7 +137,12 @@ export default function DraftTvPage() {
               className="hub-heading glow-yellow"
               style={{ color: 'var(--neon-yellow)', fontSize: 'clamp(1rem, 3.5vh, 2.4rem)' }}
             >
-              DRAFT COMPLETE 🏆
+              DRAFT COMPLETE
+              <NavIcon
+                name="trophy"
+                size="clamp(1rem, 3.5vh, 2.4rem)"
+                className="icon-after-heading"
+              />
             </div>
           )}
         </div>
@@ -151,7 +157,12 @@ export default function DraftTvPage() {
                 letterSpacing: '0.05em',
               }}
             >
-              🧪 TEST MODE
+              <NavIcon
+                name="flask"
+                size="clamp(0.65rem, 1.6vh, 0.95rem)"
+                className="icon-in-heading"
+              />
+              TEST MODE
             </div>
           )}
           {last && (
