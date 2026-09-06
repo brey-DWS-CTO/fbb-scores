@@ -60,9 +60,17 @@ export const MAX_PICKS_AWAY_PER_SEASON = 2;
 /** Most picks one team may hold in a single round of one draft. */
 export const MAX_PICKS_PER_ROUND = 2;
 
-/** The last round a team may trade. Keeper tiers span rounds 1-10. */
-export function lastTradeableRound(dataset: Pick<LeagueDataset, 'keeperRounds'>): number {
-  return dataset.keeperRounds;
+/**
+ * The last round a team may trade.
+ *
+ * The rule book says rounds 3 through 10, which is where the keeper tiers
+ * stop. The commissioner opened rounds 11 to 14 as well: they carry no keeper
+ * tier, so moving one cannot change what anybody's keepers cost. The app is
+ * ahead of the written rule here on purpose. See issue `picktrade-late-rounds`
+ * in the rule book, which is waiting on a vote to catch the wording up.
+ */
+export function lastTradeableRound(dataset: Pick<LeagueDataset, 'draftRounds'>): number {
+  return dataset.draftRounds;
 }
 
 /* ------------------------------------------------------------------ */
