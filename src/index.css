@@ -787,27 +787,6 @@ html.theme-light .more-item.active { background: rgba(0, 128, 106, 0.08); }
   margin-bottom: 14px;
   border-radius: 12px;
 }
-.schedule-legend {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin-top: 13px;
-  color: var(--text-dim);
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-.schedule-legend > span { display: inline-flex; align-items: center; gap: 5px; }
-.schedule-legend > span:first-child { color: var(--text-mid); }
-.schedule-legend b {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
-  font-size: 0.7rem;
-}
 .schedule-table-scroll {
   position: relative;
   max-height: min(68vh, 720px);
@@ -953,9 +932,13 @@ html.theme-light .more-item.active { background: rgba(0, 128, 106, 0.08); }
 .schedule-grid-table thead th,
 .schedule-summary-table thead th { height: 44px; }
 .schedule-sort-caret { color: var(--neon-orange); font-size: 0.6rem; line-height: 1; }
-th.schedule-col-active { color: var(--neon-orange) !important; font-weight: 900; }
-th.schedule-col-active,
-td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
+/* The sort bar names the sorted column and the head carries a caret, so the
+   head only needs an underline. Boxing every cell made the grid look broken. */
+th.schedule-col-active {
+  color: var(--neon-orange) !important;
+  font-weight: 900;
+  box-shadow: inset 0 -2px 0 var(--neon-orange);
+}
 /* Phone stand-ins. The desktop columns carry this text, so they stay hidden. */
 .schedule-head-short,
 .schedule-period-short,
@@ -1010,7 +993,6 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
   .schedule-summary-table th,
   .schedule-summary-table td { min-width: 44px; }
   .schedule-summary-table .schedule-summary-cell { font-size: 0.84rem; }
-  .schedule-legend { font-size: 0.64rem; gap: 9px 13px; }
   .schedule-scroll-hint {
     display: block;
     margin: 8px 0 0;
@@ -2723,6 +2705,82 @@ td.schedule-col-active { box-shadow: inset 0 0 0 2px var(--neon-orange); }
   letter-spacing: 0.06em;
   text-decoration: none;
 }
+
+/* ─── Games per week trend chart ─────────────────────────────────────── */
+.schedule-trend {
+  margin-top: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  background: var(--cell-bg);
+  overflow: hidden;
+}
+.schedule-trend-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  text-align: left;
+}
+.schedule-trend-title {
+  color: var(--neon-teal);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.schedule-trend-caret { color: var(--text-dim); font-size: 0.6rem; }
+.schedule-trend-body { padding: 0 4px 10px; }
+.schedule-trend-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.schedule-trend-gridline,
+.schedule-trend-baseline { stroke: var(--panel-border); stroke-width: 1; }
+.schedule-trend-average {
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.schedule-trend-area { fill: var(--neon-teal); fill-opacity: 0.12; }
+.schedule-trend-line {
+  fill: none;
+  stroke: var(--neon-teal);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.schedule-trend-dot { fill: var(--neon-teal); }
+.schedule-trend-dot-edge { fill: var(--neon-orange); }
+.schedule-trend-axis {
+  fill: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+}
+.schedule-trend-week {
+  fill: var(--text-mid);
+  font-size: 9px;
+  font-weight: 700;
+}
+.schedule-trend-value {
+  fill: var(--neon-orange);
+  font-size: 11px;
+  font-weight: 900;
+}
+.schedule-trend-summary {
+  margin: 6px 8px 0;
+  color: var(--text-mid);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.schedule-trend-summary b { color: var(--neon-orange); }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
