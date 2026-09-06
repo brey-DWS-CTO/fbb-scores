@@ -15,6 +15,12 @@ export interface PickTrade {
   round: number;
   from: string; // owner giving the pick up
   to: string; // owner receiving it
+  /**
+   * Which draft the pick belongs to. Absent on the committed preseason seed and
+   * on every row written before picks became season-aware, where it means the
+   * current season. Read it with `pickSeason`, never bare.
+   */
+  season?: number;
   tradeNote?: string;
   /**
    * Which team's own pick this is. Absent on the committed preseason seed,
@@ -134,6 +140,12 @@ export interface LeagueDynamicState {
   draft: {
     picks: Record<string, DraftPickState>;
     startedAt: string | null;
+    /**
+     * When the commissioner called the draft finished. Null or absent means it
+     * is still running. Closing it is what makes next season's picks tradeable,
+     * and the commissioner can clear it again if they close one by mistake.
+     */
+    closedAt?: string | null;
     /** Pool frozen when the commissioner starts the draft. */
     playerPoolSnapshotId?: string | null;
   };
@@ -159,14 +171,26 @@ export interface LeagueDynamicState {
 
 /* ---------- member-to-member pick trades ---------- */
 
-/** A pick's stable identity within a season: its round and the team it came from. */
+/**
+ * A pick's stable identity: the draft it belongs to, its round, and the team it
+ * came from. None of the three ever changes.
+ *
+ * `season` is the season whose draft the pick is in, so a 2027 pick and a 2028
+ * pick of the same round and owner are two different assets. Rows saved before
+ * picks became season-aware carry no season and mean the current one; read them
+ * through `pickSeason` in `league/pickTrades`, never bare.
+ */
 export interface PickRef {
+  season: number;
   round: number;
   originalOwner: string;
 }
 
+/** A pick exactly as it may sit in stored state: old rows have no season. */
+export type StoredPickRef = Omit<PickRef, 'season'> & { season?: number };
+
 /** One accepted move of one pick. Immutable once written. */
-export interface PickTransfer extends PickRef {
+export interface PickTransfer extends StoredPickRef {
   from: string;
   to: string;
   proposalId: string;
@@ -206,6 +230,8 @@ export interface PickTradeProposal {
 /* ---------- engine outputs ---------- */
 
 export interface PickSlot {
+  /** The season whose draft this slot is in. Always the current one. */
+  season: number;
   round: number;
   slot: number; // 1-10 position within the round (serpentine applied)
   overall: number;

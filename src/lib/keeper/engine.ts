@@ -189,7 +189,26 @@ export function pickLabel(pick: PickSlot): string {
   return `${pick.round}.${pick.slot}`;
 }
 
-/** All picks in the draft with trade-adjusted ownership, ordered by overall. */
+/**
+ * Which draft a trade row is for. Rows written before picks became season-aware
+ * carry no season and are all for the current draft.
+ */
+export function tradeSeason(trade: { season?: number }, dataset: LeagueDataset): number {
+  return trade.season ?? dataset.season;
+}
+
+/** Trade rows that move a pick in the draft this dataset describes. */
+export function currentSeasonTrades(dataset: LeagueDataset) {
+  return dataset.pickTrades.filter((trade) => tradeSeason(trade, dataset) === dataset.season);
+}
+
+/**
+ * All picks in the draft with trade-adjusted ownership, ordered by overall.
+ *
+ * This is the current draft board and nothing else. A pick in a later season's
+ * draft has no slot, because that draft order does not exist yet, so trades for
+ * a later season are skipped here on purpose.
+ */
 export function buildAllPicks(dataset: LeagueDataset): PickSlot[] {
   const teams = [...dataset.teams].sort((a, b) => a.draftPosition - b.draftPosition);
   const byOwner = new Map(teams.map((t) => [t.owner, t]));
@@ -198,6 +217,7 @@ export function buildAllPicks(dataset: LeagueDataset): PickSlot[] {
     for (const t of teams) {
       const slot = slotFor(r, t.draftPosition, teams.length);
       picks.push({
+        season: dataset.season,
         round: r,
         slot,
         overall: overallFor(r, slot, teams.length),
@@ -210,7 +230,7 @@ export function buildAllPicks(dataset: LeagueDataset): PickSlot[] {
   // last one wins. The seed records name only `from`, which is also the team
   // the pick came from; in-app transfers name `originalOwner` explicitly
   // because by then `from` is a later holder.
-  for (const trade of dataset.pickTrades) {
+  for (const trade of currentSeasonTrades(dataset)) {
     if (!byOwner.has(trade.from) || !byOwner.has(trade.to)) continue;
     const origin = trade.originalOwner ?? trade.from;
     const pick = picks.find((p) => p.round === trade.round && p.originalOwner === origin);
@@ -361,8 +381,9 @@ export function resolveTeamKeepers(
         bumped = true;
         // Only giving away your OWN round-N pick makes this a traded bump. A
         // pick you acquired and then passed on does not, because your own is
-        // still on the board.
-        const tradedAway = dataset.pickTrades.some(
+        // still on the board. Trades for a later season's draft are not this
+        // draft's business and never change what a keeper costs here.
+        const tradedAway = currentSeasonTrades(dataset).some(
           (t) => t.round === round && t.from === owner && (t.originalOwner ?? t.from) === owner,
         );
         bumpReason = sameTier && !tradedAway ? 'duplicate' : 'traded';

@@ -30,10 +30,12 @@ import {
   inboxCount,
   involves,
   MAX_TRADE_NOTE,
+  normalizeProposal,
   previewProposal,
   proposalInput,
   proposalsOf,
   touchesRef,
+  tradeableSeason,
   transfersForProposal,
   transfersOf,
   visibleProposals,
@@ -348,6 +350,9 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
   return {
     pendingTrades: inboxCount(proposals, viewer.owner),
     draftAt: DRAFT_AT_ISO,
+    /** The one draft whose picks can be traded right now. */
+    tradeableSeason: tradeableSeason(state, leagueDataset),
+    draftClosedAt: state.draft.closedAt ?? null,
     revealed,
     keeperStatus,
     playerPool: {
@@ -865,6 +870,36 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
 });
 
 /**
+ * POST /api/league/draft/close — call the draft finished (commissioner only).
+ *
+ * This is what opens next season's picks for trading. Rule 4.4.1.3 allows
+ * exactly one draft to be tradeable at a time, so the current draft's picks
+ * stop moving the moment this lands.
+ */
+router.post('/draft/close', requireAuth, requireCommissioner, async (_req, res) => {
+  const result = await mutateState((draft) => {
+    if (draft.draft.startedAt === null) {
+      throw new HttpError(409, 'Start the draft before closing it');
+    }
+    if (!draft.draft.closedAt) draft.draft.closedAt = new Date().toISOString();
+  });
+  await appendAudit(actor(res), 'draft.closed', { closedAt: result.state.draft.closedAt });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/draft/reopen — undo closing the draft (commissioner only).
+ * Closing it by mistake must not cost anybody next season's pick trades.
+ */
+router.post('/draft/reopen', requireAuth, requireCommissioner, async (_req, res) => {
+  const result = await mutateState((draft) => {
+    draft.draft.closedAt = null;
+  });
+  await appendAudit(actor(res), 'draft.reopened', null);
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
  * POST /api/league/draft/reset — clear all picks + startedAt, keep keepers
  * (commissioner only).
  */
@@ -872,6 +907,7 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
   const result = await mutateState((draft) => {
     draft.draft.picks = {};
     draft.draft.startedAt = null;
+    draft.draft.closedAt = null;
     draft.draft.playerPoolSnapshotId = null;
   });
   await appendAudit(actor(res), 'draft.reset', null);
@@ -1741,7 +1777,11 @@ interface TradeOutcome {
   refusal?: { status: number; message: string; code?: string };
 }
 
-function parsePickRefs(value: unknown, label: string): PickRef[] {
+/**
+ * Picks from a request body. A client that names no season means the current
+ * draft, which is what every pick meant before picks became season-aware.
+ */
+function parsePickRefs(value: unknown, label: string, defaultSeason: number): PickRef[] {
   if (!Array.isArray(value)) throw new HttpError(400, `${label} must be a list of picks`);
   return value.map((raw) => {
     const entry = (raw ?? {}) as Record<string, unknown>;
@@ -1750,10 +1790,16 @@ function parsePickRefs(value: unknown, label: string): PickRef[] {
       || !Number.isInteger(entry.round)
       || typeof entry.originalOwner !== 'string'
       || entry.originalOwner === ''
+      || (entry.season !== undefined
+        && (typeof entry.season !== 'number' || !Number.isInteger(entry.season)))
     ) {
       throw new HttpError(400, `Each ${label} pick needs a round and the team it came from`);
     }
-    return { round: entry.round, originalOwner: entry.originalOwner };
+    return {
+      season: (entry.season as number | undefined) ?? defaultSeason,
+      round: entry.round,
+      originalOwner: entry.originalOwner,
+    };
   });
 }
 
@@ -1770,12 +1816,18 @@ router.get('/pick-trades', requireAuth, async (_req, res, next) => {
     const owner = res.locals.owner as string;
     const isCommish = res.locals.isCommissioner === true;
     const { state } = await getState();
-    const proposals = expireStale(proposalsOf(state), new Date().toISOString()).proposals;
+    const proposals = expireStale(
+      proposalsOf(state, leagueDataset.season),
+      new Date().toISOString(),
+    ).proposals;
     const visible = visibleProposals(proposals, owner, isCommish);
     res.json({
       season: state.season,
+      /** The one draft whose picks can move right now. */
+      tradeableSeason: tradeableSeason(state, leagueDataset),
+      draftClosedAt: state.draft.closedAt ?? null,
       proposals: visible,
-      transfers: transfersOf(state),
+      transfers: transfersOf(state, leagueDataset.season),
       you: {
         owner,
         inbox: inboxCount(visible, owner),
@@ -1806,13 +1858,13 @@ router.post('/pick-trades/preview', requireAuth, async (req, res, next) => {
       if (!involves(proposal, owner)) {
         throw new HttpError(403, 'That offer is between two other members');
       }
-      input = proposalInput(proposal);
+      input = proposalInput(normalizeProposal(proposal, leagueDataset.season));
     } else {
       input = {
         proposer: owner,
         recipient: typeof body.recipient === 'string' ? body.recipient : '',
-        offer: parsePickRefs(body.offer, 'offer'),
-        request: parsePickRefs(body.request, 'request'),
+        offer: parsePickRefs(body.offer, 'offer', leagueDataset.season),
+        request: parsePickRefs(body.request, 'request', leagueDataset.season),
         note: '',
       };
     }
@@ -1838,8 +1890,8 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
     const input: ProposalInput = {
       proposer,
       recipient: typeof body.recipient === 'string' ? body.recipient : '',
-      offer: parsePickRefs(body.offer, 'offer'),
-      request: parsePickRefs(body.request, 'request'),
+      offer: parsePickRefs(body.offer, 'offer', leagueDataset.season),
+      request: parsePickRefs(body.request, 'request', leagueDataset.season),
       note: typeof body.note === 'string' ? body.note.trim().slice(0, MAX_TRADE_NOTE) : '',
     };
 
