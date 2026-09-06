@@ -69,8 +69,11 @@ export const MAX_PICKS_PER_ROUND = 2;
  * ahead of the written rule here on purpose. See issue `picktrade-late-rounds`
  * in the rule book, which is waiting on a vote to catch the wording up.
  */
-export function lastTradeableRound(dataset: Pick<LeagueDataset, 'draftRounds'>): number {
-  return dataset.draftRounds;
+export function lastTradeableRound(
+  dataset: Pick<LeagueDataset, 'draftRounds' | 'keeperRounds'>,
+  offseason = false,
+): number {
+  return offseason ? dataset.draftRounds : dataset.keeperRounds;
 }
 
 /* ------------------------------------------------------------------ */
@@ -483,7 +486,7 @@ export function isTradeableRound(
   offseason = false,
 ): boolean {
   const first = offseason ? 1 : FIRST_TRADEABLE_ROUND;
-  return round >= first && round <= lastTradeableRound(dataset);
+  return round >= first && round <= lastTradeableRound(dataset, offseason);
 }
 
 export interface TradablePick {
@@ -543,7 +546,11 @@ function blockFor(
   draftLive: boolean,
 ): PickBlock | undefined {
   if (drafted) return 'drafted';
-  if (draftLive && holdsKeeper) return 'keeper';
+  // A pick a keeper is paying with is spoken for, draft or no draft. Trading
+  // it used to quietly move the keeper onto a BETTER pick, which is a penalty
+  // the rule book never wrote down. Take the keeper off first if you want the
+  // pick back.
+  if (holdsKeeper) return 'keeper';
   if (!isTradeableRound(dataset, round, !draftLive)) return 'round-protected';
   return undefined;
 }
@@ -708,8 +715,8 @@ export function checkProposalShape(
     if (!isTradeableRound(dataset, ref.round, offseason)) {
       return refuse(
         'round-protected',
-        `Only rounds ${FIRST_TRADEABLE_ROUND} to ${lastTradeableRound(dataset)} can be traded `
-        + 'once the draft has started.',
+        `Only rounds ${FIRST_TRADEABLE_ROUND} to ${lastTradeableRound(dataset, false)} `
+        + 'can be traded once the draft has started.',
       );
     }
     if (seen.has(pickRefKey(ref))) {
@@ -862,12 +869,16 @@ export function checkProposalAgainstState(
       if (!cell) continue; // A future draft has no board, so nothing can be used.
       const entry = toTradablePick(dataset, cell, live);
       if (!entry.tradable) {
+        if (entry.blockedBy === 'drafted') {
+          return refuse('pick-used', `Pick ${entry.label} has already been used in the draft.`, true);
+        }
+        // Naming the pick would tell the other side which tier a hidden keeper
+        // is on. Once keepers are out there is nothing left to give away.
         return refuse(
           'pick-used',
-          entry.blockedBy === 'drafted'
-            ? `Pick ${entry.label} has already been used in the draft.`
-            : `Pick ${entry.label} is holding a keeper, so it cannot move.`,
-          entry.blockedBy === 'drafted',
+          state.keepersRevealed === true
+            ? `Pick ${entry.label} is paying for a keeper. Take the keeper off first.`
+            : 'One of those picks is paying for a keeper. Take the keeper off first.',
         );
       }
     }

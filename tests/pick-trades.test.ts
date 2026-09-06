@@ -186,13 +186,15 @@ test('the 1st and 2nd move in the offseason but not once the draft is on', () =>
   }
 });
 
-test('the late rounds move, even though they have no keeper tier', () => {
+test('the late rounds move in the offseason only', () => {
   // The commissioner opened rounds past the keeper tiers. They carry no tier,
   // so moving one cannot change what anybody's keepers cost. The rule book
   // still says 3 to 10; see issue picktrade-late-rounds.
   for (const round of [11, 12, 13, 14]) {
-    const check = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }));
-    assert.notEqual(check.reason, 'round-protected', `round ${round} should move`);
+    const check = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), true);
+    assert.notEqual(check.reason, 'round-protected', `round ${round} moves before the draft`);
+    const inSeason = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), false);
+    assert.equal(inSeason.reason, 'round-protected', `round ${round} is off once the draft starts`);
   }
 });
 
@@ -311,8 +313,8 @@ test('a pick already used in the draft cannot be traded', () => {
 
 /* ─── Keeper costs ─────────────────────────────────────────────────────── */
 
-test('the preview shows a keeper paying a different pick after a trade', () => {
-  // Give Amy a keeper, then trade away the pick that keeper would use.
+test('the pick a keeper is paying with cannot be traded away', () => {
+  // Give Amy a keeper, then try to trade away the pick that keeper uses.
   const player = dataset.players.find(
     (candidate) =>
       candidate.fantasyTeam === 'Amy'
@@ -343,13 +345,25 @@ test('the preview shows a keeper paying a different pick after a trade', () => {
     { owner: 'Amy', isCommissioner: false, revealed: true },
   );
 
-  assert.equal(preview.check.ok, true);
-  const amy = preview.sides.find((side) => side.owner === 'Amy');
-  assert.ok(amy);
-  assert.equal(amy.changes.length, 1, 'one keeper changes what it costs');
-  assert.equal(amy.changes[0].beforePick, pickLabel(before.keepers[0].pick!));
-  assert.notEqual(amy.changes[0].afterPick, amy.changes[0].beforePick);
-  assert.equal(amy.changes[0].afterBump, 'traded');
+  // It used to go through and quietly move the keeper onto a better pick, a
+  // penalty the rule book never wrote down. Now it is refused, and Amy can
+  // free the pick by dropping the keeper.
+  assert.equal(preview.check.ok, false);
+  assert.equal(preview.check.reason, 'pick-used');
+  assert.match(String(preview.check.message), /paying for a keeper/);
+
+  const noKeeper = state({ keepers: { Amy: [] }, keepersRevealed: true });
+  const freed = previewProposal(
+    dataset,
+    noKeeper,
+    input({
+      recipient: 'Bryan',
+      offer: [ref(round, 'Amy')],
+      request: [ref(round + 1, 'Bryan')],
+    }),
+    { owner: 'Amy', isCommissioner: false, revealed: true },
+  );
+  assert.equal(freed.check.ok, true, 'dropping the keeper frees the pick');
 });
 
 test('keeper names stay hidden from the other side before the reveal', () => {
@@ -397,7 +411,9 @@ test('a locked round-1 keeper cannot be stranded by trading the 1st', () => {
     input({ offer: [ref(1, 'Amy')], request: [ref(7, 'Kyle')] }),
   );
   assert.equal(check.ok, false);
-  assert.equal(check.reason, 'keeper-broken');
+  // Caught on the pick now, before the keeper engine is even asked: the pick
+  // is paying for a keeper, so it does not move at all.
+  assert.equal(check.reason, 'pick-used');
 
   // A trade of picks she may trade leaves the keeper intact and goes through.
   assert.equal(checkProposalAgainstState(dataset, locked, input()).ok, true);
