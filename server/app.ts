@@ -13,6 +13,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import espnRoutes from './routes/espn.js';
 import leagueRoutes from './routes/league.js';
+import notifyRoutes from './routes/notify.js';
 
 const app = express();
 
@@ -27,5 +28,6 @@ app.use(express.json({ limit: '4mb' }));
 app.use('/api', espnRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/league', leagueRoutes);
+app.use('/api/notify', notifyRoutes);
 
 export default app;
