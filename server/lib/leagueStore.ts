@@ -69,6 +69,8 @@ export interface LeagueDynamicState {
   draft: {
     picks: Record<string, DraftPickState>; // key = String(overallPick)
     startedAt: string | null;
+    /** When the commissioner called the draft finished; null while it runs. */
+    closedAt?: string | null;
     playerPoolSnapshotId?: string | null;
   };
   playerPool?: {
@@ -317,7 +319,7 @@ function defaultState(): LeagueDynamicState {
     season: SEASON,
     keepers: {},
     keepersRevealed: false,
-    draft: { picks: {}, startedAt: null },
+    draft: { picks: {}, startedAt: null, closedAt: null },
     locks: { keepersLocked: false },
     pickTransfers: [],
     pickTradeProposals: [],

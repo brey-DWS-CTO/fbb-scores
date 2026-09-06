@@ -55,7 +55,14 @@ async function request(
 
 const asRecord = (body: unknown) => body as Record<string, unknown>;
 
-const ref = (round: number, originalOwner: string): PickRef => ({ round, originalOwner });
+const SEASON = dataset.season;
+const NEXT = SEASON + 1;
+
+const ref = (round: number, originalOwner: string, season = SEASON): PickRef => ({
+  season,
+  round,
+  originalOwner,
+});
 
 function propose(
   proposer: string,
@@ -86,6 +93,26 @@ const settle = (owner: string, id: string, action: 'reject' | 'cancel') =>
   });
 
 const list = (owner: string) => request('/api/league/pick-trades', { headers: auth(owner) });
+
+/**
+ * Start the draft with rounds 1 and 2 already in the books, so the pick on the
+ * clock sits in a round the rule book actually lets teams trade.
+ */
+async function startDraftMidway(): Promise<void> {
+  await store.mutateState((draft: LeagueDynamicState) => {
+    draft.keepersRevealed = true;
+    draft.draft.startedAt = new Date().toISOString();
+    for (let overall = 1; overall <= 20; overall++) {
+      draft.draft.picks[String(overall)] = {
+        playerKey: `taken-${overall}`,
+        playerName: `Taken ${overall}`,
+      };
+    }
+  });
+}
+
+/** A trade partner who has not already used up a round or a trade-away slot. */
+const partnerFor = (holder: string) => (holder === 'Bryan' ? 'Dustin' : 'Bryan');
 
 /** Who owns a pick according to what the server has stored. */
 async function ownerOfPick(round: number, originalOwner: string): Promise<string | undefined> {
@@ -135,7 +162,7 @@ beforeEach(async () => {
   await store.mutateState((draft: LeagueDynamicState) => {
     draft.keepers = {};
     draft.keepersRevealed = false;
-    draft.draft = { picks: {}, startedAt: null };
+    draft.draft = { picks: {}, startedAt: null, closedAt: null };
     draft.locks = { keepersLocked: false };
     draft.pickTransfers = [];
     draft.pickTradeProposals = [];
@@ -145,7 +172,7 @@ beforeEach(async () => {
 /* ─── Sending an offer ─────────────────────────────────────────────────── */
 
 test('a member offers picks and both sides see it', async () => {
-  const created = await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')]);
+  const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
   assert.equal(created.status, 200);
   const proposal = asRecord(created.body).proposal as PickTradeProposal;
   assert.equal(proposal.proposer, 'Amy');
@@ -170,7 +197,7 @@ test('the server takes the proposer from the PIN, never from the body', async ()
     body: JSON.stringify({
       proposer: 'Joel',
       recipient: 'Kyle',
-      offer: [ref(2, 'Joel')],
+      offer: [ref(7, 'Joel')],
       request: [ref(4, 'Kyle')],
       note: '',
     }),
@@ -184,14 +211,14 @@ test('signing in is required', async () => {
   const anon = await request('/api/league/pick-trades', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ recipient: 'Kyle', offer: [ref(2, 'Amy')], request: [ref(4, 'Kyle')] }),
+    body: JSON.stringify({ recipient: 'Kyle', offer: [ref(7, 'Amy')], request: [ref(4, 'Kyle')] }),
   });
   assert.equal(anon.status, 401);
 });
 
 test('both sides need a pick and the picks must exist', async () => {
   assert.equal((await propose('Amy', 'Kyle', [], [ref(4, 'Kyle')])).status, 400);
-  assert.equal((await propose('Amy', 'Amy', [ref(2, 'Amy')], [ref(4, 'Amy')])).status, 400);
+  assert.equal((await propose('Amy', 'Amy', [ref(7, 'Amy')], [ref(4, 'Amy')])).status, 400);
   assert.equal((await propose('Amy', 'Kyle', [ref(99, 'Amy')], [ref(4, 'Kyle')])).status, 400);
 });
 
@@ -199,14 +226,14 @@ test('both sides need a pick and the picks must exist', async () => {
 
 test('accepting moves both picks and writes the ledger', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   const done = await accept('Kyle', proposal.id, proposal.version);
   assert.equal(done.status, 200);
   assert.equal((asRecord(done.body).proposal as PickTradeProposal).status, 'accepted');
 
-  assert.equal(await ownerOfPick(2, 'Amy'), 'Kyle');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Kyle');
   assert.equal(await ownerOfPick(4, 'Kyle'), 'Amy');
 
   const { state } = await store.getState();
@@ -216,14 +243,14 @@ test('accepting moves both picks and writes the ledger', async () => {
 
 test('an accepted trade is league news and appears in the audit log', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
   await accept('Kyle', proposal.id, proposal.version);
 
   const outsider = asRecord((await list('Joel')).body);
   const seen = (outsider.proposals as PickTradeProposal[]).find((p) => p.id === proposal.id);
   assert.ok(seen, 'everyone sees a done trade');
-  assert.deepEqual(seen.offer, [ref(2, 'Amy')], 'with the exact picks');
+  assert.deepEqual(seen.offer, [ref(7, 'Amy')], 'with the exact picks');
 
   const rows = (await request('/api/league/audit', { headers: auth(commissioner) }))
     .body as Array<{ action: string; owner: string; detail: Record<string, unknown> }>;
@@ -234,24 +261,24 @@ test('an accepted trade is league news and appears in the audit log', async () =
   assert.equal(entry.detail.proposer, 'Amy');
   assert.equal(entry.detail.recipient, 'Kyle');
   assert.ok(entry.detail.acceptedAt);
-  assert.deepEqual(entry.detail.offer, [ref(2, 'Amy')]);
+  assert.deepEqual(entry.detail.offer, [ref(7, 'Amy')]);
 });
 
 test('only the recipient can accept, and the commissioner cannot accept for them', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   assert.equal((await accept('Amy', proposal.id, proposal.version)).status, 403);
   assert.equal((await accept('Joel', proposal.id, proposal.version)).status, 403);
   const byCommish = await accept(commissioner, proposal.id, proposal.version);
   assert.equal(byCommish.status, 403);
-  assert.equal(await ownerOfPick(2, 'Amy'), 'Amy', 'nothing moved');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Amy', 'nothing moved');
 });
 
 test('accepting twice does nothing the second time', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   assert.equal((await accept('Kyle', proposal.id, proposal.version)).status, 200);
@@ -265,7 +292,7 @@ test('accepting twice does nothing the second time', async () => {
 
 test('two members accepting at the same moment produce one trade', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   const results = await Promise.all([
@@ -281,36 +308,36 @@ test('two members accepting at the same moment produce one trade', async () => {
 
 test('a stale tab cannot accept an offer that changed', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   const stale = await accept('Kyle', proposal.id, proposal.version + 5);
   assert.equal(stale.status, 409);
   assert.equal(asRecord(stale.body).code, 'stale-version');
-  assert.equal(await ownerOfPick(2, 'Amy'), 'Amy');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Amy');
 });
 
 test('pulling an offer beats a later accept', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   assert.equal((await settle('Amy', proposal.id, 'cancel')).status, 200);
   const late = await accept('Kyle', proposal.id, proposal.version);
   assert.equal(late.status, 409);
   assert.equal(asRecord(late.body).code, 'not-pending');
-  assert.equal(await ownerOfPick(2, 'Amy'), 'Amy');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Amy');
 });
 
 test('turning an offer down keeps the record and moves nothing', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   const rejected = await settle('Kyle', proposal.id, 'reject');
   assert.equal(rejected.status, 200);
   assert.equal((asRecord(rejected.body).proposal as PickTradeProposal).status, 'rejected');
-  assert.equal(await ownerOfPick(2, 'Amy'), 'Amy');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Amy');
 
   const amy = asRecord((await list('Amy')).body);
   assert.ok(
@@ -323,14 +350,14 @@ test('turning an offer down keeps the record and moves nothing', async () => {
 
 test('a pick that moved elsewhere kills the older offer instead of half trading', async () => {
   const first = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
   const second = asRecord(
-    (await propose('Amy', 'Joel', [ref(2, 'Amy')], [ref(5, 'Joel')])).body,
+    (await propose('Amy', 'Joel', [ref(7, 'Amy')], [ref(5, 'Joel')])).body,
   ).proposal as PickTradeProposal;
 
   assert.equal((await accept('Joel', second.id, second.version)).status, 200);
-  assert.equal(await ownerOfPick(2, 'Amy'), 'Joel');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Joel');
 
   const late = await accept('Kyle', first.id, first.version);
   assert.equal(late.status, 409);
@@ -343,8 +370,8 @@ test('a pick that moved elsewhere kills the older offer instead of half trading'
 });
 
 test('shopping one pick to two teams settles the moment one of them accepts', async () => {
-  await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')]);
-  const second = await propose('Amy', 'Joel', [ref(2, 'Amy')], [ref(5, 'Joel')]);
+  await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
+  const second = await propose('Amy', 'Joel', [ref(7, 'Amy')], [ref(5, 'Joel')]);
   assert.equal(second.status, 200, 'the same pick may be offered to two teams');
 
   const target = asRecord(second.body).proposal as PickTradeProposal;
@@ -368,34 +395,31 @@ test('a pick can pass through three teams and keep its history', async () => {
   assert.equal(await ownerOfPick(3, 'Ryan'), 'Ryan', 'Ryan still has his own 3rd');
 
   const two = asRecord(
-    (await propose('Amy', 'Kyle', [ref(3, 'Derek')], [ref(7, 'Kyle')])).body,
+    (await propose('Amy', 'Bryan', [ref(3, 'Derek')], [ref(7, 'Bryan')])).body,
   ).proposal as PickTradeProposal;
-  assert.equal((await accept('Kyle', two.id, two.version)).status, 200);
-  assert.equal(await ownerOfPick(3, 'Derek'), 'Kyle');
+  assert.equal((await accept('Bryan', two.id, two.version)).status, 200);
+  assert.equal(await ownerOfPick(3, 'Derek'), 'Bryan');
 
   const { state } = await store.getState();
   const chain = transfersOf(state).filter((row) => row.round === 3 && row.originalOwner === 'Derek');
-  assert.deepEqual(chain.map((row) => `${row.from}>${row.to}`), ['Ryan>Amy', 'Amy>Kyle']);
+  assert.deepEqual(chain.map((row) => `${row.from}>${row.to}`), ['Ryan>Amy', 'Amy>Bryan']);
 });
 
 /* ─── During the draft ─────────────────────────────────────────────────── */
 
 test('the pick on the clock can be traded while it is empty', async () => {
-  await store.mutateState((draft: LeagueDynamicState) => {
-    draft.keepersRevealed = true;
-    draft.draft.startedAt = new Date().toISOString();
-  });
+  await startDraftMidway();
   const { state } = await store.getState();
   const onClock = buildDraftBoard(dataset, state as never).find((cell) => cell.onClock);
   assert.ok(onClock);
   const holder = onClock.pick.currentOwner;
-  const other = Object.keys(pins).find((o) => o !== holder && o in pins) as string;
+  const other = partnerFor(holder);
 
   const created = await propose(
     holder,
     other,
     [ref(onClock.pick.round, onClock.pick.originalOwner)],
-    [ref(14, other)],
+    [ref(9, other)],
   );
   assert.equal(created.status, 200);
   const proposal = asRecord(created.body).proposal as PickTradeProposal;
@@ -404,15 +428,12 @@ test('the pick on the clock can be traded while it is empty', async () => {
 });
 
 test('a trade and a pick entered at the same moment cannot both win', async () => {
-  await store.mutateState((draft: LeagueDynamicState) => {
-    draft.keepersRevealed = true;
-    draft.draft.startedAt = new Date().toISOString();
-  });
+  await startDraftMidway();
   const { state } = await store.getState();
   const onClock = buildDraftBoard(dataset, state as never).find((cell) => cell.onClock);
   assert.ok(onClock);
   const holder = onClock.pick.currentOwner;
-  const other = Object.keys(pins).find((o) => o !== holder) as string;
+  const other = partnerFor(holder);
   const player = dataset.players.find((candidate) => candidate.keeper.eligible);
   assert.ok(player);
 
@@ -421,7 +442,7 @@ test('a trade and a pick entered at the same moment cannot both win', async () =
       holder,
       other,
       [ref(onClock.pick.round, onClock.pick.originalOwner)],
-      [ref(14, other)],
+      [ref(9, other)],
     )).body,
   ).proposal as PickTradeProposal;
 
@@ -454,15 +475,12 @@ test('a trade and a pick entered at the same moment cannot both win', async () =
 });
 
 test('a pick already used in the draft cannot be traded', async () => {
-  await store.mutateState((draft: LeagueDynamicState) => {
-    draft.keepersRevealed = true;
-    draft.draft.startedAt = new Date().toISOString();
-  });
+  await startDraftMidway();
   const { state } = await store.getState();
   const onClock = buildDraftBoard(dataset, state as never).find((cell) => cell.onClock);
   assert.ok(onClock);
   const holder = onClock.pick.currentOwner;
-  const other = Object.keys(pins).find((o) => o !== holder) as string;
+  const other = partnerFor(holder);
   const player = dataset.players.find((candidate) => candidate.keeper.eligible);
   assert.ok(player);
 
@@ -483,22 +501,19 @@ test('a pick already used in the draft cannot be traded', async () => {
     holder,
     other,
     [ref(onClock.pick.round, onClock.pick.originalOwner)],
-    [ref(14, other)],
+    [ref(9, other)],
   );
   assert.equal(blocked.status, 409);
   assert.match(String(asRecord(blocked.body).error), /already been used/);
 });
 
 test('a traded pick changes who may enter the pick on the clock', async () => {
-  await store.mutateState((draft: LeagueDynamicState) => {
-    draft.keepersRevealed = true;
-    draft.draft.startedAt = new Date().toISOString();
-  });
+  await startDraftMidway();
   const first = await store.getState();
   const onClock = buildDraftBoard(dataset, first.state as never).find((cell) => cell.onClock);
   assert.ok(onClock);
   const holder = onClock.pick.currentOwner;
-  const other = Object.keys(pins).find((o) => o !== holder && o !== commissioner) as string;
+  const other = partnerFor(holder);
   const player = dataset.players.find((candidate) => candidate.keeper.eligible);
   assert.ok(player);
 
@@ -507,7 +522,7 @@ test('a traded pick changes who may enter the pick on the clock', async () => {
       holder,
       other,
       [ref(onClock.pick.round, onClock.pick.originalOwner)],
-      [ref(14, other)],
+      [ref(9, other)],
     )).body,
   ).proposal as PickTradeProposal;
   await accept(other, proposal.id, proposal.version);
@@ -542,9 +557,10 @@ test('the preview reports how a trade changes keeper pick costs', async () => {
       && candidate.keeper.eligible
       && candidate.keeper.round !== null
       && candidate.keeper.round >= 3
+      && candidate.keeper.round <= 6
       && candidate.keeper.contract === null,
   );
-  assert.ok(player, 'fixture needs a keepable Amy player outside rounds 1-2');
+  assert.ok(player, 'fixture needs a keepable Amy player in rounds 3-6');
   const round = player.keeper.round as number;
 
   assert.equal(
@@ -559,7 +575,11 @@ test('the preview reports how a trade changes keeper pick costs', async () => {
   const preview = await request('/api/league/pick-trades/preview', {
     method: 'POST',
     headers: auth('Amy'),
-    body: JSON.stringify({ recipient: 'Kyle', offer: [ref(round, 'Amy')], request: [ref(14, 'Kyle')] }),
+    body: JSON.stringify({
+      recipient: 'Bryan',
+      offer: [ref(round, 'Amy')],
+      request: [ref(round + 1, 'Bryan')],
+    }),
   });
   assert.equal(preview.status, 200);
   const sides = asRecord(preview.body).sides as Array<Record<string, unknown>>;
@@ -568,11 +588,11 @@ test('the preview reports how a trade changes keeper pick costs', async () => {
   assert.equal(amy.detailed, true, 'you always see your own keepers');
   assert.equal((amy.changes as unknown[]).length, 1);
 
-  const kyle = sides.find((side) => side.owner === 'Kyle');
-  assert.equal(kyle?.detailed, false, 'the other side stays secret before the reveal');
+  const bryan = sides.find((side) => side.owner === 'Bryan');
+  assert.equal(bryan?.detailed, false, 'the other side stays secret before the reveal');
 });
 
-test('once keepers are locked a trade that breaks one is refused', async () => {
+test('the 1st round pick a keeper needs cannot be offered at all', async () => {
   const player = dataset.players.find(
     (candidate) =>
       candidate.fantasyTeam === 'Amy' && candidate.keeper.eligible && candidate.keeper.round === 1,
@@ -584,33 +604,18 @@ test('once keepers are locked a trade that breaks one is refused', async () => {
     headers: auth('Amy'),
     body: JSON.stringify({ selections: [{ playerKey: player.key, playerName: player.name }] }),
   });
-  const open = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(14, 'Kyle')]);
-  assert.equal(open.status, 200, 'allowed while keepers are still open');
-  const proposal = asRecord(open.body).proposal as PickTradeProposal;
 
-  await request('/api/league/locks', {
-    method: 'POST',
-    headers: auth(commissioner),
-    body: JSON.stringify({ keepersLocked: true }),
-  });
-
-  const blocked = await accept('Kyle', proposal.id, proposal.version);
-  assert.equal(blocked.status, 409);
-  assert.equal(asRecord(blocked.body).code, 'keeper-broken');
+  const blocked = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(blocked.status, 400);
+  assert.equal(asRecord(blocked.body).code, 'round-protected');
   assert.equal(await ownerOfPick(1, 'Amy'), 'Amy');
-
-  await request('/api/league/locks', {
-    method: 'POST',
-    headers: auth(commissioner),
-    body: JSON.stringify({ keepersLocked: false }),
-  });
 });
 
 /* ─── Privacy and commissioner support ─────────────────────────────────── */
 
 test('a pending offer stays between the two members', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   const outsider = asRecord((await list('Joel')).body).proposals as PickTradeProposal[];
@@ -630,7 +635,7 @@ test('a pending offer stays between the two members', async () => {
 
 test('a commissioner sees that an offer exists but not what is in it', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
 
   const commish = asRecord((await list(commissioner)).body).proposals as PickTradeProposal[];
@@ -643,23 +648,140 @@ test('a commissioner sees that an offer exists but not what is in it', async () 
   const cleared = await settle(commissioner, proposal.id, 'cancel');
   assert.equal(cleared.status, 200);
   assert.equal((asRecord(cleared.body).proposal as PickTradeProposal).status, 'cancelled');
-  assert.equal(await ownerOfPick(2, 'Amy'), 'Amy');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Amy');
 });
 
 test('an outsider cannot pull or turn down someone else offer', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
   assert.equal((await settle('Joel', proposal.id, 'cancel')).status, 403);
   assert.equal((await settle('Joel', proposal.id, 'reject')).status, 403);
   assert.equal((await settle('Amy', proposal.id, 'reject')).status, 403, 'the proposer pulls, not rejects');
 });
 
+/* ─── Closing the draft opens next season ──────────────────────────────── */
+
+const closeDraft = (owner: string) =>
+  request('/api/league/draft/close', { method: 'POST', headers: auth(owner) });
+
+const reopenDraft = (owner: string) =>
+  request('/api/league/draft/reopen', { method: 'POST', headers: auth(owner) });
+
+test('only a commissioner closes the draft, and only after it has started', async () => {
+  assert.equal((await closeDraft('Amy')).status, 403);
+  assert.equal((await closeDraft(commissioner)).status, 409, 'nothing to close yet');
+
+  await startDraftMidway();
+  assert.equal((await closeDraft(commissioner)).status, 200);
+  const { state } = await store.getState();
+  assert.ok(state.draft.closedAt, 'the moment is recorded');
+
+  const rows = (await request('/api/league/audit', { headers: auth(commissioner) }))
+    .body as Array<{ action: string; owner: string }>;
+  assert.ok(rows.some((row) => row.action === 'draft.closed' && row.owner === commissioner));
+});
+
+test('closing the draft flips which draft can be traded, and reopening flips it back', async () => {
+  await startDraftMidway();
+
+  const before = asRecord((await list('Amy')).body);
+  assert.equal(before.tradeableSeason, SEASON);
+
+  assert.equal((await closeDraft(commissioner)).status, 200);
+  const after = asRecord((await list('Amy')).body);
+  assert.equal(after.tradeableSeason, NEXT);
+
+  // Next season's picks now move.
+  const created = await propose('Amy', 'Kyle', [ref(7, 'Amy', NEXT)], [ref(4, 'Kyle', NEXT)]);
+  assert.equal(created.status, 200);
+  const proposal = asRecord(created.body).proposal as PickTradeProposal;
+  assert.equal(proposal.offer[0].season, NEXT);
+
+  assert.equal((await accept('Kyle', proposal.id, proposal.version)).status, 200);
+  assert.equal(
+    await ownerOfPick(7, 'Amy'),
+    'Amy',
+    'and this draft board does not move an inch',
+  );
+
+  // Reopening puts this draft back in play.
+  assert.equal((await reopenDraft('Amy')).status, 403);
+  assert.equal((await reopenDraft(commissioner)).status, 200);
+  assert.equal(asRecord((await list('Amy')).body).tradeableSeason, SEASON);
+  const rows = (await request('/api/league/audit', { headers: auth(commissioner) }))
+    .body as Array<{ action: string }>;
+  assert.ok(rows.some((row) => row.action === 'draft.reopened'));
+});
+
+test('an offer for the draft that is not open is refused', async () => {
+  // Next season is two drafts out until this one closes.
+  const early = await propose('Amy', 'Kyle', [ref(7, 'Amy', NEXT)], [ref(4, 'Kyle', NEXT)]);
+  assert.equal(early.status, 409);
+  assert.equal(asRecord(early.body).code, 'wrong-season');
+
+  await startDraftMidway();
+  await closeDraft(commissioner);
+
+  // And once it has closed, this draft's picks are settled.
+  const late = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(late.status, 409);
+  assert.equal(asRecord(late.body).code, 'wrong-season');
+
+  // A trade cannot straddle the two.
+  const mixed = await propose('Amy', 'Kyle', [ref(7, 'Amy', NEXT)], [ref(4, 'Kyle')]);
+  assert.equal(mixed.status, 400);
+  assert.equal(asRecord(mixed.body).code, 'mixed-seasons');
+});
+
+test('a next-season trade never touches a keeper cost in this draft', async () => {
+  const player = dataset.players.find(
+    (candidate) =>
+      candidate.fantasyTeam === 'Amy'
+      && candidate.keeper.eligible
+      && candidate.keeper.round !== null
+      && candidate.keeper.round >= 3,
+  );
+  assert.ok(player);
+  const round = player.keeper.round as number;
+  await request('/api/league/keepers/Amy', {
+    method: 'PUT',
+    headers: auth('Amy'),
+    body: JSON.stringify({ selections: [{ playerKey: player.key, playerName: player.name }] }),
+  });
+
+  const before = asRecord((await request('/api/league/state', { headers: auth('Amy') })).body);
+  const boardBefore = buildAllPicks(
+    datasetWithTransfers(dataset, transfersOf((before.state as LeagueDynamicState))),
+  );
+
+  await startDraftMidway();
+  await closeDraft(commissioner);
+  const created = await propose(
+    'Amy',
+    'Kyle',
+    [ref(round, 'Amy', NEXT)],
+    [ref(round, 'Kyle', NEXT)],
+  );
+  assert.equal(created.status, 200);
+  const proposal = asRecord(created.body).proposal as PickTradeProposal;
+  assert.equal((await accept('Kyle', proposal.id, proposal.version)).status, 200);
+
+  const { state } = await store.getState();
+  const boardAfter = buildAllPicks(datasetWithTransfers(dataset, transfersOf(state)));
+  assert.deepEqual(boardAfter, boardBefore, 'this draft board is unchanged');
+  assert.equal(
+    await ownerOfPick(round, 'Amy'),
+    'Amy',
+    'Amy still owns the pick her keeper is paying with',
+  );
+});
+
 /* ─── Persistence ──────────────────────────────────────────────────────── */
 
 test('trades and their ledger survive a fresh read of the store', async () => {
   const proposal = asRecord(
-    (await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')])).body,
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
   ).proposal as PickTradeProposal;
   await accept('Kyle', proposal.id, proposal.version);
 
