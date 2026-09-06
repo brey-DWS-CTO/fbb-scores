@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
+import NavIcon from './NavIcon.js';
 import RecordTables from './RecordTables.js';
 import RuleEditMenu from './RuleEditMenu.js';
 import PublishPanel from './PublishPanel.js';
@@ -560,7 +561,10 @@ export default function RulesPage() {
       </div>
       <header className="rules-page-header">
         <div>
-          <h1 className="hub-heading glow-teal">📖 RULE BOOK</h1>
+          <h1 className="hub-heading glow-teal">
+            <NavIcon name="book" size={18} className="icon-in-heading" />
+            RULE BOOK
+          </h1>
           <p>
             The Nerds constitution, {book.season}.
           </p>
@@ -604,7 +608,14 @@ export default function RulesPage() {
         <div className={editing ? 'panel rules-draft-bar rules-draft-on' : 'rules-draft-off'}>
           {!editing ? (
             <button type="button" className="rules-tool tap-btn" disabled={busy} onClick={enterDraft}>
-              {busy ? 'OPENING...' : '✎ EDIT THE RULE BOOK'}
+              {busy ? (
+                'OPENING...'
+              ) : (
+                <>
+                  <NavIcon name="pencil" size={14} className="icon-in-heading" />
+                  EDIT THE RULE BOOK
+                </>
+              )}
             </button>
           ) : (
             <>

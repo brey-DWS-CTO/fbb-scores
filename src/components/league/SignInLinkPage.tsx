@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { consumeLoginToken, apiErrorMessage } from '../../lib/league/api.js';
 import { leagueDataset } from '../../lib/league/data.js';
+import NavIcon from './NavIcon.js';
 
 /**
  * /sign-in/:token — where an emailed link lands. Trade the token for a session
@@ -64,7 +65,7 @@ export default function SignInLinkPage() {
               <div className="splash-step">OWNER ACCESS</div>
               <h2 id="sign-in-link-title">{problem ? 'That link did not work' : 'Signing you in…'}</h2>
             </div>
-            <div className="splash-lock" aria-hidden="true">🔐</div>
+            <div className="splash-lock"><NavIcon name="lock" size={20} /></div>
           </div>
 
           {problem ? (

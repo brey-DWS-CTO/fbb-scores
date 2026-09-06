@@ -14,6 +14,7 @@ import { draftYearLabel, tradeableSeason } from '../../lib/league/pickTrades.js'
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import ActAsPanel from './ActAsPanel.js';
 import EmailAdmin from './EmailAdmin.js';
+import NavIcon from './NavIcon.js';
 
 const btnOutline = (color: string): CSSProperties => ({
   minHeight: 44,
@@ -115,8 +116,17 @@ export default function CommissionerPanel() {
       {/* Lock toggle */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, color: locked ? 'var(--neon-red)' : 'var(--neon-teal)' }}>
-            Keepers are {locked ? 'LOCKED 🔒' : 'OPEN 🔓'}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontWeight: 700,
+              color: locked ? 'var(--neon-red)' : 'var(--neon-teal)',
+            }}
+          >
+            Keepers are {locked ? 'LOCKED' : 'OPEN'}
+            <NavIcon name={locked ? 'lock' : 'unlocked'} size={15} />
           </div>
           <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
             {locked ? 'Only you can still edit keepers.' : 'Owners can edit + save their keepers.'}
@@ -224,7 +234,8 @@ export default function CommissionerPanel() {
               }}
             >
               <span style={{ color: 'var(--neon-yellow)', fontSize: '0.72rem' }}>
-                ⚠ Don't screen-share with these on screen.
+                <NavIcon name="warning" size={14} className="icon-in-heading" />
+                Don't screen-share with these on screen.
               </span>
               <button
                 className="tap-btn"
@@ -413,7 +424,8 @@ export default function CommissionerPanel() {
             paddingRight: 12,
           }}
         >
-          📺 TV mode
+          <NavIcon name="tv" size={16} />
+          <span style={{ marginLeft: 6 }}>TV mode</span>
         </Link>
       </div>
     </section>

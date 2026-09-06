@@ -1,6 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { leagueDataset } from '../../lib/league/data.js';
+import NavIcon from './NavIcon.js';
 import TeamPickerForm from './TeamPickerForm.js';
 
 /** / — a focused sign-in page. Signed-in owners go straight to their worksheet. */
@@ -23,9 +24,9 @@ export default function SplashPage() {
           <p>Set your keepers, check the draft board, and search ALL the many rules.</p>
 
           <div className="splash-feature-row" aria-label="League hub features">
-            <span>🔒 Keepers</span>
-            <span>🎯 Draft</span>
-            <span>📖 League HQ</span>
+            <span><NavIcon name="lock" size={14} />Keepers</span>
+            <span><NavIcon name="target" size={14} />Draft</span>
+            <span><NavIcon name="book" size={14} />League HQ</span>
           </div>
         </header>
 
@@ -35,7 +36,7 @@ export default function SplashPage() {
               <div className="splash-step">OWNER ACCESS</div>
               <h2 id="sign-in-title">Who are you?</h2>
             </div>
-            <div className="splash-lock" aria-hidden="true">🔐</div>
+            <div className="splash-lock"><NavIcon name="lock" size={20} /></div>
           </div>
 
           <TeamPickerForm onDone={() => navigate('/keepers')} />

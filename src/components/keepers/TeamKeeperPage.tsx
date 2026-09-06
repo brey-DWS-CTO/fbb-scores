@@ -19,6 +19,7 @@ import {
 import { usePostseasonGames, type PostseasonGames } from '../../hooks/usePostseasonGames.js';
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
+import NavIcon from '../league/NavIcon.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
 import PostseasonTag from '../league/PostseasonTag.js';
 import { CapBar, LockBanner, RoundChip, SourceBadge } from './keeperUi.js';
@@ -295,7 +296,8 @@ function KeeperCard({
         )}
         {k.errors.map((e) => (
           <div key={e} style={{ color: 'var(--neon-red)', fontSize: '0.78rem' }}>
-            ⚠ {e}
+            <NavIcon name="warning" size={14} className="icon-in-heading" />
+            {e}
           </div>
         ))}
       </div>
@@ -740,7 +742,8 @@ export default function TeamKeeperPage() {
       {locked && !isCommish && !projectionMode && <LockBanner />}
       {locked && isCommish && (
         <div style={{ color: 'var(--neon-yellow)', fontSize: '0.75rem', marginBottom: 12 }}>
-          🔒 Keepers are locked league-wide. Commish override lets you still edit.
+          <NavIcon name="lock" size={14} className="icon-in-heading" />
+          Keepers are locked league-wide. Commish override lets you still edit.
         </div>
       )}
       {!identity && (
@@ -784,7 +787,8 @@ export default function TeamKeeperPage() {
               fontWeight: 700,
             }}
           >
-            🔒 {owner} has submitted {hiddenSelectionCount} keeper
+            <NavIcon name="lock" size={15} className="icon-in-heading" />
+            {owner} has submitted {hiddenSelectionCount} keeper
             {hiddenSelectionCount > 1 ? 's' : ''}. Names stay hidden until the commish reveals them.
           </div>
         )}
@@ -874,7 +878,8 @@ export default function TeamKeeperPage() {
                   textAlign: 'center',
                 }}
               >
-                🔒 Keeper {index + 1} is hidden
+                <NavIcon name="lock" size={15} className="icon-in-heading" />
+                Keeper {index + 1} is hidden
               </div>
             ))}
           {result.keepers.map((k) => (
@@ -1012,7 +1017,8 @@ export default function TeamKeeperPage() {
         </div>
         {meta && !meta.revealed && (
           <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', marginBottom: 10 }}>
-            🕵️ Saved keeper names stay private until the commish reveals them.
+            <NavIcon name="hidden" size={14} className="icon-in-heading" />
+            Saved keeper names stay private until the commish reveals them.
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
