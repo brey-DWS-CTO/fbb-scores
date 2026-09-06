@@ -595,7 +595,7 @@ test('the preview reports how a trade changes keeper pick costs', async () => {
   assert.equal(bryan?.detailed, false, 'the other side stays secret before the reveal');
 });
 
-test('a 1st can be offered in the offseason, and the keeper repriced', async () => {
+test('a pick paying for a keeper is refused, and freed by dropping the keeper', async () => {
   const player = dataset.players.find(
     (candidate) =>
       candidate.fantasyTeam === 'Amy' && candidate.keeper.eligible && candidate.keeper.round === 1,
@@ -608,11 +608,19 @@ test('a 1st can be offered in the offseason, and the keeper repriced', async () 
     body: JSON.stringify({ selections: [{ playerKey: player.key, playerName: player.name }] }),
   });
 
-  // Before the draft starts everything moves, 1st included. Amy keeps a
-  // round-1 player, so the keeper is not blocked, it just costs her next pick
-  // instead. Nothing is final until keepers lock, so she can change her mind.
-  const offered = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
-  assert.equal(offered.status, 200, 'the offseason lets a 1st move');
+  // The 1st moves in the offseason, but not while it is paying for a keeper.
+  const blocked = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(blocked.status, 409);
+  assert.equal(asRecord(blocked.body).code, 'pick-used');
+
+  // Dropping the keeper frees the pick, which is the whole point of the rule.
+  await request('/api/league/keepers/Amy', {
+    method: 'PUT',
+    headers: auth('Amy'),
+    body: JSON.stringify({ selections: [] }),
+  });
+  const freed = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(freed.status, 200, 'no keeper on it, so it moves');
   assert.equal(await ownerOfPick(1, 'Amy'), 'Amy', 'and nothing moves until it is taken');
 });
 

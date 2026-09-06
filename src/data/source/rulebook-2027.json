@@ -2673,8 +2673,8 @@
       "type": "settings",
       "severity": "medium",
       "status": "open",
-      "summary": "The rule book allows only rounds 3 through 10 to be traded (keepers.picktrade.rounds). The app now allows rounds 3 through 14. Rounds 11 to 14 carry no keeper tier, so moving one cannot change what anybody's keepers cost, but the written rule and the app disagree.",
-      "ruling": "Commissioner opened rounds 11 to 14 for trading on 2026-09-05, ahead of the wording. The book needs a vote to catch up: change keepers.picktrade.rounds to say rounds 3 through 14. Until that passes, the app is the looser of the two.",
+      "summary": "The rule book allows only rounds 3 through 10 to be traded (keepers.picktrade.rounds). The app allows every round in the offseason, before the draft starts, and rounds 3 through 10 once the draft is under way.",
+      "ruling": "Commissioner opened rounds 11 to 14 for offseason trading on 2026-09-05. The book needs a vote to catch up: keepers.picktrade.rounds should say rounds 3 through 10 in season, every round before the draft. Until that passes, the app is the looser of the two.",
       "ruledBy": "commissioner",
       "ruledAt": "2026-09-05"
     },
@@ -2684,7 +2684,17 @@
       "severity": "medium",
       "status": "open",
       "summary": "The rule book protects 1st and 2nd round picks outright (keepers.picktrade.rounds.protected). The app now lets them trade in the offseason, before the draft starts, and protects them again once it is under way.",
-      "ruling": "Commissioner opened the 1st and 2nd for offseason trading on 2026-09-06. The book needs a vote to catch up: keepers.picktrade.rounds.protected should say the 1st and 2nd are protected once the draft has started, not always. Note the book already allows changing this clause by 60% vote. Keepers are still safe either way: once keepers are locked, a trade that would leave a team unable to pay for one is refused on the keeper, not on the round.",
+      "ruling": "Commissioner opened the 1st and 2nd for offseason trading on 2026-09-06. The book needs a vote to catch up: keepers.picktrade.rounds.protected should say the 1st and 2nd are protected once the draft has started, not always. The book already allows changing that clause by 60% vote.",
+      "ruledBy": "commissioner",
+      "ruledAt": "2026-09-06"
+    },
+    {
+      "id": "picktrade-keeper-picks",
+      "type": "settings",
+      "severity": "medium",
+      "status": "open",
+      "summary": "Nothing in the book says what happens to a keeper when you trade away the pick it is paying with. The app used to move the keeper onto the next better pick, a penalty nobody wrote down.",
+      "ruling": "Commissioner ruled on 2026-09-06 that a pick paying for a keeper is not tradeable at all. Take the keeper off first and the pick is free. The book should say so under keepers.picktrade, so the rule exists in writing rather than only in the app.",
       "ruledBy": "commissioner",
       "ruledAt": "2026-09-06"
     }
