@@ -1964,7 +1964,16 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
       note: typeof body.note === 'string' ? body.note.trim().slice(0, MAX_TRADE_NOTE) : '',
     };
 
-    const shape = checkProposalShape(leagueDataset, input);
+    // Before the draft starts, every round moves. Once it is under way the
+    // 1st and 2nd are protected again, so a keeper always has a pick to pay
+    // with. The write below re-checks against the state it is writing to, so
+    // this read only decides which message a bad shape gets.
+    const { state: before } = await getState();
+    const shape = checkProposalShape(
+      leagueDataset,
+      input,
+      before.draft.startedAt === null,
+    );
     if (!shape.ok) {
       res.status(400).json({ error: shape.message, code: shape.reason });
       return;
