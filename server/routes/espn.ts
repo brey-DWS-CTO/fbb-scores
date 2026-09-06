@@ -173,7 +173,7 @@ router.get('/espn/league-info', async (req, res) => {
  * GET /api/espn/debug — raw ESPN data for debugging score discrepancies.
  * Only available in development.
  */
-router.get('/espn/debug', (req, res, next) => {
+router.get('/espn/debug', (_req, res, next) => {
   if (process.env.NODE_ENV === 'production') { res.status(404).json({ error: 'Not found' }); return; }
   next();
 }, async (req, res) => {
@@ -349,7 +349,7 @@ router.get('/espn/matchup/:matchupId', async (req, res) => {
  * GET /api/espn/debug-stats — inspect raw player stat entries to debug rolling averages.
  * Only available in development.
  */
-router.get('/espn/debug-stats', (req, res, next) => {
+router.get('/espn/debug-stats', (_req, res, next) => {
   if (process.env.NODE_ENV === 'production') { res.status(404).json({ error: 'Not found' }); return; }
   next();
 }, async (req, res) => {

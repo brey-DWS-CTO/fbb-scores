@@ -32,6 +32,7 @@ function RosterRow({
   canEdit,
   reason,
   postseason,
+  showApiSource,
   tapThrough,
   onTap,
 }: {
@@ -42,12 +43,16 @@ function RosterRow({
   reason: string | null;
   /** Commissioner only. Null for everyone else, and for a player with no team. */
   postseason: PostseasonGames | null;
+  /** Commissioner only: mark a line that came from ESPN, not the league sheet. */
+  showApiSource: boolean;
   /** Blocked only by the cap: keep the greyed look but let the tap land. */
   tapThrough?: boolean;
   onTap: () => void;
 }) {
   const s = p.stats2026 ?? p.api2026;
-  const apiFallback = !p.stats2026 && !!p.api2026;
+  // The degree mark says this line came from ESPN instead of the league sheet.
+  // Only the commissioner can act on that, so only the commissioner sees it.
+  const apiFallback = showApiSource && !p.stats2026 && !!p.api2026;
   const eff = p.keeper.effectiveAvg;
   const effDiff = eff != null && (!s || Math.abs(eff - s.avg) > 0.05);
   const c = p.keeper.contract;
@@ -511,7 +516,6 @@ export default function TeamKeeperPage() {
   const pickColor =
     result.keepers.length === 0 ? 'var(--text-mid)' : anyBump ? 'var(--neon-orange)' : 'var(--neon-blue)';
   const emptySlots = Math.max(0, dataset.maxKeepersPerTeam - result.keepers.length);
-  const hasApiFallback = rosterPlayers.some((p) => !p.stats2026 && p.api2026);
 
   return (
     <div className="keeper-page" style={{ maxWidth: 720, margin: '0 auto', padding: '16px 12px 8px' }}>
@@ -991,16 +995,12 @@ export default function TeamKeeperPage() {
               canEdit={canEdit}
               reason={disabledReason(p)}
               postseason={postseasonGames(p.proTeam)}
+              showApiSource={identity?.isCommissioner === true}
               tapThrough={overCapTapThrough(p)}
               onTap={() => toggleKeeper(p)}
             />
           ))}
         </div>
-        {hasApiFallback && (
-          <div style={{ color: 'var(--text-faint)', fontSize: '0.65rem', margin: '8px 14px' }}>
-            ° season line from the ESPN API (player missing from the league-official sheet)
-          </div>
-        )}
       </section>
 
       {/* ── League status: who has keepers in (names only) ─────── */}
