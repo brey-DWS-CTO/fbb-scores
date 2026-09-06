@@ -7,6 +7,9 @@
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
+  "crons": [
+    { "path": "/api/notify/tick", "schedule": "0 * * * *" }
+  ],
   "functions": {
     "api/index.ts": {
       "maxDuration": 30,

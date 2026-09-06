@@ -98,6 +98,12 @@ import {
 } from '../lib/leagueStore.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import { sendLoginLink } from '../lib/mailer.js';
+import {
+  notifyKeepersRevealed,
+  notifyTradeAccepted,
+  notifyTradeOffered,
+  notifyTradeSettled,
+} from '../lib/notifier.js';
 import { appOrigin } from './auth.js';
 import {
   canEditPoll,
@@ -750,6 +756,8 @@ router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, 
     revealed,
   });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  // Hiding them again is housekeeping. Opening them is league news.
+  if (revealed) notifyKeepersRevealed(appOrigin(req));
 });
 
 /**
@@ -1935,6 +1943,8 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
       proposal,
       ...redactState(result, { owner: proposer, isCommissioner: isCommish }),
     });
+    // After the answer, never before it. The offer is saved either way.
+    notifyTradeOffered(proposal, appOrigin(req));
   } catch (err) {
     next(err);
   }
@@ -2132,6 +2142,7 @@ router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
       proposal,
       ...redactState(result, { owner, isCommissioner: isCommish }),
     });
+    notifyTradeAccepted(proposal, appOrigin(req));
   } catch (err) {
     next(err);
   }
@@ -2201,6 +2212,7 @@ function settleRoute(action: 'reject' | 'cancel', auditAction: string) {
         proposal,
         ...redactState(result, { owner, isCommissioner: isCommish }),
       });
+      notifyTradeSettled(proposal, action, owner, appOrigin(req));
     } catch (err) {
       next(err);
     }

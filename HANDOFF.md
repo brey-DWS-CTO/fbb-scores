@@ -166,26 +166,29 @@ Nothing on the original list. What remains:
 5. **Season-average freeze, around March 2027**, before ESPN pollutes the
    averages with post-fantasy-season games. Miss it and next year's keeper tiers
    are wrong. Nothing enforces this date.
-6. **Email through Resend.** No mail path exists yet. Build it as one small
-   service, `src/lib/league/notify.ts` plus a server sender, so every message
-   goes out the same way and is testable without sending. First cut:
+6. **Email through Resend.** The first cut is built. Every message uses one
+   shell in `server/lib/mailer.ts`; `server/lib/notifier.ts` decides who hears
+   what, and `src/lib/league/notifications.ts` decides when.
 
-   - **Trade offers.** A member gets mail when an offer arrives, and when the
-     other side accepts, rejects, or cancels.
-   - **Keeper deadline.** A reminder at set intervals before the keeper lock,
-     naming the date, and only to owners who have not submitted.
-   - **Draft day.** A countdown reminder before **Sun Oct 18, 2026, 2:00 PM PT**,
-     plus an on-the-clock note during the draft.
-   - **Votes.** Mail when a poll opens, when the commissioner edits it, and when
-     it closes. Already asked for.
-   - **Rulebook.** Mail when a new revision publishes, asking for a signature.
+   Sent today: an offer arrives, an offer is taken, an offer is turned down or
+   pulled, keepers are revealed, and four countdown reminders (a week and a day
+   before the draft, three days and twelve hours before keepers close). The
+   reminders run from `GET /api/notify/tick`, which Vercel calls hourly. A
+   reminder key is claimed in the `sent_notices` table before the send, so a
+   cron that fires twice mails nobody twice. An owner with no address is
+   skipped everywhere.
 
-   Needs: an email column per owner (nothing stores one today), a per-member
-   on/off list, `RESEND_API_KEY` in Vercel, a verified sending domain under
-   `dowhatsolutions.com`, and an unsubscribe link. Send from the server only,
-   never from the browser. Log every send in the audit trail, and make sends
-   idempotent so a retry cannot mail the league twice. Local development should
-   write mail to a file instead of sending.
+   Still open: mail when a vote opens, is edited or closes; mail when a rule
+   book revision publishes, asking for a signature; an on-the-clock note during
+   the draft.
+
+   Needs in Vercel: `RESEND_API_KEY`, `CRON_SECRET` (the cron route refuses
+   anything else, and refuses everything but localhost when it is unset),
+   `PUBLIC_APP_URL` so the buttons point at the real host, and a verified
+   sending domain under `dowhatsolutions.com`. There is no unsubscribe link on
+   purpose: ten people who chose to join, and the commissioner clears an
+   address if somebody wants out. Locally, with no key, the mailer prints what
+   it would have sent and nothing leaves the machine.
 
 ### Scope note: this app augments ESPN, it does not replace it
 

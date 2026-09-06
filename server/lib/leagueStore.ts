@@ -205,6 +205,19 @@ export interface SessionRow {
   impersonatedBy?: string | null;
 }
 
+/**
+ * One notification that has already gone out.
+ *
+ * The key comes from reminderKey() and names the season, the reminder and the
+ * owner. It exists so a cron that fires twice, or a deploy that replays an
+ * hour, never mails ten people the same warning again.
+ */
+export interface SentNoticeRow {
+  key: string;
+  season: number;
+  sentAt: string;
+}
+
 export class PollWriteError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -407,6 +420,9 @@ interface StoreBackend {
   getLatestHistoryVersion(season: number): Promise<LeagueHistoryVersionRow | null>;
   getHistoryVersion(id: string): Promise<LeagueHistoryVersionRow | null>;
   listHistoryVersions(season: number): Promise<Array<Omit<LeagueHistoryVersionRow, 'history'>>>;
+  listSentNotices(season: number): Promise<string[]>;
+  /** True when this caller claimed the key, false when it was already taken. */
+  claimSentNotice(key: string, season: number, sentAt: string): Promise<boolean>;
   listPolls(season: number): Promise<unknown[]>;
   getPoll(id: string): Promise<unknown | null>;
   insertPoll(id: string, season: number, data: unknown, at: string): Promise<void>;
@@ -582,6 +598,13 @@ class NeonBackend implements StoreBackend {
       season int not null,
       data jsonb not null,
       updated_at timestamptz not null
+    )`;
+    // One row per notification already sent. The primary key is what stops a
+    // second cron run mailing the same warning twice.
+    await this.sql`CREATE TABLE IF NOT EXISTS sent_notices (
+      key text primary key,
+      season int not null,
+      sent_at timestamptz not null
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_versions (
       id text primary key,
@@ -1269,6 +1292,25 @@ class NeonBackend implements StoreBackend {
     return rows.map((raw) => historyVersionSummary(toHistoryVersionRow(raw)));
   }
 
+  async listSentNotices(season: number): Promise<string[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT key FROM sent_notices WHERE season = ${season}`) as Array<{
+      key: string;
+    }>;
+    return rows.map((r) => r.key);
+  }
+
+  async claimSentNotice(key: string, season: number, sentAt: string): Promise<boolean> {
+    await this.ensureInit();
+    // DO NOTHING, then look at what came back: two cron runs at once both try
+    // to claim, and exactly one of them gets a row.
+    const rows = (await this.sql`INSERT INTO sent_notices (key, season, sent_at)
+      VALUES (${key}, ${season}, ${sentAt})
+      ON CONFLICT (key) DO NOTHING
+      RETURNING key`) as Array<{ key: string }>;
+    return rows.length > 0;
+  }
+
   async listPolls(season: number): Promise<unknown[]> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data FROM polls WHERE season = ${season}
@@ -1346,6 +1388,7 @@ interface FileDoc {
   historyDrafts: LeagueHistoryDraftRow[];
   historyVersions: LeagueHistoryVersionRow[];
   polls: PollRow[];
+  sentNotices: SentNoticeRow[];
   ownerEmails: OwnerEmailRow[];
   loginTokens: LoginTokenRow[];
   sessions: SessionRow[];
@@ -1368,6 +1411,7 @@ function emptyDoc(): FileDoc {
     historyDrafts: [],
     historyVersions: [],
     polls: [],
+    sentNotices: [],
     ownerEmails: [],
     loginTokens: [],
     sessions: [],
@@ -1421,6 +1465,7 @@ class FileBackend implements StoreBackend {
         historyDrafts: Array.isArray(doc.historyDrafts) ? doc.historyDrafts : [],
         historyVersions: Array.isArray(doc.historyVersions) ? doc.historyVersions : [],
         polls: Array.isArray(doc.polls) ? doc.polls : [],
+        sentNotices: Array.isArray(doc.sentNotices) ? doc.sentNotices : [],
         ownerEmails: Array.isArray(doc.ownerEmails) ? doc.ownerEmails : [],
         loginTokens: Array.isArray(doc.loginTokens) ? doc.loginTokens : [],
         sessions: Array.isArray(doc.sessions) ? doc.sessions : [],
@@ -1918,6 +1963,24 @@ class FileBackend implements StoreBackend {
   async listHistoryVersions(season: number): Promise<Array<Omit<LeagueHistoryVersionRow, 'history'>>> {
     await this.ensureInit();
     return this.sortedHistoryVersions(season).map(historyVersionSummary);
+  }
+
+  async listSentNotices(season: number): Promise<string[]> {
+    await this.ensureInit();
+    return this.readDoc()
+      .sentNotices.filter((row) => row.season === season)
+      .map((row) => row.key);
+  }
+
+  async claimSentNotice(key: string, season: number, sentAt: string): Promise<boolean> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (doc.sentNotices.some((row) => row.key === key)) return false;
+      doc.sentNotices.push({ key, season, sentAt });
+      this.writeDoc(doc);
+      return true;
+    });
   }
 
   async listPolls(season: number): Promise<unknown[]> {
@@ -2434,6 +2497,19 @@ export async function listHistoryVersions(
 
 export async function listPolls(season: number): Promise<unknown[]> {
   return getBackend().listPolls(season);
+}
+
+/** Keys of every notification already sent this season. */
+export async function listSentNotices(season: number): Promise<string[]> {
+  return getBackend().listSentNotices(season);
+}
+
+/**
+ * Take a notification key. True means it is yours to send; false means it has
+ * already gone out and you must send nothing.
+ */
+export async function claimSentNotice(key: string, season: number): Promise<boolean> {
+  return getBackend().claimSentNotice(key, season, new Date().toISOString());
 }
 
 export async function getPoll(id: string): Promise<unknown | null> {
