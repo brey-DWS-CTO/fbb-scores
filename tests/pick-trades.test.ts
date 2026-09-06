@@ -169,7 +169,7 @@ test('before the draft every pick a team holds in a tradeable round can move', (
   const picks = tradablePicksFor(dataset, state(), 'Amy');
   assert.equal(picks.length, dataset.draftRounds, 'every pick is still listed');
   for (const entry of picks) {
-    const allowed = entry.ref.round >= 3 && entry.ref.round <= dataset.keeperRounds;
+    const allowed = entry.ref.round >= 3 && entry.ref.round <= dataset.draftRounds;
     assert.equal(entry.tradable, allowed, `round ${entry.ref.round}`);
     if (!allowed) assert.equal(entry.blockedBy, 'round-protected');
   }
@@ -180,11 +180,16 @@ test('the 1st and 2nd rounds never move, whoever asks', () => {
     const check = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }));
     assert.equal(check.reason, 'round-protected');
   }
-  // Rounds past the keeper tiers were never tradeable either.
-  assert.equal(
-    checkProposalShape(dataset, input({ offer: [ref(14, 'Amy')] })).reason,
-    'round-protected',
-  );
+});
+
+test('the late rounds move, even though they have no keeper tier', () => {
+  // The commissioner opened rounds past the keeper tiers. They carry no tier,
+  // so moving one cannot change what anybody's keepers cost. The rule book
+  // still says 3 to 10; see issue picktrade-late-rounds.
+  for (const round of [11, 12, 13, 14]) {
+    const check = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }));
+    assert.notEqual(check.reason, 'round-protected', `round ${round} should move`);
+  }
 });
 
 test('during the draft a used pick cannot move but the pick on the clock can', () => {
@@ -724,7 +729,7 @@ test('next season every team owns its own rounds again, with no slot', () => {
 
   const amy = tradableSeasonPicksFor(dataset, state(), 'Amy', NEXT);
   assert.equal(amy.length, dataset.draftRounds);
-  assert.equal(amy.filter((pick) => pick.tradable).length, 8, 'rounds 3 to 10');
+  assert.equal(amy.filter((pick) => pick.tradable).length, 12, 'rounds 3 to 14');
   assert.equal(amy.find((pick) => pick.ref.round === 5)?.label, `Round 5, Oct ${NEXT - 1} draft`);
 });
 

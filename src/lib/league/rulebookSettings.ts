@@ -76,8 +76,8 @@ export function buildSettingsRegistry(dataset: LeagueDataset): Map<string, Setti
     {
       key: 'picktrade.tradableRounds',
       label: 'Rounds that can be traded',
-      value: `3-${dataset.keeperRounds}`,
-      source: 'Keeper tiers span',
+      value: `3-${dataset.draftRounds}`,
+      source: 'Commissioner ruling, ahead of the rule book',
     },
   ];
   return new Map(specs.map((spec) => [spec.key, spec]));
