@@ -26,8 +26,13 @@ ALLOW = os.environ.get("ALLOW_MASTER") == "1"
 
 # `git commit` on master, and the ship script. Nothing else is blocked: reading,
 # branching, merging, pushing a branch and opening a PR all stay free.
-COMMIT = re.compile(r"\bgit\s+(-[^\s]+\s+)*commit\b")
-SHIP = re.compile(r"\bnpm\s+run\s+ship\b|\bship-production\.mjs\b")
+#
+# Both patterns require the command to sit where a command can start: the front
+# of the line, or after a separator. Without that, writing the words inside a
+# pull request body blocks the pull request, which happened the first time.
+START = r"(?:^|[\n;&|(]|&&|\|\|)\s*"
+COMMIT = re.compile(START + r"git\s+(?:-[^\s]+\s+)*commit\b")
+SHIP = re.compile(START + r"(?:npm\s+run\s+ship\b|node\s+scripts/ship-production\.mjs\b)")
 
 
 def current_branch() -> str:
