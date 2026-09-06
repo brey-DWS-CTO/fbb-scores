@@ -15,17 +15,18 @@ import {
 } from '../../lib/league/api.js';
 import {
   assetOrigin,
-  describeRef,
+  exactPickLabel,
+  exactPickTitle,
   groupPicksByOrigin,
   MAX_PICKS_PER_SIDE,
   MAX_TRADE_NOTE,
   ordinal,
   pickRefKey,
-  pickTitle,
   sameRef,
   STATUS_LABEL,
   tradablePicksFor,
   tradeSidesFor,
+  type DraftOrder,
   type PickRef,
   type PickTradeProposal,
   type TradablePick,
@@ -101,14 +102,25 @@ function PickPicker({
 
 /**
  * A round number on its own is ambiguous: a pick's identity is its round plus
- * the team it came from. So every row names both, and says which way it goes.
+ * the team it came from. So the title carries the exact pick, 1.9, the same
+ * number the draft board and the picker chips use, and the line under it says
+ * which team the pick started with. Two first rounders in one trade stay
+ * apart.
+ *
+ * The badge keeps the round and the season. A trade has two sides and the
+ * heading already names them, so a "from Kyle" line under every row would only
+ * repeat what the column and the card header said. Direction is carried by the
+ * heading and the colour down the edge.
  */
-/**
- * A trade has two sides and the heading already names them, so a "from Kyle"
- * line under every row only repeats what the column and the card header said.
- * Direction is carried by the heading and the colour down the edge.
- */
-function AssetRow({ asset, season }: { asset: TradeAsset; season: number }) {
+function AssetRow({
+  asset,
+  order,
+  season,
+}: {
+  asset: TradeAsset;
+  order: DraftOrder;
+  season: number;
+}) {
   return (
     <li className="trade-asset">
       <span className="trade-asset-badge" aria-hidden="true">
@@ -116,7 +128,7 @@ function AssetRow({ asset, season }: { asset: TradeAsset; season: number }) {
         <span className="trade-asset-year">{season}</span>
       </span>
       <span className="trade-asset-text">
-        <strong className="trade-asset-title">{pickTitle(asset.ref)}</strong>
+        <strong className="trade-asset-title">{exactPickTitle(order, asset.ref)}</strong>
         <span className="trade-asset-origin">{assetOrigin(asset)}</span>
       </span>
     </li>
@@ -126,11 +138,13 @@ function AssetRow({ asset, season }: { asset: TradeAsset; season: number }) {
 function TradeColumn({
   heading,
   assets,
+  order,
   season,
   incoming,
 }: {
   heading: string;
   assets: TradeAsset[];
+  order: DraftOrder;
   season: number;
   incoming: boolean;
 }) {
@@ -142,7 +156,12 @@ function TradeColumn({
       ) : (
         <ul className="trade-assets">
           {assets.map((asset) => (
-            <AssetRow key={pickRefKey(asset.ref)} asset={asset} season={season} />
+            <AssetRow
+              key={pickRefKey(asset.ref)}
+              asset={asset}
+              order={order}
+              season={season}
+            />
           ))}
         </ul>
       )}
@@ -157,11 +176,13 @@ function TradeColumn({
 function TradeSummary({
   proposal,
   reader,
+  order,
   season,
   named = false,
 }: {
   proposal: Pick<PickTradeProposal, 'proposer' | 'recipient' | 'offer' | 'request'>;
   reader: string;
+  order: DraftOrder;
   season: number;
   named?: boolean;
 }) {
@@ -171,12 +192,14 @@ function TradeSummary({
       <TradeColumn
         heading={named ? `${reader} receives` : 'Receives'}
         assets={sides.receives}
+        order={order}
         season={season}
         incoming
       />
       <TradeColumn
         heading={named ? `${reader} sends` : 'Sends'}
         assets={sides.sends}
+        order={order}
         season={season}
         incoming={false}
       />
@@ -195,6 +218,7 @@ function ReviewPanel({
   giver,
   taker,
   reader,
+  order,
   season,
 }: {
   preview: TradePreview;
@@ -203,6 +227,7 @@ function ReviewPanel({
   giver: string;
   taker: string;
   reader: string;
+  order: DraftOrder;
   season: number;
 }) {
   return (
@@ -210,6 +235,7 @@ function ReviewPanel({
       <TradeSummary
         proposal={{ proposer: giver, recipient: taker, offer: give, request: get }}
         reader={reader}
+        order={order}
         season={season}
       />
 
@@ -245,7 +271,7 @@ function ReviewPanel({
             .filter((entry) => entry.steps.length > 0)
             .map((entry) => (
               <p key={pickRefKey(entry.ref)} className="trade-history-line">
-                <strong>{describeRef(entry.ref)}</strong>{' '}
+                <strong>Pick {exactPickLabel(order, entry.ref)}</strong>{' '}
                 {[entry.ref.originalOwner, ...entry.steps.map((s) => s.to)].join(' → ')}
               </p>
             ))}
@@ -262,6 +288,7 @@ function ReviewPanel({
 function TradeCard({
   proposal,
   owner,
+  order,
   isCommish,
   busy,
   onAccept,
@@ -270,6 +297,7 @@ function TradeCard({
 }: {
   proposal: PickTradeProposal;
   owner: string;
+  order: DraftOrder;
   isCommish: boolean;
   busy: boolean;
   onAccept: (p: PickTradeProposal) => void;
@@ -318,6 +346,7 @@ function TradeCard({
       <TradeSummary
         proposal={proposal}
         reader={reader}
+        order={order}
         season={proposal.season}
         named={!inIt}
       />
@@ -347,6 +376,7 @@ function TradeCard({
           giver={proposal.proposer}
           taker={proposal.recipient}
           reader={reader}
+          order={order}
           season={proposal.season}
         />
       )}
@@ -584,6 +614,7 @@ export default function TradesPage() {
               giver={owner}
               taker={partner}
               reader={owner}
+              order={dataset}
               season={dataset.season}
             />
           )}
@@ -650,6 +681,7 @@ export default function TradesPage() {
             key={proposal.id}
             proposal={proposal}
             owner={owner}
+            order={dataset}
             isCommish={identity.isCommissioner}
             busy={busy}
             onAccept={(p) => act(() => acceptPickTrade(identity, p.id, p.version))}
