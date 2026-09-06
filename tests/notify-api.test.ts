@@ -74,7 +74,13 @@ async function request(
 }
 
 const asRecord = (body: unknown) => body as Record<string, unknown>;
-const ref = (round: number, originalOwner: string): PickRef => ({ round, originalOwner });
+// Picks carry the season they belong to now, and only rounds 3 through 10
+// trade. Round 2 is protected, which is why these are 7s and 4s.
+const ref = (round: number, originalOwner: string): PickRef => ({
+  season: 2027,
+  round,
+  originalOwner,
+});
 
 const propose = (proposer: string, recipient: string, offer: PickRef[], want: PickRef[]) =>
   request('/api/league/pick-trades', {
@@ -180,7 +186,7 @@ beforeEach(async () => {
 /* ─── Trades ───────────────────────────────────────────────────────────── */
 
 test('an offer mails the person who has to answer it, and nobody else', async () => {
-  const created = await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')]);
+  const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
   assert.equal(created.status, 200);
   await settled();
 
@@ -191,7 +197,7 @@ test('an offer mails the person who has to answer it, and nobody else', async ()
 });
 
 test('taking an offer mails the member who sent it', async () => {
-  const created = await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')]);
+  const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
   const proposal = asRecord(created.body).proposal as PickTradeProposal;
   mailLog = [];
 
@@ -206,7 +212,7 @@ test('taking an offer mails the member who sent it', async () => {
 });
 
 test('turning an offer down mails the member who sent it', async () => {
-  const created = await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')]);
+  const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
   const proposal = asRecord(created.body).proposal as PickTradeProposal;
   mailLog = [];
 
@@ -220,7 +226,7 @@ test('turning an offer down mails the member who sent it', async () => {
 });
 
 test('pulling an offer back mails the member it was sent to', async () => {
-  const created = await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')]);
+  const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
   const proposal = asRecord(created.body).proposal as PickTradeProposal;
   mailLog = [];
 
@@ -236,7 +242,7 @@ test('pulling an offer back mails the member it was sent to', async () => {
 test('a mail service that will not answer still leaves the trade done', async () => {
   process.env.RESEND_API_KEY = 'not-a-real-key';
   try {
-    const created = await propose('Amy', 'Kyle', [ref(2, 'Amy')], [ref(4, 'Kyle')]);
+    const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
     assert.equal(created.status, 200, 'the offer stands whatever the mail service does');
     await settled();
     assert.equal(mails().length, 0, 'nothing was written to the log outbox');

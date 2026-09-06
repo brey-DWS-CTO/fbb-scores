@@ -12,6 +12,7 @@
  *  - A reminder goes out once. The key is claimed in the store before the
  *    send, so a cron that fires twice mails nobody twice.
  */
+import { waitUntil } from '@vercel/functions';
 import rawDataset from '../../src/data/league-2027.json' with { type: 'json' };
 import type { LeagueDataset, PickRef, PickTradeProposal } from '../../src/lib/keeper/types.js';
 import { describeTrade, exactPickLabel } from '../../src/lib/league/pickTrades.js';
@@ -41,12 +42,23 @@ let pending: Promise<void> = Promise.resolve();
  * The work begins now; nothing waits for it. Errors are swallowed on purpose,
  * because the thing that triggered the mail has already happened and cannot be
  * undone by a mail server having a bad day.
+ *
+ * On Vercel a function can be frozen the moment it answers, which would cut a
+ * send off in flight and lose the mail with no error anywhere. `waitUntil`
+ * tells the platform to keep the function alive until the send finishes. It
+ * does nothing outside Vercel, so local and test runs are unchanged.
  */
 function queueMail(what: string, work: () => Promise<void>): void {
   const run = work().catch((err) => {
     console.error(`[notify] ${what} failed:`, err instanceof Error ? err.message : err);
   });
   pending = pending.then(() => run);
+  try {
+    waitUntil(run);
+  } catch {
+    // Outside a Vercel request there is nothing to hold open, and the send is
+    // already running. Losing this is not a reason to lose the send.
+  }
 }
 
 /** Waits for every queued send. For tests, not for routes. */
