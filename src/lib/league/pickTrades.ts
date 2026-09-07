@@ -31,6 +31,7 @@ import {
 } from '../keeper/engine.js';
 import type {
   BoardCell,
+  KeeperSelection,
   LeagueDataset,
   LeagueDynamicState,
   PickRef,
@@ -466,7 +467,7 @@ export function seasonPicksFor(
 }
 
 /** Why a pick cannot move. */
-export type PickBlock = 'drafted' | 'keeper' | 'round-protected';
+export type PickBlock = 'drafted' | 'round-protected';
 
 /** True when the rule book lets this round be traded at all. */
 /**
@@ -505,10 +506,13 @@ export interface TradablePick {
  * still move.
  *
  * Before the draft everything the team owns in a tradeable round can move,
- * keeper slots included. A keeper only pencils a pick in, and the engine
- * reprices it after a trade, which is the whole point of the cost preview. Once
- * the draft is running the board is real: a pick with anyone in it stays put,
- * while the pick on the clock is still empty and can move.
+ * keeper slots included. A keeper only pencils a pick in. Moving the pick a
+ * keeper is charged to resets that owner's keepers, and they pick again before
+ * the deadline. Blocking the pick instead used to leak: an untradeable pick
+ * told the other side which tier a hidden keeper was on.
+ *
+ * Once the draft is running the board is real: a pick with anyone in it stays
+ * put, while the pick on the clock is still empty and can move.
  */
 export function tradablePicksFor(
   dataset: LeagueDataset,
@@ -527,7 +531,7 @@ function toTradablePick(
   cell: BoardCell,
   draftLive: boolean,
 ): TradablePick {
-  const blockedBy = blockFor(dataset, cell.pick.round, cell.selection !== null, cell.keeper !== null, draftLive);
+  const blockedBy = blockFor(dataset, cell.pick.round, cell.selection !== null, draftLive);
   return {
     ref: refOf(cell.pick),
     pick: cell.pick,
@@ -542,15 +546,9 @@ function blockFor(
   dataset: LeagueDataset,
   round: number,
   drafted: boolean,
-  holdsKeeper: boolean,
   draftLive: boolean,
 ): PickBlock | undefined {
   if (drafted) return 'drafted';
-  // A pick a keeper is paying with is spoken for, draft or no draft. Trading
-  // it used to quietly move the keeper onto a BETTER pick, which is a penalty
-  // the rule book never wrote down. Take the keeper off first if you want the
-  // pick back.
-  if (holdsKeeper) return 'keeper';
   if (!isTradeableRound(dataset, round, !draftLive)) return 'round-protected';
   return undefined;
 }
@@ -566,8 +564,8 @@ export interface TradableSeasonPick extends SeasonPick {
  * Every pick a team holds in one season's draft, flagged for whether it can
  * move. Use this when the season may not be the current one.
  *
- * A pick in a future draft is never drafted, never holding a keeper, and never
- * on the clock, so only the round rule can stop it.
+ * A pick in a future draft is never drafted and never on the clock, so only the
+ * round rule can stop it.
  */
 export function tradableSeasonPicksFor(
   dataset: LeagueDataset,
@@ -868,17 +866,14 @@ export function checkProposalAgainstState(
       const cell = byKey.get(pickRefKey(ref));
       if (!cell) continue; // A future draft has no board, so nothing can be used.
       const entry = toTradablePick(dataset, cell, live);
-      if (!entry.tradable) {
-        if (entry.blockedBy === 'drafted') {
-          return refuse('pick-used', `Pick ${entry.label} has already been used in the draft.`, true);
-        }
-        // Naming the pick would tell the other side which tier a hidden keeper
-        // is on. Once keepers are out there is nothing left to give away.
+      if (entry.blockedBy === 'drafted') {
+        return refuse('pick-used', `Pick ${entry.label} has already been used in the draft.`, true);
+      }
+      if (entry.blockedBy === 'round-protected') {
         return refuse(
-          'pick-used',
-          state.keepersRevealed === true
-            ? `Pick ${entry.label} is paying for a keeper. Take the keeper off first.`
-            : 'One of those picks is paying for a keeper. Take the keeper off first.',
+          'round-protected',
+          `Only rounds ${FIRST_TRADEABLE_ROUND} to ${lastTradeableRound(dataset, false)} `
+          + 'can be traded once the draft has started.',
         );
       }
     }
@@ -1056,6 +1051,111 @@ export function visibleProposals(
 export function inboxCount(proposals: PickTradeProposal[], owner: string | null): number {
   if (!owner) return 0;
   return proposals.filter((p) => isPending(p) && p.recipient === owner).length;
+}
+
+/* ------------------------------------------------------------------ */
+/* Picks that are paying for a keeper                                  */
+/* ------------------------------------------------------------------ */
+
+/** One pick in a trade that its owner's keeper is charged to right now. */
+export interface KeeperCharge {
+  ref: PickRef;
+  /** The exact pick, "4.10". A round on its own names the wrong pick. */
+  label: string;
+  playerName: string;
+}
+
+/**
+ * The picks in `refs` that this owner's keepers are actually charged to.
+ *
+ * The engine charges a keeper to the worst pick the team owns at or better
+ * than the keeper's tier round. A team holding 4.4, 4.9 and 4.10 pays its
+ * round-4 keeper out of 4.10, so trading 4.4 or 4.9 changes nothing and
+ * trading 4.10 changes everything. Keying on the round instead of the exact
+ * pick would reset the wrong people. The engine works the pick out; this only
+ * reads it back.
+ */
+export function keeperChargedPicks(
+  dataset: LeagueDataset,
+  owner: string,
+  selections: KeeperSelection[],
+  refs: PickRef[],
+): KeeperCharge[] {
+  if (selections.length === 0 || refs.length === 0) return [];
+  const moving = new Set(refs.map(pickRefKey));
+  const charges: KeeperCharge[] = [];
+  for (const keeper of resolveTeamKeepers(dataset, owner, selections).keepers) {
+    if (!keeper.pick) continue;
+    const ref = refOf(keeper.pick);
+    if (!moving.has(pickRefKey(ref))) continue;
+    charges.push({ ref, label: pickLabel(keeper.pick), playerName: keeper.selection.playerName });
+  }
+  return charges;
+}
+
+/**
+ * Whose keeper selections an accepted trade wipes.
+ *
+ * Only the owner whose charged pick moves is reset, never both sides, and all
+ * of that owner's keepers go, not only the one on the pick. They pick again
+ * before the keeper deadline.
+ *
+ * Locked keepers are never reset. Nobody can re-pick after the deadline, so a
+ * trade that would leave a locked owner unable to pay is refused instead. See
+ * the `keeper-broken` guard in `checkProposalAgainstState`.
+ */
+export function ownersResetByTrade(
+  dataset: LeagueDataset,
+  state: Pick<LeagueDynamicState, 'keepers' | 'locks'>,
+  input: ProposalInput,
+): string[] {
+  if (state.locks.keepersLocked) return [];
+  const sides: Array<[string, PickRef[]]> = [
+    [input.proposer, input.offer],
+    [input.recipient, input.request],
+  ];
+  return sides
+    .filter(([owner, refs]) =>
+      keeperChargedPicks(dataset, owner, state.keepers[owner] ?? [], refs).length > 0)
+    .map(([owner]) => owner);
+}
+
+/** Which side of the trade the reader is on when the warning is written. */
+export type KeeperResetMoment = 'send' | 'accept';
+
+export interface KeeperResetWarning {
+  charges: KeeperCharge[];
+  /** One line per affected pick, then what happens. Show them in order. */
+  lines: string[];
+}
+
+/**
+ * The warning one member reads before a trade that would reset their keepers.
+ *
+ * It names only the reader's own picks and the reader's own players. Showing
+ * the other side's would rebuild the leak this rule was written to close.
+ * Null when nothing of theirs is paying for a keeper, so an ordinary trade
+ * gets no extra step.
+ */
+export function keeperResetWarning(
+  dataset: LeagueDataset,
+  state: Pick<LeagueDynamicState, 'keepers' | 'locks'>,
+  owner: string,
+  refs: PickRef[],
+  moment: KeeperResetMoment,
+): KeeperResetWarning | null {
+  if (state.locks.keepersLocked) return null;
+  const charges = keeperChargedPicks(dataset, owner, state.keepers[owner] ?? [], refs);
+  if (charges.length === 0) return null;
+  const lines = charges.map(
+    (charge) => `Pick ${charge.label} is currently being used to keep ${charge.playerName}.`,
+  );
+  lines.push(
+    moment === 'send'
+      ? 'If this trade is accepted, your keepers will be reset.'
+      : 'Accepting this trade will reset your keepers.',
+  );
+  return { charges, lines };
 }
 
 /* ------------------------------------------------------------------ */

@@ -2808,6 +2808,51 @@ th.schedule-col-active {
   vertical-align: -0.16em;
 }
 
+/* ─── The keeper reset warning ───────────────────────────────────────── */
+/* A trade can take the pick a keeper is paying for. Nobody should find that
+   out afterwards, so it stops the thumb before the tap lands. */
+.keeper-reset-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.62);
+}
+.keeper-reset {
+  width: min(100%, 420px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 18px 16px;
+  border: 2px solid var(--neon-red);
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+}
+.keeper-reset-line {
+  margin: 10px 0 0;
+  color: var(--text-hi);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.keeper-reset-note {
+  margin: 12px 0 0;
+  color: var(--text-mid);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+.keeper-reset-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+@media (min-width: 420px) {
+  .keeper-reset-actions { flex-direction: row; }
+  .keeper-reset-actions > * { flex: 1; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

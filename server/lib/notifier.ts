@@ -18,6 +18,7 @@ import type { LeagueDataset, PickRef, PickTradeProposal } from '../../src/lib/ke
 import { describeTrade, exactPickLabel } from '../../src/lib/league/pickTrades.js';
 import {
   dueReminders,
+  keeperDeadline,
   reminderCopy,
   type DueReminder,
 } from '../../src/lib/league/notifications.js';
@@ -124,8 +125,44 @@ export function notifyTradeOffered(proposal: PickTradeProposal, origin: string):
   );
 }
 
-/** A trade was taken. Mails the person who sent it. */
-export function notifyTradeAccepted(proposal: PickTradeProposal, origin: string): void {
+/** The keeper deadline in Pacific time, which is how the league says dates. */
+function keeperDeadlineLabel(): string {
+  const at = keeperDeadline(new Date(DRAFT_AT_ISO));
+  return `${at.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })} Pacific`;
+}
+
+/**
+ * The line an owner reads when a trade took the pick their keeper was paying
+ * with. Their whole keeper list is gone and they pick again.
+ */
+function keeperResetLines(): string[] {
+  return [
+    'That trade moved a pick one of your keepers was paying for, so your keepers have been cleared.',
+    `Pick them again by ${keeperDeadlineLabel()}.`,
+  ];
+}
+
+function keeperLink(origin: string): string {
+  return `${origin}/keepers`;
+}
+
+/**
+ * A trade was taken. Mails the person who sent it, and tells either side whose
+ * keepers the trade cleared that they have to pick again.
+ */
+export function notifyTradeAccepted(
+  proposal: PickTradeProposal,
+  origin: string,
+  keepersReset: string[] = [],
+): void {
+  const proposerReset = keepersReset.includes(proposal.proposer);
   queueMail('trade accepted', () =>
     mailTo(
       proposal.proposer,
@@ -136,8 +173,28 @@ export function notifyTradeAccepted(proposal: PickTradeProposal, origin: string)
         lines: [
           `${proposal.recipient} took your offer.`,
           `You give ${sideLabel(proposal.offer)}. You get ${sideLabel(proposal.request)}.`,
+          ...(proposerReset ? keeperResetLines() : []),
         ],
-        action: { label: 'SEE THE PICKS', href: tradeLink(origin) },
+        action: proposerReset
+          ? { label: 'PICK YOUR KEEPERS', href: keeperLink(origin) }
+          : { label: 'SEE THE PICKS', href: tradeLink(origin) },
+      },
+      origin,
+    ),
+  );
+
+  // The member who accepted gets no trade mail, because they were there. They
+  // do get one when their own keepers went with it.
+  if (!keepersReset.includes(proposal.recipient)) return;
+  queueMail('keepers reset', () =>
+    mailTo(
+      proposal.recipient,
+      {
+        subject: 'Your keepers need picking again',
+        preheader: describeTrade(proposal, leagueDataset),
+        heading: 'Your keepers are cleared',
+        lines: keeperResetLines(),
+        action: { label: 'PICK YOUR KEEPERS', href: keeperLink(origin) },
       },
       origin,
     ),
