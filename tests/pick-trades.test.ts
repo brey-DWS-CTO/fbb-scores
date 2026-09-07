@@ -476,6 +476,57 @@ test('keeper names stay hidden from the other side before the reveal', () => {
   assert.equal(kyle.detailed, false);
   assert.equal(kyle.changes.length, 0, 'no player names leak');
   assert.ok(kyle.summary.length > 0, 'the other side still gets a plain answer');
+  // The summary used to read "Kyle's keepers still work. 1 would cost a
+  // different pick", which tells Amy a pick in this trade is charged to a
+  // Kyle keeper. That is the tier, which is the whole secret.
+  assert.doesNotMatch(kyle.summary, /different pick|still work|no longer pay|problem to fix/);
+});
+
+test('what a hidden keeper costs does not leak through the summary', () => {
+  // Pick a Kyle keeper and put the very pick it is charged to in the trade,
+  // which is the case most likely to give the game away.
+  const player = dataset.players.find(
+    (candidate) =>
+      candidate.fantasyTeam === 'Kyle'
+      && candidate.keeper.eligible
+      && candidate.keeper.round !== null
+      && candidate.keeper.round >= 3,
+  );
+  assert.ok(player, 'fixture needs a keepable Kyle player in a tradeable round');
+  const selections = [{ playerKey: player.key, playerName: player.name }];
+  const live = state({ keepers: { Kyle: selections }, keepersRevealed: false });
+
+  // Ask the engine which pick actually pays for it, then put that in the trade.
+  const resolved = resolveTeamKeepers(dataset, 'Kyle', selections);
+  const chargedPick = resolved.keepers[0]?.pick;
+  assert.ok(chargedPick, 'the keeper is charged to a pick');
+  const chargedRef = {
+    season: dataset.season,
+    round: chargedPick.round,
+    originalOwner: chargedPick.originalOwner,
+  };
+
+  const hidden = previewProposal(
+    dataset,
+    live,
+    input({ recipient: 'Kyle', request: [chargedRef] }),
+    { owner: 'Amy', isCommissioner: false, revealed: false },
+  );
+  const kyleSide = hidden.sides.find((side) => side.owner === 'Kyle');
+  assert.ok(kyleSide);
+  assert.equal(kyleSide.changes.length, 0);
+  assert.doesNotMatch(kyleSide.summary, /different pick|still work|no longer pay|problem to fix/);
+
+  // Once the commissioner reveals keepers there is nothing left to protect.
+  const open = previewProposal(
+    dataset,
+    state({ keepers: { Kyle: selections }, keepersRevealed: true }),
+    input({ recipient: 'Kyle', request: [chargedRef] }),
+    { owner: 'Amy', isCommissioner: false, revealed: true },
+  );
+  const openSide = open.sides.find((side) => side.owner === 'Kyle');
+  assert.ok(openSide);
+  assert.equal(openSide.detailed, true, 'after the reveal the detail is fair game');
 });
 
 test('a locked round-1 keeper cannot be stranded by trading the 1st', () => {

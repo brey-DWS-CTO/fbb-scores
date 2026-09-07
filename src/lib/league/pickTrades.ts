@@ -1264,13 +1264,21 @@ function summarise(
   detailed: boolean,
 ): string {
   if (keeperCount === 0) return `${owner} has no keepers in yet.`;
+  // Everything below this line is about which pick pays for which keeper, and
+  // that is the exact thing kept secret until the reveal. Saying "1 would cost
+  // a different pick" about somebody whose keepers you cannot see tells you a
+  // pick in this trade is charged to one of them, which is the leak the reset
+  // rule exists to avoid. Keeper counts are already public, so the count is
+  // all a stranger gets.
+  if (!detailed) {
+    const noun = keeperCount === 1 ? 'keeper' : 'keepers';
+    return `${owner} has ${keeperCount} ${noun} in. What they cost stays private until the reveal.`;
+  }
   if (worksBefore && !worksAfter) return `${owner} could no longer pay for a keeper after this.`;
   if (!worksBefore) return `${owner}'s keeper set already has a problem to fix.`;
   if (changeCount === 0) return `${owner}'s keeper pick costs do not change.`;
   const noun = changeCount === 1 ? 'keeper' : 'keepers';
-  return detailed
-    ? `${owner}: ${changeCount} ${noun} would cost a different pick.`
-    : `${owner}'s keepers still work. ${changeCount} would cost a different pick.`;
+  return `${owner}: ${changeCount} ${noun} would cost a different pick.`;
 }
 
 /* ------------------------------------------------------------------ */
