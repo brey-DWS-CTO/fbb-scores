@@ -385,56 +385,47 @@ test('the warning names the exact pick and the reader own keeper, and nobody els
   assert.equal(keeperResetWarning(dataset, live, 'Amy', [spare.ref], 'send'), null);
 });
 
-test('with three picks in one round, only the charged one resets the keepers', () => {
+test('with two picks in one round, only the charged one resets the keepers', () => {
   // The engine charges a keeper to the WORST pick owned at or better than the
-  // tier round. Ryan holding 4.4, 4.9 and 4.10 pays out of 4.10. Trading 4.4
-  // or 4.9 must change nothing at all.
+  // tier round. Ryan really holds 4.4 and 4.9, so Banchero pays out of 4.9 and
+  // trading 4.4 must change nothing.
+  //
+  // Two in a round is the most the rule book allows (keepers.picktrade.
+  // maxPerRound), so this is the real shape of the case, not a made-up one.
   const { player, round } = keeperFor('Ryan', 4, 4);
   const selections = [{ playerKey: player.key, playerName: player.name }];
 
-  // Top Ryan up to exactly three picks in that round. The seed already gives
-  // him more than his own, so count first rather than assuming.
-  const inRound = buildAllPicks(dataset).filter((pick) => pick.round === round);
-  const already = inRound.filter((pick) => pick.currentOwner === 'Ryan').length;
-  const donors = inRound
-    .filter((pick) => pick.currentOwner !== 'Ryan' && pick.currentOwner === pick.originalOwner)
-    .slice(0, 3 - already);
-  const stacked = datasetWithTransfers(
-    dataset,
-    donors.map((pick) => transfer(round, pick.originalOwner, pick.currentOwner, 'Ryan')),
-  );
-  const held = buildAllPicks(stacked)
+  const held = buildAllPicks(dataset)
     .filter((pick) => pick.round === round && pick.currentOwner === 'Ryan')
     .sort((a, b) => a.overall - b.overall);
-  assert.equal(held.length, 3, 'Ryan holds three picks in the round');
+  assert.equal(held.length, 2, 'the seed already gives Ryan two picks in this round');
 
-  const charged = resolveTeamKeepers(stacked, 'Ryan', selections).keepers[0].pick;
-  assert.equal(charged?.overall, held[2].overall, 'the latest pick pays');
+  const charged = resolveTeamKeepers(dataset, 'Ryan', selections).keepers[0].pick;
+  assert.equal(charged?.overall, held[1].overall, 'the later pick pays');
 
   const live = state({ keepers: { Ryan: selections }, keepersRevealed: true });
-  for (const spare of [held[0], held[1]]) {
-    const deal = input({
-      proposer: 'Ryan',
-      recipient: 'Kyle',
-      offer: [refOf(spare)],
-      request: [ref(round, 'Kyle')],
-    });
-    assert.deepEqual(
-      ownersResetByTrade(stacked, live, deal),
-      [],
-      `trading ${pickLabel(spare)} leaves the charged pick alone`,
-    );
-    assert.equal(keeperResetWarning(stacked, live, 'Ryan', deal.offer, 'send'), null);
-  }
+
+  const spare = input({
+    proposer: 'Ryan',
+    recipient: 'Kyle',
+    offer: [refOf(held[0])],
+    request: [ref(round, 'Kyle')],
+  });
+  assert.deepEqual(
+    ownersResetByTrade(dataset, live, spare),
+    [],
+    `trading ${pickLabel(held[0])} leaves the charged pick alone`,
+  );
+  assert.equal(keeperResetWarning(dataset, live, 'Ryan', spare.offer, 'send'), null);
 
   const real = input({
     proposer: 'Ryan',
     recipient: 'Kyle',
-    offer: [refOf(held[2])],
+    offer: [refOf(held[1])],
     request: [ref(round, 'Kyle')],
   });
-  assert.deepEqual(ownersResetByTrade(stacked, live, real), ['Ryan']);
-  assert.ok(keeperResetWarning(stacked, live, 'Ryan', real.offer, 'send'));
+  assert.deepEqual(ownersResetByTrade(dataset, live, real), ['Ryan']);
+  assert.ok(keeperResetWarning(dataset, live, 'Ryan', real.offer, 'send'));
 });
 
 test('locked keepers are never reset by a trade', () => {
