@@ -18,6 +18,7 @@ import {
 import {
   assetOrigin,
   exactPickLabel,
+  draftYearLabel,
   exactPickTitle,
   groupPicksByOrigin,
   keeperResetWarning,
@@ -27,13 +28,14 @@ import {
   pickRefKey,
   sameRef,
   STATUS_LABEL,
-  tradablePicksFor,
+  tradableSeasonPicksFor,
+  tradeableSeason,
   tradeSidesFor,
   type DraftOrder,
   type KeeperResetWarning,
   type PickRef,
   type PickTradeProposal,
-  type TradablePick,
+  type TradableSeasonPick,
   type TradeAsset,
   type TradePreview,
 } from '../../lib/league/pickTrades.js';
@@ -54,7 +56,7 @@ function PickPicker({
   onToggle,
 }: {
   heading: string;
-  picks: TradablePick[];
+  picks: TradableSeasonPick[];
   chosen: PickRef[];
   onToggle: (ref: PickRef) => void;
 }) {
@@ -85,8 +87,10 @@ function PickPicker({
                   aria-pressed={on}
                   onClick={() => onToggle(entry.ref)}
                 >
-                  R{entry.ref.round}
-                  <span className="trade-chip-slot"> · {entry.label}</span>
+                  {/* A pick on the board reads "R1 · 1.9". Next year's draft
+                      has no order yet, so its label already says the round and
+                      the year and repeating it would be silly. */}
+                  {entry.slot === null ? entry.label : <>R{entry.ref.round}<span className="trade-chip-slot"> · {entry.label}</span></>}
                   {entry.onClock && <span className="trade-chip-note"> ON THE CLOCK</span>}
                   {entry.blockedBy === 'drafted' && <span className="trade-chip-note"> USED</span>}
                 </button>
@@ -557,13 +561,18 @@ export default function TradesPage() {
     void load();
   }, [load]);
 
+  // Exactly one draft is open for trading at a time, and which one flips when
+  // the commissioner closes the draft. The picker has to follow it or it
+  // offers picks every proposal will be refused for.
+  const openSeason = tradeableSeason(state, dataset);
+
   const myPicks = useMemo(
-    () => (owner ? tradablePicksFor(dataset, state, owner) : []),
-    [dataset, state, owner],
+    () => (owner ? tradableSeasonPicksFor(dataset, state, owner, openSeason) : []),
+    [dataset, state, owner, openSeason],
   );
   const theirPicks = useMemo(
-    () => (partner ? tradablePicksFor(dataset, state, partner) : []),
-    [dataset, state, partner],
+    () => (partner ? tradableSeasonPicksFor(dataset, state, partner, openSeason) : []),
+    [dataset, state, partner, openSeason],
   );
 
   if (!identity) {
@@ -649,7 +658,10 @@ export default function TradesPage() {
             <NavIcon name="swap" size={18} className="icon-in-heading" />
             PICK TRADES
           </h1>
-          <p>Swap draft picks with one other team. Picks only, nothing else.</p>
+          <p>
+            Swap picks in the {draftYearLabel(openSeason)} with one other team. Picks only,
+            nothing else.
+          </p>
         </div>
         <IdentityChip />
       </header>

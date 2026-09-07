@@ -594,12 +594,14 @@ export function tradableSeasonPicksFor(
 }
 
 /** Picks grouped by the team they came from, then by round. For the selector. */
-export function groupPicksByOrigin(picks: TradablePick[]): Array<{
+export function groupPicksByOrigin<T extends { ref: PickRef }>(picks: T[]): Array<{
   originalOwner: string;
-  picks: TradablePick[];
+  picks: T[];
 }> {
-  const groups = new Map<string, TradablePick[]>();
-  for (const entry of [...picks].sort((a, b) => a.pick.round - b.pick.round)) {
+  // Rounds come off the ref, not the board slot, because a pick in a draft
+  // that has no order yet has no slot to read.
+  const groups = new Map<string, T[]>();
+  for (const entry of [...picks].sort((a, b) => a.ref.round - b.ref.round)) {
     const list = groups.get(entry.ref.originalOwner) ?? [];
     list.push(entry);
     groups.set(entry.ref.originalOwner, list);
