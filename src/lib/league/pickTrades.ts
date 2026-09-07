@@ -1196,9 +1196,11 @@ export interface TradePreview {
  * How the trade changes both teams' keeper pick costs.
  *
  * Keeper names are secret until the commissioner reveals them, so the full
- * before/after list is built only for teams the viewer may already see. The
- * other side still gets a plain answer about whether its keepers survive,
- * which is what the member needs to decide.
+ * before/after list is built only for teams the viewer may already see. A side
+ * the viewer may not see gets one thing the league already publishes: how many
+ * keepers that team has in. What those keepers cost, and whether this trade
+ * changes it, stays private. Either would say a pick in this trade is charged
+ * to one of them, which names the tier the reset rule exists to hide.
  */
 export function previewProposal(
   dataset: LeagueDataset,
