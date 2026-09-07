@@ -31,6 +31,7 @@ import {
   involves,
   MAX_TRADE_NOTE,
   normalizeProposal,
+  ownersResetByTrade,
   previewProposal,
   proposalInput,
   proposalsOf,
@@ -1844,6 +1845,8 @@ router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
 interface TradeOutcome {
   proposal?: PickTradeProposal;
   refusal?: { status: number; message: string; code?: string };
+  /** Owners whose keeper selections the accepted trade cleared. */
+  keepersReset?: string[];
 }
 
 /**
@@ -2107,6 +2110,10 @@ router.post('/polls/:id/amend', requireAuth, requireCommissioner, async (req, re
  * owns each pick right now, whether the draft has moved past them, and the
  * keeper lock. If any of it fails the whole thing is refused. A trade never
  * half happens.
+ *
+ * If a pick that was paying for somebody's keeper moves, that owner's keeper
+ * selections are cleared in the same write and they pick again before the
+ * deadline. Only the owner whose pick moved, and all of their keepers.
  */
 router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
   try {
@@ -2153,7 +2160,8 @@ router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
       }
 
       const input = proposalInput(proposal);
-      const check = checkProposalAgainstState(currentDataset(draft), draft, input);
+      const before = currentDataset(draft);
+      const check = checkProposalAgainstState(before, draft, input);
       if (!check.ok) {
         // Something that can never come back, such as a pick that now belongs
         // to a third team, files the offer instead of leaving it in the inbox.
@@ -2182,10 +2190,16 @@ router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
         resolvedAt: now,
         resolvedBy: owner,
       };
+      // Worked out on the board as it stands, before the picks move, because
+      // the question is which pick was paying for a keeper up to now. The
+      // clearing happens in this same write, so a trade and its keeper reset
+      // can never half apply.
+      const keepersReset = ownersResetByTrade(before, draft, input);
       draft.pickTransfers = [
         ...transfersOf(draft),
         ...transfersForProposal(input, now, proposal.id),
       ];
+      for (const reset of keepersReset) draft.keepers[reset] = [];
       draft.pickTradeProposals = proposals.map((p, i) => {
         if (i === index) return accepted;
         if (p.status !== 'pending') return p;
@@ -2198,12 +2212,13 @@ router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
           reason: 'A pick in this offer went somewhere else.',
         };
       });
-      outcomes.push({ proposal: accepted });
+      outcomes.push({ proposal: accepted, keepersReset });
     });
 
     if (sendOutcome(res, outcomes[0])) return;
     const proposal = outcomes[0]?.proposal;
     if (!proposal) throw new HttpError(500, 'The trade could not be saved');
+    const keepersReset = outcomes[0]?.keepersReset ?? [];
     await appendAudit(actor(res), 'pick-trade.accepted', {
       proposalId: proposal.id,
       proposer: proposal.proposer,
@@ -2215,12 +2230,14 @@ router.post('/pick-trades/:id/accept', requireAuth, async (req, res, next) => {
       // Draft positions decide a pick's slot and never move, so the base
       // dataset is enough to name the exact picks here.
       summary: describeTrade(proposal, leagueDataset),
+      keepersReset,
     });
     res.json({
       proposal,
+      keepersReset,
       ...redactState(result, { owner, isCommissioner: isCommish }),
     });
-    notifyTradeAccepted(proposal, appOrigin(req));
+    notifyTradeAccepted(proposal, appOrigin(req), keepersReset);
   } catch (err) {
     next(err);
   }

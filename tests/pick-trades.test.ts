@@ -22,7 +22,9 @@ import {
   expiresAtFrom,
   futurePickLabel,
   inboxCount,
+  keeperResetWarning,
   ordinal,
+  ownersResetByTrade,
   pickRefKey,
   pickSeason,
   pickSlotFor,
@@ -313,57 +315,145 @@ test('a pick already used in the draft cannot be traded', () => {
 
 /* ─── Keeper costs ─────────────────────────────────────────────────────── */
 
-test('the pick a keeper is paying with cannot be traded away', () => {
-  // Give Amy a keeper, then try to trade away the pick that keeper uses.
+/** A keepable player on one team whose tier sits in a round trades can reach. */
+function keeperFor(owner: string, low = 3, high = 6) {
   const player = dataset.players.find(
     (candidate) =>
-      candidate.fantasyTeam === 'Amy'
+      candidate.fantasyTeam === owner
       && candidate.keeper.eligible
       && candidate.keeper.round !== null
-      && candidate.keeper.round >= 3
-      && candidate.keeper.round <= 6
+      && candidate.keeper.round >= low
+      && candidate.keeper.round <= high
       && candidate.keeper.contract === null,
   );
-  assert.ok(player, 'fixture needs a keepable Amy player in rounds 3-6');
-  const round = player.keeper.round as number;
+  assert.ok(player, `fixture needs a keepable ${owner} player in rounds ${low}-${high}`);
+  return { player, round: player.keeper.round as number };
+}
 
+test('the pick a keeper is paying with can be traded, and resets that owner', () => {
+  // Any pick trades now. Blocking one leaked: before the reveal, a pick the
+  // other side could not ask for told them which tier your keeper was on.
+  const { player, round } = keeperFor('Amy');
   const selections = [{ playerKey: player.key, playerName: player.name }];
   const before = resolveTeamKeepers(dataset, 'Amy', selections);
   assert.equal(before.keepers[0].pick?.round, round);
 
-  // Amy sends the pick the keeper would use and gets back a worse one, so the
-  // keeper has to bump to a better pick she already owns.
   const live = state({ keepers: { Amy: selections }, keepersRevealed: true });
-  const preview = previewProposal(
-    dataset,
-    live,
-    input({
-      recipient: 'Bryan',
-      offer: [ref(round, 'Amy')],
-      request: [ref(round + 1, 'Bryan')],
-    }),
-    { owner: 'Amy', isCommissioner: false, revealed: true },
-  );
+  const deal = input({
+    recipient: 'Bryan',
+    offer: [ref(round, 'Amy')],
+    request: [ref(round + 1, 'Bryan')],
+  });
+  const preview = previewProposal(dataset, live, deal, {
+    owner: 'Amy',
+    isCommissioner: false,
+    revealed: true,
+  });
+  assert.equal(preview.check.ok, true, 'the trade goes through');
 
-  // It used to go through and quietly move the keeper onto a better pick, a
-  // penalty the rule book never wrote down. Now it is refused, and Amy can
-  // free the pick by dropping the keeper.
-  assert.equal(preview.check.ok, false);
-  assert.equal(preview.check.reason, 'pick-used');
-  assert.match(String(preview.check.message), /paying for a keeper/);
+  // Amy's keepers go and Bryan's stand, because only Amy's pick was paying.
+  assert.deepEqual(ownersResetByTrade(dataset, live, deal), ['Amy']);
+});
 
-  const noKeeper = state({ keepers: { Amy: [] }, keepersRevealed: true });
-  const freed = previewProposal(
-    dataset,
-    noKeeper,
-    input({
-      recipient: 'Bryan',
-      offer: [ref(round, 'Amy')],
-      request: [ref(round + 1, 'Bryan')],
-    }),
-    { owner: 'Amy', isCommissioner: false, revealed: true },
+test('the warning names the exact pick and the reader own keeper, and nobody else', () => {
+  const { player, round } = keeperFor('Amy');
+  const selections = [{ playerKey: player.key, playerName: player.name }];
+  const charged = resolveTeamKeepers(dataset, 'Amy', selections).keepers[0].pick;
+  assert.ok(charged);
+  const live = state({ keepers: { Amy: selections }, keepersRevealed: true });
+
+  const sending = keeperResetWarning(dataset, live, 'Amy', [ref(round, 'Amy')], 'send');
+  assert.ok(sending);
+  assert.deepEqual(sending.lines, [
+    `Pick ${pickLabel(charged)} is currently being used to keep ${player.name}.`,
+    'If this trade is accepted, your keepers will be reset.',
+  ]);
+
+  const accepting = keeperResetWarning(dataset, live, 'Amy', [ref(round, 'Amy')], 'accept');
+  assert.ok(accepting);
+  assert.equal(accepting.lines[1], 'Accepting this trade will reset your keepers.');
+
+  // Bryan reads the same trade. Amy's keeper is none of his business, and he
+  // has none of his own, so he gets no popup at all.
+  assert.equal(keeperResetWarning(dataset, live, 'Bryan', [ref(round, 'Amy')], 'accept'), null);
+
+  // An ordinary trade of a pick nothing is charged to gets no popup either.
+  const spare = tradablePicksFor(dataset, live, 'Amy').find(
+    (entry) => entry.pick.overall !== charged.overall && entry.pick.round > round,
   );
-  assert.equal(freed.check.ok, true, 'dropping the keeper frees the pick');
+  assert.ok(spare);
+  assert.equal(keeperResetWarning(dataset, live, 'Amy', [spare.ref], 'send'), null);
+});
+
+test('with three picks in one round, only the charged one resets the keepers', () => {
+  // The engine charges a keeper to the WORST pick owned at or better than the
+  // tier round. Ryan holding 4.4, 4.9 and 4.10 pays out of 4.10. Trading 4.4
+  // or 4.9 must change nothing at all.
+  const { player, round } = keeperFor('Ryan', 4, 4);
+  const selections = [{ playerKey: player.key, playerName: player.name }];
+
+  // Top Ryan up to exactly three picks in that round. The seed already gives
+  // him more than his own, so count first rather than assuming.
+  const inRound = buildAllPicks(dataset).filter((pick) => pick.round === round);
+  const already = inRound.filter((pick) => pick.currentOwner === 'Ryan').length;
+  const donors = inRound
+    .filter((pick) => pick.currentOwner !== 'Ryan' && pick.currentOwner === pick.originalOwner)
+    .slice(0, 3 - already);
+  const stacked = datasetWithTransfers(
+    dataset,
+    donors.map((pick) => transfer(round, pick.originalOwner, pick.currentOwner, 'Ryan')),
+  );
+  const held = buildAllPicks(stacked)
+    .filter((pick) => pick.round === round && pick.currentOwner === 'Ryan')
+    .sort((a, b) => a.overall - b.overall);
+  assert.equal(held.length, 3, 'Ryan holds three picks in the round');
+
+  const charged = resolveTeamKeepers(stacked, 'Ryan', selections).keepers[0].pick;
+  assert.equal(charged?.overall, held[2].overall, 'the latest pick pays');
+
+  const live = state({ keepers: { Ryan: selections }, keepersRevealed: true });
+  for (const spare of [held[0], held[1]]) {
+    const deal = input({
+      proposer: 'Ryan',
+      recipient: 'Kyle',
+      offer: [refOf(spare)],
+      request: [ref(round, 'Kyle')],
+    });
+    assert.deepEqual(
+      ownersResetByTrade(stacked, live, deal),
+      [],
+      `trading ${pickLabel(spare)} leaves the charged pick alone`,
+    );
+    assert.equal(keeperResetWarning(stacked, live, 'Ryan', deal.offer, 'send'), null);
+  }
+
+  const real = input({
+    proposer: 'Ryan',
+    recipient: 'Kyle',
+    offer: [refOf(held[2])],
+    request: [ref(round, 'Kyle')],
+  });
+  assert.deepEqual(ownersResetByTrade(stacked, live, real), ['Ryan']);
+  assert.ok(keeperResetWarning(stacked, live, 'Ryan', real.offer, 'send'));
+});
+
+test('locked keepers are never reset by a trade', () => {
+  // Nobody can re-pick after the deadline, so the lock refuses the trades that
+  // would break a keeper set and leaves the rest of them priced by the engine.
+  const { player, round } = keeperFor('Amy');
+  const selections = [{ playerKey: player.key, playerName: player.name }];
+  const locked = state({
+    keepers: { Amy: selections },
+    keepersRevealed: true,
+    locks: { keepersLocked: true },
+  });
+  const deal = input({
+    recipient: 'Bryan',
+    offer: [ref(round, 'Amy')],
+    request: [ref(round + 1, 'Bryan')],
+  });
+  assert.deepEqual(ownersResetByTrade(dataset, locked, deal), []);
+  assert.equal(keeperResetWarning(dataset, locked, 'Amy', deal.offer, 'send'), null);
 });
 
 test('keeper names stay hidden from the other side before the reveal', () => {
@@ -411,9 +501,9 @@ test('a locked round-1 keeper cannot be stranded by trading the 1st', () => {
     input({ offer: [ref(1, 'Amy')], request: [ref(7, 'Kyle')] }),
   );
   assert.equal(check.ok, false);
-  // Caught on the pick now, before the keeper engine is even asked: the pick
-  // is paying for a keeper, so it does not move at all.
-  assert.equal(check.reason, 'pick-used');
+  // The keeper engine catches it: after the lock there is no re-pick, so a
+  // trade that leaves her unable to pay is refused rather than reset.
+  assert.equal(check.reason, 'keeper-broken');
 
   // A trade of picks she may trade leaves the keeper intact and goes through.
   assert.equal(checkProposalAgainstState(dataset, locked, input()).ok, true);

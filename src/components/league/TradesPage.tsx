@@ -20,6 +20,7 @@ import {
   exactPickLabel,
   exactPickTitle,
   groupPicksByOrigin,
+  keeperResetWarning,
   MAX_PICKS_PER_SIDE,
   MAX_TRADE_NOTE,
   ordinal,
@@ -29,6 +30,7 @@ import {
   tradablePicksFor,
   tradeSidesFor,
   type DraftOrder,
+  type KeeperResetWarning,
   type PickRef,
   type PickTradeProposal,
   type TradablePick,
@@ -87,13 +89,70 @@ function PickPicker({
                   <span className="trade-chip-slot"> · {entry.label}</span>
                   {entry.onClock && <span className="trade-chip-note"> ON THE CLOCK</span>}
                   {entry.blockedBy === 'drafted' && <span className="trade-chip-note"> USED</span>}
-                  {entry.blockedBy === 'keeper' && <span className="trade-chip-note"> KEEPER</span>}
                 </button>
               );
             })}
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* The keeper reset warning                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Shown when a trade would move a pick the reader's own keeper is paying for.
+ *
+ * It names the reader's picks and the reader's players, never the other
+ * side's. A blocked pick, or a warning about somebody else's keeper, would
+ * tell the other side which tier a hidden keeper sits on.
+ */
+function KeeperResetDialog({
+  warning,
+  confirmLabel,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  warning: KeeperResetWarning;
+  confirmLabel: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="keeper-reset-backdrop" role="presentation" onClick={onCancel}>
+      <div
+        className="panel keeper-reset"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Your keepers will reset"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className="hub-heading glow-red">YOUR KEEPERS WILL RESET</span>
+        {warning.lines.map((line) => (
+          <p key={line} className="keeper-reset-line">
+            {line}
+          </p>
+        ))}
+        <p className="keeper-reset-note">Pick them again before the keeper deadline.</p>
+        <div className="keeper-reset-actions">
+          <button
+            type="button"
+            className="trade-btn trade-btn-yes tap-btn"
+            disabled={busy}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+          <button type="button" className="trade-btn trade-btn-no tap-btn" onClick={onCancel}>
+            GO BACK
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -293,6 +352,7 @@ function TradeCard({
   order,
   isCommish,
   busy,
+  resetWarning,
   onAccept,
   onReject,
   onCancel,
@@ -302,6 +362,8 @@ function TradeCard({
   order: DraftOrder;
   isCommish: boolean;
   busy: boolean;
+  /** Set when accepting would clear this reader's own keepers. */
+  resetWarning: KeeperResetWarning | null;
   onAccept: (p: PickTradeProposal) => void;
   onReject: (p: PickTradeProposal) => void;
   onCancel: (p: PickTradeProposal) => void;
@@ -310,6 +372,7 @@ function TradeCard({
   const [preview, setPreview] = useState<TradePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [warning, setWarning] = useState(false);
   const { identity } = useIdentity();
 
   const pending = proposal.status === 'pending';
@@ -389,9 +452,15 @@ function TradeCard({
             type="button"
             className="trade-btn trade-btn-yes tap-btn"
             disabled={busy}
-            onClick={() => (confirming ? onAccept(proposal) : setConfirming(true))}
+            onClick={() => {
+              // A trade that clears your keepers gets the warning instead of
+              // the second tap. Every other trade keeps the plain two taps.
+              if (resetWarning) setWarning(true);
+              else if (confirming) onAccept(proposal);
+              else setConfirming(true);
+            }}
           >
-            {confirming ? 'TAP AGAIN TO TRADE' : 'ACCEPT THIS TRADE'}
+            {confirming && !resetWarning ? 'TAP AGAIN TO TRADE' : 'ACCEPT THIS TRADE'}
           </button>
           <button
             type="button"
@@ -403,8 +472,20 @@ function TradeCard({
           </button>
         </div>
       )}
-      {confirming && pending && theirs && (
+      {confirming && !resetWarning && pending && theirs && (
         <p className="trade-reason">The picks move as soon as you tap again.</p>
+      )}
+      {warning && resetWarning && (
+        <KeeperResetDialog
+          warning={resetWarning}
+          confirmLabel="ACCEPT AND RESET"
+          busy={busy}
+          onConfirm={() => {
+            setWarning(false);
+            onAccept(proposal);
+          }}
+          onCancel={() => setWarning(false)}
+        />
       )}
 
       {pending && (mine || isCommish) && (
@@ -459,6 +540,7 @@ export default function TradesPage() {
   const [get, setGet] = useState<PickRef[]>([]);
   const [note, setNote] = useState('');
   const [preview, setPreview] = useState<TradePreview | null>(null);
+  const [sendWarning, setSendWarning] = useState<KeeperResetWarning | null>(null);
 
   const owner = identity?.owner ?? '';
 
@@ -524,6 +606,7 @@ export default function TradesPage() {
     setGet([]);
     setNote('');
     setPreview(null);
+    setSendWarning(null);
   };
 
   const review = () =>
@@ -537,6 +620,14 @@ export default function TradesPage() {
       resetComposer();
       setTab('sent');
     });
+
+  // Only the sender's own picks and own keepers. Warning about the other
+  // side's would say which tier their hidden keeper is on.
+  const askBeforeSending = () => {
+    const warn = keeperResetWarning(dataset, state, owner, give, 'send');
+    if (warn) setSendWarning(warn);
+    else void send();
+  };
 
   const proposals = data?.proposals ?? [];
   const inbox = proposals.filter((p) => p.status === 'pending' && p.recipient === owner);
@@ -656,7 +747,7 @@ export default function TradesPage() {
                 type="button"
                 className="rule-edit-save tap-btn"
                 disabled={busy}
-                onClick={send}
+                onClick={askBeforeSending}
               >
                 {busy ? 'SENDING...' : `SEND IT TO ${partner.toUpperCase()}`}
               </button>
@@ -665,6 +756,19 @@ export default function TradesPage() {
               CANCEL
             </button>
           </div>
+
+          {sendWarning && (
+            <KeeperResetDialog
+              warning={sendWarning}
+              confirmLabel="SEND IT ANYWAY"
+              busy={busy}
+              onConfirm={() => {
+                setSendWarning(null);
+                void send();
+              }}
+              onCancel={() => setSendWarning(null)}
+            />
+          )}
         </div>
       )}
 
@@ -706,6 +810,13 @@ export default function TradesPage() {
             order={dataset}
             isCommish={identity.isCommissioner}
             busy={busy}
+            resetWarning={
+              // Accepting sends the picks this member was asked for, so those
+              // are the ones that could be paying for their keepers.
+              proposal.recipient === owner
+                ? keeperResetWarning(dataset, state, owner, proposal.request, 'accept')
+                : null
+            }
             onAccept={(p) => act(() => acceptPickTrade(identity, p.id, p.version))}
             onReject={(p) => act(() => rejectPickTrade(identity, p.id))}
             onCancel={(p) => act(() => cancelPickTrade(identity, p.id))}

@@ -595,33 +595,44 @@ test('the preview reports how a trade changes keeper pick costs', async () => {
   assert.equal(bryan?.detailed, false, 'the other side stays secret before the reveal');
 });
 
-test('a pick paying for a keeper is refused, and freed by dropping the keeper', async () => {
+test('accepting a trade of the pick a keeper is charged to clears that owner alone', async () => {
   const player = dataset.players.find(
     (candidate) =>
       candidate.fantasyTeam === 'Amy' && candidate.keeper.eligible && candidate.keeper.round === 1,
   );
   assert.ok(player, 'fixture needs a round-1 keeper on Amy');
+  const kyleKeeper = dataset.players.find(
+    (candidate) =>
+      candidate.fantasyTeam === 'Kyle' && candidate.keeper.eligible && candidate.keeper.round === 1,
+  );
+  assert.ok(kyleKeeper, 'fixture needs a round-1 keeper on Kyle');
 
-  await request('/api/league/keepers/Amy', {
-    method: 'PUT',
-    headers: auth('Amy'),
-    body: JSON.stringify({ selections: [{ playerKey: player.key, playerName: player.name }] }),
-  });
+  for (const [owner, keeper] of [['Amy', player], ['Kyle', kyleKeeper]] as const) {
+    assert.equal(
+      (await request(`/api/league/keepers/${owner}`, {
+        method: 'PUT',
+        headers: auth(owner),
+        body: JSON.stringify({
+          selections: [{ playerKey: keeper.key, playerName: keeper.name }],
+        }),
+      })).status,
+      200,
+    );
+  }
 
-  // The 1st moves in the offseason, but not while it is paying for a keeper.
-  const blocked = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
-  assert.equal(blocked.status, 409);
-  assert.equal(asRecord(blocked.body).code, 'pick-used');
+  // The 1st moves in the offseason, keeper or no keeper. Nothing is blocked.
+  const created = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(created.status, 200, 'a pick paying for a keeper still trades');
+  const proposal = asRecord(created.body).proposal as PickTradeProposal;
 
-  // Dropping the keeper frees the pick, which is the whole point of the rule.
-  await request('/api/league/keepers/Amy', {
-    method: 'PUT',
-    headers: auth('Amy'),
-    body: JSON.stringify({ selections: [] }),
-  });
-  const freed = await propose('Amy', 'Kyle', [ref(1, 'Amy')], [ref(4, 'Kyle')]);
-  assert.equal(freed.status, 200, 'no keeper on it, so it moves');
-  assert.equal(await ownerOfPick(1, 'Amy'), 'Amy', 'and nothing moves until it is taken');
+  const taken = await accept('Kyle', proposal.id, proposal.version);
+  assert.equal(taken.status, 200);
+  assert.deepEqual(asRecord(taken.body).keepersReset, ['Amy']);
+  assert.equal(await ownerOfPick(1, 'Amy'), 'Kyle');
+
+  const { state } = await store.getState();
+  assert.deepEqual(state.keepers.Amy, [], "Amy's keepers are cleared, so she picks again");
+  assert.equal(state.keepers.Kyle?.length, 1, 'Kyle kept his: only the moved pick resets');
 });
 
 /* ─── Privacy and commissioner support ─────────────────────────────────── */

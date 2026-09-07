@@ -2693,8 +2693,18 @@
       "type": "settings",
       "severity": "medium",
       "status": "open",
-      "summary": "Nothing in the book says what happens to a keeper when you trade away the pick it is paying with. The app used to move the keeper onto the next better pick, a penalty nobody wrote down.",
-      "ruling": "Commissioner ruled on 2026-09-06 that a pick paying for a keeper is not tradeable at all. Take the keeper off first and the pick is free. The book should say so under keepers.picktrade, so the rule exists in writing rather than only in the app.",
+      "summary": "Nothing in the book says what happens to a keeper when you trade away the pick it is paying with. A short-lived rule blocked the pick outright, which leaked: before the reveal, a pick nobody could trade told the other side which tier your hidden keeper was on.",
+      "ruling": "Commissioner ruled on 2026-09-06 that any pick can be traded, keeper or no keeper. If a trade moves the pick a keeper is charged to, that owner's keeper selections are cleared and they pick again before the keeper deadline. Only the owner whose pick moved is reset, and all of their keepers go, not just the one. The app warns each member about their own keepers before they send or accept. The book should say so under keepers.picktrade.",
+      "ruledBy": "commissioner",
+      "ruledAt": "2026-09-06"
+    },
+    {
+      "id": "keeper-charged-latest-pick",
+      "type": "settings",
+      "severity": "medium",
+      "status": "open",
+      "summary": "The book never says which pick a keeper is paid for out of when a team holds more than one pick at or better than the keeper's tier round. The app has always charged the latest pick.",
+      "ruling": "Commissioner confirmed on 2026-09-06 what the app has always done: a keeper is charged to the latest pick you own at or better than its tier round. Holding 4.4 and 4.10 means a round-4 keeper costs 4.10, not 4.4. This decides which trades reset a keeper set: trading 4.4 changes nothing, trading 4.10 clears your keepers. The book should say so under keepers.picktrade.",
       "ruledBy": "commissioner",
       "ruledAt": "2026-09-06"
     }
