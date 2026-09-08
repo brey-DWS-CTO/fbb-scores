@@ -161,6 +161,12 @@ export interface LeagueDynamicState {
     acceptedAt?: string;
     acceptedBy?: string;
   };
+  /** Commissioner-accepted ESPN draft rankings: ADP, ranks, projections. */
+  draftRankings?: {
+    activeSnapshotId: string | null;
+    acceptedAt?: string;
+    acceptedBy?: string;
+  };
   /**
    * Team names as ESPN last reported them, owner to name. People rename their
    * team whenever they like, so the committed name goes stale. Read it through

@@ -30,6 +30,7 @@ import {
   LINK_WINDOW_MINUTES,
 } from '../../src/lib/league/auth.js';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
+import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
@@ -79,6 +80,12 @@ export interface LeagueDynamicState {
     acceptedBy?: string;
   };
   schedule?: {
+    activeSnapshotId: string | null;
+    acceptedAt?: string;
+    acceptedBy?: string;
+  };
+  /** Commissioner-accepted ESPN draft rankings. Missing means none yet. */
+  draftRankings?: {
     activeSnapshotId: string | null;
     acceptedAt?: string;
     acceptedBy?: string;
@@ -306,6 +313,19 @@ export class ScheduleAcceptError extends Error {
   }
 }
 
+/**
+ * No `draft-started` here on purpose. A ranking orders a list and decides
+ * nothing, so it may still be refreshed on draft day.
+ */
+export class DraftRankingAcceptError extends Error {
+  reason: 'stale-base' | 'snapshot-conflict';
+
+  constructor(reason: DraftRankingAcceptError['reason'], message: string) {
+    super(message);
+    this.reason = reason;
+  }
+}
+
 // ─── League config (static import — bundled on Vercel) ───────────────────────
 
 interface ConfigTeam {
@@ -393,6 +413,14 @@ interface StoreBackend {
   getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null>;
   acceptScheduleSnapshot(
     snapshot: StoredScheduleSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult>;
+  getDraftRankingSnapshot(id: string): Promise<DraftRankingSnapshot | null>;
+  acceptDraftRankingSnapshot(
+    snapshot: DraftRankingSnapshot,
     expectedCurrentId: string,
     fallbackId: string,
     acceptedAt: string,
@@ -592,6 +620,17 @@ class NeonBackend implements StoreBackend {
       primary key (season, viewer, target)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS schedule_snapshots (
+      id text primary key,
+      season int not null,
+      fingerprint text not null unique,
+      data jsonb not null,
+      created_at timestamptz not null,
+      created_by text not null
+    )`;
+    // Immutable like the other two snapshot tables. The whole snapshot sits
+    // in `data`; the columns beside it exist so a row can be found and dated
+    // without unpacking a few hundred players.
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_ranking_snapshots (
       id text primary key,
       season int not null,
       fingerprint text not null unique,
@@ -1045,6 +1084,59 @@ class NeonBackend implements StoreBackend {
     throw new ScheduleAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
   }
 
+  async getDraftRankingSnapshot(id: string): Promise<DraftRankingSnapshot | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data FROM draft_ranking_snapshots WHERE id = ${id}`) as Array<{
+      data: DraftRankingSnapshot;
+    }>;
+    return rows[0]?.data ?? null;
+  }
+
+  async acceptDraftRankingSnapshot(
+    snapshot: DraftRankingSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult> {
+    await this.ensureInit();
+    const pointer = { activeSnapshotId: snapshot.id, acceptedAt, acceptedBy };
+    const rows = (await this.sql`WITH eligible AS (
+        SELECT id FROM league_state
+        WHERE id = 1
+          AND COALESCE(data #>> '{draftRankings,activeSnapshotId}', ${fallbackId}) = ${expectedCurrentId}
+      ), inserted AS (
+        INSERT INTO draft_ranking_snapshots (id, season, fingerprint, data, created_at, created_by)
+        SELECT ${snapshot.id}, ${snapshot.season}, ${snapshot.fingerprint},
+          ${JSON.stringify(snapshot)}::jsonb, ${snapshot.createdAt}, ${snapshot.createdBy}
+        FROM eligible
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id
+      ), valid_snapshot AS (
+        SELECT id FROM inserted
+        UNION ALL
+        SELECT id FROM draft_ranking_snapshots
+          WHERE id = ${snapshot.id} AND fingerprint = ${snapshot.fingerprint}
+      )
+      UPDATE league_state
+      SET data = jsonb_set(data, '{draftRankings}', ${JSON.stringify(pointer)}::jsonb, true),
+        version = version + 1,
+        updated_at = now()
+      WHERE id = 1
+        AND COALESCE(data #>> '{draftRankings,activeSnapshotId}', ${fallbackId}) = ${expectedCurrentId}
+        AND EXISTS (SELECT 1 FROM valid_snapshot)
+      RETURNING data, version`) as Array<{ data: LeagueDynamicState; version: number }>;
+    const updated = rows[0];
+    if (updated) return { state: updated.data, version: updated.version };
+
+    const state = await this.getState();
+    const currentId = state.state.draftRankings?.activeSnapshotId ?? fallbackId;
+    if (currentId !== expectedCurrentId) {
+      throw new DraftRankingAcceptError('stale-base', 'The active draft rankings changed; preview again');
+    }
+    throw new DraftRankingAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
+  }
+
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -1381,6 +1473,7 @@ interface FileDoc {
   audit: AuditRow[];
   playerPoolSnapshots: PlayerPoolSnapshot[];
   scheduleSnapshots: StoredScheduleSnapshot[];
+  draftRankingSnapshots: DraftRankingSnapshot[];
   keeperScenarios: Array<{
     season: number;
     viewer: string;
@@ -1410,6 +1503,7 @@ function emptyDoc(): FileDoc {
     audit: [],
     playerPoolSnapshots: [],
     scheduleSnapshots: [],
+    draftRankingSnapshots: [],
     keeperScenarios: [],
     rulebookDrafts: [],
     rulebookVersions: [],
@@ -1464,6 +1558,7 @@ class FileBackend implements StoreBackend {
         audit: Array.isArray(doc.audit) ? doc.audit : [],
         playerPoolSnapshots: Array.isArray(doc.playerPoolSnapshots) ? doc.playerPoolSnapshots : [],
         scheduleSnapshots: Array.isArray(doc.scheduleSnapshots) ? doc.scheduleSnapshots : [],
+        draftRankingSnapshots: Array.isArray(doc.draftRankingSnapshots) ? doc.draftRankingSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
@@ -1771,6 +1866,39 @@ class FileBackend implements StoreBackend {
       }
       if (!existing) doc.scheduleSnapshots.push(structuredClone(snapshot));
       doc.state.schedule = { activeSnapshotId: snapshot.id, acceptedAt, acceptedBy };
+      doc.version += 1;
+      doc.updatedAt = acceptedAt;
+      this.writeDoc(doc);
+      return { state: doc.state, version: doc.version };
+    });
+  }
+
+  async getDraftRankingSnapshot(id: string): Promise<DraftRankingSnapshot | null> {
+    await this.ensureInit();
+    const doc = this.readDoc();
+    return doc.draftRankingSnapshots.find((snapshot) => snapshot.id === id) ?? null;
+  }
+
+  async acceptDraftRankingSnapshot(
+    snapshot: DraftRankingSnapshot,
+    expectedCurrentId: string,
+    fallbackId: string,
+    acceptedAt: string,
+    acceptedBy: string,
+  ): Promise<MutateResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const currentId = doc.state.draftRankings?.activeSnapshotId ?? fallbackId;
+      if (currentId !== expectedCurrentId) {
+        throw new DraftRankingAcceptError('stale-base', 'The active draft rankings changed; preview again');
+      }
+      const existing = doc.draftRankingSnapshots.find((candidate) => candidate.id === snapshot.id);
+      if (existing && existing.fingerprint !== snapshot.fingerprint) {
+        throw new DraftRankingAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
+      }
+      if (!existing) doc.draftRankingSnapshots.push(structuredClone(snapshot));
+      doc.state.draftRankings = { activeSnapshotId: snapshot.id, acceptedAt, acceptedBy };
       doc.version += 1;
       doc.updatedAt = acceptedAt;
       this.writeDoc(doc);
@@ -2578,6 +2706,26 @@ export async function acceptScheduleSnapshot(
   acceptedBy: string,
 ): Promise<MutateResult> {
   return getBackend().acceptScheduleSnapshot(
+    snapshot,
+    expectedCurrentId,
+    fallbackId,
+    acceptedAt,
+    acceptedBy,
+  );
+}
+
+export async function getDraftRankingSnapshot(id: string): Promise<DraftRankingSnapshot | null> {
+  return getBackend().getDraftRankingSnapshot(id);
+}
+
+export async function acceptDraftRankingSnapshot(
+  snapshot: DraftRankingSnapshot,
+  expectedCurrentId: string,
+  fallbackId: string,
+  acceptedAt: string,
+  acceptedBy: string,
+): Promise<MutateResult> {
+  return getBackend().acceptDraftRankingSnapshot(
     snapshot,
     expectedCurrentId,
     fallbackId,

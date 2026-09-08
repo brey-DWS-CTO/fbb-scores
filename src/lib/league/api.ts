@@ -12,6 +12,12 @@ import type {
   PlayerPoolRefreshPreview,
   PlayerPoolSnapshot,
 } from './playerPool.js';
+import type {
+  DraftRankingRefreshPreview,
+  DraftRankingSnapshot,
+  EspnDraftRankingPlayer,
+  ScoringItem,
+} from './draftRankings.js';
 import type { KeeperScenario } from './keeperScenario.js';
 import type { Rulebook } from './rulebook.js';
 import type {
@@ -44,6 +50,9 @@ export interface StateMeta {
     draftSnapshotId: string | null;
   };
   schedule?: {
+    activeSnapshotId: string;
+  };
+  draftRankings?: {
     activeSnapshotId: string;
   };
   viewer: string | null;
@@ -86,6 +95,27 @@ export interface TeamNameCandidateInput {
   sourceSeason: number;
   fetchedAt: string;
   teams: EspnTeamName[];
+}
+
+export interface DraftRankingCandidateInput {
+  sourceSeason: number;
+  /** `espn-kona` from the fetch; `manual` for a set loaded by hand. */
+  source: 'espn-kona' | 'manual';
+  sourceUrl: string | null;
+  fetchedAt: string;
+  scoringItems: ScoringItem[];
+  players: EspnDraftRankingPlayer[];
+}
+
+export interface DraftRankingPreviewResponse {
+  currentSnapshotId: string;
+  candidateSnapshotId: string;
+  fingerprint: string;
+  preview: DraftRankingRefreshPreview;
+}
+
+export interface FetchedDraftRankingPreviewResponse extends DraftRankingPreviewResponse {
+  candidate: DraftRankingCandidateInput;
 }
 
 export interface TeamNamePreviewResponse {
@@ -522,6 +552,42 @@ export async function acceptTeamNames(
   const { data } = await axios.post(
     '/api/league/team-names/accept',
     { ...preview.candidate, fingerprint: preview.fingerprint },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** The accepted ESPN draft rankings, or the empty fallback. Commissioner-only for now. */
+export async function fetchDraftRankings(
+  c: Credentials,
+): Promise<{ snapshot: DraftRankingSnapshot; fallback: boolean }> {
+  const { data } = await axios.get('/api/league/draft-rankings', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Ask ESPN for its draft numbers and see what would change. Writes nothing. */
+export async function fetchEspnDraftRankingPreview(
+  c: Credentials,
+): Promise<FetchedDraftRankingPreviewResponse> {
+  const { data } = await axios.post('/api/league/draft-rankings/fetch-preview', {}, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+/** Store the exact rankings that were previewed. */
+export async function acceptDraftRankings(
+  c: Credentials,
+  candidate: DraftRankingCandidateInput,
+  preview: Pick<DraftRankingPreviewResponse, 'currentSnapshotId' | 'fingerprint'>,
+): Promise<StateResponse & { snapshot: DraftRankingSnapshot }> {
+  const { data } = await axios.post(
+    '/api/league/draft-rankings/accept',
+    {
+      ...candidate,
+      expectedCurrentSnapshotId: preview.currentSnapshotId,
+      fingerprint: preview.fingerprint,
+    },
     { headers: authHeaders(c) },
   );
   return data;

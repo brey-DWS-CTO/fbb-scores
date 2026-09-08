@@ -2853,6 +2853,69 @@ th.schedule-col-active {
   .keeper-reset-actions > * { flex: 1; }
 }
 
+/* ─── Draft rankings admin: snapshot summary, movers, board sample ───── */
+.rank-admin-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.rank-admin-chip {
+  padding: 4px 8px;
+  border: 1px solid var(--chip-color, var(--panel-border));
+  border-radius: 999px;
+  color: var(--chip-color, var(--text-mid));
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+.rank-admin-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 4px 9px;
+  border: 1px solid var(--neon-purple);
+  border-radius: 6px;
+  color: var(--neon-purple);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.rank-admin-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rank-admin-list li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  font-size: 0.76rem;
+}
+.rank-admin-pos { color: var(--text-dim); font-weight: 800; font-variant-numeric: tabular-nums; }
+.rank-admin-name {
+  color: var(--text-hi);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-admin-name small { color: var(--text-dim); font-weight: 600; margin-left: 6px; }
+.rank-admin-num {
+  color: var(--text-body);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rank-admin-num small { color: var(--text-dim); font-weight: 600; margin-left: 4px; }
+.rank-admin-up { color: var(--neon-teal); }
+.rank-admin-down { color: var(--neon-red); }
+.rank-admin-note { color: var(--text-dim); font-size: 0.68rem; margin-top: 9px; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
