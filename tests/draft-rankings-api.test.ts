@@ -70,6 +70,8 @@ function candidate(over: { scoringItems?: typeof SCORING; withProjection?: boole
     }));
   return {
     sourceSeason: dataset.season,
+    source: 'espn-kona' as const,
+    sourceUrl: null as string | null,
     fetchedAt: '2026-09-07T12:00:00.000Z',
     scoringItems: over.scoringItems ?? SCORING,
     players,
@@ -300,6 +302,37 @@ test('a changed candidate, a stale base, and an unchanged candidate are all refu
   });
   assert.equal(same.status, 409);
   assert.match(String(same.body.error), /already matches/);
+});
+
+test('a set loaded by hand is stored as manual, with where it came from', async () => {
+  const body = {
+    ...candidate({ withProjection: true }),
+    source: 'manual' as const,
+    sourceUrl: 'https://www.espn.com/fantasy/basketball/story/_/page/projections',
+  };
+  const previewed = await preview(body);
+  assert.equal(previewed.status, 200);
+  const accepted = await accept({
+    ...body,
+    expectedCurrentSnapshotId: previewed.body.currentSnapshotId,
+    fingerprint: previewed.body.fingerprint,
+  });
+  assert.equal(accepted.status, 200);
+  const snapshot = accepted.body.snapshot as DraftRankingSnapshot;
+  assert.equal(snapshot.source, 'manual');
+  assert.equal(snapshot.sourceUrl, body.sourceUrl);
+  assert.equal(snapshot.players[0]?.projection?.id, `10${dataset.season}`);
+
+  // A candidate that omits the source is the ESPN fetch, and the source is
+  // part of the fingerprint, so relabelling the same numbers is a new snapshot.
+  const asEspn = { ...body, source: undefined, sourceUrl: undefined };
+  const again = await preview(asEspn);
+  assert.equal(again.status, 200);
+  assert.notEqual(again.body.candidateSnapshotId, snapshot.id);
+
+  const bogus = await preview({ ...body, source: 'guess' });
+  assert.equal(bogus.status, 400);
+  assert.match(String(bogus.body.error), /source/);
 });
 
 test('a malformed candidate is refused before anything is diffed', async () => {

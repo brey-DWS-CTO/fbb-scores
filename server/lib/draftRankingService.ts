@@ -18,6 +18,7 @@ import {
   type DraftRankEntry,
   type DraftRankingRefreshPreview,
   type DraftRankingSnapshot,
+  type DraftRankingSource,
   type EspnDraftRankingPlayer,
   type ProjectionRow,
   type ScoringItem,
@@ -29,9 +30,16 @@ const MIN_PLAYER_COUNT = 100;
 const MAX_PLAYER_COUNT = 3_000;
 const MAX_SCORING_ITEMS = 100;
 const MAX_STAT_KEYS = 100;
+const MAX_SOURCE_URL = 500;
+
+/** The two sources a candidate may claim. `none` is only ever the fallback. */
+type CandidateSource = Exclude<DraftRankingSource, 'none'>;
 
 export interface DraftRankingCandidate {
   sourceSeason: number;
+  /** Absent means the live ESPN fetch. A hand-loaded set says `manual`. */
+  source: CandidateSource;
+  sourceUrl: string | null;
   fetchedAt: string;
   scoringItems: ScoringItem[];
   players: EspnDraftRankingPlayer[];
@@ -45,7 +53,8 @@ export interface PreparedDraftRankingCandidate {
 }
 
 function contentFingerprint(
-  source: DraftRankingSnapshot['source'],
+  source: DraftRankingSource,
+  sourceUrl: string | null,
   sourceSeason: number,
   scoringItems: ScoringItem[],
   players: DraftRankingSnapshot['players'],
@@ -54,6 +63,7 @@ function contentFingerprint(
     .update(JSON.stringify({
       season: dataset.season,
       source,
+      sourceUrl,
       sourceSeason,
       projectionStatId: projectionStatId(sourceSeason),
       scoringItems,
@@ -78,11 +88,12 @@ export const FALLBACK_DRAFT_RANKINGS: DraftRankingSnapshot = {
   season: dataset.season,
   sourceSeason: dataset.season,
   source: 'none',
+  sourceUrl: null,
   fetchedAt: dataset.generatedAt,
   createdAt: dataset.generatedAt,
   createdBy: 'system',
   baseSnapshotId: null,
-  fingerprint: contentFingerprint('none', dataset.season, [], []),
+  fingerprint: contentFingerprint('none', null, dataset.season, [], []),
   projectionStatId: projectionStatId(dataset.season),
   scoringItems: [],
   players: [],
@@ -175,6 +186,18 @@ export function parseDraftRankingCandidate(value: unknown): DraftRankingCandidat
     throw new Error('fetchedAt must be an ISO date-time');
   }
   const fetchedAt = new Date(body.fetchedAt).toISOString();
+
+  const source: CandidateSource = body.source === undefined ? 'espn-kona' : body.source as CandidateSource;
+  if (source !== 'espn-kona' && source !== 'manual') {
+    throw new Error('source must be espn-kona or manual');
+  }
+  let sourceUrl: string | null = null;
+  if (body.sourceUrl !== undefined && body.sourceUrl !== null) {
+    if (typeof body.sourceUrl !== 'string' || body.sourceUrl.trim().length > MAX_SOURCE_URL) {
+      throw new Error('sourceUrl must be text');
+    }
+    sourceUrl = body.sourceUrl.trim() || null;
+  }
   const scoringItems = parseScoringItems(body.scoringItems ?? []);
 
   if (!Array.isArray(body.players)) throw new Error('players must be an array');
@@ -207,7 +230,7 @@ export function parseDraftRankingCandidate(value: unknown): DraftRankingCandidat
     };
   });
 
-  return { sourceSeason, fetchedAt, scoringItems, players };
+  return { sourceSeason, source, sourceUrl, fetchedAt, scoringItems, players };
 }
 
 export async function resolveCurrentDraftRankings(
@@ -245,6 +268,8 @@ export async function fetchEspnDraftRankingCandidate(): Promise<DraftRankingCand
   ]);
   return parseDraftRankingCandidate({
     sourceSeason,
+    source: 'espn-kona',
+    sourceUrl: null,
     fetchedAt: new Date().toISOString(),
     scoringItems,
     players,
@@ -258,7 +283,8 @@ export async function prepareDraftRankingCandidate(
   const currentSnapshot = await resolveCurrentDraftRankings(state);
   const preview = previewDraftRankingRefresh(currentSnapshot, candidate.players, candidate.scoringItems);
   const fingerprint = contentFingerprint(
-    'espn-kona',
+    candidate.source,
+    candidate.sourceUrl,
     candidate.sourceSeason,
     preview.nextScoringItems,
     preview.nextPlayers,
@@ -281,7 +307,8 @@ export function makeDraftRankingSnapshot(
     id: prepared.snapshotId,
     season: dataset.season,
     sourceSeason: candidate.sourceSeason,
-    source: 'espn-kona',
+    source: candidate.source,
+    sourceUrl: candidate.sourceUrl,
     fetchedAt: candidate.fetchedAt,
     createdAt,
     createdBy,

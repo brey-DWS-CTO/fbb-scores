@@ -68,11 +68,21 @@ export interface EspnDraftRankingPlayer {
 /** The stored form. Same fields; normalized. */
 export type DraftRankingPlayer = EspnDraftRankingPlayer;
 
+/**
+ * Where a snapshot's numbers came from. `espn-kona` is the live fetch;
+ * `manual` is a set loaded by hand, ESPN's website numbers or somebody
+ * else's, posted through the same preview and accept routes; `none` is the
+ * empty fallback before anything is accepted.
+ */
+export type DraftRankingSource = 'espn-kona' | 'manual' | 'none';
+
 export interface DraftRankingSnapshot {
   id: string;
   season: number;
   sourceSeason: number;
-  source: 'espn-kona' | 'none';
+  source: DraftRankingSource;
+  /** Where a hand-loaded set was taken from, when the loader said. */
+  sourceUrl: string | null;
   fetchedAt: string;
   createdAt: string;
   createdBy: string;

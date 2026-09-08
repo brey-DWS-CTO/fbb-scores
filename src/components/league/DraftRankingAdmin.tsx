@@ -163,10 +163,13 @@ export default function DraftRankingAdmin() {
           ) : (
             <>
               <div style={{ color: 'var(--text-hi)', fontWeight: 800 }}>
-                {rankedCount} ranked · {current.players.length} players · ESPN
+                {rankedCount} ranked · {current.players.length} players ·{' '}
+                {current.source === 'manual' ? 'loaded by hand' : 'ESPN'}
               </div>
               <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>
-                {current.id} · fetched {formatTime(current.fetchedAt)}
+                {current.id} · {current.source === 'manual' ? 'captured' : 'fetched'}{' '}
+                {formatTime(current.fetchedAt)}
+                {current.sourceUrl ? ` · from ${current.sourceUrl}` : ''}
               </div>
             </>
           )}

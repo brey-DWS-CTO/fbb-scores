@@ -99,6 +99,9 @@ export interface TeamNameCandidateInput {
 
 export interface DraftRankingCandidateInput {
   sourceSeason: number;
+  /** `espn-kona` from the fetch; `manual` for a set loaded by hand. */
+  source: 'espn-kona' | 'manual';
+  sourceUrl: string | null;
   fetchedAt: string;
   scoringItems: ScoringItem[];
   players: EspnDraftRankingPlayer[];
