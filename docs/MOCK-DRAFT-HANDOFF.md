@@ -206,9 +206,39 @@ Capture in one snapshot: ADP, STANDARD and ROTO rank, auction value, percent
 owned, and the projection stat dict when `102027` starts returning. Key the
 projection on `10{season}` so it works for any year.
 
+**Projections must also be loadable by hand, not only fetched.** ESPN has not
+published 2026-27 projections yet, and the commissioner may want to load a set
+before they do, whether ESPN's own numbers off their website or somebody
+else's. So the snapshot takes projections from two sources: the ESPN fetch,
+and a paste or upload of per-player stat lines keyed on `espnId` or matched by
+name with review. Record which source a snapshot came from and show it.
+
+This is the same shape the schedule already uses: see
+`src/data/source/basketball-monster-schedule-2027.json`, a manual capture with
+`sourceUrl` and `capturedAt` recorded. Follow that precedent.
+
 ### 2. A value model, not a ranking
 
 Raw FPPG does not rank a draft, and this is where the tool earns its keep.
+
+**Projections get scored against this league's own settings, never ESPN's.**
+That is the whole point. A projection row is a dictionary of raw counting
+stats, so run it through `computeFpts(stats, scoringItems)` with the live
+`scoringSettings.scoringItems` from `mSettings`. ESPN's own rank and auction
+value are computed for ESPN's default scoring, which is not this league's.
+Two players who look level on ESPN's board can be far apart here.
+
+**Keep the two ideas separate, because they answer different questions:**
+
+| | What it is | What it is for |
+| --- | --- | --- |
+| **Value** | What a player is worth under **our** scoring | What you should do |
+| **ADP** | What people actually do, under ESPN's default | What the room will do |
+
+Never collapse them into one number. The simulation needs both, and it needs
+to know which is which.
+
+On top of the value number:
 
 The league starts 10 and caps games per week, so what matters is value over
 the replacement player **at each position**, weighted by projected games
@@ -224,12 +254,33 @@ Keep it pure, in `src/lib/league/`, tested with no server and no browser.
 best-available player make a mock useless, because real people reach and real
 people have needs. Blend:
 
-- value from step 2
+- value from step 2, which is our scoring
 - ESPN ADP from step 1, which is what makes bots reach like humans do
 - positional need for that team's current roster
 - noise
 
 Then pick from the top few rather than always the top one.
+
+**Make the blend a setting, because the commissioner wants both answers.**
+
+- **Sharp.** Every team drafts to our value model, as if all ten managers had
+  read the projections and knew the scoring. This answers "what should
+  happen".
+- **Realistic.** Weighted toward ADP, so the room reaches the way real people
+  do. This answers "what will happen".
+
+Both are useful and they disagree, which is the interesting part. A player
+who is a bargain in our scoring but goes early on ADP is exactly the thing
+worth knowing before draft day.
+
+**Later, once the mock works: tendencies per manager.** These are ten people
+the commissioner has drafted against for years, and they are not
+interchangeable. A per-owner setting sliding between sharp and ADP-following,
+plus a positional bias, would make the sim behave like this league rather than
+a generic room. Do not build it in the first pass. Design the opponent model
+so that each team's behaviour already reads from a per-owner settings object,
+even if every owner starts with the same values, so adding it later is filling
+in numbers rather than restructuring.
 
 It must fill 1 C, 1 PF, 1 SF, 1 SG, 1 PG, 1 F, 1 G, 3 FLEX and notice when a
 slot has become unfillable.
@@ -337,5 +388,10 @@ summary.
   seeded runs.
 - The board says which ranking source it used, and works today on ESPN draft
   rank with no projections at all.
+- Projections, whenever they arrive or are loaded by hand, are scored through
+  this league's own settings and not ESPN's, and the tool shows value and ADP
+  as two separate things.
+- The sim runs both sharp and realistic, and the two disagree in ways the
+  commissioner can point at.
 - Nothing secret leaks. An assumed keeper never becomes a real one on screen.
 - **Brey can answer Kyle's question without typing a list by hand.**
