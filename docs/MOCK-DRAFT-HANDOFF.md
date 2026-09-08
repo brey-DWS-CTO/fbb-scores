@@ -62,16 +62,16 @@ works, and every convention you invent instead of borrowing is a thing ten
 league members have to learn for no reason. Study these and write down what
 they do, then match it unless there is a reason not to:
 
-- **Sleeper** — the best draft room in the business. Look at the queue, the
+- **Sleeper.** The best draft room in the business. Look at the queue, the
   positional filters, the tier breaks, how "you are on the clock" feels, and
   how it behaves on a phone. This app is phone-first, and Sleeper is the bar.
-- **Yahoo Fantasy** — mock draft lobby, autopick behaviour, pre-draft
+- **Yahoo Fantasy.** Mock draft lobby, autopick behaviour, pre-draft
   rankings you can drag to reorder.
-- **FantasyPros Draft Wizard** — the closest thing to what is being asked
+- **FantasyPros Draft Wizard.** The closest thing to what is being asked
   for here. Look hard at Draft Simulator and Mock Draft Simulator: how it
   presents "who will be there at your next pick", how it grades a pick, and
   how it shows a distribution rather than a single answer.
-- **ESPN's own** — the league already lives in ESPN, so its conventions are
+- **ESPN's own.** The league already lives in ESPN, so its conventions are
   the ones these ten people know best.
 
 Report what you learned before building. The specific things worth stealing:
