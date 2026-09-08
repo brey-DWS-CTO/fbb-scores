@@ -156,11 +156,47 @@ What is confirmed about the mechanism, for when they do arrive:
   places; `scripts/fetch-keeper-data.ts` does the same.
 - A projection row carries a raw stat dictionary. I pulled `102026` and it
   has 31 populated keys, in the exact ids this app already reads: `0` PTS,
-  `1` BLK, `2` STL, `3` AST, `6` REB, `11` TO, `13`/`14` FGM/FGA. So it goes
-  straight into `computeFpts` and comes out as projected FPPG **in this
-  league's scoring**, keyed on `espnId`, with no name matching at all.
+  `1` BLK, `2` STL, `3` AST, `6` REB, `11` TO, `13`/`14` FGM/FGA. It is keyed
+  on `espnId`, so there is no name matching at all.
+- **Correction, found while building phase 1.** An earlier draft of this doc
+  said the stat dict "goes straight into `computeFpts` and comes out as
+  projected FPPG". It does not. A season row holds **totals**, so points per
+  game needs a divide by projected games played (stat `42`), or ESPN's
+  `averageStats` when that is present. Handle both, and refuse to emit a zero
+  when neither exists. Taking the total for an average would have quietly
+  produced numbers roughly seventy times too big.
 
 Re-check weekly. These usually land closer to opening night.
+
+### If the commissioner wants numbers before ESPN publishes
+
+Checked 8 September 2026. This is the commissioner's call, not an engineering
+one, and the terms differ sharply.
+
+| Source | Has 2026-27 now | Export | Cost | The catch |
+| --- | --- | --- | --- | --- |
+| **Hashtag Basketball** | **Yes**, updated 5 Sep | None. HTML table | **$2.50/mo** via Patreon | No CSV and no API, so it is copy by hand |
+| **RotoWire** | **Yes** | **Yes**, an Export Table button | $7.99 to $19.99/mo | Terms ban crawling **and** ban sharing what you export |
+| **FantasyPros** | **No.** Still on 2025-26 | API on the top tier | ~$108/yr | The only written personal-use licence, but no 2026-27 numbers yet |
+| **Basketball Monster** | Yes | None found | $69.95/season | The clearest prohibition of the four |
+
+Two things changed from what an earlier draft of this doc said:
+
+1. **FantasyPros is no longer the obvious fallback.** Their NBA projections
+   have not rolled over to 2026-27, so the paid recommendation buys a licence
+   and last season's numbers.
+2. **Hashtag Basketball is the cheap, live option**, and its terms are
+   unusually thin: no anti-scraping clause at all, only a ban on
+   redistribution. At $2.50 a month with no export, the honest path is a
+   subscriber reading a page they paid for and typing the numbers in, which
+   is what the manual load above is for and what the repo already does for
+   the Basketball Monster schedule.
+
+**Do not scrape any of them.** Basketball Monster says "You may not scrape or
+otherwise copy our Content"; RotoWire bans crawling and spidering by name;
+FantasyPros sells the API you would be scraping around. Hashtag has no such
+clause, but silence is not permission, and at $2.50 a month they are the
+likeliest to say yes if asked.
 
 ## No projections yet: what the board shows
 
@@ -224,9 +260,10 @@ Raw FPPG does not rank a draft, and this is where the tool earns its keep.
 **Projections get scored against this league's own settings, never ESPN's.**
 That is the whole point. A projection row is a dictionary of raw counting
 stats, so run it through `computeFpts(stats, scoringItems)` with the live
-`scoringSettings.scoringItems` from `mSettings`. ESPN's own rank and auction
-value are computed for ESPN's default scoring, which is not this league's.
-Two players who look level on ESPN's board can be far apart here.
+`scoringSettings.scoringItems` from `mSettings`, then divide by projected
+games played to get a per-game number. ESPN's own rank and auction value are
+computed for ESPN's default scoring, which is not this league's. Two players
+who look level on ESPN's board can be far apart here.
 
 **Keep the two ideas separate, because they answer different questions:**
 
