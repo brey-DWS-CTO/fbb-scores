@@ -139,6 +139,35 @@ one `kona_player_info` call, per player:
 I pulled those numbers myself. They are real, current, and enough to build
 and ship the entire tool. **Nothing is blocked on projections.**
 
+**Corrections, found while building phases 2 and 3 (12 September 2026).**
+
+- **ADP means something for about 170 players, not 390.** ESPN marks a
+  player its mock rooms never draft with an ADP of about 140, and 218 of the
+  388 ranked players carry that marker. So "everybody else has an ADP near
+  140" is true of half the ranked list too. The value model treats an ADP at
+  or past 139 as no ADP (`UNDRAFTED_ADP` in `draftValue.ts`); past that the
+  room model follows ESPN's rank, which is what a room drafting down ESPN's
+  list actually does.
+- **The players endpoint needs no login.** `kona_player_info` for the season
+  answers without `espn_s2` or `SWID`, ranks and ADP included. Only the
+  league's own `mSettings` (the scoring items) needs the cookies. The tests
+  read a real capture, `tests/fixtures/espn-draft-rankings-2027.json`, with
+  its `capturedAt`.
+- **The dataset is not the draft pool.** ESPN ranks 110 players the committed
+  324 do not hold: rookies (Maluach, Yang Hansen), returning veterans
+  (Caruso, Conley), free agents. Cooper Flagg is in. A mock must run on the
+  accepted player pool laid over the dataset (`applyPlayerPoolToDataset`), or
+  those players cannot be drafted.
+- **Last season and ESPN's rank disagree more than expected.** Maxey scored
+  like a top-five player for this league; ESPN ranks him 21st. Kawhi 46 FPPG,
+  ranked 68th. The value model follows the board's order (projection, ESPN
+  rank, last season) by default and takes a `prefer` switch, because the two
+  answers are both worth seeing.
+- **The rule book already holds the scoring.** Appendix A lists this league's
+  values (AST 1.4, STL and BLK 2.5, TO -1.8, and so on). Scoring still
+  arrives live from `mSettings` and is never hardcoded; the appendix is a
+  check, not a source.
+
 ### Not available yet, verified
 
 **Full-season stat projections (`102027`) do not exist yet.** I requested
@@ -285,6 +314,22 @@ Nobody else's draft tool knows this league's schedule grid. You do.
 
 Keep it pure, in `src/lib/league/`, tested with no server and no browser.
 
+**Built: `src/lib/league/draftValue.ts`, `valueBoard()`.** Two things turned
+out differently from the plan above:
+
+- **A rank has to become points before it can be a value.** With no
+  projection, the best forecast is ESPN's rank, and a rank is not a number of
+  points. The model fits a curve from rank to last-season FPPG in this
+  league's scoring over the 250 or so players who have both, and reads a
+  ranked player's points off it. So a rookie ESPN ranks 39th is valued like a
+  39th-ranked player scored for us, never left at zero.
+- **The schedule is a nudge, not a swing.** With every week weighted by what
+  the 30-game limit lets ten starters use, teams land within 2 percent of
+  each other over the season. It breaks ties and orders the middle of the
+  board; it does not move stars. Weighting play-in or playoff weeks higher
+  (`phaseWeights`) is where the schedule would start to matter, and that is
+  the commissioner's number to set.
+
 ### 3. The simulation
 
 **The opponent model is the whole thing.** Nine bots taking the
@@ -326,6 +371,22 @@ slot has become unfillable.
 answer is "across 200 drafts from slot 9, here is who was there at 2.09 and
 how often". Seeded, so a result can be reproduced and argued about in the
 group chat.
+
+**Built: `src/lib/league/mockDraft.ts`.** `buildMockBoard()` makes the board
+from the engine; `simulateMany()` runs it; `availabilityAt()` is the
+distribution. Two things the plan above did not say:
+
+- **"Pick from the top few" cannot be a fixed draw.** A three-way draw at
+  every pick let Shai fall to fifth in one run out of nine, which no room
+  does. The draw is only among players within a band of the best score
+  (`topBand`), so a clear best is taken and a near tie is a coin flip. Noise
+  is a share of the score, so the top of the draft is steady and the middle
+  is not, which is how real ADP spreads look.
+- **The engine drops an illegal keeper set without a word.** `buildDraftBoard`
+  skips any team whose selections fail validation and leaves the picks live.
+  A guessed keeper set that is over the cap would quietly vanish, so the mock
+  board reports every refused set in `rejected` with the engine's reasons.
+  A screen must show it.
 
 ### 4. What-if worlds
 
