@@ -1,6 +1,12 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import type { EspnLeagueResponse } from '../../types/index.js';
+import {
+  projectionStatId,
+  type DraftRankEntry,
+  type EspnDraftRankingPlayer,
+  type ScoringItem,
+} from '../league/draftRankings.js';
 import type { EspnPlayerPoolPlayer } from '../league/playerPool.js';
 import type { EspnTeamName } from '../league/teamNames.js';
 import { NBA_TEAM_ABBREV } from './calculations.js';
@@ -16,19 +22,34 @@ interface EspnClientConfig {
   cookieOverride?: string;
 }
 
-interface EspnKonaPlayerEntry {
-  id: number;
-  player?: {
-    id?: number;
-    fullName?: string;
-    proTeamId?: number;
-    defaultPositionId?: number;
-    eligibleSlots?: number[];
-  };
+/** One stat row on a kona player. `id` is `{source}{split}{season}`, e.g. `102027`. */
+interface EspnKonaStatRow {
+  id?: string;
+  seasonId?: number;
+  statSourceId?: number;
+  statSplitTypeId?: number;
+  stats?: Record<string, number>;
+  averageStats?: Record<string, number>;
+}
+
+interface EspnKonaPlayer {
+  id?: number;
   fullName?: string;
   proTeamId?: number;
   defaultPositionId?: number;
   eligibleSlots?: number[];
+  ownership?: {
+    averageDraftPosition?: number;
+    percentOwned?: number;
+  };
+  draftRanksByRankType?: Record<string, { rank?: number; auctionValue?: number } | undefined>;
+  stats?: EspnKonaStatRow[];
+}
+
+/** ESPN nests the player under `player` on modern seasons and inlines it on old ones. */
+interface EspnKonaPlayerEntry extends EspnKonaPlayer {
+  id: number;
+  player?: EspnKonaPlayer;
 }
 
 interface EspnKonaResponse {
@@ -346,10 +367,16 @@ export class EspnClient {
     return teams;
   }
 
-  /** Fetch every active-player page without requesting stats. */
-  async fetchPlayerPool(): Promise<EspnPlayerPoolPlayer[]> {
+  /**
+   * Every page of `kona_player_info` for active players, one entry per player
+   * id. `filter` is merged into the players filter, so a caller can ask for
+   * extra stat rows without owning the paging.
+   */
+  private async fetchKonaEntries(
+    filter: Record<string, unknown> = {},
+  ): Promise<EspnKonaPlayerEntry[]> {
     const limit = 500;
-    const byId = new Map<number, EspnPlayerPoolPlayer>();
+    const byId = new Map<number, EspnKonaPlayerEntry>();
 
     for (let page = 0; page < 10; page += 1) {
       const offset = page * limit;
@@ -362,6 +389,7 @@ export class EspnClient {
               limit,
               offset,
               sortPercOwned: { sortPriority: 1, sortAsc: false },
+              ...filter,
             },
           }),
         },
@@ -369,29 +397,10 @@ export class EspnClient {
       const entries = data.players ?? [];
       let added = 0;
       for (const entry of entries) {
-        const raw = entry.player ?? entry;
-        const espnId = raw.id ?? entry.id;
-        const fullName = raw.fullName?.trim();
-        if (!Number.isInteger(espnId) || espnId <= 0 || !fullName) continue;
-        const positions = [...new Set(
-          (raw.eligibleSlots ?? [])
-            .map((slot) => ELIGIBLE_SLOT_POSITION[slot])
-            .filter((position): position is string => Boolean(position)),
-        )];
-        const fallbackPosition = raw.defaultPositionId
-          ? DEFAULT_POSITION[raw.defaultPositionId]
-          : undefined;
-        if (positions.length === 0 && fallbackPosition) positions.push(fallbackPosition);
-        if (positions.length === 0) continue;
-        const proTeamId = raw.proTeamId ?? 0;
-        const player: EspnPlayerPoolPlayer = {
-          espnId,
-          fullName,
-          proTeam: proTeamId === 0 ? 'FA' : (NBA_TEAM_ABBREV[proTeamId] ?? String(proTeamId)),
-          positions,
-        };
+        const espnId = entry.player?.id ?? entry.id;
+        if (!Number.isInteger(espnId) || espnId <= 0) continue;
         if (!byId.has(espnId)) added += 1;
-        byId.set(espnId, player);
+        byId.set(espnId, entry);
       }
 
       if (entries.length < limit) return [...byId.values()];
@@ -401,5 +410,95 @@ export class EspnClient {
     }
 
     throw new Error('ESPN player pool exceeded 5,000 entries');
+  }
+
+  /** Fetch every active-player page without requesting stats. */
+  async fetchPlayerPool(): Promise<EspnPlayerPoolPlayer[]> {
+    const players: EspnPlayerPoolPlayer[] = [];
+    for (const entry of await this.fetchKonaEntries()) {
+      const raw = entry.player ?? entry;
+      const espnId = raw.id ?? entry.id;
+      const fullName = raw.fullName?.trim();
+      if (!Number.isInteger(espnId) || espnId <= 0 || !fullName) continue;
+      const positions = [...new Set(
+        (raw.eligibleSlots ?? [])
+          .map((slot) => ELIGIBLE_SLOT_POSITION[slot])
+          .filter((position): position is string => Boolean(position)),
+      )];
+      const fallbackPosition = raw.defaultPositionId
+        ? DEFAULT_POSITION[raw.defaultPositionId]
+        : undefined;
+      if (positions.length === 0 && fallbackPosition) positions.push(fallbackPosition);
+      if (positions.length === 0) continue;
+      const proTeamId = raw.proTeamId ?? 0;
+      players.push({
+        espnId,
+        fullName,
+        proTeam: proTeamId === 0 ? 'FA' : (NBA_TEAM_ABBREV[proTeamId] ?? String(proTeamId)),
+        positions,
+      });
+    }
+    return players;
+  }
+
+  /**
+   * ESPN's draft numbers for every active player: average draft position, the
+   * STANDARD and ROTO draft ranks with their auction values, percent owned,
+   * and the full-season projection row once ESPN has published one.
+   *
+   * The projection is asked for by name, `10{season}`, through
+   * `filterStatsForTopScoringPeriodIds`. Until ESPN publishes it the row is
+   * absent, which is normal and not an error: the snapshot simply carries no
+   * projection and the board orders on the rank.
+   */
+  async fetchDraftRankings(season: number): Promise<EspnDraftRankingPlayer[]> {
+    const projectionId = projectionStatId(season);
+    const entries = await this.fetchKonaEntries({
+      filterStatsForTopScoringPeriodIds: {
+        value: 2,
+        additionalValue: [`00${season}`, projectionId],
+      },
+    });
+
+    const rankEntry = (entry: { rank?: number; auctionValue?: number } | undefined): DraftRankEntry | null =>
+      entry && typeof entry.rank === 'number'
+        ? { rank: entry.rank, auctionValue: typeof entry.auctionValue === 'number' ? entry.auctionValue : null }
+        : null;
+
+    const players: EspnDraftRankingPlayer[] = [];
+    for (const entry of entries) {
+      const raw = entry.player ?? entry;
+      const espnId = raw.id ?? entry.id;
+      const fullName = raw.fullName?.trim();
+      if (!Number.isInteger(espnId) || espnId <= 0 || !fullName) continue;
+      const proTeamId = raw.proTeamId ?? 0;
+      const ranks = raw.draftRanksByRankType ?? {};
+      const projection = (raw.stats ?? []).find((row) =>
+        String(row.id ?? '') === projectionId
+        || (row.statSourceId === 1 && row.statSplitTypeId === 0 && row.seasonId === season)) ?? null;
+      players.push({
+        espnId,
+        fullName,
+        proTeam: proTeamId === 0 ? 'FA' : (NBA_TEAM_ABBREV[proTeamId] ?? String(proTeamId)),
+        adp: raw.ownership?.averageDraftPosition ?? null,
+        percentOwned: raw.ownership?.percentOwned ?? null,
+        standard: rankEntry(ranks.STANDARD),
+        roto: rankEntry(ranks.ROTO),
+        projection: projection
+          ? { id: projectionId, stats: projection.stats ?? {}, averageStats: projection.averageStats ?? null }
+          : null,
+      });
+    }
+    if (players.length === 0) throw new Error('ESPN returned no players');
+    return players;
+  }
+
+  /** The league's scoring items from `mSettings`. Empty when ESPN sends none. */
+  async fetchScoringItems(): Promise<ScoringItem[]> {
+    const { data } = await this.http.get<EspnLeagueResponse>('', {
+      params: { view: 'mSettings', _: Date.now() },
+    });
+    return (data.settings?.scoringSettings?.scoringItems ?? [])
+      .map((item) => ({ statId: item.statId, points: item.points }));
   }
 }

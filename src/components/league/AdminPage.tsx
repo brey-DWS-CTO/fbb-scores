@@ -9,6 +9,7 @@ import CommissionerPanel from './CommissionerPanel.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import PlayerPoolAdmin from './PlayerPoolAdmin.js';
+import DraftRankingAdmin from './DraftRankingAdmin.js';
 import TeamNameAdmin from './TeamNameAdmin.js';
 import HistoryAdmin from './HistoryAdmin.js';
 import { RoundChip } from '../keepers/keeperUi.js';
@@ -123,6 +124,8 @@ export default function AdminPage() {
       <TeamNameAdmin />
 
       <PlayerPoolAdmin />
+
+      <DraftRankingAdmin />
 
       <HistoryAdmin />
 

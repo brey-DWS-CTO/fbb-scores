@@ -58,6 +58,8 @@ import {
   appendAudit,
   acceptPlayerPoolSnapshot,
   acceptScheduleSnapshot,
+  acceptDraftRankingSnapshot,
+  DraftRankingAcceptError,
   clearKeeperScenario,
   clearKeeperScenariosForSeason,
   getKeeperScenario,
@@ -168,6 +170,14 @@ import {
   parseTeamNameCandidate,
   prepareTeamNameCandidate,
 } from '../lib/teamNameService.js';
+import {
+  FALLBACK_DRAFT_RANKINGS,
+  fetchEspnDraftRankingCandidate,
+  makeDraftRankingSnapshot,
+  parseDraftRankingCandidate,
+  prepareDraftRankingCandidate,
+  resolveCurrentDraftRankings,
+} from '../lib/draftRankingService.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -367,6 +377,9 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
     },
     schedule: {
       activeSnapshotId: state.schedule?.activeSnapshotId ?? FALLBACK_SCHEDULE.id,
+    },
+    draftRankings: {
+      activeSnapshotId: state.draftRankings?.activeSnapshotId ?? FALLBACK_DRAFT_RANKINGS.id,
     },
     viewer: viewer.owner,
     isCommissioner: viewer.isCommissioner,
@@ -669,6 +682,120 @@ router.post('/team-names/accept', requireAuth, requireCommissioner, async (req, 
   res.json({
     ...redactState(result, { owner, isCommissioner: true }),
     preview: prepared.preview,
+  });
+});
+
+// ─── Draft rankings ──────────────────────────────────────────────────────────
+//
+// ESPN's ADP, draft ranks and projections, frozen the same way as the player
+// pool. Commissioner-only end to end until the mock draft is good enough to
+// show the league.
+
+/** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */
+router.get('/draft-rankings', requireAuth, requireCommissioner, async (_req, res) => {
+  const { state } = await getState();
+  const snapshot = await resolveCurrentDraftRankings(state);
+  res.json({
+    snapshot,
+    fallback: snapshot.id === FALLBACK_DRAFT_RANKINGS.id,
+  });
+});
+
+/** Read ESPN's draft numbers right now and preview them without writing. */
+router.post('/draft-rankings/fetch-preview', requireAuth, requireCommissioner, async (_req, res) => {
+  const candidate = await fetchEspnDraftRankingCandidate();
+  const { state } = await getState();
+  const prepared = await prepareDraftRankingCandidate(state, candidate);
+  res.json({
+    candidate,
+    currentSnapshotId: prepared.currentSnapshot.id,
+    candidateSnapshotId: prepared.snapshotId,
+    fingerprint: prepared.fingerprint,
+    preview: prepared.preview,
+  });
+});
+
+/** POST /api/league/draft-rankings/preview — diff a candidate, write nothing. */
+router.post('/draft-rankings/preview', requireAuth, requireCommissioner, async (req, res) => {
+  let candidate;
+  try {
+    candidate = parseDraftRankingCandidate(req.body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid draft rankings' });
+    return;
+  }
+  const { state } = await getState();
+  const prepared = await prepareDraftRankingCandidate(state, candidate);
+  res.json({
+    currentSnapshotId: prepared.currentSnapshot.id,
+    candidateSnapshotId: prepared.snapshotId,
+    fingerprint: prepared.fingerprint,
+    preview: prepared.preview,
+  });
+});
+
+/**
+ * POST /api/league/draft-rankings/accept — store the exact candidate that was
+ * previewed. The base has to still be current; the draft may have started.
+ */
+router.post('/draft-rankings/accept', requireAuth, requireCommissioner, async (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof body.expectedCurrentSnapshotId !== 'string' || body.expectedCurrentSnapshotId === '') {
+    res.status(400).json({ error: 'expectedCurrentSnapshotId is required' });
+    return;
+  }
+  if (typeof body.fingerprint !== 'string' || body.fingerprint === '') {
+    res.status(400).json({ error: 'fingerprint is required' });
+    return;
+  }
+
+  let candidate;
+  try {
+    candidate = parseDraftRankingCandidate(body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid draft rankings' });
+    return;
+  }
+
+  const { state } = await getState();
+  const prepared = await prepareDraftRankingCandidate(state, candidate);
+  if (body.expectedCurrentSnapshotId !== prepared.currentSnapshot.id) {
+    res.status(409).json({ error: 'The active draft rankings changed; preview again' });
+    return;
+  }
+  if (body.fingerprint !== prepared.fingerprint) {
+    res.status(409).json({ error: 'The candidate no longer matches the preview; preview again' });
+    return;
+  }
+  if (prepared.snapshotId === prepared.currentSnapshot.id) {
+    res.status(409).json({ error: 'The candidate already matches the active draft rankings' });
+    return;
+  }
+
+  const acceptedAt = new Date().toISOString();
+  const acceptedBy = res.locals.owner as string;
+  const snapshot = makeDraftRankingSnapshot(candidate, prepared, acceptedAt, acceptedBy);
+  const result = await acceptDraftRankingSnapshot(
+    snapshot,
+    body.expectedCurrentSnapshotId,
+    FALLBACK_DRAFT_RANKINGS.id,
+    acceptedAt,
+    acceptedBy,
+  );
+  await appendAudit(actor(res), 'draft_rankings.accepted', {
+    snapshotId: snapshot.id,
+    baseSnapshotId: snapshot.baseSnapshotId,
+    sourceSeason: snapshot.sourceSeason,
+    counts: prepared.preview.counts,
+    added: prepared.preview.added.length,
+    removed: prepared.preview.removed.length,
+    moved: prepared.preview.moved.length,
+    projectionArrived: prepared.preview.projectionArrived,
+    scoringChanged: prepared.preview.scoringChanged,
+  });
+  res.json({
+    ...redactState(result, { owner: acceptedBy, isCommissioner: true }),
+    snapshot,
   });
 });
 
@@ -2647,6 +2774,10 @@ router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => 
     return;
   }
   if (err instanceof ScheduleAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof DraftRankingAcceptError) {
     res.status(409).json({ error: err.message, reason: err.reason });
     return;
   }
