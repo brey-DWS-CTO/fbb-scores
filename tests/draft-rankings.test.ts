@@ -239,7 +239,7 @@ test('with no scoring items the projection source is unusable and the board fall
 });
 
 test('ADP stands in when ESPN has no rank, and the entry says which it used', () => {
-  const players = [player({ key: 'ranked', espnId: 1 }), player({ key: 'adp-only', espnId: 2 })];
+  const players = [player({ key: 'adp-only', espnId: 2 }), player({ key: 'ranked', espnId: 1 })];
   const snapshot = {
     scoringItems: SCORING,
     players: [
@@ -248,11 +248,40 @@ test('ADP stands in when ESPN has no rank, and the entry says which it used', ()
     ],
   };
   const ranking = rankBoard(players, snapshot);
-  assert.deepEqual(names(ranking), ['adp-only', 'ranked']);
-  assert.equal(ranking.entries[0]?.espnBasis, 'adp');
-  assert.equal(ranking.entries[0]?.value, 12.5);
-  assert.equal(ranking.entries[1]?.espnBasis, 'rank');
-  assert.equal(ranking.entries[1]?.value, 50);
+  // Ranked first, however low the other player's ADP. A rank and an ADP are
+  // different scales and never compare.
+  assert.deepEqual(names(ranking), ['ranked', 'adp-only']);
+  assert.equal(ranking.entries[0]?.espnBasis, 'rank');
+  assert.equal(ranking.entries[0]?.value, 50);
+  assert.equal(ranking.entries[1]?.espnBasis, 'adp');
+  assert.equal(ranking.entries[1]?.value, 12.5);
+});
+
+test('undrafted players never sort above ranked ones', () => {
+  // The real shape, read from ESPN on 12 September 2026: ESPN ranks about 390
+  // players and gives everybody else an ADP near 140, meaning "went
+  // undrafted". Before this, rank 300 sorted below a 140.
+  const players = [
+    player({ key: 'Boo Buie', espnId: 10 }),
+    player({ key: 'rank 300', espnId: 11 }),
+    player({ key: 'rank 2', espnId: 12 }),
+    player({ key: 'drafted late', espnId: 13 }),
+  ];
+  const snapshot = {
+    scoringItems: SCORING,
+    players: [
+      espn({ espnId: 10, adp: 140 }),
+      espn({ espnId: 11, standard: { rank: 300, auctionValue: 1 }, adp: 140 }),
+      espn({ espnId: 12, standard: { rank: 2, auctionValue: 62 }, adp: 2.9 }),
+      espn({ espnId: 13, adp: 118.4 }),
+    ],
+  };
+  assert.deepEqual(names(rankBoard(players, snapshot)), [
+    'rank 2',
+    'rank 300',
+    'drafted late',
+    'Boo Buie',
+  ]);
 });
 
 test('tied ESPN ranks break on ADP, then on name, never the other way round', () => {

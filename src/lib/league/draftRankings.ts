@@ -452,6 +452,14 @@ export function rankBoard(
     if (a.source === 'none' || a.value === null || b.value === null) {
       return byNameThenId(a.player, b.player);
     }
+    // A rank and an ADP are not the same scale, so they never compare. ESPN
+    // ranks about 390 players and gives everybody else an ADP near 140, the
+    // "went undrafted" value. Letting 140 compete with rank 300 put hundreds
+    // of undrafted players above real ones, so ranked players always come
+    // first and ADP only orders the players ESPN did not rank.
+    if (a.source === 'espn-rank' && a.espnBasis !== b.espnBasis) {
+      return a.espnBasis === 'rank' ? -1 : 1;
+    }
     // Ranks read low to high; points read high to low.
     const gap = a.source === 'espn-rank' ? a.value - b.value : b.value - a.value;
     if (gap !== 0) return gap;
