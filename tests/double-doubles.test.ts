@@ -39,8 +39,6 @@ test('double- and triple-double odds land near real 2024-25 rates', () => {
     assert.ok(Math.abs(odds.doubleDouble - dd) <= 0.10, `${name} DD ${odds.doubleDouble.toFixed(2)} vs ${dd}`);
     assert.ok(Math.abs(odds.tripleDouble - td) <= 0.07, `${name} TD ${odds.tripleDouble.toFixed(2)} vs ${td}`);
     assert.ok(odds.tripleDouble <= odds.doubleDouble);
-    assert.ok(odds.quadrupleDouble <= odds.tripleDouble);
-    assert.ok(odds.quadrupleDouble < 0.01, `${name} should almost never post a quadruple-double`);
   }
 });
 
@@ -51,10 +49,12 @@ const LEAGUE = [
   { statId: 39, points: 170 },
 ];
 
-test('the bonus pays only for items the dictionary lacks', () => {
+test('the bonus pays only for items the dictionary lacks, and never guesses a quadruple-double', () => {
   const jokic = REAL_2025[0][1];
   const estimated = estimatedBonusPerGame(jokic, LEAGUE);
   assert.ok(estimated > 4 && estimated < 5.5, `Jokic bonus ${estimated}`);
+  // The 170-point quadruple-double is in the scoring and is left at zero on purpose.
+  assert.equal(estimatedBonusPerGame(jokic, [{ statId: 39, points: 170 }]), 0);
   // ESPN sends the counts itself: nothing is estimated on top.
   const withCounts = { ...jokic, '37': 0.9, '38': 0.49, '39': 0 };
   assert.equal(estimatedBonusPerGame(withCounts, LEAGUE), 0);

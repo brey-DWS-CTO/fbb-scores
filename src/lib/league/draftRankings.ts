@@ -196,10 +196,11 @@ function byEspnOrder(players: DraftRankingPlayer[]): DraftRankingPlayer[] {
  * With no scoring items there is no answer, not a zero: every player would
  * tie at 0 and the board would quietly become meaningless.
  *
- * ESPN's projections carry no double-double, triple-double or
- * quadruple-double counts, and this league pays for all three. When a scoring
- * item asks for one the dictionary lacks, its odds are estimated from the
- * per-game line (see `doubleDoubles.ts`) and paid at the league's rate.
+ * ESPN's projections carry no double-double or triple-double counts, and
+ * this league pays for both. When a scoring item asks for one the dictionary
+ * lacks, its odds are estimated from the per-game line (see
+ * `doubleDoubles.ts`) and paid at the league's rate. The quadruple-double
+ * is left alone: nobody projects to one.
  */
 export function projectedFppg(
   projection: ProjectionRow | null,

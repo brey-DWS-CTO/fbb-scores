@@ -41,17 +41,18 @@ Jokic reads 60.3, four points under a season he actually played.
 
 ## The double-double bonus
 
-This league pays 1.8 for a double-double, 6.2 for a triple-double and 170
-for a quadruple-double. ESPN's projection dictionary has none of those
-counts, so scored as sent, every double-double player came up short. Jokic
-lost about five points a game, Sabonis and Giddey two to three.
+This league pays 1.8 for a double-double and 6.2 for a triple-double. ESPN's
+projection dictionary has neither count, so scored as sent, every
+double-double player came up short. Jokic lost about five points a game,
+Sabonis and Giddey two to three. The 170-point quadruple-double is not
+estimated. Nobody projects to one, and a guess would only add noise.
 
 `src/lib/league/doubleDoubles.ts` estimates the odds from the projected
 per-game line. Each of points, rebounds, assists, steals and blocks is
 treated as roughly normal around its average, with a spread of 1.1 times
 the square root of the average, and a game counts the category at 9.5 or
 more. The five are taken as independent, and the 32 ways they can land
-give exact odds of two, three or four at once. The bonus is paid only for
+give exact odds of two or three at once. The bonus is paid only for
 items the dictionary lacks, so if ESPN ever sends stat 37, nothing is added
 twice. `projectedBonusPerGame` reports the estimate apart from the rest.
 

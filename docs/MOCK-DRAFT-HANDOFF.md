@@ -202,7 +202,7 @@ The dated fixture is `tests/fixtures/espn-draft-rankings-2027-2026-09-25.json`:
 path. **The projections omit DD, TD and QD**, which the league scores at 1.8,
 6.2 and 170. Scored as sent, Jokic came out four points a game under the
 season he had just played. `src/lib/league/doubleDoubles.ts` now estimates
-the odds of each from the projected per-game line and pays them at the
+the odds of a DD and a TD from the projected per-game line and pays them at the
 league's rate, only for the items ESPN left out. It is checked against real
 2024-25 rates in `tests/double-doubles.test.ts`. The live QD setting is 170,
 while Appendix A says 175. Live settings win.
