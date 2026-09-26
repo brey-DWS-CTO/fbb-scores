@@ -2,7 +2,14 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import { fetchDraftRankings, fetchPickTrades } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  fetchDraftRankings,
+  fetchPickTrades,
+  resetKeeperScenarioTarget,
+  saveKeeperScenarioTarget,
+  type Credentials,
+} from '../../lib/league/api.js';
 import { rankSourceLabel } from '../../lib/league/draftRankings.js';
 import { valueBoard } from '../../lib/league/draftValue.js';
 import {
@@ -44,6 +51,79 @@ function KeeperTag({ status }: { status: 'known' | 'assumed' }) {
     <span className={`mock-tag ${status === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>
       {status === 'known' ? 'keeper' : 'guess'}
     </span>
+  );
+}
+
+const keeperOption = (player: DatasetPlayer) =>
+  `${player.name} · R${player.keeper.round ?? '?'} · ${player.keeper.effectiveAvg?.toFixed(1) ?? '–'}`;
+
+interface GuessEditorProps {
+  owner: string;
+  candidates: DatasetPlayer[];
+  guess: KeeperSelection[];
+  identity: Credentials;
+  onSaved: (scenario: Record<string, KeeperSelection[]>) => void;
+  onClose: () => void;
+}
+
+/** Edit one team's guessed keepers in place. Saves through the private scenario, the same as the keeper page. */
+function GuessEditor({ owner, candidates, guess, identity, onSaved, onClose }: GuessEditorProps) {
+  const [picks, setPicks] = useState<[string, string]>([guess[0]?.playerKey ?? '', guess[1]?.playerKey ?? '']);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const byKey = new Map(candidates.map((player) => [player.key, player]));
+
+  const run = async (action: () => Promise<{ scenario: Record<string, KeeperSelection[]> }>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await action();
+      onSaved(response.scenario);
+      onClose();
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = () => {
+    const selections = picks
+      .filter((key, index) => key !== '' && picks.indexOf(key) === index)
+      .map((key) => byKey.get(key))
+      .filter((player): player is DatasetPlayer => player !== undefined)
+      .map((player) => ({ playerKey: player.key, playerName: player.name }));
+    return selections.length === 0
+      ? run(() => resetKeeperScenarioTarget(identity, owner))
+      : run(() => saveKeeperScenarioTarget(identity, owner, selections));
+  };
+
+  return (
+    <div className="mock-guess-editor">
+      {[0, 1].map((index) => (
+        <select
+          key={index}
+          className="hub-input mock-select"
+          aria-label={`${owner} guess ${index + 1}`}
+          value={picks[index]}
+          disabled={busy}
+          onChange={(event) => {
+            const next: [string, string] = [...picks] as [string, string];
+            next[index] = event.target.value;
+            setPicks(next);
+          }}
+        >
+          <option value="">Nobody</option>
+          {candidates.map((player) => (
+            <option key={player.key} value={player.key}>{keeperOption(player)}</option>
+          ))}
+        </select>
+      ))}
+      <div className="mock-guess-actions">
+        <button type="button" className="tap-btn mock-mini-btn is-primary" disabled={busy} onClick={save}>SAVE</button>
+        <button type="button" className="tap-btn mock-mini-btn" disabled={busy} onClick={onClose}>CANCEL</button>
+      </div>
+      {error && <div className="mock-note mock-note-bad">{error}</div>}
+    </div>
   );
 }
 
@@ -204,6 +284,11 @@ export default function MockDraftPage() {
   const [tradesOn, setTradesOn] = useState<string[]>([]);
   const [tryKeepers, setTryKeepers] = useState(false);
   const [tryPicks, setTryPicks] = useState<[string, string]>(['', '']);
+  const [useEntered, setUseEntered] = useState(true);
+  const [guessInstead, setGuessInstead] = useState<string[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+  const toggleGuessInstead = (owner: string) =>
+    setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
   const snapshot = rankingsQuery.data?.snapshot ?? null;
   const fetchedProposals = tradesQuery.data?.proposals;
@@ -234,12 +319,12 @@ export default function MockDraftPage() {
   }, [ownCandidates, tryKeepers, tryPicks]);
 
   const now = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [] }),
-    [dataset, viewer, state, scenario, proposals],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [], useEntered, guessInstead }),
+    [dataset, viewer, state, scenario, proposals, useEntered, guessInstead],
   );
   const whatIf = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers }),
-    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead }),
+    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead],
   );
 
   const owners = useMemo(() => dataset.teams.map((team) => team.owner), [dataset.teams]);
@@ -277,7 +362,15 @@ export default function MockDraftPage() {
     .map((owner) => ({
       owner,
       keepers: now.board.slots.filter((slot) => slot.pick.currentOwner === owner && slot.keeper).map((slot) => slot.keeper!),
+      entered: (state.keepers[owner]?.length ?? 0) > 0,
+      guess: scenario[owner] ?? [],
+      rejected: now.board.rejected.find((entry) => entry.owner === owner) ?? null,
     }));
+  const enteredCount = guessRows.filter((row) => row.entered).length;
+  const candidatesFor = (owner: string) =>
+    dataset.players
+      .filter((player) => player.fantasyTeam === owner && player.keeper.eligible)
+      .sort((a, b) => (b.keeper.effectiveAvg ?? -1) - (a.keeper.effectiveAvg ?? -1));
 
   const toggleTrade = (id: string) =>
     setTradesOn((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
@@ -360,23 +453,62 @@ export default function MockDraftPage() {
           {revealed ? 'KEEPERS' : 'YOUR GUESSES AT THEIR KEEPERS'}
         </div>
         {!revealed && (
-          <div className="mock-note mock-note-dim">
-            Keepers are secret until the reveal. Both worlds use your private guesses, never anyone&apos;s real picks.
-            Edit a guess on that team&apos;s keeper page.
-          </div>
+          <>
+            <label className="mock-use-entered">
+              <input type="checkbox" checked={useEntered} onChange={(event) => setUseEntered(event.target.checked)} />
+              <span>
+                Use what teams have already entered ({enteredCount} of {guessRows.length} so far). Your guess covers the rest.
+              </span>
+            </label>
+            <div className="mock-note mock-note-dim">
+              {useEntered
+                ? 'Entered picks are tagged KEEPER, your guesses GUESS. Only you can see the entered ones before the reveal.'
+                : 'Both worlds use your guesses only, never what anyone has entered.'}
+            </div>
+          </>
         )}
         <ul className="mock-guesses">
           {guessRows.map((row) => (
-            <li key={row.owner}>
+            <li key={row.owner} className={editing === row.owner ? 'is-editing' : undefined}>
               <span className="mock-guess-owner">{row.owner}</span>
               <span className="mock-guess-players">
                 {row.keepers.length === 0
-                  ? <span className="mock-live">{revealed ? 'none' : 'no guess'}</span>
+                  ? <span className="mock-live">{revealed ? 'none' : row.entered && useEntered ? 'entered, but the picks stay live' : 'no guess'}</span>
                   : row.keepers.map((keeper) => (
                     <span key={keeper.playerKey}>{keeper.playerName} <KeeperTag status={keeper.status} /></span>
                   ))}
+                {row.rejected && <small className="mock-note-bad">{row.rejected.errors.join(' ')}</small>}
+                {!revealed && useEntered && row.entered && (
+                  <label className="mock-guess-instead">
+                    <input
+                      type="checkbox"
+                      checked={guessInstead.includes(row.owner)}
+                      onChange={() => toggleGuessInstead(row.owner)}
+                    />
+                    <span>
+                      use my guess instead
+                      {guessInstead.includes(row.owner)
+                        ? ' (entered picks set aside)'
+                        : row.guess.length > 0 ? ` (${row.guess.map((k) => k.playerName).join(', ')})` : ''}
+                    </span>
+                  </label>
+                )}
               </span>
-              {!revealed && <Link className="mock-edit" to={`/keepers/${encodeURIComponent(row.owner)}`}>edit</Link>}
+              {!revealed && editing !== row.owner && (
+                <button type="button" className="tap-btn mock-edit" onClick={() => setEditing(row.owner)}>
+                  {row.guess.length > 0 ? 'edit guess' : 'guess'}
+                </button>
+              )}
+              {!revealed && editing === row.owner && identity && (
+                <GuessEditor
+                  owner={row.owner}
+                  candidates={candidatesFor(row.owner)}
+                  guess={row.guess}
+                  identity={identity}
+                  onSaved={scenarioQuery.setScenario}
+                  onClose={() => setEditing(null)}
+                />
+              )}
             </li>
           ))}
         </ul>

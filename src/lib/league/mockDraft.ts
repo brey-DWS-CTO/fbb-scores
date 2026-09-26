@@ -109,6 +109,18 @@ export interface MockBoardInput {
   state: LeagueDynamicState;
   /** The viewer's guesses at what other teams keep, and their own what-ifs. */
   scenario: KeeperScenario;
+  /**
+   * Use what other teams have already entered, before the reveal, and fall
+   * back to the guess only where a team has entered nothing. Only the
+   * commissioner's state carries other teams' entries pre-reveal; for
+   * anyone else those are redacted, so this changes nothing for them.
+   */
+  useEntered?: boolean;
+  /**
+   * Teams whose entered keepers to set aside in favour of the guess, even
+   * with `useEntered` on: "I think Kyle will change his mind."
+   */
+  guessInstead?: readonly string[];
 }
 
 export interface MockKeeperSets {
@@ -125,12 +137,18 @@ export interface MockKeeperSets {
  * team pre-reveal, so they cannot leak into a guess. The viewer's own
  * scenario entry, when there is one, is a what-if and wins over their real
  * selection, which is how "if I keep Cade" gets asked.
+ *
+ * With `useEntered` on, a team that has already entered keepers is read as
+ * known before the reveal, and the guess covers only the teams that have
+ * not. The commissioner can see every entry already; this lets the mock use
+ * them too.
  */
 export function keepersForMock(
   dataset: Pick<LeagueDataset, 'teams'>,
   input: MockBoardInput,
 ): MockKeeperSets {
   const revealed = input.state.keepersRevealed === true;
+  const guessInstead = new Set(input.guessInstead ?? []);
   const keepers: Record<string, KeeperSelection[]> = {};
   const status: Record<string, KeeperStatus> = {};
   const copy = (selections: readonly KeeperSelection[] | undefined): KeeperSelection[] =>
@@ -147,7 +165,10 @@ export function keepersForMock(
         keepers[owner] = copy(input.state.keepers[owner]);
         status[owner] = 'known';
       }
-    } else if (revealed) {
+    } else if (
+      revealed
+      || (input.useEntered === true && !guessInstead.has(owner) && (input.state.keepers[owner]?.length ?? 0) > 0)
+    ) {
       keepers[owner] = copy(input.state.keepers[owner]);
       status[owner] = 'known';
     } else {

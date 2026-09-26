@@ -3050,6 +3050,22 @@ th.schedule-col-active {
 .mock-own-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 @media (max-width: 480px) { .mock-own-picks { grid-template-columns: 1fr; } .mock-guesses li { grid-template-columns: 56px minmax(0, 1fr) auto; } }
 
+/* Guesses edited in place on the mock page. The editor opens under the row
+   and takes the row's full width. */
+.mock-use-entered { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; font-size: 0.75rem; color: var(--text-body); cursor: pointer; }
+.mock-use-entered input { margin-top: 2px; accent-color: var(--neon-teal); }
+.mock-guess-players small { display: block; width: 100%; font-weight: 600; font-size: 0.66rem; }
+.mock-edit { background: none; border: 0; padding: 0; font: inherit; }
+.mock-guesses li.is-editing { grid-template-columns: 64px minmax(0, 1fr); }
+.mock-guess-editor { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.mock-guess-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+.mock-mini-btn.is-primary { border-color: var(--neon-purple); color: var(--neon-purple); background: rgba(204,0,255,0.08); }
+.mock-mini-btn:disabled { opacity: 0.5; cursor: wait; }
+@media (max-width: 480px) { .mock-guess-editor { grid-template-columns: 1fr; } }
+
+.mock-guess-instead { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 0.68rem; font-weight: 600; color: var(--text-dim); cursor: pointer; }
+.mock-guess-instead input { accent-color: var(--neon-purple); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

@@ -530,6 +530,14 @@ that turned out differently:
 - **The watched pick is "your Nth live pick", not a fixed slot.** In the
   what-if world 1.9 may belong to Kyle. Watching by the viewer's own picks
   keeps the two columns comparable.
+- **The commissioner uses what teams have entered.** Brey's call, 26
+  September 2026: "it's my benefit for building this app." A switch on the
+  page, on by default, reads each team's entered keepers as known before the
+  reveal and falls back to his guess only where a team has entered nothing.
+  Off, it is guesses only, as the handoff first said. The switch does
+  nothing for anyone but the commissioner, since the server redacts other
+  teams' entries for everyone else. Guesses are edited on the page too, in
+  place, through the same private scenario the keeper pages write.
 
 ## Rules you must not break
 

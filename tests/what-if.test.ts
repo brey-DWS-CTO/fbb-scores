@@ -20,6 +20,7 @@ const select = (fullName: string) => {
 const cade = select('Cade Cunningham');
 const sabonis = select('Domantas Sabonis');
 const jokic = select('Nikola Jokic');
+const flagg = select('Cooper Flagg');
 
 function state(patch: Partial<LeagueDynamicState> = {}): LeagueDynamicState {
   return {
@@ -176,6 +177,38 @@ test('a what-if pair is picked after the trade, so Cade can be kept with the pic
   assert.equal(slot(world, 5).keeper?.status, 'assumed');
   assert.equal(slot(world, 9).keeper, null);
   assert.ok(world.board.taken.includes(cade.playerKey));
+});
+
+test('the commissioner can use what teams have entered, with the guess as the fallback', () => {
+  // Kyle has entered Sabonis; the guess says Flagg. Joel has entered nothing; the guess says Jokic.
+  const entered = state({ keepers: { Kyle: [sabonis] } });
+  const scenario = { Kyle: [flagg], Joel: [jokic] };
+
+  // Flagg is a round-4 tier, so the guess sits on Kyle's round-4 pick; Sabonis is round 1 and sits on 1.5.
+  const kyleKeeper = (world: ReturnType<typeof buildWorld>) =>
+    world.board.slots.find((entry) => entry.pick.currentOwner === 'Kyle' && entry.keeper)!;
+
+  const guesses = buildWorld(dataset, { viewer: 'Brey', state: entered, scenario, proposals: [], tradesOn: [] });
+  assert.equal(kyleKeeper(guesses).keeper?.playerName, flagg.playerName, 'off: the guess is used even where Kyle has entered');
+  assert.equal(kyleKeeper(guesses).keeper?.status, 'assumed');
+  assert.equal(kyleKeeper(guesses).pick.round, 4);
+
+  const real = buildWorld(dataset, { viewer: 'Brey', state: entered, scenario, proposals: [], tradesOn: [], useEntered: true });
+  assert.equal(slot(real, 5).keeper?.playerName, sabonis.playerName, 'on: what Kyle entered wins');
+  assert.equal(slot(real, 5).keeper?.status, 'known');
+  assert.equal(real.board.taken.includes(flagg.playerKey), false, 'the guess about Kyle is set aside');
+  assert.equal(slot(real, 1).keeper?.playerName, jokic.playerName, 'Joel entered nothing, so the guess stands');
+  assert.equal(slot(real, 1).keeper?.status, 'assumed');
+  assert.deepEqual(real.board.knownOwners.sort(), ['Brey', 'Kyle']);
+
+  // "I think Kyle will change his mind": his entry is set aside, the guess stands, Joel is unchanged.
+  const doubt = buildWorld(dataset, {
+    viewer: 'Brey', state: entered, scenario, proposals: [], tradesOn: [], useEntered: true, guessInstead: ['Kyle'],
+  });
+  assert.equal(kyleKeeper(doubt).keeper?.playerName, flagg.playerName);
+  assert.equal(kyleKeeper(doubt).keeper?.status, 'assumed');
+  assert.equal(doubt.board.taken.includes(sabonis.playerKey), false);
+  assert.equal(slot(doubt, 1).keeper?.playerName, jokic.playerName);
 });
 
 test('after the reveal every keeper is known and the scenario plays no part', () => {
