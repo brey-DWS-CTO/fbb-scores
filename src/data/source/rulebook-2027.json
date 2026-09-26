@@ -395,8 +395,25 @@
                   "text": "A 43.7 ppg player would cost a 2nd round pick and a 29.4 ppg player would cost a 9th round pick."
                 },
                 {
+                  "id": "keepers.tiers.basis.sameTier",
+                  "legacyNumber": "4.2.2.3",
+                  "title": "Two keepers in the same tier",
+                  "text": "If a team keeps two players in the same tier, the second keeper costs a pick one round earlier. A team that holds two picks in that round uses both instead.",
+                  "resolvedBy": [
+                    "open-first-round-same-tier"
+                  ],
+                  "children": [
+                    {
+                      "id": "keepers.tiers.basis.sameTier.example",
+                      "kind": "example",
+                      "text": "Two keepers in the 6th round tier cost a 6th round pick and a 5th round pick."
+                    }
+                  ]
+                },
+                {
                   "id": "keepers.tiers.basis.charge",
-                  "text": "A keeper costs the latest pick the team owns in its tier round or any earlier round. If the team traded away its pick in that round, the keeper moves up to the team's next latest pick.",
+                  "title": "Which pick a keeper uses",
+                  "text": "A keeper uses the team's latest pick in its tier round. If the team has no pick left in that round, the keeper moves up to the next round where it has one.",
                   "addedBy": "commissioner-2026-09-06",
                   "resolvedBy": [
                     "keeper-charged-latest-pick"
@@ -405,22 +422,7 @@
                     {
                       "id": "keepers.tiers.basis.charge.example",
                       "kind": "example",
-                      "text": "A team holds picks 4.4 and 4.9. A keeper in the 4th round tier costs 4.9, not 4.4."
-                    }
-                  ]
-                },
-                {
-                  "id": "keepers.tiers.basis.sameTier",
-                  "legacyNumber": "4.2.2.3",
-                  "text": "Two keepers in the same tier: the keeper with the higher average takes the pick in that round. The other moves up to the team's next latest pick, which is a second pick in the same round if the team holds one, and otherwise the latest pick it owns in an earlier round. See {{ref:keepers.picktrade}}.",
-                  "resolvedBy": [
-                    "open-first-round-same-tier"
-                  ],
-                  "children": [
-                    {
-                      "id": "keepers.tiers.basis.sameTier.example",
-                      "kind": "example",
-                      "text": "A team keeps two players in the 6th round tier. The one with the higher average costs its 6th round pick and the other costs its 5th. If it traded away its 5th, the other costs its 4th. If it holds two 6th round picks, the two keepers cost both 6ths."
+                      "text": "A team holds picks 4.4 and 4.9. A keeper in the 4th round tier uses 4.9, not 4.4."
                     }
                   ]
                 },
@@ -595,7 +597,8 @@
             {
               "id": "keepers.picktrade.rounds",
               "legacyNumber": "4.4.1",
-              "text": "Before the draft starts, a team may trade a pick in any round. Once the draft is under way, only 3rd through 10th round picks may be traded, and only picks not yet used.",
+              "title": "When picks can be traded",
+              "text": "In the offseason, from the end of the championship through the end of the draft, a team may trade a pick in any round. During the season, from the end of the draft through Week 15, only 3rd through 10th round picks may be traded. From the end of Week 15 until the championship ends, no picks may be traded. During the draft, a pick already used cannot be traded.",
               "settings": [
                 "picktrade.tradableRounds"
               ],
@@ -607,7 +610,7 @@
                 {
                   "id": "keepers.picktrade.rounds.protected",
                   "legacyNumber": "4.4.1.1",
-                  "text": "1st and 2nd round picks are locked once the draft starts. This can be changed with a 60% vote.",
+                  "text": "During the season, 1st and 2nd round picks cannot be traded. This can be changed with a 60% vote.",
                   "voteThreshold": 60,
                   "resolvedBy": [
                     "picktrade-offseason-firsts"
@@ -654,15 +657,21 @@
             },
             {
               "id": "keepers.picktrade.keeperPick",
-              "text": "A pick can be traded even when a keeper costs it. If a trade moves the pick a team's keeper costs (see {{ref:keepers.tiers.basis.charge}}), all of that team's keepers are cleared and it picks them again before the keeper deadline. The other team's keepers stay as they are.",
+              "title": "Trading a pick your keeper uses",
+              "text": "You may trade the pick one of your keepers uses (see {{ref:keepers.tiers.basis.charge}}). If you do, all your keepers are cleared and you choose them again before the keeper deadline. The other team's keepers do not change.",
               "addedBy": "commissioner-2026-09-06",
               "resolvedBy": [
                 "picktrade-keeper-picks"
               ],
               "children": [
                 {
+                  "id": "keepers.picktrade.keeperPick.example",
+                  "kind": "example",
+                  "text": "Your keeper uses your 4th round pick and you trade that pick away. Your keepers are cleared. If you keep the same player again, he uses your next pick up and may cost more."
+                },
+                {
                   "id": "keepers.picktrade.keeperPick.locked",
-                  "text": "Once keepers are locked, a trade that would leave either team unable to pay for a keeper is refused."
+                  "text": "Once keepers are locked, a trade that would leave either team without a pick for a keeper is refused."
                 }
               ]
             },
@@ -674,7 +683,7 @@
                 {
                   "id": "keepers.picktrade.deadline.week",
                   "legacyNumber": "4.4.4.1",
-                  "text": "Draft picks may not be traded after Week 15.",
+                  "text": "No picks may be traded from the end of Week 15 until the championship ends. See {{ref:keepers.picktrade.rounds}}.",
                   "settings": [
                     "picktrade.deadlineWeek"
                   ]
@@ -2726,7 +2735,7 @@
       "ruling": "Commissioner opened rounds 11 to 14 for offseason trading on 2026-09-05. The book needs a vote to catch up: keepers.picktrade.rounds should say rounds 3 through 10 in season, every round before the draft. Until that passes, the app is the looser of the two.",
       "ruledBy": "commissioner",
       "ruledAt": "2026-09-05",
-      "fix": "Book caught up on 2026-09-26: keepers.picktrade.rounds now says any round before the draft, rounds 3 through 10 once it starts."
+      "fix": "Book caught up on 2026-09-26: keepers.picktrade.rounds now says any round in the offseason (the draft included), rounds 3 through 10 in season, and nothing from the end of Week 15 until the championship ends. The app enforces all three."
     },
     {
       "id": "picktrade-offseason-firsts",
@@ -2737,7 +2746,7 @@
       "ruling": "Commissioner opened the 1st and 2nd for offseason trading on 2026-09-06. The book needs a vote to catch up: keepers.picktrade.rounds.protected should say the 1st and 2nd are protected once the draft has started, not always. The book already allows changing that clause by 60% vote.",
       "ruledBy": "commissioner",
       "ruledAt": "2026-09-06",
-      "fix": "Book caught up on 2026-09-26: keepers.picktrade.rounds.protected now locks the 1st and 2nd only once the draft starts."
+      "fix": "Book caught up on 2026-09-26: keepers.picktrade.rounds.protected now locks the 1st and 2nd only during the season."
     },
     {
       "id": "picktrade-keeper-picks",

@@ -706,7 +706,10 @@ test('only a commissioner closes the draft, and only after it has started', asyn
   assert.ok(rows.some((row) => row.action === 'draft.closed' && row.owner === commissioner));
 });
 
-test('closing the draft flips which draft can be traded, and reopening flips it back', async () => {
+test('closing the draft flips which draft can be traded, and reopening flips it back', async (t) => {
+  // Next season's picks only move in season before Week 15 ends. Pin the
+  // clock there so the test does not depend on the day it runs.
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-12-01T20:00:00.000Z') });
   await startDraftMidway();
 
   const before = asRecord((await list('Amy')).body);

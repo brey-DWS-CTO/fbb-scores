@@ -3002,6 +3002,10 @@ th.schedule-col-active {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
+/* Which trade window is open, under the pick trades heading. */
+.rules-page-header p.trade-window { margin-top: 6px; color: var(--neon-teal); font-weight: 700; }
+.rules-page-header p.trade-window-closed { color: var(--neon-yellow); }
+
 @media print {
   .rules-jump { display: none !important; }
   .rules-clause-example { background: none; border-left: 0; }

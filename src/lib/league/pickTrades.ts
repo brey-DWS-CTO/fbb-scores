@@ -41,6 +41,8 @@ import type {
   PickTransfer,
   StoredPickRef,
 } from '../keeper/types.js';
+import type { LeagueSchedulePeriod } from './schedule.js';
+import { leagueSchedule2027 } from './scheduleData.js';
 
 export type { PickRef, PickTradeProposal, PickTradeStatus, PickTransfer, StoredPickRef };
 
@@ -52,7 +54,7 @@ export const MAX_PICKS_PER_SIDE = 6;
 
 export const MAX_TRADE_NOTE = 400;
 
-/** The lowest round a team may trade once the draft starts (rule keepers.picktrade.rounds.protected). */
+/** The lowest round a team may trade during the season (rule keepers.picktrade.rounds.protected). */
 export const FIRST_TRADEABLE_ROUND = 3;
 
 /** Most of its own picks a team may have traded away for one draft. */
@@ -64,9 +66,9 @@ export const MAX_PICKS_PER_ROUND = 2;
 /**
  * The last round a team may trade.
  *
- * Before the draft every round moves, 11 to 14 included: they carry no keeper
- * tier, so moving one cannot change what anybody's keepers cost. Once the draft
- * starts only rounds up to 10, where the keeper tiers stop, can move. Rule
+ * In the offseason every round moves, 11 to 14 included: they carry no keeper
+ * tier, so moving one cannot change what anybody's keepers cost. During the
+ * season only rounds up to 10, where the keeper tiers stop, can move. Rule
  * keepers.picktrade.rounds says the same.
  */
 export function lastTradeableRound(
@@ -112,6 +114,97 @@ export function tradeableSeason(
 ): number {
   return state.draft.closedAt ? dataset.season + 1 : dataset.season;
 }
+
+/* ------------------------------------------------------------------ */
+/* When picks can move                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Rule keepers.picktrade.rounds splits the year in three:
+ *  - offseason: the championship ends, through the end of the draft. Every
+ *    round moves, the live draft included.
+ *  - in-season: the draft closes, through the end of Week 15. Rounds 3 to 10.
+ *  - closed: the end of Week 15 until the championship ends. Nothing moves.
+ */
+export type TradeWindow = 'offseason' | 'in-season' | 'closed';
+
+/** The last week of the season picks can be traded in. */
+export const TRADE_DEADLINE_WEEK = 15;
+
+export interface TradeCalendar {
+  /** Trades stop when this moment arrives: the end of Week 15. */
+  deadlineAt: Date;
+  /** Every round opens again: the end of the championship. */
+  seasonEndsAt: Date;
+}
+
+/**
+ * The first moment after a league day ends, in Pacific time.
+ *
+ * Schedule dates are Pacific calendar days. Midnight Pacific is 08:00 UTC in
+ * winter and 07:00 UTC in summer, so ask the clock which one applies.
+ */
+export function pacificMidnightAfter(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number);
+  const winter = new Date(Date.UTC(y, m - 1, d + 1, 8));
+  const hour = Number(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: 'numeric',
+      hourCycle: 'h23',
+    }).format(winter),
+  );
+  return hour === 1 ? new Date(winter.getTime() - 3_600_000) : winter;
+}
+
+/** Where the trade windows fall, read from the league schedule. */
+export function tradeCalendarFor(
+  periods: ReadonlyArray<Pick<LeagueSchedulePeriod, 'leagueWeek' | 'endDate'>>,
+): TradeCalendar {
+  const deadline = periods.find((p) => p.leagueWeek === TRADE_DEADLINE_WEEK);
+  const last = [...periods].sort((a, b) => b.leagueWeek - a.leagueWeek)[0];
+  if (!deadline || !last) throw new Error('The league schedule is missing weeks.');
+  return {
+    deadlineAt: pacificMidnightAfter(deadline.endDate),
+    seasonEndsAt: pacificMidnightAfter(last.endDate),
+  };
+}
+
+/**
+ * The 2026-27 calendar, from the committed schedule. Client and server both
+ * read this one, so the chips a member sees match what the server allows.
+ * Next season needs its own, like the rest of the 2027 data.
+ */
+export const TRADE_CALENDAR_2027 = tradeCalendarFor(leagueSchedule2027);
+
+/** Which trade window the league is in right now. */
+export function tradeWindow(
+  state: Pick<LeagueDynamicState, 'draft'>,
+  now: Date = new Date(),
+  calendar: TradeCalendar = TRADE_CALENDAR_2027,
+): TradeWindow {
+  // Until the draft closes, this season's picks are in play: offseason.
+  if (!state.draft.closedAt) return 'offseason';
+  const t = now.getTime();
+  if (t < calendar.deadlineAt.getTime()) return 'in-season';
+  if (t < calendar.seasonEndsAt.getTime()) return 'closed';
+  return 'offseason';
+}
+
+/** One line telling members what they can trade right now. */
+export function tradeWindowLine(window: TradeWindow): string {
+  if (window === 'offseason') return 'Every round can be traded until the draft ends.';
+  if (window === 'in-season') {
+    return `During the season only rounds ${FIRST_TRADEABLE_ROUND} to ${KEEPER_ROUNDS} can be traded, until Week ${TRADE_DEADLINE_WEEK} ends.`;
+  }
+  return WINDOW_CLOSED_MESSAGE;
+}
+
+const IN_SEASON_ROUNDS_MESSAGE = (dataset: Pick<LeagueDataset, 'keeperRounds'>) =>
+  `During the season only rounds ${FIRST_TRADEABLE_ROUND} to ${dataset.keeperRounds} can be traded.`;
+
+const WINDOW_CLOSED_MESSAGE =
+  `Pick trades are closed from the end of Week ${TRADE_DEADLINE_WEEK} until the championship ends.`;
 
 /**
  * The calendar year a season's draft is held in.
@@ -466,17 +559,14 @@ export function seasonPicksFor(
 }
 
 /** Why a pick cannot move. */
-export type PickBlock = 'drafted' | 'round-protected';
+export type PickBlock = 'drafted' | 'round-protected' | 'window-closed';
 
 /**
  * Whether a round can move.
  *
- * In the offseason, before the draft has started, everything moves, 1st and
- * 2nd included. Once the draft is under way the 1st and 2nd are protected
- * again, because from then on a keeper is paid for out of a round and a team
- * that traded its top picks away could be left unable to pay.
- *
- * Rules keepers.picktrade.rounds and keepers.picktrade.rounds.protected.
+ * In the offseason, the live draft included, everything moves. During the
+ * season only rounds 3 to 10 do. Rules keepers.picktrade.rounds and
+ * keepers.picktrade.rounds.protected. See `tradeWindow` for which is which.
  */
 export function isTradeableRound(
   dataset: LeagueDataset,
@@ -509,7 +599,8 @@ export interface TradablePick {
  * told the other side which tier a hidden keeper was on.
  *
  * Once the draft is running the board is real: a pick with anyone in it stays
- * put, while the pick on the clock is still empty and can move.
+ * put, while the pick on the clock is still empty and can move. The current
+ * draft is always in the offseason window, so every round is open.
  */
 export function tradablePicksFor(
   dataset: LeagueDataset,
@@ -517,18 +608,13 @@ export function tradablePicksFor(
   owner: string,
 ): TradablePick[] {
   const board = buildDraftBoard(dataset, state);
-  const live = state.draft.startedAt !== null;
   return board
     .filter((cell) => cell.pick.currentOwner === owner)
-    .map((cell) => toTradablePick(dataset, cell, live));
+    .map((cell) => toTradablePick(dataset, cell));
 }
 
-function toTradablePick(
-  dataset: LeagueDataset,
-  cell: BoardCell,
-  draftLive: boolean,
-): TradablePick {
-  const blockedBy = blockFor(dataset, cell.pick.round, cell.selection !== null, draftLive);
+function toTradablePick(dataset: LeagueDataset, cell: BoardCell): TradablePick {
+  const blockedBy = blockFor(dataset, cell.pick.round, cell.selection !== null, 'offseason');
   return {
     ref: refOf(cell.pick),
     pick: cell.pick,
@@ -543,10 +629,11 @@ function blockFor(
   dataset: LeagueDataset,
   round: number,
   drafted: boolean,
-  draftLive: boolean,
+  window: TradeWindow,
 ): PickBlock | undefined {
   if (drafted) return 'drafted';
-  if (!isTradeableRound(dataset, round, !draftLive)) return 'round-protected';
+  if (window === 'closed') return 'window-closed';
+  if (!isTradeableRound(dataset, round, window === 'offseason')) return 'round-protected';
   return undefined;
 }
 
@@ -562,13 +649,15 @@ export interface TradableSeasonPick extends SeasonPick {
  * move. Use this when the season may not be the current one.
  *
  * A pick in a future draft is never drafted and never on the clock, so only the
- * round rule can stop it.
+ * trade window can stop it.
  */
 export function tradableSeasonPicksFor(
   dataset: LeagueDataset,
   state: LeagueDynamicState,
   owner: string,
   season: number,
+  now: Date = new Date(),
+  calendar: TradeCalendar = TRADE_CALENDAR_2027,
 ): TradableSeasonPick[] {
   if (season === dataset.season) {
     return tradablePicksFor(dataset, state, owner).map((entry) => ({
@@ -582,10 +671,7 @@ export function tradableSeasonPicksFor(
     }));
   }
   return seasonPicksFor(dataset, season, owner).map((pick) => {
-    // A later draft is by definition not under way, so its rounds all move.
-    const blockedBy: PickBlock | undefined = isTradeableRound(dataset, pick.ref.round, true)
-      ? undefined
-      : 'round-protected';
+    const blockedBy = blockFor(dataset, pick.ref.round, false, tradeWindow(state, now, calendar));
     return { ...pick, tradable: blockedBy === undefined, blockedBy, onClock: false };
   });
 }
@@ -630,6 +716,7 @@ export type TradeRefusal =
   | 'duplicate-pick'
   | 'unknown-pick'
   | 'round-protected'
+  | 'window-closed'
   | 'mixed-seasons'
   | 'wrong-season'
   | 'too-many-away'
@@ -673,8 +760,9 @@ export function proposalSeason(input: ProposalInput): number | null {
  * the rule-book limits that need only the picks themselves.
  *
  * Rule 4.4.2 wants the same number of picks each way. Rule 4.4.1 locks the 1st
- * and 2nd, and rounds past the keeper tiers, once the draft starts. One
- * proposal names one draft, because only one is ever open.
+ * and 2nd, and rounds past the keeper tiers, during the season. Pass
+ * `offseason` false for the in-season window. One proposal names one draft,
+ * because only one is ever open.
  */
 export function checkProposalShape(
   dataset: LeagueDataset,
@@ -710,11 +798,7 @@ export function checkProposalShape(
       return refuse('unknown-pick', 'One of those picks does not exist.');
     }
     if (!isTradeableRound(dataset, ref.round, offseason)) {
-      return refuse(
-        'round-protected',
-        `Only rounds ${FIRST_TRADEABLE_ROUND} to ${lastTradeableRound(dataset, false)} `
-        + 'can be traded once the draft has started.',
-      );
+      return refuse('round-protected', IN_SEASON_ROUNDS_MESSAGE(dataset));
     }
     if (seen.has(pickRefKey(ref))) {
       return refuse('duplicate-pick', 'The same pick is listed twice.');
@@ -820,10 +904,14 @@ export function checkProposalAgainstState(
   dataset: LeagueDataset,
   state: LeagueDynamicState,
   input: ProposalInput,
+  now: Date = new Date(),
+  calendar: TradeCalendar = TRADE_CALENDAR_2027,
 ): TradeCheck {
-  // This one has the state, so it works the offseason out rather than being
+  // This one has the state, so it works the window out rather than being
   // told. It is the check that actually guards the write.
-  const shape = checkProposalShape(dataset, input, state.draft.startedAt === null);
+  const window = tradeWindow(state, now, calendar);
+  if (window === 'closed') return refuse('window-closed', WINDOW_CLOSED_MESSAGE);
+  const shape = checkProposalShape(dataset, input, window === 'offseason');
   if (!shape.ok) return shape;
 
   const season = proposalSeason(input) as number;
@@ -864,16 +952,9 @@ export function checkProposalAgainstState(
       }
       const cell = byKey.get(pickRefKey(ref));
       if (!cell) continue; // A future draft has no board, so nothing can be used.
-      const entry = toTradablePick(dataset, cell, live);
+      const entry = toTradablePick(dataset, cell);
       if (entry.blockedBy === 'drafted') {
         return refuse('pick-used', `Pick ${entry.label} has already been used in the draft.`, true);
-      }
-      if (entry.blockedBy === 'round-protected') {
-        return refuse(
-          'round-protected',
-          `Only rounds ${FIRST_TRADEABLE_ROUND} to ${lastTradeableRound(dataset, false)} `
-          + 'can be traded once the draft has started.',
-        );
       }
     }
   }
