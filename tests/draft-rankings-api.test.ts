@@ -7,6 +7,7 @@ import test, { after, before, beforeEach } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
+import liveFixture from './fixtures/espn-draft-rankings-2027-2026-09-25.json' with { type: 'json' };
 import type { LeagueDataset, LeagueDynamicState } from '../src/lib/keeper/types.ts';
 import type { DraftRankingSnapshot, EspnDraftRankingPlayer } from '../src/lib/league/draftRankings.ts';
 
@@ -211,6 +212,24 @@ test('previews without writing, then accepts the exact candidate', async () => {
   const rows = audit.body as unknown as Array<{ action: string }> | { rows?: Array<{ action: string }> };
   const actions = Array.isArray(rows) ? rows.map((row) => row.action) : (rows.rows ?? []).map((row) => row.action);
   assert.ok(actions.includes('draft_rankings.accepted'), `audit trail missing: ${actions.join(', ')}`);
+});
+
+test('real projections survive preview, acceptance and reloading the stored snapshot', async () => {
+  const body = { sourceSeason: 2027, source: 'espn-kona', fetchedAt: liveFixture.capturedAt,
+    players: liveFixture.players, scoringItems: liveFixture.scoringItems };
+  const previewed = await preview(body);
+  assert.equal(previewed.status, 200);
+  const diff = previewed.body.preview as { projectionArrived: boolean; counts: { projected: number } };
+  assert.equal(diff.projectionArrived, true);
+  assert.equal(diff.counts.projected, 348);
+  const accepted = await accept({ ...body, expectedCurrentSnapshotId: previewed.body.currentSnapshotId,
+    fingerprint: previewed.body.fingerprint });
+  assert.equal(accepted.status, 200);
+  const current = await request('/api/league/draft-rankings', { headers: auth(commissioner) });
+  const snapshot = current.body.snapshot as DraftRankingSnapshot;
+  assert.equal(snapshot.players.filter((player) => player.projection).length, 348);
+  assert.equal(snapshot.players.find((player) => player.fullName === 'Nikola Jokic')!.projection!.stats['42'], 72);
+  assert.deepEqual(snapshot.scoringItems, [...liveFixture.scoringItems].sort((a, b) => a.statId - b.statId));
 });
 
 test('the second snapshot diffs against the first and can land after the draft starts', async () => {

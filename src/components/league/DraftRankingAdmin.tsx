@@ -176,7 +176,7 @@ export default function DraftRankingAdmin() {
           <div style={{ color: projectedCount > 0 ? 'var(--neon-teal)' : 'var(--text-mid)', marginTop: 4 }}>
             {projectedCount > 0
               ? `ESPN projections in hand for ${projectedCount} players.`
-              : `ESPN has not published ${rankSourceLabel('projection', season)}s yet. That is expected before the season; the board orders on the next best source until they land.`}
+              : `No ${rankSourceLabel('projection', season)}s in the accepted snapshot. Fetch ESPN rankings to check for new projections.`}
           </div>
         </div>
       ) : (
@@ -252,8 +252,10 @@ export default function DraftRankingAdmin() {
 
           {diff.projectionArrived && (
             <div style={{ color: 'var(--neon-teal)', fontSize: '0.76rem', fontWeight: 800, marginTop: 10 }}>
-              ESPN projections have arrived for {diff.counts.projected} players. Accepting this
-              switches the board to {rankSourceLabel('projection', season)}.
+              ESPN projections have arrived for {diff.counts.projected} players. Accepting this{' '}
+              {diff.nextScoringItems.length > 0
+                ? `switches the board to ${rankSourceLabel('projection', season)}.`
+                : 'stores them, but the board still needs the league scoring items to use them.'}
             </div>
           )}
           {diff.scoringChanged && diff.previousCounts.players > 0 && (

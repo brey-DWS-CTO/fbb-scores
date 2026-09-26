@@ -25,6 +25,7 @@
  */
 import type { DatasetPlayer } from '../keeper/types.js';
 import { computeFpts, round1 } from '../espn/calculations.js';
+import { estimatedBonusPerGame } from './doubleDoubles.js';
 
 export interface ScoringItem {
   statId: number;
@@ -194,19 +195,40 @@ function byEspnOrder(players: DraftRankingPlayer[]): DraftRankingPlayer[] {
  * totals go through the scoring and are divided by projected games (`42`).
  * With no scoring items there is no answer, not a zero: every player would
  * tie at 0 and the board would quietly become meaningless.
+ *
+ * ESPN's projections carry no double-double, triple-double or
+ * quadruple-double counts, and this league pays for all three. When a scoring
+ * item asks for one the dictionary lacks, its odds are estimated from the
+ * per-game line (see `doubleDoubles.ts`) and paid at the league's rate.
  */
 export function projectedFppg(
   projection: ProjectionRow | null,
   scoringItems: readonly ScoringItem[],
 ): number | null {
-  if (!projection || scoringItems.length === 0) return null;
+  const perGame = projectedPerGame(projection);
+  if (!perGame || scoringItems.length === 0) return null;
   const items = [...scoringItems];
-  if (projection.averageStats) {
-    return computeFpts(projection.averageStats, items);
-  }
+  return round1(computeFpts(perGame, items) + estimatedBonusPerGame(perGame, items));
+}
+
+/** The per-game line behind a projection: ESPN's averages, or totals over games. */
+export function projectedPerGame(projection: ProjectionRow | null): Record<string, number> | null {
+  if (!projection) return null;
+  if (projection.averageStats) return projection.averageStats;
   const games = projection.stats['42'] ?? 0;
   if (games <= 0) return null;
-  return round1(computeFpts(projection.stats, items) / games);
+  const perGame: Record<string, number> = {};
+  for (const [id, value] of Object.entries(projection.stats)) perGame[id] = value / games;
+  return perGame;
+}
+
+/** The estimated double-double bonus inside a projected FPPG, per game. */
+export function projectedBonusPerGame(
+  projection: ProjectionRow | null,
+  scoringItems: readonly ScoringItem[],
+): number {
+  const perGame = projectedPerGame(projection);
+  return perGame ? round1(estimatedBonusPerGame(perGame, scoringItems)) : 0;
 }
 
 /** Last season's FPPG in this league's scoring, from the committed dataset. */

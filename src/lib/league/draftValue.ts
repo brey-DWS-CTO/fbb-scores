@@ -118,8 +118,8 @@ export function starterSlotList(roster: Pick<RosterSettings, 'starters'>): Start
 /**
  * A fitted curve from ESPN draft rank to points per game in this league's
  * scoring. Built from the players who have both a rank and a league number,
- * so the curve says "a player ESPN ranks here scored this much for us last
- * year", never a made-up scale.
+ * so the curve uses this season's projections when enough exist, otherwise
+ * last season's points. It never uses a made-up scale.
  */
 export interface RankBridge {
   /**
@@ -397,7 +397,7 @@ export function roomRankOf(
 /** Projected share of the season from a projection's games played, else all of it. */
 function availabilityOf(espn: DraftRankingPlayer | null): number {
   const games = espn?.projection?.stats['42'];
-  if (games === undefined || !Number.isFinite(games) || games <= 0) return 1;
+  if (games === undefined || !Number.isFinite(games) || games < 0) return 1;
   return Math.min(1, games / 82);
 }
 
@@ -424,9 +424,16 @@ export function valueBoard(
   const espnOf = (player: DatasetPlayer): DraftRankingPlayer | null =>
     player.espnId !== null ? byEspnId.get(player.espnId) ?? null : null;
 
-  // The bridge from rank to points is fitted on players with a real season
-  // behind them, so a rank never maps to points through a ten-game sample.
-  const bridge = fitRankToPoints(players.flatMap((player) => {
+  // Use this season's projected points when enough ranked players have them.
+  // Do not mix forecasts and last year's points in one fit. Before projections
+  // arrive, keep the established last-season bridge and its sample-size floor.
+  const projectedBridge = fitRankToPoints(players.flatMap((player) => {
+    const espn = espnOf(player);
+    const rank = espn?.standard?.rank ?? null;
+    const points = projectedFppg(espn?.projection ?? null, scoringItems);
+    return rank !== null && points !== null && availabilityOf(espn) > 0 ? [{ rank, points }] : [];
+  }));
+  const bridge = projectedBridge ?? fitRankToPoints(players.flatMap((player) => {
     const rank = espnOf(player)?.standard?.rank ?? null;
     const last = lastSeasonFppg(player);
     const games = player.stats2026?.gp ?? player.api2026?.gp ?? 0;
