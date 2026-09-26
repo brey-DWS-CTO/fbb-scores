@@ -598,7 +598,6 @@
               "id": "keepers.picktrade.rounds",
               "legacyNumber": "4.4.1",
               "title": "When picks can be traded",
-              "text": "In the offseason, from the end of the championship through the end of the draft, a team may trade a pick in any round. During the season, from the end of the draft through Week 15, only 3rd through 10th round picks may be traded. From the end of Week 15 until the championship ends, no picks may be traded. During the draft, a pick already used cannot be traded.",
               "settings": [
                 "picktrade.tradableRounds"
               ],
@@ -608,27 +607,42 @@
               ],
               "children": [
                 {
+                  "id": "keepers.picktrade.rounds.offseason",
+                  "title": "Offseason",
+                  "text": "From the end of the championship through the end of the draft, a team may trade a pick in any round."
+                },
+                {
                   "id": "keepers.picktrade.rounds.protected",
                   "legacyNumber": "4.4.1.1",
-                  "text": "During the season, 1st and 2nd round picks cannot be traded. This can be changed with a 60% vote.",
+                  "title": "In season",
+                  "text": "From the end of the draft through Week 15, only 3rd through 10th round picks may be traded. 1st and 2nd round picks stay locked. This can be changed with a 60% vote.",
                   "voteThreshold": 60,
                   "resolvedBy": [
                     "picktrade-offseason-firsts"
                   ]
                 },
                 {
-                  "id": "keepers.picktrade.rounds.maxAway",
-                  "legacyNumber": "4.4.1.2",
-                  "text": "Each team may trade away at most two of its own picks for any one draft. Passing on a pick you got in a trade does not count.",
-                  "settings": [
-                    "picktrade.maxTradedAwayPerYear"
-                  ]
+                  "id": "keepers.picktrade.rounds.closed",
+                  "title": "Closed",
+                  "text": "From the end of Week 15 until the championship ends, no picks may be traded."
+                },
+                {
+                  "id": "keepers.picktrade.rounds.used",
+                  "text": "Once a pick is used in the draft, it is the player taken with it. Trading it is a player trade, not a pick trade."
                 },
                 {
                   "id": "keepers.picktrade.rounds.horizon",
                   "legacyNumber": "4.4.1.3",
                   "text": "Only one draft's picks can be traded at a time: this season's until its draft ends, then next season's. Picks two or more drafts out cannot be traded."
                 }
+              ]
+            },
+            {
+              "id": "keepers.picktrade.rounds.maxAway",
+              "legacyNumber": "4.4.1.2",
+              "text": "Each team may trade away at most two of its own picks for any one draft. Passing on a pick you got in a trade does not count.",
+              "settings": [
+                "picktrade.maxTradedAwayPerYear"
               ]
             },
             {
@@ -683,7 +697,7 @@
                 {
                   "id": "keepers.picktrade.deadline.week",
                   "legacyNumber": "4.4.4.1",
-                  "text": "No picks may be traded from the end of Week 15 until the championship ends. See {{ref:keepers.picktrade.rounds}}.",
+                  "text": "No picks may be traded from the end of Week 15 until the championship ends. See {{ref:keepers.picktrade.rounds.closed}}.",
                   "settings": [
                     "picktrade.deadlineWeek"
                   ]

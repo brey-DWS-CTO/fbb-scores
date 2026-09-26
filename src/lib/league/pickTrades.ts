@@ -954,7 +954,7 @@ export function checkProposalAgainstState(
       if (!cell) continue; // A future draft has no board, so nothing can be used.
       const entry = toTradablePick(dataset, cell);
       if (entry.blockedBy === 'drafted') {
-        return refuse('pick-used', `Pick ${entry.label} has already been used in the draft.`, true);
+        return refuse('pick-used', `Pick ${entry.label} has been used. It is a player now, so trade the player instead.`, true);
       }
     }
   }

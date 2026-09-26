@@ -507,7 +507,7 @@ test('a pick already used in the draft cannot be traded', async () => {
     [ref(9, other)],
   );
   assert.equal(blocked.status, 409);
-  assert.match(String(asRecord(blocked.body).error), /already been used/);
+  assert.match(String(asRecord(blocked.body).error), /has been used/);
 });
 
 test('a traded pick changes who may enter the pick on the clock', async () => {
