@@ -77,7 +77,7 @@ export function buildSettingsRegistry(dataset: LeagueDataset): Map<string, Setti
       key: 'picktrade.tradableRounds',
       label: 'Rounds that can be traded',
       value: `1-${dataset.draftRounds} in the offseason, ${3}-${dataset.keeperRounds} once the draft starts`,
-      source: 'Commissioner ruling, ahead of the rule book',
+      source: 'Pick trade rules',
     },
   ];
   return new Map(specs.map((spec) => [spec.key, spec]));

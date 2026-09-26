@@ -52,7 +52,7 @@ export const MAX_PICKS_PER_SIDE = 6;
 
 export const MAX_TRADE_NOTE = 400;
 
-/** The lowest round the rule book lets a team trade. 1st and 2nd are protected. */
+/** The lowest round a team may trade once the draft starts (rule keepers.picktrade.rounds.protected). */
 export const FIRST_TRADEABLE_ROUND = 3;
 
 /** Most of its own picks a team may have traded away for one draft. */
@@ -64,11 +64,10 @@ export const MAX_PICKS_PER_ROUND = 2;
 /**
  * The last round a team may trade.
  *
- * The rule book says rounds 3 through 10, which is where the keeper tiers
- * stop. The commissioner opened rounds 11 to 14 as well: they carry no keeper
- * tier, so moving one cannot change what anybody's keepers cost. The app is
- * ahead of the written rule here on purpose. See issue `picktrade-late-rounds`
- * in the rule book, which is waiting on a vote to catch the wording up.
+ * Before the draft every round moves, 11 to 14 included: they carry no keeper
+ * tier, so moving one cannot change what anybody's keepers cost. Once the draft
+ * starts only rounds up to 10, where the keeper tiers stop, can move. Rule
+ * keepers.picktrade.rounds says the same.
  */
 export function lastTradeableRound(
   dataset: Pick<LeagueDataset, 'draftRounds' | 'keeperRounds'>,
@@ -469,7 +468,6 @@ export function seasonPicksFor(
 /** Why a pick cannot move. */
 export type PickBlock = 'drafted' | 'round-protected';
 
-/** True when the rule book lets this round be traded at all. */
 /**
  * Whether a round can move.
  *
@@ -478,8 +476,7 @@ export type PickBlock = 'drafted' | 'round-protected';
  * again, because from then on a keeper is paid for out of a round and a team
  * that traded its top picks away could be left unable to pay.
  *
- * The rule book still says rounds 3 to 10 flat. The app is ahead of it on
- * purpose: see issues `picktrade-late-rounds` and `picktrade-offseason-firsts`.
+ * Rules keepers.picktrade.rounds and keepers.picktrade.rounds.protected.
  */
 export function isTradeableRound(
   dataset: LeagueDataset,
@@ -675,9 +672,9 @@ export function proposalSeason(input: ProposalInput): number | null {
  * Shape checks that need no league state: sizes, duplicates, sane rounds, and
  * the rule-book limits that need only the picks themselves.
  *
- * Rule 4.4.2 wants the same number of picks each way. Rule 4.4.1 puts the 1st
- * and 2nd rounds off limits, and rounds past the keeper tiers were never
- * tradeable. One proposal names one draft, because only one is ever open.
+ * Rule 4.4.2 wants the same number of picks each way. Rule 4.4.1 locks the 1st
+ * and 2nd, and rounds past the keeper tiers, once the draft starts. One
+ * proposal names one draft, because only one is ever open.
  */
 export function checkProposalShape(
   dataset: LeagueDataset,
@@ -735,7 +732,7 @@ export function checkProposalShape(
  * app, counting this trade.
  *
  * Only the app's own ledger counts. The committed preseason seed records trades
- * the league agreed before the app was the system of record (rule 4.4.6), and
+ * the league agreed before the app was the system of record (rule keepers.picktrade.ledger), and
  * those are settled. A pick sent, reacquired and sent again counts once.
  */
 export function picksTradedAway(
@@ -989,7 +986,7 @@ export function canAnswer(
     return refuse('not-pending', 'That offer has already been settled.');
   }
   if (action === 'accept') {
-    // The commissioner never accepts for a member. Rule 4.4.6 support work is
+    // The commissioner never accepts for a member. Rule keepers.picktrade.ledger support work is
     // limited to cancelling something stuck.
     return proposal.recipient === owner
       ? OK

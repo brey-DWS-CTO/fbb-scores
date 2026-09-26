@@ -2916,6 +2916,98 @@ th.schedule-col-active {
 .rank-admin-down { color: var(--neon-red); }
 .rank-admin-note { color: var(--text-dim); font-size: 0.68rem; margin-top: 9px; }
 
+/* ─── Rule book, easier to read ──────────────────────────────────────── */
+/* Each level steps in by one unit. Phones get a smaller step so deep rules
+   keep room for their words. */
+.rules-page { --rules-indent: 14px; }
+@media (min-width: 640px) { .rules-page { --rules-indent: 22px; } }
+.rules-clause { margin-left: calc(var(--rules-depth, 0) * var(--rules-indent)); }
+
+/* Number in one column, words in the next: wrapped lines hang under the
+   words, not under the number. */
+.rules-clause-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 4px;
+}
+.rules-clause-row .rules-number { margin-right: 0; }
+.rules-clause-row .rules-clause-text { text-indent: 0; }
+
+/* A rule like 4.1 opens a group, so give it air above. */
+.rules-clause-top { margin-top: 10px; }
+.rules-section-body > .rules-clause-top:first-child { margin-top: 2px; }
+.rules-clause-subhead .rules-clause-title {
+  color: var(--text-hi);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+/* Examples sit apart from the rules they explain. */
+.rules-clause-example {
+  /* Pull the box left by its own border and padding so the number still
+     lines up with the rules around it. */
+  margin-left: calc(var(--rules-depth, 0) * var(--rules-indent) - 6px);
+  padding: 6px 10px 6px 4px;
+  border-left: 2px solid var(--panel-border);
+  border-radius: 0 8px 8px 0;
+  background: var(--chip-bg);
+}
+.rules-clause-example .rules-clause-text { color: var(--text-mid); font-size: 0.9rem; }
+
+/* Not published yet: one quiet line, not a warning box. */
+.rules-unpublished { display: flex; align-items: center; gap: 7px; }
+.rules-unpublished-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--neon-yellow);
+}
+
+/* Article shortcuts. One swipeable row on a phone, wrapped on a wide screen. */
+.rules-jump {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.rules-jump::-webkit-scrollbar { display: none; }
+@media (min-width: 840px) { .rules-jump { flex-wrap: wrap; overflow: visible; } }
+.rules-jump-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--text-mid);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rules-jump-chip:hover, .rules-jump-chip:focus-visible {
+  border-color: var(--neon-teal);
+  color: var(--neon-teal);
+  outline: none;
+}
+.rules-jump-number {
+  color: var(--neon-teal);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+@media print {
+  .rules-jump { display: none !important; }
+  .rules-clause-example { background: none; border-left: 0; }
+  .rules-clause-example .rules-clause-text { color: #333; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

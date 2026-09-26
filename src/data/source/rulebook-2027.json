@@ -71,15 +71,21 @@
             {
               "id": "format.democracy.limit",
               "legacyNumber": "1.3.1",
-              "text": "A maximum of 3 votes for rule or format changes may occur per year. All votes must occur before the draft, preferably at least one week before the draft date.",
+              "text": "Each member may start one vote per season. A cancelled vote does not count toward that one. The commissioners may start more. Votes must be started before the draft, ideally at least one week before it.",
               "settings": [
-                "vote.maxPerYear"
+                "vote.launchesPerMember"
+              ],
+              "resolvedBy": [
+                "vote-launch-quota"
               ]
             },
             {
               "id": "format.democracy.propose",
               "legacyNumber": "1.3.2",
-              "text": "Any member of the league can propose a rule or topic to be voted on to the commissioners. The commissioners have final selection over what topics may be voted on for the upcoming year."
+              "text": "Any member can propose a new rule or a change to a rule by starting a vote in the league app. The commissioners may reword a vote while it is open, or cancel it.",
+              "resolvedBy": [
+                "vote-launch-quota"
+              ]
             },
             {
               "id": "format.democracy.tie",
@@ -347,12 +353,12 @@
             {
               "id": "keepers.select.method",
               "legacyNumber": "4.1.2",
-              "text": "Keepers may be selected in the ESPN app or by notifying the commissioners."
+              "text": "Keepers are selected on your keeper page in the league app."
             },
             {
               "id": "keepers.select.deadline",
               "legacyNumber": "4.1.3",
-              "text": "If notifying the commissioners, notification must be in public group chat at least 24 hours before the commencement of the draft.",
+              "text": "Keepers must be selected at least 24 hours before the draft starts. The commissioners then lock them.",
               "settings": [
                 "keeper.noticeHours"
               ]
@@ -377,7 +383,7 @@
                 {
                   "id": "keepers.tiers.basis.averages",
                   "legacyNumber": "4.2.2.1",
-                  "text": "These tiers are set by player averages from the prior year. See the Keeper League Worksheet for further information.",
+                  "text": "These tiers are set by player averages from the prior year. Every player who played more than 25 games is ranked by average. The top 10 make the 1st round tier, the next 10 the 2nd round tier, and so on down to the 10th round tier, which takes everyone left. The league app shows each season's tiers on every keeper page.",
                   "settings": [
                     "keeper.tierAlgorithm"
                   ]
@@ -389,11 +395,33 @@
                   "text": "A 43.7 ppg player would cost a 2nd round pick and a 29.4 ppg player would cost a 9th round pick."
                 },
                 {
+                  "id": "keepers.tiers.basis.charge",
+                  "text": "A keeper costs the latest pick the team owns in its tier round or any earlier round. If the team traded away its pick in that round, the keeper moves up to the team's next latest pick.",
+                  "addedBy": "commissioner-2026-09-06",
+                  "resolvedBy": [
+                    "keeper-charged-latest-pick"
+                  ],
+                  "children": [
+                    {
+                      "id": "keepers.tiers.basis.charge.example",
+                      "kind": "example",
+                      "text": "A team holds picks 4.4 and 4.9. A keeper in the 4th round tier costs 4.9, not 4.4."
+                    }
+                  ]
+                },
+                {
                   "id": "keepers.tiers.basis.sameTier",
                   "legacyNumber": "4.2.2.3",
-                  "text": "Two keepers in the same tier: if a team wants to keep two players at 36.5 ppg average, they must use their 4th round pick and then their 3rd round pick to keep these players unless they trade for an additional 4th round pick. See {{ref:keepers.picktrade}}.",
+                  "text": "Two keepers in the same tier: the keeper with the higher average takes the pick in that round. The other moves up to the team's next latest pick, which is a second pick in the same round if the team holds one, and otherwise the latest pick it owns in an earlier round. See {{ref:keepers.picktrade}}.",
                   "resolvedBy": [
                     "open-first-round-same-tier"
+                  ],
+                  "children": [
+                    {
+                      "id": "keepers.tiers.basis.sameTier.example",
+                      "kind": "example",
+                      "text": "A team keeps two players in the 6th round tier. The one with the higher average costs its 6th round pick and the other costs its 5th. If it traded away its 5th, the other costs its 4th. If it holds two 6th round picks, the two keepers cost both 6ths."
+                    }
                   ]
                 },
                 {
@@ -567,21 +595,28 @@
             {
               "id": "keepers.picktrade.rounds",
               "legacyNumber": "4.4.1",
-              "text": "Each team may trade its 3rd through 10th round draft picks for the following season.",
+              "text": "Before the draft starts, a team may trade a pick in any round. Once the draft is under way, only 3rd through 10th round picks may be traded, and only picks not yet used.",
               "settings": [
                 "picktrade.tradableRounds"
+              ],
+              "resolvedBy": [
+                "picktrade-late-rounds",
+                "picktrade-offseason-firsts"
               ],
               "children": [
                 {
                   "id": "keepers.picktrade.rounds.protected",
                   "legacyNumber": "4.4.1.1",
-                  "text": "1st and 2nd round draft picks are not tradeable. This can be changed with a 60% vote.",
-                  "voteThreshold": 60
+                  "text": "1st and 2nd round picks are locked once the draft starts. This can be changed with a 60% vote.",
+                  "voteThreshold": 60,
+                  "resolvedBy": [
+                    "picktrade-offseason-firsts"
+                  ]
                 },
                 {
                   "id": "keepers.picktrade.rounds.maxAway",
                   "legacyNumber": "4.4.1.2",
-                  "text": "Each team may only trade away a maximum of two picks per year.",
+                  "text": "Each team may trade away at most two of its own picks for any one draft. Passing on a pick you got in a trade does not count.",
                   "settings": [
                     "picktrade.maxTradedAwayPerYear"
                   ]
@@ -589,7 +624,7 @@
                 {
                   "id": "keepers.picktrade.rounds.horizon",
                   "legacyNumber": "4.4.1.3",
-                  "text": "Draft picks from the draft 2 or more seasons in the future are not tradeable."
+                  "text": "Only one draft's picks can be traded at a time: this season's until its draft ends, then next season's. Picks two or more drafts out cannot be traded."
                 }
               ]
             },
@@ -604,7 +639,7 @@
             {
               "id": "keepers.picktrade.maxPerRound",
               "legacyNumber": "4.4.3",
-              "text": "Each team may acquire a maximum of 2 picks for a given round for the next year's draft.",
+              "text": "Each team may hold at most 2 picks in any one round of a draft.",
               "settings": [
                 "picktrade.maxPerRound"
               ],
@@ -614,6 +649,20 @@
                   "legacyNumber": "4.4.3.1",
                   "kind": "example",
                   "text": "If Team A trades for Team B's 3rd round pick and also still has its original 3rd round pick, Team A may acquire no more 3rd round picks unless they trade one of them away."
+                }
+              ]
+            },
+            {
+              "id": "keepers.picktrade.keeperPick",
+              "text": "A pick can be traded even when a keeper costs it. If a trade moves the pick a team's keeper costs (see {{ref:keepers.tiers.basis.charge}}), all of that team's keepers are cleared and it picks them again before the keeper deadline. The other team's keepers stay as they are.",
+              "addedBy": "commissioner-2026-09-06",
+              "resolvedBy": [
+                "picktrade-keeper-picks"
+              ],
+              "children": [
+                {
+                  "id": "keepers.picktrade.keeperPick.locked",
+                  "text": "Once keepers are locked, a trade that would leave either team unable to pay for a keeper is refused."
                 }
               ]
             },
@@ -2672,41 +2721,55 @@
       "id": "picktrade-late-rounds",
       "type": "settings",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "summary": "The rule book allows only rounds 3 through 10 to be traded (keepers.picktrade.rounds). The app allows every round in the offseason, before the draft starts, and rounds 3 through 10 once the draft is under way.",
       "ruling": "Commissioner opened rounds 11 to 14 for offseason trading on 2026-09-05. The book needs a vote to catch up: keepers.picktrade.rounds should say rounds 3 through 10 in season, every round before the draft. Until that passes, the app is the looser of the two.",
       "ruledBy": "commissioner",
-      "ruledAt": "2026-09-05"
+      "ruledAt": "2026-09-05",
+      "fix": "Book caught up on 2026-09-26: keepers.picktrade.rounds now says any round before the draft, rounds 3 through 10 once it starts."
     },
     {
       "id": "picktrade-offseason-firsts",
       "type": "settings",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "summary": "The rule book protects 1st and 2nd round picks outright (keepers.picktrade.rounds.protected). The app now lets them trade in the offseason, before the draft starts, and protects them again once it is under way.",
       "ruling": "Commissioner opened the 1st and 2nd for offseason trading on 2026-09-06. The book needs a vote to catch up: keepers.picktrade.rounds.protected should say the 1st and 2nd are protected once the draft has started, not always. The book already allows changing that clause by 60% vote.",
       "ruledBy": "commissioner",
-      "ruledAt": "2026-09-06"
+      "ruledAt": "2026-09-06",
+      "fix": "Book caught up on 2026-09-26: keepers.picktrade.rounds.protected now locks the 1st and 2nd only once the draft starts."
     },
     {
       "id": "picktrade-keeper-picks",
       "type": "settings",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "summary": "Nothing in the book says what happens to a keeper when you trade away the pick it is paying with. A short-lived rule blocked the pick outright, which leaked: before the reveal, a pick nobody could trade told the other side which tier your hidden keeper was on.",
       "ruling": "Commissioner ruled on 2026-09-06 that any pick can be traded, keeper or no keeper. If a trade moves the pick a keeper is charged to, that owner's keeper selections are cleared and they pick again before the keeper deadline. Only the owner whose pick moved is reset, and all of their keepers go, not just the one. The app warns each member about their own keepers before they send or accept. The book should say so under keepers.picktrade.",
       "ruledBy": "commissioner",
-      "ruledAt": "2026-09-06"
+      "ruledAt": "2026-09-06",
+      "fix": "Book caught up on 2026-09-26: new clause keepers.picktrade.keeperPick."
     },
     {
       "id": "keeper-charged-latest-pick",
       "type": "settings",
       "severity": "medium",
-      "status": "open",
+      "status": "resolved",
       "summary": "The book never says which pick a keeper is paid for out of when a team holds more than one pick at or better than the keeper's tier round. The app has always charged the latest pick.",
       "ruling": "Commissioner confirmed on 2026-09-06 what the app has always done: a keeper is charged to the latest pick you own at or better than its tier round. Ryan holds 4.4 and 4.9, so a round-4 keeper of his costs 4.9, not 4.4. This decides which trades reset a keeper set: trading 4.4 changes nothing, trading 4.9 clears his keepers. Note two picks in a round is the most anyone may hold (keepers.picktrade.maxPerRound). The book should say so under keepers.picktrade.",
       "ruledBy": "commissioner",
-      "ruledAt": "2026-09-06"
+      "ruledAt": "2026-09-06",
+      "fix": "Book caught up on 2026-09-26: new clause keepers.tiers.basis.charge, and keepers.tiers.basis.sameTier rewritten as a general rule instead of one 4th round case."
+    },
+    {
+      "id": "vote-launch-quota",
+      "type": "settings",
+      "severity": "medium",
+      "status": "resolved",
+      "summary": "1.3.1 capped the league at 3 votes a year and 1.3.2 let the commissioners choose every topic. The app lets each member start one vote per season, with the commissioners exempt from that count.",
+      "ruling": "Commissioner added the one-vote-per-member launch on 2026-08-31. Book caught up on 2026-09-26: 1.3.1 and 1.3.2 now describe what the app does.",
+      "ruledBy": "commissioner",
+      "ruledAt": "2026-08-31"
     }
   ]
 }

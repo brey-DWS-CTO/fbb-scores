@@ -190,8 +190,8 @@ test('the 1st and 2nd move in the offseason but not once the draft is on', () =>
 
 test('the late rounds move in the offseason only', () => {
   // The commissioner opened rounds past the keeper tiers. They carry no tier,
-  // so moving one cannot change what anybody's keepers cost. The rule book
-  // still says 3 to 10; see issue picktrade-late-rounds.
+  // so moving one cannot change what anybody's keepers cost. Rule
+  // keepers.picktrade.rounds.
   for (const round of [11, 12, 13, 14]) {
     const check = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), true);
     assert.notEqual(check.reason, 'round-protected', `round ${round} moves before the draft`);
