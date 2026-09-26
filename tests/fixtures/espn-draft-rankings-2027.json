@@ -1,0 +1,8615 @@
+{
+ "note": "Real ESPN kona_player_info numbers for the 2026-27 season, captured from the public players endpoint with no login. Test data only: every player ESPN gave a STANDARD draft rank, plus every player in the committed dataset. ESPN had published no 2026-27 projection row on this date, so projection is null throughout. Scoring items need a league login, so they are not here.",
+ "capturedAt": "2026-09-13T06:12:44.953Z",
+ "season": 2027,
+ "source": "espn-kona",
+ "sourceUrl": "https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/2027/players?view=kona_player_info",
+ "players": [
+  {
+   "espnId": 3112335,
+   "fullName": "Nikola Jokic",
+   "proTeam": "DEN",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 1.8,
+   "percentOwned": 99.9,
+   "standard": {
+    "rank": 1,
+    "auctionValue": 65
+   },
+   "roto": {
+    "rank": 2,
+    "auctionValue": 65
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278073,
+   "fullName": "Shai Gilgeous-Alexander",
+   "proTeam": "OKC",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 2.94,
+   "percentOwned": 99.9,
+   "standard": {
+    "rank": 2,
+    "auctionValue": 62
+   },
+   "roto": {
+    "rank": 3,
+    "auctionValue": 64
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3032977,
+   "fullName": "Giannis Antetokounmpo",
+   "proTeam": "MIA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 5.27,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 3,
+    "auctionValue": 61
+   },
+   "roto": {
+    "rank": 15,
+    "auctionValue": 45
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5104157,
+   "fullName": "Victor Wembanyama",
+   "proTeam": "SAS",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 2.93,
+   "percentOwned": 99.9,
+   "standard": {
+    "rank": 4,
+    "auctionValue": 60
+   },
+   "roto": {
+    "rank": 1,
+    "auctionValue": 68
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3945274,
+   "fullName": "Luka Doncic",
+   "proTeam": "LAL",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 4.6,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 5,
+    "auctionValue": 59
+   },
+   "roto": {
+    "rank": 4,
+    "auctionValue": 63
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6583,
+   "fullName": "Anthony Davis",
+   "proTeam": "WAS",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 12.44,
+   "percentOwned": 98.3,
+   "standard": {
+    "rank": 6,
+    "auctionValue": 58
+   },
+   "roto": {
+    "rank": 17,
+    "auctionValue": 43
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4594268,
+   "fullName": "Anthony Edwards",
+   "proTeam": "MIN",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 6.74,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 7,
+    "auctionValue": 57
+   },
+   "roto": {
+    "rank": 10,
+    "auctionValue": 55
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432166,
+   "fullName": "Cade Cunningham",
+   "proTeam": "DET",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 8.3,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 8,
+    "auctionValue": 56
+   },
+   "roto": {
+    "rank": 7,
+    "auctionValue": 58
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3155942,
+   "fullName": "Domantas Sabonis",
+   "proTeam": "SAC",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 19.31,
+   "percentOwned": 96.7,
+   "standard": {
+    "rank": 9,
+    "auctionValue": 55
+   },
+   "roto": {
+    "rank": 48,
+    "auctionValue": 12
+   },
+   "projection": null
+  },
+  {
+   "espnId": 1966,
+   "fullName": "LeBron James",
+   "proTeam": "PHI",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 13.59,
+   "percentOwned": 99.6,
+   "standard": {
+    "rank": 10,
+    "auctionValue": 54
+   },
+   "roto": {
+    "rank": 39,
+    "auctionValue": 17
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277905,
+   "fullName": "Trae Young",
+   "proTeam": "WAS",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 21.39,
+   "percentOwned": 96.8,
+   "standard": {
+    "rank": 11,
+    "auctionValue": 53
+   },
+   "roto": {
+    "rank": 35,
+    "auctionValue": 20
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3992,
+   "fullName": "James Harden",
+   "proTeam": "CLE",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 17.07,
+   "percentOwned": 99.5,
+   "standard": {
+    "rank": 12,
+    "auctionValue": 52
+   },
+   "roto": {
+    "rank": 6,
+    "auctionValue": 59
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4065648,
+   "fullName": "Jayson Tatum",
+   "proTeam": "BOS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 11.74,
+   "percentOwned": 99.7,
+   "standard": {
+    "rank": 12,
+    "auctionValue": 52
+   },
+   "roto": {
+    "rank": 9,
+    "auctionValue": 56
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3136195,
+   "fullName": "Karl-Anthony Towns",
+   "proTeam": "NYK",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 14.62,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 13,
+    "auctionValue": 50
+   },
+   "roto": {
+    "rank": 11,
+    "auctionValue": 54
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3149673,
+   "fullName": "Pascal Siakam",
+   "proTeam": "IND",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 23.28,
+   "percentOwned": 98.5,
+   "standard": {
+    "rank": 14,
+    "auctionValue": 48
+   },
+   "roto": {
+    "rank": 26,
+    "auctionValue": 28
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4684740,
+   "fullName": "Amen Thompson",
+   "proTeam": "HOU",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 19.23,
+   "percentOwned": 99.5,
+   "standard": {
+    "rank": 15,
+    "auctionValue": 46
+   },
+   "roto": {
+    "rank": 12,
+    "auctionValue": 50
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3136193,
+   "fullName": "Devin Booker",
+   "proTeam": "PHX",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 20.01,
+   "percentOwned": 99.7,
+   "standard": {
+    "rank": 16,
+    "auctionValue": 45
+   },
+   "roto": {
+    "rank": 28,
+    "auctionValue": 26
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4017837,
+   "fullName": "Ivica Zubac",
+   "proTeam": "IND",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 37.19,
+   "percentOwned": 91.4,
+   "standard": {
+    "rank": 17,
+    "auctionValue": 44
+   },
+   "roto": {
+    "rank": 174,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4871145,
+   "fullName": "Josh Giddey",
+   "proTeam": "CHI",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 31.18,
+   "percentOwned": 96.1,
+   "standard": {
+    "rank": 18,
+    "auctionValue": 43
+   },
+   "roto": {
+    "rank": 42,
+    "auctionValue": 15
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3917376,
+   "fullName": "Jaylen Brown",
+   "proTeam": "PHI",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 18.1,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 19,
+    "auctionValue": 42
+   },
+   "roto": {
+    "rank": 24,
+    "auctionValue": 32
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4593803,
+   "fullName": "Jalen Williams",
+   "proTeam": "OKC",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 31.25,
+   "percentOwned": 97.5,
+   "standard": {
+    "rank": 20,
+    "auctionValue": 41
+   },
+   "roto": {
+    "rank": 30,
+    "auctionValue": 25
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431678,
+   "fullName": "Tyrese Maxey",
+   "proTeam": "PHI",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 17.64,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 21,
+    "auctionValue": 40
+   },
+   "roto": {
+    "rank": 8,
+    "auctionValue": 57
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6478,
+   "fullName": "Nikola Vucevic",
+   "proTeam": "ORL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 47.25,
+   "percentOwned": 88.1,
+   "standard": {
+    "rank": 22,
+    "auctionValue": 37
+   },
+   "roto": {
+    "rank": 108,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3975,
+   "fullName": "Stephen Curry",
+   "proTeam": "GSW",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 20.25,
+   "percentOwned": 99.3,
+   "standard": {
+    "rank": 23,
+    "auctionValue": 36
+   },
+   "roto": {
+    "rank": 41,
+    "auctionValue": 15
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4871144,
+   "fullName": "Alperen Sengun",
+   "proTeam": "HOU",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 32.56,
+   "percentOwned": 97.7,
+   "standard": {
+    "rank": 24,
+    "auctionValue": 34
+   },
+   "roto": {
+    "rank": 49,
+    "auctionValue": 11
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3934672,
+   "fullName": "Jalen Brunson",
+   "proTeam": "NYK",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 21.07,
+   "percentOwned": 99.7,
+   "standard": {
+    "rank": 25,
+    "auctionValue": 32
+   },
+   "roto": {
+    "rank": 38,
+    "auctionValue": 19
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066261,
+   "fullName": "Bam Adebayo",
+   "proTeam": "MIA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 30.19,
+   "percentOwned": 98.6,
+   "standard": {
+    "rank": 26,
+    "auctionValue": 29
+   },
+   "roto": {
+    "rank": 31,
+    "auctionValue": 24
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432158,
+   "fullName": "Evan Mobley",
+   "proTeam": "CLE",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 33.79,
+   "percentOwned": 98.6,
+   "standard": {
+    "rank": 26,
+    "auctionValue": 29
+   },
+   "roto": {
+    "rank": 29,
+    "auctionValue": 26
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3908809,
+   "fullName": "Donovan Mitchell",
+   "proTeam": "CLE",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 22.7,
+   "percentOwned": 99.8,
+   "standard": {
+    "rank": 27,
+    "auctionValue": 28
+   },
+   "roto": {
+    "rank": 23,
+    "auctionValue": 34
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066259,
+   "fullName": "De'Aaron Fox",
+   "proTeam": "SAS",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 40.61,
+   "percentOwned": 95.5,
+   "standard": {
+    "rank": 28,
+    "auctionValue": 27
+   },
+   "roto": {
+    "rank": 47,
+    "auctionValue": 12
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395628,
+   "fullName": "Zion Williamson",
+   "proTeam": "NOP",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 43.23,
+   "percentOwned": 95,
+   "standard": {
+    "rank": 29,
+    "auctionValue": 26
+   },
+   "roto": {
+    "rank": 71,
+    "auctionValue": 5
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4279888,
+   "fullName": "Ja Morant",
+   "proTeam": "POR",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 44.72,
+   "percentOwned": 95,
+   "standard": {
+    "rank": 30,
+    "auctionValue": 26
+   },
+   "roto": {
+    "rank": 58,
+    "auctionValue": 8
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3202,
+   "fullName": "Kevin Durant",
+   "proTeam": "HOU",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 26.16,
+   "percentOwned": 99.7,
+   "standard": {
+    "rank": 31,
+    "auctionValue": 25
+   },
+   "roto": {
+    "rank": 22,
+    "auctionValue": 36
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3936299,
+   "fullName": "Jamal Murray",
+   "proTeam": "DEN",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 36.56,
+   "percentOwned": 98.6,
+   "standard": {
+    "rank": 32,
+    "auctionValue": 24
+   },
+   "roto": {
+    "rank": 25,
+    "auctionValue": 29
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4566434,
+   "fullName": "Franz Wagner",
+   "proTeam": "ORL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 51.56,
+   "percentOwned": 92,
+   "standard": {
+    "rank": 33,
+    "auctionValue": 23
+   },
+   "roto": {
+    "rank": 91,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3978,
+   "fullName": "DeMar DeRozan",
+   "proTeam": "DEN",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 52.17,
+   "percentOwned": 90.4,
+   "standard": {
+    "rank": 34,
+    "auctionValue": 22
+   },
+   "roto": {
+    "rank": 55,
+    "auctionValue": 9
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432573,
+   "fullName": "Paolo Banchero",
+   "proTeam": "ORL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 37.3,
+   "percentOwned": 98.7,
+   "standard": {
+    "rank": 35,
+    "auctionValue": 21
+   },
+   "roto": {
+    "rank": 46,
+    "auctionValue": 13
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432816,
+   "fullName": "LaMelo Ball",
+   "proTeam": "MIN",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 31.58,
+   "percentOwned": 99.1,
+   "standard": {
+    "rank": 36,
+    "auctionValue": 20
+   },
+   "roto": {
+    "rank": 13,
+    "auctionValue": 48
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433134,
+   "fullName": "Scottie Barnes",
+   "proTeam": "TOR",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 30.68,
+   "percentOwned": 99.2,
+   "standard": {
+    "rank": 37,
+    "auctionValue": 20
+   },
+   "roto": {
+    "rank": 21,
+    "auctionValue": 37
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066320,
+   "fullName": "Desmond Bane",
+   "proTeam": "ORL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 49.26,
+   "percentOwned": 93.5,
+   "standard": {
+    "rank": 38,
+    "auctionValue": 20
+   },
+   "roto": {
+    "rank": 19,
+    "auctionValue": 41
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5041939,
+   "fullName": "Cooper Flagg",
+   "proTeam": "DAL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 23.97,
+   "percentOwned": 99.7,
+   "standard": {
+    "rank": 39,
+    "auctionValue": 19
+   },
+   "roto": {
+    "rank": 14,
+    "auctionValue": 46
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395651,
+   "fullName": "Coby White",
+   "proTeam": "CHA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 61.85,
+   "percentOwned": 85.2,
+   "standard": {
+    "rank": 40,
+    "auctionValue": 17
+   },
+   "roto": {
+    "rank": 96,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3062679,
+   "fullName": "Josh Hart",
+   "proTeam": "NYK",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 57.49,
+   "percentOwned": 91,
+   "standard": {
+    "rank": 41,
+    "auctionValue": 16
+   },
+   "roto": {
+    "rank": 111,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4701230,
+   "fullName": "Jalen Johnson",
+   "proTeam": "ATL",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 35.96,
+   "percentOwned": 97.7,
+   "standard": {
+    "rank": 42,
+    "auctionValue": 15
+   },
+   "roto": {
+    "rank": 5,
+    "auctionValue": 60
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066328,
+   "fullName": "Jarrett Allen",
+   "proTeam": "CLE",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 65.2,
+   "percentOwned": 88.1,
+   "standard": {
+    "rank": 43,
+    "auctionValue": 15
+   },
+   "roto": {
+    "rank": 97,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4869342,
+   "fullName": "Dyson Daniels",
+   "proTeam": "ATL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 60.88,
+   "percentOwned": 89.2,
+   "standard": {
+    "rank": 44,
+    "auctionValue": 14
+   },
+   "roto": {
+    "rank": 43,
+    "auctionValue": 14
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433255,
+   "fullName": "Chet Holmgren",
+   "proTeam": "OKC",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 45.04,
+   "percentOwned": 96.9,
+   "standard": {
+    "rank": 45,
+    "auctionValue": 14
+   },
+   "roto": {
+    "rank": 20,
+    "auctionValue": 40
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3078576,
+   "fullName": "Derrick White",
+   "proTeam": "BOS",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 55.07,
+   "percentOwned": 92.2,
+   "standard": {
+    "rank": 46,
+    "auctionValue": 13
+   },
+   "roto": {
+    "rank": 16,
+    "auctionValue": 44
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3133628,
+   "fullName": "Myles Turner",
+   "proTeam": "MIL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 74.72,
+   "percentOwned": 80,
+   "standard": {
+    "rank": 47,
+    "auctionValue": 13
+   },
+   "roto": {
+    "rank": 88,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4437244,
+   "fullName": "Jalen Green",
+   "proTeam": "PHX",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 69.06,
+   "percentOwned": 86.5,
+   "standard": {
+    "rank": 48,
+    "auctionValue": 12
+   },
+   "roto": {
+    "rank": 112,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278104,
+   "fullName": "Michael Porter Jr.",
+   "proTeam": "BKN",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 64.45,
+   "percentOwned": 89.6,
+   "standard": {
+    "rank": 49,
+    "auctionValue": 12
+   },
+   "roto": {
+    "rank": 57,
+    "auctionValue": 8
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066383,
+   "fullName": "Miles Bridges",
+   "proTeam": "PHX",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 74.4,
+   "percentOwned": 84.4,
+   "standard": {
+    "rank": 50,
+    "auctionValue": 11
+   },
+   "roto": {
+    "rank": 64,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3147657,
+   "fullName": "Mikal Bridges",
+   "proTeam": "NYK",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 69.28,
+   "percentOwned": 87.7,
+   "standard": {
+    "rank": 51,
+    "auctionValue": 11
+   },
+   "roto": {
+    "rank": 40,
+    "auctionValue": 16
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066457,
+   "fullName": "Austin Reaves",
+   "proTeam": "LAL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 53.57,
+   "percentOwned": 93.1,
+   "standard": {
+    "rank": 52,
+    "auctionValue": 10
+   },
+   "roto": {
+    "rank": 67,
+    "auctionValue": 6
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3059318,
+   "fullName": "Joel Embiid",
+   "proTeam": "PHI",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 52.85,
+   "percentOwned": 93.6,
+   "standard": {
+    "rank": 53,
+    "auctionValue": 10
+   },
+   "roto": {
+    "rank": 86,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277961,
+   "fullName": "Jaren Jackson Jr.",
+   "proTeam": "UTA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 74.23,
+   "percentOwned": 84.8,
+   "standard": {
+    "rank": 54,
+    "auctionValue": 10
+   },
+   "roto": {
+    "rank": 44,
+    "auctionValue": 14
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433621,
+   "fullName": "Jalen Duren",
+   "proTeam": "DET",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 68.89,
+   "percentOwned": 88,
+   "standard": {
+    "rank": 55,
+    "auctionValue": 9
+   },
+   "roto": {
+    "rank": 84,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6430,
+   "fullName": "Jimmy Butler III",
+   "proTeam": "GSW",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 82.32,
+   "percentOwned": 76,
+   "standard": {
+    "rank": 56,
+    "auctionValue": 9
+   },
+   "roto": {
+    "rank": 381,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3134908,
+   "fullName": "Jakob Poeltl",
+   "proTeam": "TOR",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 92.7,
+   "percentOwned": 64.4,
+   "standard": {
+    "rank": 57,
+    "auctionValue": 8
+   },
+   "roto": {
+    "rank": 178,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433136,
+   "fullName": "Walker Kessler",
+   "proTeam": "LAL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 78.61,
+   "percentOwned": 82.1,
+   "standard": {
+    "rank": 58,
+    "auctionValue": 8
+   },
+   "roto": {
+    "rank": 45,
+    "auctionValue": 13
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397688,
+   "fullName": "Trey Murphy III",
+   "proTeam": "NOP",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 75.82,
+   "percentOwned": 85.3,
+   "standard": {
+    "rank": 59,
+    "auctionValue": 8
+   },
+   "roto": {
+    "rank": 51,
+    "auctionValue": 10
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3064440,
+   "fullName": "Zach LaVine",
+   "proTeam": "SAC",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 88.87,
+   "percentOwned": 73.5,
+   "standard": {
+    "rank": 60,
+    "auctionValue": 7
+   },
+   "roto": {
+    "rank": 75,
+    "auctionValue": 5
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683021,
+   "fullName": "Deni Avdija",
+   "proTeam": "POR",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 67.28,
+   "percentOwned": 89.1,
+   "standard": {
+    "rank": 61,
+    "auctionValue": 7
+   },
+   "roto": {
+    "rank": 56,
+    "auctionValue": 8
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395725,
+   "fullName": "Tyler Herro",
+   "proTeam": "MIL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 80.39,
+   "percentOwned": 83.3,
+   "standard": {
+    "rank": 62,
+    "auctionValue": 7
+   },
+   "roto": {
+    "rank": 68,
+    "auctionValue": 6
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277956,
+   "fullName": "Jordan Poole",
+   "proTeam": "NOP",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 92.19,
+   "percentOwned": 63.7,
+   "standard": {
+    "rank": 63,
+    "auctionValue": 7
+   },
+   "roto": {
+    "rank": 137,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397140,
+   "fullName": "Kevin Porter Jr.",
+   "proTeam": "MIL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 94.46,
+   "percentOwned": 72.9,
+   "standard": {
+    "rank": 64,
+    "auctionValue": 7
+   },
+   "roto": {
+    "rank": 146,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431767,
+   "fullName": "Christian Braun",
+   "proTeam": "DEN",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 98.27,
+   "percentOwned": 62.1,
+   "standard": {
+    "rank": 65,
+    "auctionValue": 7
+   },
+   "roto": {
+    "rank": 189,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6606,
+   "fullName": "Damian Lillard",
+   "proTeam": "POR",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 82.67,
+   "percentOwned": 83.4,
+   "standard": {
+    "rank": 66,
+    "auctionValue": 6
+   },
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4431680,
+   "fullName": "Onyeka Okongwu",
+   "proTeam": "ATL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 93.9,
+   "percentOwned": 77.6,
+   "standard": {
+    "rank": 66,
+    "auctionValue": 6
+   },
+   "roto": {
+    "rank": 79,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3934719,
+   "fullName": "OG Anunoby",
+   "proTeam": "NYK",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 70.13,
+   "percentOwned": 88.6,
+   "standard": {
+    "rank": 67,
+    "auctionValue": 6
+   },
+   "roto": {
+    "rank": 53,
+    "auctionValue": 10
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6450,
+   "fullName": "Kawhi Leonard",
+   "proTeam": "LAC",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 51.15,
+   "percentOwned": 94.8,
+   "standard": {
+    "rank": 68,
+    "auctionValue": 6
+   },
+   "roto": {
+    "rank": 70,
+    "auctionValue": 6
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3059319,
+   "fullName": "Andrew Wiggins",
+   "proTeam": "MIA",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 93.01,
+   "percentOwned": 78.3,
+   "standard": {
+    "rank": 69,
+    "auctionValue": 6
+   },
+   "roto": {
+    "rank": 52,
+    "auctionValue": 10
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4396907,
+   "fullName": "Darius Garland",
+   "proTeam": "LAC",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 90.41,
+   "percentOwned": 81,
+   "standard": {
+    "rank": 70,
+    "auctionValue": 5
+   },
+   "roto": {
+    "rank": 133,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3032976,
+   "fullName": "Rudy Gobert",
+   "proTeam": "MIN",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 87.08,
+   "percentOwned": 81.6,
+   "standard": {
+    "rank": 71,
+    "auctionValue": 5
+   },
+   "roto": {
+    "rank": 60,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3064514,
+   "fullName": "Julius Randle",
+   "proTeam": "BKN",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 82.85,
+   "percentOwned": 83.3,
+   "standard": {
+    "rank": 72,
+    "auctionValue": 5
+   },
+   "roto": {
+    "rank": 54,
+    "auctionValue": 9
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3913176,
+   "fullName": "Brandon Ingram",
+   "proTeam": "TOR",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 87.49,
+   "percentOwned": 82.2,
+   "standard": {
+    "rank": 73,
+    "auctionValue": 5
+   },
+   "roto": {
+    "rank": 36,
+    "auctionValue": 20
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5160992,
+   "fullName": "Alex Sarr",
+   "proTeam": "WAS",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 94.54,
+   "percentOwned": 78.8,
+   "standard": {
+    "rank": 74,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 37,
+    "auctionValue": 20
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3102531,
+   "fullName": "Kristaps Porzingis",
+   "proTeam": "GSW",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 100.49,
+   "percentOwned": 73.1,
+   "standard": {
+    "rank": 75,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 155,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395625,
+   "fullName": "RJ Barrett",
+   "proTeam": "TOR",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 100.45,
+   "percentOwned": 76.1,
+   "standard": {
+    "rank": 76,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 161,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4711272,
+   "fullName": "Reed Sheppard",
+   "proTeam": "HOU",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 102.4,
+   "percentOwned": 73.7,
+   "standard": {
+    "rank": 77,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 69,
+    "auctionValue": 6
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2595516,
+   "fullName": "Norman Powell",
+   "proTeam": "CHI",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 101.61,
+   "percentOwned": 76.4,
+   "standard": {
+    "rank": 78,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 82,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2490149,
+   "fullName": "CJ McCollum",
+   "proTeam": "ATL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 98.45,
+   "percentOwned": 77.5,
+   "standard": {
+    "rank": 79,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 32,
+    "auctionValue": 23
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4351851,
+   "fullName": "Anfernee Simons",
+   "proTeam": "PHI",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 107.5,
+   "percentOwned": 67.8,
+   "standard": {
+    "rank": 80,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 59,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066336,
+   "fullName": "Lauri Markkanen",
+   "proTeam": "UTA",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 88.58,
+   "percentOwned": 82.7,
+   "standard": {
+    "rank": 81,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 122,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4701232,
+   "fullName": "Mark Williams",
+   "proTeam": "PHX",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 115.25,
+   "percentOwned": 55.7,
+   "standard": {
+    "rank": 82,
+    "auctionValue": 4
+   },
+   "roto": {
+    "rank": 141,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395712,
+   "fullName": "Andrew Nembhard",
+   "proTeam": "IND",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 109.59,
+   "percentOwned": 71.4,
+   "standard": {
+    "rank": 83,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 104,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278129,
+   "fullName": "Deandre Ayton",
+   "proTeam": "WAS",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 115.15,
+   "percentOwned": 61.5,
+   "standard": {
+    "rank": 84,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 95,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066354,
+   "fullName": "Payton Pritchard",
+   "proTeam": "BOS",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 100.67,
+   "percentOwned": 77.9,
+   "standard": {
+    "rank": 85,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 81,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2530530,
+   "fullName": "T.J. McConnell",
+   "proTeam": "IND",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 116.82,
+   "percentOwned": 51.9,
+   "standard": {
+    "rank": 86,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 139,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4396971,
+   "fullName": "Naz Reid",
+   "proTeam": "CHA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 99.2,
+   "percentOwned": 76.2,
+   "standard": {
+    "rank": 87,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 50,
+    "auctionValue": 11
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431671,
+   "fullName": "Jaden McDaniels",
+   "proTeam": "MIN",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 97.05,
+   "percentOwned": 79.2,
+   "standard": {
+    "rank": 88,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 63,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3908845,
+   "fullName": "John Collins",
+   "proTeam": "DET",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 113.91,
+   "percentOwned": 65.3,
+   "standard": {
+    "rank": 89,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 89,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278067,
+   "fullName": "Nic Claxton",
+   "proTeam": "CHI",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 118.3,
+   "percentOwned": 59.2,
+   "standard": {
+    "rank": 90,
+    "auctionValue": 3
+   },
+   "roto": {
+    "rank": 101,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066262,
+   "fullName": "Malik Monk",
+   "proTeam": "SAC",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 119.41,
+   "percentOwned": 50.7,
+   "standard": {
+    "rank": 91,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 204,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4914336,
+   "fullName": "Shaedon Sharpe",
+   "proTeam": "POR",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 118.85,
+   "percentOwned": 62.7,
+   "standard": {
+    "rank": 92,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 92,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4222252,
+   "fullName": "Isaiah Hartenstein",
+   "proTeam": "OKC",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 120.37,
+   "percentOwned": 55.7,
+   "standard": {
+    "rank": 93,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 171,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6440,
+   "fullName": "Tobias Harris",
+   "proTeam": "SAS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 119.33,
+   "percentOwned": 57,
+   "standard": {
+    "rank": 94,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 128,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4251,
+   "fullName": "Paul George",
+   "proTeam": "BOS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 98.63,
+   "percentOwned": 80.6,
+   "standard": {
+    "rank": 95,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 34,
+    "auctionValue": 21
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432174,
+   "fullName": "Cam Thomas",
+   "proTeam": "FA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 123.76,
+   "percentOwned": 43.6,
+   "standard": {
+    "rank": 96,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 237,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3136776,
+   "fullName": "D'Angelo Russell",
+   "proTeam": "MEM",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 123.61,
+   "percentOwned": 44.2,
+   "standard": {
+    "rank": 97,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 228,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395724,
+   "fullName": "Immanuel Quickley",
+   "proTeam": "TOR",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 119.25,
+   "percentOwned": 67.8,
+   "standard": {
+    "rank": 98,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 85,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3064290,
+   "fullName": "Aaron Gordon",
+   "proTeam": "DEN",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 121.7,
+   "percentOwned": 58.3,
+   "standard": {
+    "rank": 99,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 132,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4594327,
+   "fullName": "Keegan Murray",
+   "proTeam": "SAC",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 126.78,
+   "percentOwned": 45.2,
+   "standard": {
+    "rank": 100,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 151,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6589,
+   "fullName": "Draymond Green",
+   "proTeam": "GSW",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 117.37,
+   "percentOwned": 55.4,
+   "standard": {
+    "rank": 101,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 80,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278049,
+   "fullName": "Daniel Gafford",
+   "proTeam": "DAL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 130.32,
+   "percentOwned": 31.7,
+   "standard": {
+    "rank": 102,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 140,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4684742,
+   "fullName": "Ausar Thompson",
+   "proTeam": "DET",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 109.38,
+   "percentOwned": 74.3,
+   "standard": {
+    "rank": 103,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 72,
+    "auctionValue": 5
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4593125,
+   "fullName": "Santi Aldama",
+   "proTeam": "DAL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 130.66,
+   "percentOwned": 34.8,
+   "standard": {
+    "rank": 104,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 166,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433287,
+   "fullName": "Brandon Miller",
+   "proTeam": "CHA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 106.29,
+   "percentOwned": 77.2,
+   "standard": {
+    "rank": 105,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 73,
+    "auctionValue": 5
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4845367,
+   "fullName": "Stephon Castle",
+   "proTeam": "SAS",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 76.84,
+   "percentOwned": 88.9,
+   "standard": {
+    "rank": 106,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 135,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683634,
+   "fullName": "Bennedict Mathurin",
+   "proTeam": "NOP",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 128.57,
+   "percentOwned": 43.5,
+   "standard": {
+    "rank": 107,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 160,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4600663,
+   "fullName": "Zach Edey",
+   "proTeam": "MEM",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 126.7,
+   "percentOwned": 53,
+   "standard": {
+    "rank": 108,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 117,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4065733,
+   "fullName": "Ty Jerome",
+   "proTeam": "MEM",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 130.5,
+   "percentOwned": 37.7,
+   "standard": {
+    "rank": 109,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 148,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5175643,
+   "fullName": "Egor Demin",
+   "proTeam": "BKN",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 131.48,
+   "percentOwned": 38.1,
+   "standard": {
+    "rank": 109,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 103,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3064482,
+   "fullName": "Bobby Portis",
+   "proTeam": "MIA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 131.45,
+   "percentOwned": 34.4,
+   "standard": {
+    "rank": 110,
+    "auctionValue": 2
+   },
+   "roto": {
+    "rank": 102,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105623,
+   "fullName": "Kel'el Ware",
+   "proTeam": "MIL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 127.93,
+   "percentOwned": 47.8,
+   "standard": {
+    "rank": 111,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 110,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105565,
+   "fullName": "Donovan Clingan",
+   "proTeam": "POR",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 108.24,
+   "percentOwned": 73.5,
+   "standard": {
+    "rank": 112,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 33,
+    "auctionValue": 22
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433192,
+   "fullName": "Tari Eason",
+   "proTeam": "HOU",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 135.04,
+   "percentOwned": 21.2,
+   "standard": {
+    "rank": 113,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 118,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395630,
+   "fullName": "Devin Vassell",
+   "proTeam": "SAS",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 125.82,
+   "percentOwned": 50,
+   "standard": {
+    "rank": 114,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 98,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431736,
+   "fullName": "Toumani Camara",
+   "proTeam": "POR",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 130.72,
+   "percentOwned": 39.7,
+   "standard": {
+    "rank": 115,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 61,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432165,
+   "fullName": "Jalen Suggs",
+   "proTeam": "ORL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 131.71,
+   "percentOwned": 38.6,
+   "standard": {
+    "rank": 116,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 119,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4591725,
+   "fullName": "Ryan Rollins",
+   "proTeam": "MIL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 123.57,
+   "percentOwned": 61.1,
+   "standard": {
+    "rank": 116,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 99,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433627,
+   "fullName": "Keyonte George",
+   "proTeam": "UTA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 112.37,
+   "percentOwned": 73.7,
+   "standard": {
+    "rank": 117,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 74,
+    "auctionValue": 5
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2779,
+   "fullName": "Chris Paul",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 135.17,
+   "percentOwned": 11.2,
+   "standard": {
+    "rank": 118,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 379,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683678,
+   "fullName": "Scoot Henderson",
+   "proTeam": "POR",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 136.42,
+   "percentOwned": 20.2,
+   "standard": {
+    "rank": 119,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 147,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3133603,
+   "fullName": "Kelly Oubre Jr.",
+   "proTeam": "IND",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 136.75,
+   "percentOwned": 13,
+   "standard": {
+    "rank": 120,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 159,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105592,
+   "fullName": "Cam Whitmore",
+   "proTeam": "FA",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.43,
+   "percentOwned": 4.8,
+   "standard": {
+    "rank": 121,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 363,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278355,
+   "fullName": "Obi Toppin",
+   "proTeam": "IND",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.61,
+   "percentOwned": 6.5,
+   "standard": {
+    "rank": 122,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 219,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431785,
+   "fullName": "Scotty Pippen Jr.",
+   "proTeam": "MEM",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 137.94,
+   "percentOwned": 7.4,
+   "standard": {
+    "rank": 123,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 169,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3032979,
+   "fullName": "Dennis Schroder",
+   "proTeam": "CHA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.16,
+   "percentOwned": 5.3,
+   "standard": {
+    "rank": 124,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 129,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683766,
+   "fullName": "Isaiah Collier",
+   "proTeam": "UTA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.71,
+   "percentOwned": 9.9,
+   "standard": {
+    "rank": 125,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 100,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3934673,
+   "fullName": "Donte DiVincenzo",
+   "proTeam": "MIN",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 136.44,
+   "percentOwned": 11.3,
+   "standard": {
+    "rank": 126,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 77,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4065732,
+   "fullName": "De'Andre Hunter",
+   "proTeam": "SAC",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.82,
+   "percentOwned": 3.2,
+   "standard": {
+    "rank": 127,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 184,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3135046,
+   "fullName": "Tyus Jones",
+   "proTeam": "DEN",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.9,
+   "percentOwned": 2.1,
+   "standard": {
+    "rank": 128,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 303,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4873138,
+   "fullName": "Ace Bailey",
+   "proTeam": "UTA",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 131.96,
+   "percentOwned": 32.3,
+   "standard": {
+    "rank": 129,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 115,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3995,
+   "fullName": "Jrue Holiday",
+   "proTeam": "POR",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 134.86,
+   "percentOwned": 24.1,
+   "standard": {
+    "rank": 130,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 179,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3134907,
+   "fullName": "Kyle Kuzma",
+   "proTeam": "MIL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.55,
+   "percentOwned": 6.1,
+   "standard": {
+    "rank": 131,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 165,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397183,
+   "fullName": "Aaron Wiggins",
+   "proTeam": "ATL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.55,
+   "percentOwned": 3.4,
+   "standard": {
+    "rank": 132,
+    "auctionValue": 1
+   },
+   "roto": {
+    "rank": 213,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3138196,
+   "fullName": "Cameron Johnson",
+   "proTeam": "DEN",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.22,
+   "percentOwned": 5.2,
+   "standard": {
+    "rank": 133,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 163,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397424,
+   "fullName": "Neemias Queta",
+   "proTeam": "BOS",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 137.11,
+   "percentOwned": 20.1,
+   "standard": {
+    "rank": 134,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 116,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4711294,
+   "fullName": "Matas Buzelis",
+   "proTeam": "CHI",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 123.29,
+   "percentOwned": 59.6,
+   "standard": {
+    "rank": 135,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 76,
+    "auctionValue": 5
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4845374,
+   "fullName": "Bub Carrington",
+   "proTeam": "WAS",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.92,
+   "percentOwned": 2.9,
+   "standard": {
+    "rank": 136,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 206,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5061589,
+   "fullName": "Yves Missi",
+   "proTeam": "NOP",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 2.5,
+   "standard": {
+    "rank": 137,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 229,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5037871,
+   "fullName": "Dylan Harper",
+   "proTeam": "SAS",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 102.91,
+   "percentOwned": 77.9,
+   "standard": {
+    "rank": 138,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 127,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6475,
+   "fullName": "Klay Thompson",
+   "proTeam": "MIA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 129.96,
+   "percentOwned": 23.9,
+   "standard": {
+    "rank": 139,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 248,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277811,
+   "fullName": "Collin Sexton",
+   "proTeam": "LAL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.09,
+   "percentOwned": 6.9,
+   "standard": {
+    "rank": 140,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 157,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6580,
+   "fullName": "Bradley Beal",
+   "proTeam": "LAC",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.62,
+   "percentOwned": 3,
+   "standard": {
+    "rank": 141,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 372,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4396909,
+   "fullName": "Aaron Nesmith",
+   "proTeam": "IND",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.83,
+   "percentOwned": 3.4,
+   "standard": {
+    "rank": 142,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 154,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683778,
+   "fullName": "Jared McCain",
+   "proTeam": "OKC",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 133.4,
+   "percentOwned": 18.3,
+   "standard": {
+    "rank": 143,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 144,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683688,
+   "fullName": "Dereck Lively II",
+   "proTeam": "DAL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.6,
+   "percentOwned": 3.5,
+   "standard": {
+    "rank": 144,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 362,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6442,
+   "fullName": "Kyrie Irving",
+   "proTeam": "DAL",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 97.59,
+   "percentOwned": 80.3,
+   "standard": {
+    "rank": 145,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 27,
+    "auctionValue": 27
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4709138,
+   "fullName": "Brandin Podziemski",
+   "proTeam": "GSW",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 137.1,
+   "percentOwned": 14,
+   "standard": {
+    "rank": 146,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 114,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5061575,
+   "fullName": "Kon Knueppel",
+   "proTeam": "CHA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 91.42,
+   "percentOwned": 83.7,
+   "standard": {
+    "rank": 147,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 78,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2990984,
+   "fullName": "Buddy Hield",
+   "proTeam": "ATL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.72,
+   "percentOwned": 2,
+   "standard": {
+    "rank": 148,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 355,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2991043,
+   "fullName": "Caris LeVert",
+   "proTeam": "MIL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 149,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 244,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3448,
+   "fullName": "Brook Lopez",
+   "proTeam": "LAC",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.81,
+   "percentOwned": 3,
+   "standard": {
+    "rank": 150,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 167,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278078,
+   "fullName": "P.J. Washington",
+   "proTeam": "DAL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.74,
+   "percentOwned": 9.7,
+   "standard": {
+    "rank": 151,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 123,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3468,
+   "fullName": "Russell Westbrook",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 137.19,
+   "percentOwned": 8.5,
+   "standard": {
+    "rank": 152,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 109,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397014,
+   "fullName": "Quentin Grimes",
+   "proTeam": "LAL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.61,
+   "percentOwned": 8.3,
+   "standard": {
+    "rank": 153,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 106,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277813,
+   "fullName": "Herbert Jones",
+   "proTeam": "NOP",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.76,
+   "percentOwned": 3.1,
+   "standard": {
+    "rank": 154,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 138,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5211175,
+   "fullName": "Zaccharie Risacher",
+   "proTeam": "DAL",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.89,
+   "percentOwned": 3.6,
+   "standard": {
+    "rank": 155,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 168,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4684793,
+   "fullName": "Kyle Filipowski",
+   "proTeam": "UTA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139,
+   "percentOwned": 6,
+   "standard": {
+    "rank": 156,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 120,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5104155,
+   "fullName": "Bilal Coulibaly",
+   "proTeam": "WAS",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.91,
+   "percentOwned": 3.4,
+   "standard": {
+    "rank": 157,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 121,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2991070,
+   "fullName": "Jerami Grant",
+   "proTeam": "MEM",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.94,
+   "percentOwned": 10.4,
+   "standard": {
+    "rank": 158,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 107,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433218,
+   "fullName": "Jaden Ivey",
+   "proTeam": "FA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 140,
+   "percentOwned": 1.1,
+   "standard": {
+    "rank": 159,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 252,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6477,
+   "fullName": "Jonas Valanciunas",
+   "proTeam": "FA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 1.1,
+   "standard": {
+    "rank": 160,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 242,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397002,
+   "fullName": "Ayo Dosunmu",
+   "proTeam": "MIN",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 137.47,
+   "percentOwned": 20,
+   "standard": {
+    "rank": 161,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 130,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2580782,
+   "fullName": "Spencer Dinwiddie",
+   "proTeam": "FA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.9,
+   "standard": {
+    "rank": 162,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 378,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433083,
+   "fullName": "Cam Spencer",
+   "proTeam": "MEM",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.05,
+   "percentOwned": 2.1,
+   "standard": {
+    "rank": 162,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 143,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432639,
+   "fullName": "Jabari Smith Jr.",
+   "proTeam": "HOU",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 130.32,
+   "percentOwned": 48.3,
+   "standard": {
+    "rank": 163,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 83,
+    "auctionValue": 4
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5124612,
+   "fullName": "VJ Edgecombe",
+   "proTeam": "PHI",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 111.52,
+   "percentOwned": 76.4,
+   "standard": {
+    "rank": 164,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 90,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3102530,
+   "fullName": "Jusuf Nurkic",
+   "proTeam": "UTA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.09,
+   "percentOwned": 9.3,
+   "standard": {
+    "rank": 165,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 94,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2583632,
+   "fullName": "Royce O'Neale",
+   "proTeam": "CHA",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 1.7,
+   "standard": {
+    "rank": 166,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 142,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397020,
+   "fullName": "Luguentz Dort",
+   "proTeam": "ATL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.5,
+   "percentOwned": 3.3,
+   "standard": {
+    "rank": 167,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 233,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5093267,
+   "fullName": "Collin Murray-Boyles",
+   "proTeam": "TOR",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.14,
+   "percentOwned": 5,
+   "standard": {
+    "rank": 168,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 198,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4702177,
+   "fullName": "Keon Ellis",
+   "proTeam": "BKN",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.09,
+   "percentOwned": 1.3,
+   "standard": {
+    "rank": 169,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 263,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4065804,
+   "fullName": "Sam Hauser",
+   "proTeam": "BOS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.9,
+   "percentOwned": 2,
+   "standard": {
+    "rank": 170,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 224,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277847,
+   "fullName": "Wendell Carter Jr.",
+   "proTeam": "ORL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.53,
+   "percentOwned": 3.7,
+   "standard": {
+    "rank": 171,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 134,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6578,
+   "fullName": "Harrison Barnes",
+   "proTeam": "SAS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 172,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 226,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395723,
+   "fullName": "Keldon Johnson",
+   "proTeam": "SAS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.84,
+   "percentOwned": 3.8,
+   "standard": {
+    "rank": 173,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 149,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3102529,
+   "fullName": "Clint Capela",
+   "proTeam": "HOU",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.78,
+   "percentOwned": 1.1,
+   "standard": {
+    "rank": 174,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 283,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683692,
+   "fullName": "Cason Wallace",
+   "proTeam": "OKC",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 137.34,
+   "percentOwned": 11,
+   "standard": {
+    "rank": 175,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 87,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433247,
+   "fullName": "Jonathan Kuminga",
+   "proTeam": "MIN",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 136.39,
+   "percentOwned": 11.6,
+   "standard": {
+    "rank": 176,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 176,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278039,
+   "fullName": "Nickeil Alexander-Walker",
+   "proTeam": "ATL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 115.65,
+   "percentOwned": 68.4,
+   "standard": {
+    "rank": 177,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 66,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277869,
+   "fullName": "Jose Alvarado",
+   "proTeam": "NYK",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.36,
+   "percentOwned": 2.7,
+   "standard": {
+    "rank": 178,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 225,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3155526,
+   "fullName": "Dillon Brooks",
+   "proTeam": "PHX",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 135.04,
+   "percentOwned": 22.8,
+   "standard": {
+    "rank": 179,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 131,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278594,
+   "fullName": "Naji Marshall",
+   "proTeam": "DAL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 3,
+   "standard": {
+    "rank": 180,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 153,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4610139,
+   "fullName": "Jeremy Sochan",
+   "proTeam": "POR",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.9,
+   "percentOwned": 1,
+   "standard": {
+    "rank": 181,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 325,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3948153,
+   "fullName": "Chris Boucher",
+   "proTeam": "FA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.75,
+   "percentOwned": 0.8,
+   "standard": {
+    "rank": 182,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 322,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397136,
+   "fullName": "Saddiq Bey",
+   "proTeam": "NOP",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.55,
+   "percentOwned": 16.6,
+   "standard": {
+    "rank": 183,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 124,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277843,
+   "fullName": "Gary Trent Jr.",
+   "proTeam": "MIL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.81,
+   "percentOwned": 0.9,
+   "standard": {
+    "rank": 184,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 290,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5174563,
+   "fullName": "Kyshawn George",
+   "proTeam": "WAS",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 136.15,
+   "percentOwned": 16,
+   "standard": {
+    "rank": 185,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 62,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5238230,
+   "fullName": "Tre Johnson",
+   "proTeam": "WAS",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.77,
+   "percentOwned": 2.4,
+   "standard": {
+    "rank": 186,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 172,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2581018,
+   "fullName": "Kentavious Caldwell-Pope",
+   "proTeam": "PHI",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.49,
+   "percentOwned": 1.5,
+   "standard": {
+    "rank": 187,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 253,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066372,
+   "fullName": "Kevin Huerter",
+   "proTeam": "DET",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.71,
+   "percentOwned": 1.3,
+   "standard": {
+    "rank": 188,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 199,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105839,
+   "fullName": "Brice Sensabaugh",
+   "proTeam": "UTA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.43,
+   "percentOwned": 5.4,
+   "standard": {
+    "rank": 189,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 105,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4702384,
+   "fullName": "Nique Clifford",
+   "proTeam": "SAC",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 190,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 158,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6609,
+   "fullName": "Khris Middleton",
+   "proTeam": "WAS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.75,
+   "percentOwned": 1.4,
+   "standard": {
+    "rank": 191,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 214,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432848,
+   "fullName": "Jaime Jaquez Jr.",
+   "proTeam": "MIL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138,
+   "percentOwned": 15,
+   "standard": {
+    "rank": 192,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 150,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4869780,
+   "fullName": "Derik Queen",
+   "proTeam": "NOP",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 134.78,
+   "percentOwned": 32.4,
+   "standard": {
+    "rank": 193,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 126,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066436,
+   "fullName": "De'Anthony Melton",
+   "proTeam": "GSW",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.73,
+   "percentOwned": 1.4,
+   "standard": {
+    "rank": 194,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 182,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5144091,
+   "fullName": "Jeremiah Fears",
+   "proTeam": "NOP",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.59,
+   "percentOwned": 15,
+   "standard": {
+    "rank": 195,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 125,
+    "auctionValue": 1
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2528426,
+   "fullName": "Jordan Clarkson",
+   "proTeam": "NYK",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.53,
+   "percentOwned": 1.7,
+   "standard": {
+    "rank": 196,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 285,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2991350,
+   "fullName": "Alex Caruso",
+   "proTeam": "OKC",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.28,
+   "percentOwned": 4.9,
+   "standard": {
+    "rank": 197,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 241,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432809,
+   "fullName": "Cole Anthony",
+   "proTeam": "FA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 198,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 266,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3135045,
+   "fullName": "Grayson Allen",
+   "proTeam": "CHA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.69,
+   "percentOwned": 8.3,
+   "standard": {
+    "rank": 199,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 175,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395626,
+   "fullName": "Tre Jones",
+   "proTeam": "CHI",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.83,
+   "percentOwned": 6.8,
+   "standard": {
+    "rank": 200,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 187,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3195,
+   "fullName": "Mike Conley",
+   "proTeam": "BOS",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.77,
+   "percentOwned": 0.9,
+   "standard": {
+    "rank": 201,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 287,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683024,
+   "fullName": "Killian Hayes",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.88,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 202,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 370,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3213,
+   "fullName": "Al Horford",
+   "proTeam": "GSW",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.55,
+   "percentOwned": 1.7,
+   "standard": {
+    "rank": 203,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 185,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2991139,
+   "fullName": "Kris Dunn",
+   "proTeam": "LAC",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.04,
+   "percentOwned": 0.8,
+   "standard": {
+    "rank": 204,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 181,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3907823,
+   "fullName": "Terance Mann",
+   "proTeam": "BKN",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 205,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 240,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5106258,
+   "fullName": "Gradey Dick",
+   "proTeam": "TOR",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.4,
+   "percentOwned": 1.5,
+   "standard": {
+    "rank": 206,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 183,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3907497,
+   "fullName": "Dejounte Murray",
+   "proTeam": "NOP",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 130.24,
+   "percentOwned": 48.2,
+   "standard": {
+    "rank": 207,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 93,
+    "auctionValue": 3
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4348700,
+   "fullName": "Goga Bitadze",
+   "proTeam": "ORL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.91,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 208,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 216,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4017844,
+   "fullName": "Guerschon Yabusele",
+   "proTeam": "CHI",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 209,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 318,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5112087,
+   "fullName": "Jaylen Wells",
+   "proTeam": "MEM",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.98,
+   "percentOwned": 1.2,
+   "standard": {
+    "rank": 210,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 162,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278076,
+   "fullName": "Nick Richards",
+   "proTeam": "MIA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 211,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 312,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5203685,
+   "fullName": "Khaman Maluach",
+   "proTeam": "PHX",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.87,
+   "percentOwned": 2.6,
+   "standard": {
+    "rank": 212,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 351,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066648,
+   "fullName": "Rui Hachimura",
+   "proTeam": "LAC",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.65,
+   "percentOwned": 5.5,
+   "standard": {
+    "rank": 213,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 217,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5217746,
+   "fullName": "Yang Hansen",
+   "proTeam": "POR",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.75,
+   "percentOwned": 1.1,
+   "standard": {
+    "rank": 214,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 297,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432810,
+   "fullName": "Isaiah Stewart",
+   "proTeam": "MEM",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 215,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 156,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3157465,
+   "fullName": "Duncan Robinson",
+   "proTeam": "DET",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.72,
+   "percentOwned": 1.8,
+   "standard": {
+    "rank": 216,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 207,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4712849,
+   "fullName": "Anthony Black",
+   "proTeam": "ORL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 136.56,
+   "percentOwned": 18.3,
+   "standard": {
+    "rank": 217,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 65,
+    "auctionValue": 7
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4351852,
+   "fullName": "Mitchell Robinson",
+   "proTeam": "BOS",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.89,
+   "percentOwned": 6.4,
+   "standard": {
+    "rank": 218,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 205,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2528210,
+   "fullName": "Tim Hardaway Jr.",
+   "proTeam": "MIA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.71,
+   "percentOwned": 2.3,
+   "standard": {
+    "rank": 219,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 208,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2990962,
+   "fullName": "Taurean Prince",
+   "proTeam": "DET",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 220,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 349,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397018,
+   "fullName": "Ochai Agbaji",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 221,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 321,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2489663,
+   "fullName": "Kelly Olynyk",
+   "proTeam": "FA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.83,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 222,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 298,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3907498,
+   "fullName": "Matisse Thybulle",
+   "proTeam": "LAL",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 223,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 235,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2566769,
+   "fullName": "Malcolm Brogdon",
+   "proTeam": "NYK",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": null,
+   "adp": 139.96,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 224,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 382,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4592479,
+   "fullName": "Julian Champagnie",
+   "proTeam": "SAS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.24,
+   "percentOwned": 8.7,
+   "standard": {
+    "rank": 225,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 152,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3037789,
+   "fullName": "Bogdan Bogdanovic",
+   "proTeam": "HOU",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.92,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 226,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 265,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3074752,
+   "fullName": "Terry Rozier",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.86,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 227,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 383,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395702,
+   "fullName": "Isaiah Joe",
+   "proTeam": "DET",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.93,
+   "percentOwned": 1.1,
+   "standard": {
+    "rank": 228,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 222,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3906665,
+   "fullName": "Brandon Clarke",
+   "proTeam": "MEM",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": null,
+   "adp": null,
+   "percentOwned": null,
+   "standard": {
+    "rank": 229,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 220,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4997528,
+   "fullName": "Nikola Jovic",
+   "proTeam": "MIA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.94,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 229,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 268,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4065670,
+   "fullName": "Bruce Brown",
+   "proTeam": "FA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 230,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 236,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432582,
+   "fullName": "Max Christie",
+   "proTeam": "DAL",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 1.3,
+   "standard": {
+    "rank": 231,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 164,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278053,
+   "fullName": "Davion Mitchell",
+   "proTeam": "MIA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.14,
+   "percentOwned": 5.2,
+   "standard": {
+    "rank": 232,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 177,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432170,
+   "fullName": "Isaiah Jackson",
+   "proTeam": "LAC",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 233,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 258,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2990969,
+   "fullName": "Georges Niang",
+   "proTeam": "GSW",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.02,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 234,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 259,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066211,
+   "fullName": "Robert Williams III",
+   "proTeam": "POR",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.03,
+   "percentOwned": 0.9,
+   "standard": {
+    "rank": 235,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 201,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2993874,
+   "fullName": "Kyle Anderson",
+   "proTeam": "TOR",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 236,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 218,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4888725,
+   "fullName": "Ryan Dunn",
+   "proTeam": "PHX",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.05,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 237,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 264,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3138160,
+   "fullName": "Caleb Martin",
+   "proTeam": "DAL",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.09,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 238,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 302,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4576087,
+   "fullName": "Peyton Watson",
+   "proTeam": "CLE",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 138.7,
+   "percentOwned": 11.1,
+   "standard": {
+    "rank": 239,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 136,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3150844,
+   "fullName": "Moritz Wagner",
+   "proTeam": "BKN",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.04,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 240,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 211,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397475,
+   "fullName": "AJ Green",
+   "proTeam": "MIL",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.84,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 241,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 232,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3064560,
+   "fullName": "Luke Kornet",
+   "proTeam": "SAS",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.61,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 242,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 192,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6585,
+   "fullName": "Andre Drummond",
+   "proTeam": "NYK",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.77,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 243,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 193,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4280151,
+   "fullName": "Corey Kispert",
+   "proTeam": "ATL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.04,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 244,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 260,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3155535,
+   "fullName": "Kevon Looney",
+   "proTeam": "LAL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.93,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 245,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 292,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5107173,
+   "fullName": "Danny Wolf",
+   "proTeam": "BKN",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.04,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 246,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 366,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4873201,
+   "fullName": "Asa Newell",
+   "proTeam": "ATL",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.07,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 247,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 315,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432247,
+   "fullName": "Jaylen Clark",
+   "proTeam": "MIN",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 248,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 328,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433137,
+   "fullName": "Ziaire Williams",
+   "proTeam": "LAL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 249,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 254,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4065778,
+   "fullName": "Max Strus",
+   "proTeam": "LAC",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 250,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 341,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432847,
+   "fullName": "Terrence Shannon Jr.",
+   "proTeam": "MIN",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 251,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 342,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5107897,
+   "fullName": "Jonathan Mogbo",
+   "proTeam": "SAC",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.06,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 252,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 352,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683771,
+   "fullName": "Ronald Holland II",
+   "proTeam": "DET",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.05,
+   "percentOwned": 0.8,
+   "standard": {
+    "rank": 253,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 246,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066218,
+   "fullName": "Grant Williams",
+   "proTeam": "CHA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.02,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 254,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 230,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432819,
+   "fullName": "Tre Mann",
+   "proTeam": "WAS",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.04,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 255,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 299,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2990992,
+   "fullName": "Marcus Smart",
+   "proTeam": "HOU",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.74,
+   "percentOwned": 1.6,
+   "standard": {
+    "rank": 256,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 173,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105637,
+   "fullName": "Adem Bona",
+   "proTeam": "PHI",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.93,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 257,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 275,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2488653,
+   "fullName": "Mason Plumlee",
+   "proTeam": "FA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 258,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 339,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3913174,
+   "fullName": "Luke Kennard",
+   "proTeam": "PHX",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 1.1,
+   "standard": {
+    "rank": 259,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 243,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4684275,
+   "fullName": "Rob Dillingham",
+   "proTeam": "CHI",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.87,
+   "percentOwned": 1,
+   "standard": {
+    "rank": 260,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 186,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397189,
+   "fullName": "Jalen Smith",
+   "proTeam": "CHI",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.8,
+   "standard": {
+    "rank": 261,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 180,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431823,
+   "fullName": "Miles McBride",
+   "proTeam": "NYK",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.8,
+   "percentOwned": 1.4,
+   "standard": {
+    "rank": 262,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 364,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4897943,
+   "fullName": "Dalton Knecht",
+   "proTeam": "LAL",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.89,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 263,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 338,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2580365,
+   "fullName": "Larry Nance Jr.",
+   "proTeam": "IND",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 264,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 323,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431687,
+   "fullName": "Patrick Williams",
+   "proTeam": "CHI",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.03,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 265,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 281,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4592829,
+   "fullName": "Quenton Jackson",
+   "proTeam": "IND",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.01,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 265,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 256,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4702382,
+   "fullName": "Tristan da Silva",
+   "proTeam": "ORL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.02,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 266,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 250,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066421,
+   "fullName": "Lonzo Ball",
+   "proTeam": "FA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.16,
+   "percentOwned": 1.3,
+   "standard": {
+    "rank": 267,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 231,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431684,
+   "fullName": "Trayce Jackson-Davis",
+   "proTeam": "TOR",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 268,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 313,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5106060,
+   "fullName": "Jarace Walker",
+   "proTeam": "IND",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.1,
+   "percentOwned": 0.9,
+   "standard": {
+    "rank": 269,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 221,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432171,
+   "fullName": "Moses Moody",
+   "proTeam": "GSW",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 140.03,
+   "percentOwned": 0.9,
+   "standard": {
+    "rank": 270,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 251,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4896372,
+   "fullName": "Walter Clayton Jr.",
+   "proTeam": "MEM",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 140.05,
+   "percentOwned": 0.8,
+   "standard": {
+    "rank": 271,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 188,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432241,
+   "fullName": "Jamal Shead",
+   "proTeam": "TOR",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.05,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 272,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 227,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431714,
+   "fullName": "Jalen Wilson",
+   "proTeam": "ATL",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 273,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 333,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432823,
+   "fullName": "Jaylin Williams",
+   "proTeam": "OKC",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.34,
+   "percentOwned": 2.1,
+   "standard": {
+    "rank": 274,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 223,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397885,
+   "fullName": "Dalano Banton",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.03,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 275,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 359,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683750,
+   "fullName": "Jordan Hawkins",
+   "proTeam": "MEM",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.09,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 276,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 343,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4065654,
+   "fullName": "Jonathan Isaac",
+   "proTeam": "ORL",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 140.07,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 277,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 331,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5279130,
+   "fullName": "Nolan Traore",
+   "proTeam": "BKN",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 140.07,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 278,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 368,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4592691,
+   "fullName": "Jake LaRavia",
+   "proTeam": "LAL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.01,
+   "percentOwned": 1,
+   "standard": {
+    "rank": 279,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 210,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2993370,
+   "fullName": "Richaun Holmes",
+   "proTeam": "FA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.03,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 280,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 380,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3936099,
+   "fullName": "Derrick Jones Jr.",
+   "proTeam": "LAC",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.03,
+   "percentOwned": 0.5,
+   "standard": {
+    "rank": 281,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 203,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278541,
+   "fullName": "Jaylen Nowell",
+   "proTeam": "WAS",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": null,
+   "adp": 140.02,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 282,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 234,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4712863,
+   "fullName": "Mouhamed Gueye",
+   "proTeam": "ATL",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 140.01,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 283,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 286,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066650,
+   "fullName": "Zach Collins",
+   "proTeam": "CHI",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 140,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 284,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 239,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4997537,
+   "fullName": "Tristan Vukcevic",
+   "proTeam": "WAS",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 285,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 272,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431679,
+   "fullName": "Precious Achiuwa",
+   "proTeam": "SAC",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.1,
+   "percentOwned": 1.1,
+   "standard": {
+    "rank": 286,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 191,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3907387,
+   "fullName": "Ben Simmons",
+   "proTeam": "SAC",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 138.99,
+   "percentOwned": 2.9,
+   "standard": {
+    "rank": 287,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 371,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4684272,
+   "fullName": "Ja'Kobe Walter",
+   "proTeam": "TOR",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 288,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 190,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433249,
+   "fullName": "Moussa Diabate",
+   "proTeam": "CHA",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.79,
+   "percentOwned": 4,
+   "standard": {
+    "rank": 289,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 145,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105550,
+   "fullName": "GG Jackson",
+   "proTeam": "MEM",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.01,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 290,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 215,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3064230,
+   "fullName": "Cameron Payne",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 291,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 361,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432811,
+   "fullName": "Josh Green",
+   "proTeam": "UTA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 292,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 309,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4066757,
+   "fullName": "Sam Merrill",
+   "proTeam": "CLE",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 293,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 197,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397077,
+   "fullName": "Jaxson Hayes",
+   "proTeam": "UTA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.93,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 294,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 262,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2578185,
+   "fullName": "Dorian Finney-Smith",
+   "proTeam": "CHA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.01,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 295,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 261,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3431,
+   "fullName": "Eric Gordon",
+   "proTeam": "FA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 296,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 385,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431828,
+   "fullName": "KJ Martin",
+   "proTeam": "UTA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": null,
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 297,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 273,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3136196,
+   "fullName": "Trey Lyles",
+   "proTeam": "MIN",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 298,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 269,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4712896,
+   "fullName": "Noah Clowney",
+   "proTeam": "BKN",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 299,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 212,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432822,
+   "fullName": "Isaac Okoro",
+   "proTeam": "CHI",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 300,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 249,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3899664,
+   "fullName": "Simone Fontecchio",
+   "proTeam": "MIA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.93,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 301,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 270,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433076,
+   "fullName": "Ben Sheppard",
+   "proTeam": "IND",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 302,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 271,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3133626,
+   "fullName": "Kenrich Williams",
+   "proTeam": "OKC",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.92,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 303,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 284,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3912848,
+   "fullName": "Dean Wade",
+   "proTeam": "PHI",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.83,
+   "percentOwned": 0.8,
+   "standard": {
+    "rank": 304,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 255,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278562,
+   "fullName": "Paul Reed",
+   "proTeam": "DET",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.91,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 305,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 238,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432181,
+   "fullName": "Julian Strawther",
+   "proTeam": "DEN",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.03,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 306,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 365,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432813,
+   "fullName": "Jeremiah Robinson-Earl",
+   "proTeam": "DAL",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": null,
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 307,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 277,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5239590,
+   "fullName": "Liam McNeeley",
+   "proTeam": "CHA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 308,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 336,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4278077,
+   "fullName": "Jarred Vanderbilt",
+   "proTeam": "LAL",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 309,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 280,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3102528,
+   "fullName": "Dante Exum",
+   "proTeam": "FA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.99,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 310,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 386,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3934723,
+   "fullName": "Thomas Bryant",
+   "proTeam": "CLE",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 311,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 301,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3137259,
+   "fullName": "Gabe Vincent",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 312,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 209,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5214640,
+   "fullName": "Kasparas Jakucionis",
+   "proTeam": "MIL",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.04,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 313,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 170,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432107,
+   "fullName": "Marcus Sasser",
+   "proTeam": "DAL",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.03,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 314,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 282,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3012,
+   "fullName": "Kyle Lowry",
+   "proTeam": "PHI",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.88,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 315,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 374,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397227,
+   "fullName": "Vince Williams Jr.",
+   "proTeam": "FA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 140,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 316,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 194,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683686,
+   "fullName": "Nick Smith Jr.",
+   "proTeam": "FA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.93,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 317,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 279,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397886,
+   "fullName": "Charles Bassey",
+   "proTeam": "GSW",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 318,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 310,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2578239,
+   "fullName": "Pat Connaughton",
+   "proTeam": "CHA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 319,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 344,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3134903,
+   "fullName": "Gary Payton II",
+   "proTeam": "GSW",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 320,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 196,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3416,
+   "fullName": "Nicolas Batum",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 321,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 304,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3914285,
+   "fullName": "Drew Eubanks",
+   "proTeam": "FA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 140.02,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 322,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 311,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5157066,
+   "fullName": "Johnny Furphy",
+   "proTeam": "IND",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 139.92,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 323,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 369,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4593841,
+   "fullName": "Baylor Scheierman",
+   "proTeam": "BOS",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 324,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 306,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277848,
+   "fullName": "Marvin Bagley III",
+   "proTeam": "DEN",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 325,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 200,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2528693,
+   "fullName": "Torrey Craig",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 326,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 291,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3913180,
+   "fullName": "Garrison Mathews",
+   "proTeam": "FA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 327,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 295,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4594326,
+   "fullName": "Kris Murray",
+   "proTeam": "MEM",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 328,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 267,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3449,
+   "fullName": "Kevin Love",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.84,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 329,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 257,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5242496,
+   "fullName": "Noa Essengue",
+   "proTeam": "CHI",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 330,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 305,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4601023,
+   "fullName": "Oso Ighodaro",
+   "proTeam": "PHX",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.7,
+   "standard": {
+    "rank": 331,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 367,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 6429,
+   "fullName": "Alec Burks",
+   "proTeam": "FA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 332,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 278,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4565201,
+   "fullName": "Malaki Branham",
+   "proTeam": "ORL",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 333,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 316,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3134932,
+   "fullName": "John Konchar",
+   "proTeam": "MIN",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 334,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 274,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277964,
+   "fullName": "Xavier Tillman",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 335,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 353,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5239561,
+   "fullName": "Jase Richardson",
+   "proTeam": "ORL",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 336,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 335,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5175647,
+   "fullName": "Hugo Gonzalez",
+   "proTeam": "BOS",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.9,
+   "percentOwned": 0.9,
+   "standard": {
+    "rank": 337,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 317,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3922230,
+   "fullName": "Aaron Holiday",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 338,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 329,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105553,
+   "fullName": "Julian Phillips",
+   "proTeam": "MIN",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 339,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 345,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4868423,
+   "fullName": "Jaden Hardy",
+   "proTeam": "LAL",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 340,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 320,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433159,
+   "fullName": "Dalen Terry",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 341,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 326,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3133635,
+   "fullName": "Jevon Carter",
+   "proTeam": "ORL",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 342,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 300,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4398390,
+   "fullName": "Jalen Pickett",
+   "proTeam": "LAC",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 343,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 293,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4895758,
+   "fullName": "Cody Williams",
+   "proTeam": "MIN",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 344,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 308,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3102532,
+   "fullName": "Vasilije Micic",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 345,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 276,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2999547,
+   "fullName": "Gary Harris",
+   "proTeam": "DET",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 346,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 202,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2960236,
+   "fullName": "Maxi Kleber",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 347,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 324,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432190,
+   "fullName": "Andre Jackson Jr.",
+   "proTeam": "TOR",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 348,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 330,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2991235,
+   "fullName": "Steven Adams",
+   "proTeam": "HOU",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.92,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 349,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 245,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4397102,
+   "fullName": "Bol Bol",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.72,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 350,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 376,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2531367,
+   "fullName": "Dwight Powell",
+   "proTeam": "FA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 351,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 319,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433623,
+   "fullName": "Caleb Houstan",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 352,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 356,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4277922,
+   "fullName": "Jericho Sims",
+   "proTeam": "MIL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 353,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 314,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4432735,
+   "fullName": "Dariq Whitehead",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 354,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 334,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3136777,
+   "fullName": "Jae'Sean Tate",
+   "proTeam": "HOU",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 355,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 348,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4595400,
+   "fullName": "Olivier-Maxence Prosper",
+   "proTeam": "MEM",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 356,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 288,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3064447,
+   "fullName": "Delon Wright",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 357,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 294,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683774,
+   "fullName": "Bronny James",
+   "proTeam": "LAL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 137.45,
+   "percentOwned": 4.5,
+   "standard": {
+    "rank": 358,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 350,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5105806,
+   "fullName": "Jett Howard",
+   "proTeam": "DAL",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 359,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 332,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2968436,
+   "fullName": "Joe Ingles",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 360,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 373,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3134916,
+   "fullName": "Jordan McLaughlin",
+   "proTeam": "SAS",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 361,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 377,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3209,
+   "fullName": "Jeff Green",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 362,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 375,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4023,
+   "fullName": "Garrett Temple",
+   "proTeam": "TOR",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 363,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 347,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683736,
+   "fullName": "Kobe Bufkin",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 364,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 327,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5099752,
+   "fullName": "Rayan Rupert",
+   "proTeam": "PHI",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 365,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 337,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4433569,
+   "fullName": "Johni Broome",
+   "proTeam": "LAC",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 366,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 358,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3032978,
+   "fullName": "Dario Saric",
+   "proTeam": "DET",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": null,
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 367,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 296,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4592492,
+   "fullName": "Bones Hyland",
+   "proTeam": "MIN",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.91,
+   "percentOwned": 0.6,
+   "standard": {
+    "rank": 368,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 195,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4395620,
+   "fullName": "Hunter Tyson",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 369,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 354,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4396818,
+   "fullName": "Jordan Miller",
+   "proTeam": "LAC",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 140.02,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 370,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 340,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4683689,
+   "fullName": "Jordan Walsh",
+   "proTeam": "BOS",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.92,
+   "percentOwned": 0.4,
+   "standard": {
+    "rank": 371,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 289,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5081727,
+   "fullName": "Sidy Cissoko",
+   "proTeam": "POR",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 372,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 307,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4431752,
+   "fullName": "Kobe Brown",
+   "proTeam": "IND",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 373,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 247,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4591259,
+   "fullName": "Koby Brea",
+   "proTeam": "PHX",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 374,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 360,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5044385,
+   "fullName": "Leonard Miller",
+   "proTeam": "CHI",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.01,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 375,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 346,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5211983,
+   "fullName": "Pacome Dadiet",
+   "proTeam": "NYK",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.2,
+   "standard": {
+    "rank": 376,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 357,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 4396993,
+   "fullName": "Tyrese Haliburton",
+   "proTeam": "IND",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 83.02,
+   "percentOwned": 85.7,
+   "standard": {
+    "rank": 377,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 18,
+    "auctionValue": 42
+   },
+   "projection": null
+  },
+  {
+   "espnId": 5289900,
+   "fullName": "Mohamed Diawara",
+   "proTeam": "NYK",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.97,
+   "percentOwned": 0.3,
+   "standard": {
+    "rank": 378,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 387,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 2991230,
+   "fullName": "Fred VanVleet",
+   "proTeam": "HOU",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 137.99,
+   "percentOwned": 20.2,
+   "standard": {
+    "rank": 379,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 113,
+    "auctionValue": 2
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3059409,
+   "fullName": "Nigel Hayes-Davis",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": {
+    "rank": 380,
+    "auctionValue": 0
+   },
+   "roto": {
+    "rank": 384,
+    "auctionValue": 0
+   },
+   "projection": null
+  },
+  {
+   "espnId": 3133602,
+   "fullName": "Svi Mykhailiuk",
+   "proTeam": "UTA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 3146557,
+   "fullName": "Jock Landale",
+   "proTeam": "ATL",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.3,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 3907822,
+   "fullName": "Malik Beasley",
+   "proTeam": "FA",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 3914044,
+   "fullName": "Landry Shamet",
+   "proTeam": "NYK",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.84,
+   "percentOwned": 0.6,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4065731,
+   "fullName": "Jay Huff",
+   "proTeam": "IND",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.78,
+   "percentOwned": 0.9,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4066399,
+   "fullName": "Micah Potter",
+   "proTeam": "POR",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4066796,
+   "fullName": "DeJon Jarreau",
+   "proTeam": "MEM",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": null,
+   "adp": 139.98,
+   "percentOwned": 0,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4277951,
+   "fullName": "Luka Garza",
+   "proTeam": "BOS",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 0.2,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4278402,
+   "fullName": "Jordan Goodwin",
+   "proTeam": "PHX",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140.01,
+   "percentOwned": 0.2,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4278580,
+   "fullName": "Sandro Mamukelashvili",
+   "proTeam": "LAL",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.8,
+   "percentOwned": 1.6,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4278585,
+   "fullName": "Collin Gillespie",
+   "proTeam": "PHX",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.7,
+   "percentOwned": 3.8,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4279318,
+   "fullName": "Daeqwon Plowden",
+   "proTeam": "SAC",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4395650,
+   "fullName": "Leaky Black",
+   "proTeam": "FA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4396963,
+   "fullName": "Blake Hinson",
+   "proTeam": "UTA",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4397040,
+   "fullName": "Brandon Williams",
+   "proTeam": "FA",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.92,
+   "percentOwned": 0.3,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4398207,
+   "fullName": "Jalen Slawson",
+   "proTeam": "IND",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4431695,
+   "fullName": "Drew Timme",
+   "proTeam": "FA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4432194,
+   "fullName": "Day'Ron Sharpe",
+   "proTeam": "BKN",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.85,
+   "percentOwned": 1.9,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4432646,
+   "fullName": "Kennedy Chandler",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4432827,
+   "fullName": "Oscar Tshiebwe",
+   "proTeam": "UTA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4432907,
+   "fullName": "Justin Champagnie",
+   "proTeam": "WAS",
+   "positions": [
+    "SF",
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.3,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4433144,
+   "fullName": "Caleb Love",
+   "proTeam": "PHI",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.89,
+   "percentOwned": 0.2,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4433174,
+   "fullName": "Dylan Cardwell",
+   "proTeam": "SAC",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 0.3,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4433188,
+   "fullName": "Devin Carter",
+   "proTeam": "FA",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.2,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4433629,
+   "fullName": "Ryan Nembhard",
+   "proTeam": "ATL",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.2,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4576060,
+   "fullName": "Ryan Kalkbrenner",
+   "proTeam": "CHA",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.7,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4578893,
+   "fullName": "Vit Krejci",
+   "proTeam": "POR",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4592216,
+   "fullName": "Alondes Williams",
+   "proTeam": "WAS",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": null,
+   "adp": 139.97,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4593016,
+   "fullName": "Quinten Post",
+   "proTeam": "MEM",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.96,
+   "percentOwned": 0.2,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4593041,
+   "fullName": "David Roddy",
+   "proTeam": "DEN",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4596528,
+   "fullName": "Lawson Lovering",
+   "proTeam": "MEM",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": null,
+   "adp": 140,
+   "percentOwned": 0,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4601025,
+   "fullName": "Pelle Larsson",
+   "proTeam": "MIA",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.94,
+   "percentOwned": 1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4606840,
+   "fullName": "Jamir Watkins",
+   "proTeam": "WAS",
+   "positions": [
+    "SG"
+   ],
+   "injuryStatus": "OUT",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4683742,
+   "fullName": "Julian Reese",
+   "proTeam": "FA",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4683747,
+   "fullName": "Jaylon Tyson",
+   "proTeam": "CLE",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.92,
+   "percentOwned": 1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4684806,
+   "fullName": "Taylor Hendricks",
+   "proTeam": "MEM",
+   "positions": [
+    "PF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.3,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4687718,
+   "fullName": "Josh Minott",
+   "proTeam": "BKN",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.99,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4781746,
+   "fullName": "Javon Small",
+   "proTeam": "MEM",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4870562,
+   "fullName": "Dominick Barlow",
+   "proTeam": "PHI",
+   "positions": [
+    "PF",
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.92,
+   "percentOwned": 0.6,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4898371,
+   "fullName": "Maxime Raynaud",
+   "proTeam": "SAC",
+   "positions": [
+    "C"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.97,
+   "percentOwned": 2.1,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4900671,
+   "fullName": "Ajay Mitchell",
+   "proTeam": "OKC",
+   "positions": [
+    "PG",
+    "SG"
+   ],
+   "injuryStatus": "DAY_TO_DAY",
+   "adp": 139.68,
+   "percentOwned": 2.8,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4903027,
+   "fullName": "Cedric Coward",
+   "proTeam": "MEM",
+   "positions": [
+    "SG",
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.64,
+   "percentOwned": 4.3,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 4997536,
+   "fullName": "Gui Santos",
+   "proTeam": "GSW",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.95,
+   "percentOwned": 0.8,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 5107199,
+   "fullName": "Daniss Jenkins",
+   "proTeam": "DET",
+   "positions": [
+    "PG"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 139.98,
+   "percentOwned": 0.6,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 5144126,
+   "fullName": "Will Riley",
+   "proTeam": "WAS",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0.5,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  },
+  {
+   "espnId": 5174655,
+   "fullName": "Chaney Johnson",
+   "proTeam": "BKN",
+   "positions": [
+    "SF"
+   ],
+   "injuryStatus": "ACTIVE",
+   "adp": 140,
+   "percentOwned": 0,
+   "standard": null,
+   "roto": null,
+   "projection": null
+  }
+ ]
+}
