@@ -91,7 +91,7 @@ export function computeFpts(
 // ─── Win Probability ─────────────────────────────────────────────────────────
 
 /** Approximate the standard normal CDF. */
-function normalCdf(x: number): number {
+export function normalCdf(x: number): number {
   const t = 1 / (1 + 0.2316419 * Math.abs(x));
   const d = 0.3989422804014327;
   const p = d * Math.exp(-x * x / 2) * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.8212560 + t * 1.3302744))));

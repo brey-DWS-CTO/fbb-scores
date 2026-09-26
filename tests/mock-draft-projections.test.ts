@@ -137,15 +137,17 @@ test('projections: the realistic room keeps stars early and leaves several optio
   assert.ok(results.every((result) => result.warnings.length === 0));
 });
 
-test('projections: Jalen Johnson goes early in a sharp room and Mitchell is the pick at 1.9', () => {
+test('projections: Jalen Johnson goes early in a sharp room and Cade is the pick at 1.9', () => {
   const sharpRuns = run('sharp');
   const sharp5 = availabilityAt(sharpRuns, 5);
   const realistic5 = availabilityAt(run('realistic'), 5);
   assert.ok(share(sharp5, 'J. Johnson') < 0.1);
   assert.ok(share(realistic5, 'J. Johnson') > 0.6);
   const sharp9 = availabilityAt(sharpRuns, 9);
-  assert.equal(takenMostOften(sharp9)[0], 'D. Mitchell');
-  assert.ok(sharp9.rows.find((row) => row.playerName === 'D. Mitchell')!.takenHereShare > 0.5);
+  assert.equal(takenMostOften(sharp9)[0], 'C. Cunningham');
+  assert.ok(sharp9.rows.find((row) => row.playerName === 'C. Cunningham')!.takenHereShare > 0.5);
+  // Sabonis is a double-double a night. With that paid, a sharp room takes him before 1.9 most of the time.
+  assert.ok(share(sharp9, 'D. Sabonis') < 0.35);
   assert.ok(sharpRuns.every((result) => result.warnings.length === 0));
 });
 test('the no-deal world keeps Cade at 1.9 and takes him off the board', () => {

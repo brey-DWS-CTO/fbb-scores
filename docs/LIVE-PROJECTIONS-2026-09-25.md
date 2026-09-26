@@ -2,8 +2,9 @@
 
 ESPN now supplies 348 usable season projections. The existing fetch and
 totals-to-FPPG calculation work. The fixes are the rank bridge, zero-game
-availability, and admin copy that mistook a stale snapshot for unpublished
-projections or promised a source switch without scoring settings.
+availability, an estimate for the double-double bonuses ESPN leaves out,
+and admin copy that mistook a stale snapshot for unpublished projections or
+promised a source switch without scoring settings.
 
 ## Capture
 
@@ -25,14 +26,45 @@ Yang Hansen.
 
 Scoring comes from league 100537's live `mSettings`, not the rulebook or
 ESPN's `appliedTotal`. The 13 items include DD, TD and QD, which the
-projection dictionaries omit. Those bonus points cannot be forecast from
-this response. Live QD is 170; Appendix A says 175. No keeper math changed.
+projection dictionaries omit. See "The double-double bonus" below for how
+those are filled in. Live QD is 170; Appendix A says 175. No keeper math
+changed.
 
 | Player | Last-season FPPG | Projected FPPG | Projected games |
 | --- | ---: | ---: | ---: |
-| Nikola Jokic | 64.2 | 60.3 | 72 |
-| Shai Gilgeous-Alexander | 51.7 | 52.1 | 76 |
-| Luka Doncic | 56.5 | 55.6 | 68 |
+| Nikola Jokic | 64.2 | 64.7 | 72 |
+| Shai Gilgeous-Alexander | 51.7 | 52.4 | 76 |
+| Luka Doncic | 56.5 | 57.8 | 68 |
+
+Projected FPPG here includes the estimated double-double bonus. Without it
+Jokic reads 60.3, four points under a season he actually played.
+
+## The double-double bonus
+
+This league pays 1.8 for a double-double, 6.2 for a triple-double and 170
+for a quadruple-double. ESPN's projection dictionary has none of those
+counts, so scored as sent, every double-double player came up short. Jokic
+lost about five points a game, Sabonis and Giddey two to three.
+
+`src/lib/league/doubleDoubles.ts` estimates the odds from the projected
+per-game line. Each of points, rebounds, assists, steals and blocks is
+treated as roughly normal around its average, with a spread of 1.1 times
+the square root of the average, and a game counts the category at 9.5 or
+more. The five are taken as independent, and the 32 ways they can land
+give exact odds of two, three or four at once. The bonus is paid only for
+items the dictionary lacks, so if ESPN ever sends stat 37, nothing is added
+twice. `projectedBonusPerGame` reports the estimate apart from the rest.
+
+Checked against 2024-25 box scores: Jokic 0.91 double-double odds against
+a real 0.90, triple-double 0.46 against 0.49; Sabonis 0.85 against 0.87;
+Giannis 0.77 against 0.81; Harden 0.45 against 0.38; Giddey 0.43 against
+0.43. Wembanyama runs low, 0.66 against 0.78: a big's rebounds vary less
+than the model assumes. The tests hold each name to a band and name the
+miss.
+
+What it moved: Jokic 60.3 to 64.7, Sabonis 43.2 to 45.6 and 11th to 9th,
+Giddey 40.3 to 43.0 and 25th to 14th, Giannis 55.6 to 57.5. The top five
+did not change order.
 
 Four matched players fall outside a factor of 1.6: Beal 9.8 to 23.2,
 Adams 18.2 to 9.8, Dick 10.0 to 18.2, Sochan 8.3 to 17.8. These are
@@ -70,9 +102,9 @@ forecasts from a saved response, not claims about actual draft choices.
 | 1.4 | Bryan | Jalen Johnson | Cunningham |
 | 1.5 | Kyle | Edwards | Antetokounmpo |
 | 1.6 | Dustin | Tatum, assumed keeper | Tatum, assumed keeper |
-| 1.7 | Aaron | Cunningham | Flagg |
+| 1.7 | Aaron | Sabonis | Flagg |
 | 1.8 | Derek | Wembanyama, assumed keeper | Wembanyama, assumed keeper |
-| 1.9 | Brey | Mitchell | Edwards |
+| 1.9 | Brey | Cunningham | Edwards |
 | 1.10 | Amy | Doncic, assumed keeper | Doncic, assumed keeper |
 
 Chance the player is still available, before the pick:
@@ -80,23 +112,28 @@ Chance the player is still available, before the pick:
 | Player | Sharp 1.5 | Realistic 1.5 | Sharp 1.9 | Realistic 1.9 |
 | --- | ---: | ---: | ---: | ---: |
 | Giannis | 0% | 12.5% | 0% | 2% |
-| Jalen Johnson | 4.5% | 76% | 0% | 19.5% |
-| Edwards | 95.5% | 44% | 0% | 10.5% |
-| Cunningham | 100% | 78.5% | 24.5% | 30% |
-| Mitchell | 100% | 94.5% | 80.5% | 73.5% |
-| Sabonis | 100% | 99.5% | 95.5% | 97.5% |
-| Maxey | 100% | 98.5% | 99.5% | 88% |
+| Jalen Johnson | 1.5% | 70% | 0% | 16% |
+| Edwards | 98.5% | 49% | 1.5% | 11% |
+| Cunningham | 100% | 81.5% | 81% | 33% |
+| Mitchell | 100% | 94% | 97% | 76% |
+| Sabonis | 100% | 99.5% | 21% | 96.5% |
+| Maxey | 100% | 98.5% | 100% | 87% |
+| Giddey | 100% | 100% | 100% | 99% |
 | Anthony Davis | 100% | 100% | 100% | 100% |
 
-At 1.9, sharp rooms take Mitchell 58%, Cunningham 23.5%, Sabonis 15%.
-Realistic rooms take Mitchell 23%, Johnson 16%, Cunningham 16%, Maxey 13%.
-Barnes at 1.3 in the sample is a rare noisy reach, not the typical pick.
-The model parameters have not been tuned to restore the old readout.
+At 1.9, sharp rooms take Cunningham 58.5%, Sabonis 20%, Mitchell 16.5%.
+Realistic rooms take Mitchell 24.5%, Cunningham 18%, Maxey 13%, Johnson
+12.5%. Sabonis is the double-double story: a sharp room takes him before
+1.9 four times in five, a realistic room almost never does. Barnes at 1.3
+in the sample is a rare noisy reach; across 200 realistic runs 1.3 is
+Giannis 61%, Edwards 17%. The model parameters have not been tuned to
+restore the old readout.
 
-Our board differs from ESPN's current rank: Durant 14 vs 21, Siakam 15
-vs 25, Towns 16 vs 22, Duren 18 vs 26, Davis 21 vs 29, Barnes 22 vs 15,
-and Young 24 vs 14. These gaps combine league scoring, games, positional
-replacement and schedule. They are not pure FPPG ranks.
+Our board differs from ESPN's current rank: Towns 12 vs 22, Duren 13 vs
+26, Giddey 14 vs 16, Siakam 16 vs 25, Durant 19 vs 21, Davis 20 vs 29,
+Maxey 21 vs 12, Barnes 24 vs 15, and Young 26 vs 14. These gaps combine
+league scoring, the double-double bonus, games, positional replacement and
+schedule. They are not pure FPPG ranks.
 
 PR #29's Davis story is gone: the new projection has 45.9 FPPG but only
 61 games, while updated rank and ADP also changed. The difference from
@@ -108,7 +145,7 @@ that PR cannot all be attributed to projections alone.
 2. Open the branch preview's Commish page. Fetch rankings. Check the
    projection count and scoring warning before accepting.
 3. Accept the snapshot, reload, and check that the source says
-   2026-27 projection and Jokic shows about 60 FPPG, never 3,000.
+   2026-27 projection and Jokic shows about 65 FPPG, never 3,000.
 
 For the repeatable report, set `REPORT_PROJECTIONS=1` and run
 `node --require ./tests/tsx-windows-shim.cjs --import tsx --test tests/mock-draft-projections.test.ts`.

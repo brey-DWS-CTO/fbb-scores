@@ -199,9 +199,13 @@ availability. Missing games still mean unknown availability; zero means none.
 The dated fixture is `tests/fixtures/espn-draft-rankings-2027-2026-09-25.json`:
 448 ranked or committed players, raw projection metadata, and the league's
 13 live scoring items. Keep the 13 September fixture for the no-projection
-path. **The projections omit DD, TD and QD**, which the league scores. The
-model scores the stats ESPN supplies; it does not invent those bonuses.
-The live QD setting is 170, while Appendix A says 175. Live settings win.
+path. **The projections omit DD, TD and QD**, which the league scores at 1.8,
+6.2 and 170. Scored as sent, Jokic came out four points a game under the
+season he had just played. `src/lib/league/doubleDoubles.ts` now estimates
+the odds of each from the projected per-game line and pays them at the
+league's rate, only for the items ESPN left out. It is checked against real
+2024-25 rates in `tests/double-doubles.test.ts`. The live QD setting is 170,
+while Appendix A says 175. Live settings win.
 
 The rank bridge now fits projected FPPG when at least ten ranked players
 have usable projections. It falls back to the old last-season fit as a
