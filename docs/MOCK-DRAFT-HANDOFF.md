@@ -168,9 +168,59 @@ and ship the entire tool. **Nothing is blocked on projections.**
   arrives live from `mSettings` and is never hardcoded; the appendix is a
   check, not a source.
 
-### Not available yet, verified
+### Available since 25 September 2026, verified
 
-**Full-season stat projections (`102027`) do not exist yet.** I requested
+**Correction, checked 25 September 2026.** The public players endpoint now
+returns 349 `102027` rows, of which 348 have stats. The existing
+`filterStatsForTopScoringPeriodIds` filter works. The live commissioner fetch
+also finds 348 usable projections across 1,095 active players. No filter
+change was needed. The public response with the client filter holds 3,184
+players; without a filter it returns only 50, including 20 projection rows.
+
+Each current projection has `statSourceId: 1`, `statSplitTypeId: 0`,
+`seasonId: 2027`, and `scoringPeriodId: 0`. The filtered public response also
+contains 399 prior-year `102026` rows, but no projection with another split.
+The current season check keeps those prior-year rows out.
+
+The 348 populated rows have 31 keys:
+`0, 1, 2, 3, 6, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25,
+26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 40, 42`.
+Counting stats are season totals. Other keys include rates and averages, so
+not every number in the dictionary is a total. Stat `42` supplies games;
+no row has `averageStats`, so a totals/averages agreement check is not possible.
+Jokic has 2,034 points and 72 games, not 2,034 points per game.
+
+Rookies AJ Dybantsa, Darryn Peterson and Cameron Boozer have projections.
+Six injured players have populated projections; injured Jordan Miller has
+an empty row that normalization drops. No row has an explicit zero for games.
+A synthetic zero-game test now guards the bug that treated zero as full
+availability. Missing games still mean unknown availability; zero means none.
+
+The dated fixture is `tests/fixtures/espn-draft-rankings-2027-2026-09-25.json`:
+448 ranked or committed players, raw projection metadata, and the league's
+13 live scoring items. Keep the 13 September fixture for the no-projection
+path. **The projections omit DD, TD and QD**, which the league scores. The
+model scores the stats ESPN supplies; it does not invent those bonuses.
+The live QD setting is 170, while Appendix A says 175. Live settings win.
+
+The rank bridge now fits projected FPPG when at least ten ranked players
+have usable projections. It falls back to the old last-season fit as a
+whole when fewer do, rather than mixing forecasts with history. Players
+without usable projections still get rank estimates. `prefer` changes the
+source order; it does not change what ESPN's current rank is calibrated to.
+
+The real data also disproves a universal 1.6 comparison band: Beal rises
+from 9.8 to 23.2, Dick from 10.0 to 18.2, Sochan from 8.3 to 17.8, and Adams
+falls from 18.2 to 9.8. The test names these four exceptions and checks every
+other matched player against the band. It never rescales forecasts to force
+agreement with last season.
+
+See [the capture and mock report](LIVE-PROJECTIONS-2026-09-25.md) for both
+round-one readouts, odds and board moves.
+
+### Earlier finding: not available on 7 September 2026
+
+**At that check, full-season stat projections (`102027`) did not exist.** I requested
 them by name through `filterStatsForTopScoringPeriodIds.additionalValue` and
 got nothing back. `002027` exists but is empty, which fits a season that has
 not started.
@@ -195,7 +245,7 @@ What is confirmed about the mechanism, for when they do arrive:
   when neither exists. Taking the total for an average would have quietly
   produced numbers roughly seventy times too big.
 
-Re-check weekly. These usually land closer to opening night.
+This finding is retained as history. The dated correction above supersedes it.
 
 ### If the commissioner wants numbers before ESPN publishes
 
