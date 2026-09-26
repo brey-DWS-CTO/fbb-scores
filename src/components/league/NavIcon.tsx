@@ -26,6 +26,7 @@ const paths = {
   hidden: 'M3 4l18 16 M10.4 5.3A9.6 9.6 0 0 1 12 5.2c6.1 0 9.8 6.8 9.8 6.8a18.4 18.4 0 0 1-3.7 4.4 M6.3 7.6A18.2 18.2 0 0 0 2.2 12S5.9 18.8 12 18.8a9.5 9.5 0 0 0 3.5-.7 M9.8 10.3a3 3 0 0 0 4 4.2',
   menu: 'M3 6h18 M3 12h18 M3 18h18',
   close: 'M6 6l12 12 M18 6L6 18',
+  chevrons: 'M11 17l-5-5 5-5 M18 17l-5-5 5-5',
 };
 
 export type NavIconName = keyof typeof paths;

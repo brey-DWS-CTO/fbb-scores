@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon, { type NavIconName } from './NavIcon.js';
+import { readSidebarCollapsed, writeSidebarCollapsed } from '../../lib/league/sidebar.js';
 
 type NavItem = {
   to: string;
@@ -59,6 +60,22 @@ export default function AppNav() {
   // give away an offer between two other teams.
   const pendingTrades = meta?.pendingTrades ?? 0;
 
+  // Desktop only: the sidebar shrinks to icons so wide pages get the room.
+  // The class sits on <html> because the page shell that must widen with it
+  // lives outside this component.
+  const [collapsed, setCollapsed] = useState(() =>
+    readSidebarCollapsed(typeof window === 'undefined' ? undefined : window.localStorage),
+  );
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('nav-collapsed', collapsed);
+    return () => document.documentElement.classList.remove('nav-collapsed');
+  }, [collapsed]);
+  const toggleSidebar = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    writeSidebarCollapsed(window.localStorage, next);
+  };
+
   const items = NAV.filter((t) => !t.commishOnly || identity?.isCommissioner);
   const primary = items.filter((t) => t.primary);
   const secondary = items.filter((t) => !t.primary);
@@ -81,7 +98,7 @@ export default function AppNav() {
 
   return (
     <>
-      <header className="top-nav">
+      <header className="top-nav" id="app-sidebar">
         <div className="top-nav-inner">
           <NavLink to="/keepers" className="top-nav-brand hub-heading">
             <img src="/logo.png" alt="" aria-hidden="true" />
@@ -93,8 +110,9 @@ export default function AppNav() {
                 key={t.to}
                 to={t.to}
                 className={({ isActive }) => (isActive ? 'top-nav-link hub-heading active' : 'top-nav-link hub-heading')}
+                {...(collapsed ? { title: t.label, 'aria-label': t.label } : {})}
               >
-                <span aria-hidden="true"><NavIcon name={t.icon} /></span><span>{t.label}</span>
+                <span aria-hidden="true"><NavIcon name={t.icon} /></span><span className="top-nav-label">{t.label}</span>
                 {t.to === '/trades' && pendingTrades > 0 && (
                   <span className="nav-pill" aria-label={`${pendingTrades} offers waiting`}>
                     {pendingTrades}
@@ -103,6 +121,18 @@ export default function AppNav() {
               </NavLink>
             ))}
           </nav>
+          <button
+            type="button"
+            className="nav-collapse-btn tap-btn hub-heading"
+            aria-expanded={!collapsed}
+            aria-controls="app-sidebar"
+            title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+            aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+            onClick={toggleSidebar}
+          >
+            <span aria-hidden="true"><NavIcon name="chevrons" className={collapsed ? 'nav-collapse-icon flipped' : 'nav-collapse-icon'} /></span>
+            <span className="top-nav-label">{collapsed ? 'EXPAND' : 'COLLAPSE'}</span>
+          </button>
           <div className="top-nav-account">
             <IdentityChip placement="nav" />
           </div>
