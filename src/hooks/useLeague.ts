@@ -19,6 +19,8 @@ import { datasetWithTransfers, transfersOf } from '../lib/league/pickTrades.js';
 import { leagueDataset } from '../lib/league/data.js';
 import { leagueHistorySeed } from '../lib/league/historyData.js';
 import { applyPlayerPoolToDataset } from '../lib/league/playerPool.js';
+import { draftIsLive, pollInterval } from '../lib/league/polling.js';
+import { idleForMs, wakeOnActivity } from './useActivity.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
 import type { KeeperScenario } from '../lib/league/keeperScenario.js';
 
@@ -33,16 +35,24 @@ const EMPTY_STATE: LeagueDynamicState = {
 };
 
 /**
- * Poll the shared league state. `fast` = 3s (TV/draft mode), default 5s.
+ * Poll the shared league state. `fast` = 3s while the draft is live (TV and
+ * draft pages), otherwise 30s, and not at all once the viewer goes idle. See
+ * src/lib/league/polling.ts for why.
  * Sends the signed-in identity so the server can un-redact what this viewer
  * is allowed to see (own keepers; everything for the commissioner).
  */
 export function useLeagueState(fast = false) {
   const { identity } = useIdentity();
+  const queryClient = useQueryClient();
+  useEffect(() => wakeOnActivity(queryClient), [queryClient]);
   const query = useQuery<StateResponse>({
     queryKey: ['league-state', identity?.owner ?? 'anon'],
     queryFn: () => fetchLeagueState(identity),
-    refetchInterval: fast ? 3000 : 5000,
+    refetchInterval: (current) => pollInterval({
+      fast,
+      draftLive: draftIsLive(current.state.data?.state),
+      idleForMs: idleForMs(),
+    }),
     refetchOnWindowFocus: true,
     staleTime: 1000,
   });
