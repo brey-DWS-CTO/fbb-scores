@@ -8,9 +8,7 @@ import PlayerCombobox from './PlayerCombobox.js';
 import CommissionerPanel from './CommissionerPanel.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
-import PlayerPoolAdmin from './PlayerPoolAdmin.js';
-import DraftRankingAdmin from './DraftRankingAdmin.js';
-import TeamNameAdmin from './TeamNameAdmin.js';
+import EspnSyncPanel from './EspnSyncPanel.js';
 import HistoryAdmin from './HistoryAdmin.js';
 import { RoundChip } from '../keepers/keeperUi.js';
 
@@ -110,7 +108,7 @@ export default function AdminPage() {
         <IdentityChip />
       </div>
       <div style={{ color: 'var(--text-mid)', fontSize: '0.78rem', marginBottom: 14 }}>
-        Tier + cap tweaks live here. Changes apply league-wide instantly and are audit-logged.
+        Your controls. Every change here reaches the whole league at once and goes in the log.
       </div>
       {error && (
         <div style={{ color: 'var(--neon-red)', fontSize: '0.82rem', marginBottom: 12 }}>
@@ -121,35 +119,7 @@ export default function AdminPage() {
 
       <CommissionerPanel />
 
-      <TeamNameAdmin />
-
-      <PlayerPoolAdmin />
-
-      <DraftRankingAdmin />
-
-      <HistoryAdmin />
-
-      <section className="panel commish-schedule-link">
-        <div>
-          <div className="hub-heading">
-            <NavIcon name="target" size={14} className="icon-in-heading" />
-            MOCK DRAFT
-          </div>
-          <p>Round one as it stands, pending trades as switches, and who is likely there at your pick across 200 drafts.</p>
-        </div>
-        <Link className="tap-btn" to="/mock">OPEN MOCK DRAFT →</Link>
-      </section>
-
-      <section className="panel commish-schedule-link">
-        <div>
-          <div className="hub-heading">
-            <NavIcon name="calendar" size={14} className="icon-in-heading" />
-            SCHEDULE
-          </div>
-          <p>Review the 2027 NBA grid, Play-In weeks, playoff totals, and accepted snapshots.</p>
-        </div>
-        <Link className="tap-btn" to="/schedule">OPEN SCHEDULE →</Link>
-      </section>
+      <EspnSyncPanel />
 
       {/* ── Test mode ──────────────────────────────────────────── */}
       <section
@@ -252,6 +222,13 @@ export default function AdminPage() {
           ))}
         </div>
       </section>
+
+      {/* ── Rarely used: cap and tiers, then league history ────── */}
+      <details className="commish-fold">
+        <summary className="hub-heading">
+          CAP AND TIERS
+          <small>Cap, tier bands, round overrides, last season's averages</small>
+        </summary>
 
       {/* ── Salary cap ─────────────────────────────────────────── */}
       <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
@@ -368,7 +345,7 @@ export default function AdminPage() {
       </section>
 
       {/* ── Player round overrides ─────────────────────────────── */}
-      <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
+      <section id="round-overrides" className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14, scrollMarginTop: 16 }}>
         <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)', marginBottom: 10 }}>
           PLAYER ROUND OVERRIDES
         </div>
@@ -519,7 +496,7 @@ export default function AdminPage() {
                   className="tap-btn"
                   onClick={() => {
                     setTarget(p);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    document.getElementById('round-overrides')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }}
                   style={{
                     display: 'flex',
@@ -597,6 +574,15 @@ export default function AdminPage() {
           </div>
         ))}
       </section>
+      </details>
+
+      <details className="commish-fold">
+        <summary className="hub-heading">
+          LEAGUE HISTORY
+          <small>Record a season, import from ESPN, publish</small>
+        </summary>
+        <HistoryAdmin />
+      </details>
     </div>
   );
 }

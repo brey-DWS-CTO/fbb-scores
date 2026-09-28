@@ -3378,6 +3378,78 @@ th.schedule-col-active {
 .mock-guess-players > span { display: inline-flex; align-items: center; gap: 6px; }
 .mock-guess-editor { margin-top: 6px; }
 
+/* ─── Commish page: one ESPN check, and folds for rare tools ────────── */
+.espn-sync { padding: 14px; border-radius: 10px; margin-bottom: 14px; }
+.espn-sync-title { font-size: 0.62rem; color: var(--neon-blue); margin-bottom: 6px; }
+.espn-sync-lede { color: var(--text-mid); font-size: 0.76rem; line-height: 1.5; margin: 0 0 10px; }
+.espn-sync-now { list-style: none; margin: 0; padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--input-bg); }
+.espn-sync-now li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 0.76rem; }
+.espn-sync-now li span:first-child { color: var(--text-mid); }
+.espn-sync-now li span:last-child { color: var(--text-hi); font-weight: 700; text-align: right; }
+.espn-sync-warn { color: var(--neon-yellow); font-size: 0.75rem; margin-top: 10px; }
+.espn-sync-results { list-style: none; margin: 10px 0 0; padding: 0; font-size: 0.78rem; }
+.espn-sync-results li { padding: 2px 0; color: var(--text-body); }
+.espn-sync-results li.is-ok { color: var(--neon-teal); }
+.espn-sync-results li.is-bad { color: var(--neon-red); }
+.espn-sync-btn {
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 2px solid var(--neon-blue);
+  background: rgba(0,153,255,0.08);
+  color: var(--neon-blue);
+  font-weight: 800;
+}
+.espn-sync-btn.is-save { border-color: var(--neon-teal); background: transparent; color: var(--neon-teal); }
+.espn-sync-btn.is-confirm { border-color: var(--neon-yellow); background: rgba(255,230,0,0.1); color: var(--neon-yellow); }
+.espn-sync-check { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--panel-border); }
+.espn-sync-part { padding: 8px 0; border-bottom: 1px solid var(--panel-border); }
+.espn-sync-part-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+.espn-sync-part-label { color: var(--text-hi); font-weight: 800; font-size: 0.8rem; }
+.espn-sync-tag {
+  padding: 2px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.espn-sync-tag.is-new { border-color: var(--neon-teal); color: var(--neon-teal); }
+.espn-sync-tag.is-bad { border-color: var(--neon-red); color: var(--neon-red); }
+.espn-sync-line { color: var(--text-body); font-size: 0.78rem; }
+.espn-sync-line.is-bad { color: var(--neon-red); }
+.espn-sync-detail { color: var(--text-mid); font-size: 0.72rem; margin-top: 3px; line-height: 1.45; }
+.espn-sync-detail.is-warn { color: var(--neon-yellow); }
+
+.commish-fold { margin-bottom: 14px; }
+.commish-fold > summary {
+  list-style: none;
+  display: block;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  color: var(--text-hi);
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+.commish-fold > summary::-webkit-details-marker { display: none; }
+.commish-fold > summary::before { content: '▸ '; color: var(--text-dim); }
+.commish-fold[open] > summary { margin-bottom: 12px; }
+.commish-fold[open] > summary::before { content: '▾ '; }
+.commish-fold > summary small {
+  display: block;
+  margin: 3px 0 0 12px;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
