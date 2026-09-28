@@ -25,6 +25,7 @@ import {
   keeperResetWarning,
   ordinal,
   ownersResetByTrade,
+  pacificMidnightAfter,
   pickRefKey,
   pickSeason,
   pickSlotFor,
@@ -38,7 +39,11 @@ import {
   tradablePicksFor,
   tradableSeasonPicksFor,
   tradeableSeason,
+  tradeCalendarFor,
   tradeSidesFor,
+  tradeWindow,
+  tradeWindowLine,
+  TRADE_CALENDAR_2027,
   transfersForProposal,
   transfersOf,
   visibleProposals,
@@ -51,6 +56,11 @@ const dataset = rawDataset as unknown as LeagueDataset;
 /** The draft that is on now, and the one after it. */
 const SEASON = dataset.season;
 const NEXT = SEASON + 1;
+
+/** Moments in each trade window of the 2026-27 season. */
+const IN_SEASON = new Date('2026-12-01T20:00:00.000Z');
+const AFTER_DEADLINE = new Date('2027-02-10T20:00:00.000Z');
+const AFTER_TITLE = new Date('2027-04-15T20:00:00.000Z');
 
 const ref = (round: number, originalOwner: string, season = SEASON) => ({
   season,
@@ -178,25 +188,25 @@ test('before the draft every pick a team holds in a tradeable round can move', (
   }
 });
 
-test('the 1st and 2nd move in the offseason but not once the draft is on', () => {
+test('the 1st and 2nd move in the offseason but not during the season', () => {
   for (const round of [1, 2]) {
     const offseason = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), true);
     assert.notEqual(offseason.reason, 'round-protected', `round ${round} moves before the draft`);
 
-    const live = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), false);
-    assert.equal(live.reason, 'round-protected', `round ${round} is protected once it starts`);
+    const inSeason = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), false);
+    assert.equal(inSeason.reason, 'round-protected', `round ${round} is locked in season`);
   }
 });
 
 test('the late rounds move in the offseason only', () => {
   // The commissioner opened rounds past the keeper tiers. They carry no tier,
-  // so moving one cannot change what anybody's keepers cost. The rule book
-  // still says 3 to 10; see issue picktrade-late-rounds.
+  // so moving one cannot change what anybody's keepers cost. Rule
+  // keepers.picktrade.rounds.
   for (const round of [11, 12, 13, 14]) {
     const check = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), true);
     assert.notEqual(check.reason, 'round-protected', `round ${round} moves before the draft`);
     const inSeason = checkProposalShape(dataset, input({ offer: [ref(round, 'Amy')] }), false);
-    assert.equal(inSeason.reason, 'round-protected', `round ${round} is off once the draft starts`);
+    assert.equal(inSeason.reason, 'round-protected', `round ${round} is locked in season`);
   }
 });
 
@@ -234,6 +244,91 @@ test('during the draft a used pick cannot move but the pick on the clock can', (
   );
   assert.equal(blocked?.tradable, false);
   assert.equal(blocked?.blockedBy, 'drafted');
+});
+
+test('during the draft every round is still open', () => {
+  const live = state({
+    keepersRevealed: true,
+    draft: { picks: midDraftPicks(), startedAt: '2026-10-18T21:00:00.000Z' },
+  });
+  assert.equal(tradeWindow(live, IN_SEASON), 'offseason', 'the draft is part of the offseason');
+  for (const round of [1, 2, 11, 14]) {
+    const open = tradablePicksFor(dataset, live, 'Amy').filter(
+      (entry) => entry.ref.round === round && entry.blockedBy !== 'drafted',
+    );
+    for (const entry of open) assert.equal(entry.tradable, true, `round ${round} moves mid-draft`);
+  }
+});
+
+/* ─── Trade windows ────────────────────────────────────────────────────── */
+
+const afterDraft = () =>
+  state({
+    draft: {
+      picks: {},
+      startedAt: '2026-10-18T21:00:00.000Z',
+      closedAt: '2026-10-19T00:00:00.000Z',
+    },
+  });
+
+test('the trade calendar ends Week 15 and the championship at midnight Pacific', () => {
+  assert.equal(pacificMidnightAfter('2027-01-31').toISOString(), '2027-02-01T08:00:00.000Z');
+  assert.equal(pacificMidnightAfter('2027-03-28').toISOString(), '2027-03-29T07:00:00.000Z');
+  assert.equal(TRADE_CALENDAR_2027.deadlineAt.toISOString(), '2027-02-01T08:00:00.000Z');
+  assert.equal(TRADE_CALENDAR_2027.seasonEndsAt.toISOString(), '2027-03-29T07:00:00.000Z');
+  assert.throws(() => tradeCalendarFor([]), /missing weeks/);
+});
+
+test('the window runs offseason, in season, closed, then offseason again', () => {
+  assert.equal(tradeWindow(state(), AFTER_DEADLINE), 'offseason', 'the draft is not over');
+  const done = afterDraft();
+  assert.equal(tradeWindow(done, IN_SEASON), 'in-season');
+  assert.equal(tradeWindow(done, TRADE_CALENDAR_2027.deadlineAt), 'closed', 'the moment counts');
+  assert.equal(tradeWindow(done, AFTER_DEADLINE), 'closed');
+  assert.equal(tradeWindow(done, TRADE_CALENDAR_2027.seasonEndsAt), 'offseason');
+  assert.equal(tradeWindow(done, AFTER_TITLE), 'offseason');
+});
+
+test('in season only rounds 3 to 10 of next year move', () => {
+  const done = afterDraft();
+  const trade = (round: number, now: Date) =>
+    checkProposalAgainstState(
+      dataset,
+      done,
+      input({ offer: [ref(round, 'Amy', NEXT)], request: [ref(round, 'Kyle', NEXT)] }),
+      now,
+    );
+  assert.equal(trade(5, IN_SEASON).ok, true);
+  for (const round of [1, 2, 11]) {
+    const check = trade(round, IN_SEASON);
+    assert.equal(check.reason, 'round-protected', `round ${round}`);
+    assert.match(check.message ?? '', /During the season only rounds 3 to 10/);
+  }
+  const chips = tradableSeasonPicksFor(dataset, done, 'Amy', NEXT, IN_SEASON);
+  assert.equal(chips.filter((pick) => pick.tradable).length, 8);
+  assert.equal(chips.find((pick) => pick.ref.round === 1)?.blockedBy, 'round-protected');
+});
+
+test('after Week 15 nothing moves until the championship ends', () => {
+  const done = afterDraft();
+  const offer = input({ offer: [ref(5, 'Amy', NEXT)], request: [ref(5, 'Kyle', NEXT)] });
+  const closed = checkProposalAgainstState(dataset, done, offer, AFTER_DEADLINE);
+  assert.equal(closed.reason, 'window-closed');
+  assert.match(closed.message ?? '', /end of Week 15 until the championship ends/);
+  const chips = tradableSeasonPicksFor(dataset, done, 'Amy', NEXT, AFTER_DEADLINE);
+  assert.ok(chips.every((pick) => !pick.tradable && pick.blockedBy === 'window-closed'));
+
+  // Once the title is decided, every round opens again, 1st included.
+  const first = input({ offer: [ref(1, 'Amy', NEXT)], request: [ref(1, 'Kyle', NEXT)] });
+  assert.equal(checkProposalAgainstState(dataset, done, first, AFTER_TITLE).ok, true);
+  const open = tradableSeasonPicksFor(dataset, done, 'Amy', NEXT, AFTER_TITLE);
+  assert.equal(open.filter((pick) => pick.tradable).length, dataset.draftRounds);
+});
+
+test('the trades page says which window is open', () => {
+  assert.match(tradeWindowLine('offseason'), /Every round can be traded until the draft ends/);
+  assert.match(tradeWindowLine('in-season'), /only rounds 3 to 10 .* until Week 15 ends/);
+  assert.match(tradeWindowLine('closed'), /closed from the end of Week 15/);
 });
 
 /* ─── Validation ───────────────────────────────────────────────────────── */
@@ -917,10 +1012,11 @@ test('only the open draft can be traded, and the wrong one is refused', () => {
       dataset,
       closed,
       input({ offer: [ref(7, 'Amy', NEXT)], request: [ref(7, 'Kyle', NEXT)] }),
+      IN_SEASON,
     ).ok,
     true,
   );
-  assert.equal(checkProposalAgainstState(dataset, closed, input()).reason, 'wrong-season');
+  assert.equal(checkProposalAgainstState(dataset, closed, input(), IN_SEASON).reason, 'wrong-season');
 });
 
 test('one trade cannot mix two drafts', () => {
@@ -958,6 +1054,7 @@ test('a team may trade away two of its own picks in a draft, not three', () => {
       data,
       closed,
       input({ offer: [ref(7, 'Amy', NEXT)], request: [ref(7, 'Kyle', NEXT)] }),
+      IN_SEASON,
     ).ok,
     true,
   );
@@ -996,6 +1093,7 @@ test('a team may hold two picks in a round, not three', () => {
         offer: [ref(8, 'Ryan', NEXT)],
         request: [ref(3, 'Amy', NEXT)],
       }),
+      IN_SEASON,
     ).ok,
     true,
   );

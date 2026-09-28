@@ -30,6 +30,8 @@ import {
   STATUS_LABEL,
   tradableSeasonPicksFor,
   tradeableSeason,
+  tradeWindow,
+  tradeWindowLine,
   tradeSidesFor,
   type DraftOrder,
   type KeeperResetWarning,
@@ -565,6 +567,7 @@ export default function TradesPage() {
   // the commissioner closes the draft. The picker has to follow it or it
   // offers picks every proposal will be refused for.
   const openSeason = tradeableSeason(state, dataset);
+  const windowNow = tradeWindow(state);
 
   const myPicks = useMemo(
     () => (owner ? tradableSeasonPicksFor(dataset, state, owner, openSeason) : []),
@@ -662,6 +665,9 @@ export default function TradesPage() {
             Swap picks in the {draftYearLabel(openSeason)} with one other team. Picks only,
             nothing else.
           </p>
+          <p className={windowNow === 'closed' ? 'trade-window trade-window-closed' : 'trade-window'}>
+            {tradeWindowLine(windowNow)}
+          </p>
         </div>
         <IdentityChip />
       </header>
@@ -672,7 +678,7 @@ export default function TradesPage() {
         <button
           type="button"
           className="rules-tool trade-start tap-btn"
-          disabled={busy}
+          disabled={busy || windowNow === 'closed'}
           onClick={() => setComposing(true)}
         >
           + PROPOSE A TRADE

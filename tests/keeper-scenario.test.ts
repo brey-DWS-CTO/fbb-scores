@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { LeagueDynamicState } from '../src/lib/keeper/types.ts';
 import {
+  projectedOwners,
   projectedPlayerKeys,
   scenarioWithProjectedKeepers,
   stateWithKeeperScenario,
@@ -58,4 +59,18 @@ test('overlays a private scenario without mutating real keeper state', () => {
     Brey: [{ playerKey: 'mobley', playerName: 'E. Mobley' }],
   });
   assert.deepEqual([...projectedPlayerKeys(scenario)], ['allen']);
+});
+
+test('lists the owners with a projection saved, skipping empty ones', () => {
+  const scenario = {
+    Joel: [{ playerKey: 'mobley', playerName: 'E. Mobley' }],
+    Kyle: [],
+    Amy: [
+      { playerKey: 'allen', playerName: 'J. Allen' },
+      { playerKey: 'garland', playerName: 'D. Garland' },
+    ],
+  };
+
+  assert.deepEqual([...projectedOwners(scenario)].sort(), ['Amy', 'Joel']);
+  assert.deepEqual([...projectedOwners({})], []);
 });
