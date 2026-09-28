@@ -1,4 +1,4 @@
-import rawSchedule from '../../data/source/basketball-monster-schedule-2027.json';
+import rawSchedule from '../../data/source/basketball-monster-schedule-2027.json' with { type: 'json' };
 import {
   buildLeagueSchedule,
   normalizeScheduleSource,

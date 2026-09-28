@@ -1,4 +1,4 @@
-import raw from '../../data/league-2027.json';
+import raw from '../../data/league-2027.json' with { type: 'json' };
 import type { LeagueDataset } from '../keeper/types.js';
 
 /** The static 2027 league dataset (players, tiers, teams, trades, contracts). */

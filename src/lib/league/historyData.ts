@@ -1,4 +1,4 @@
-import rawHistory from '../../data/source/league-history-2027.json';
+import rawHistory from '../../data/source/league-history-2027.json' with { type: 'json' };
 import type { LeagueHistory } from './history.js';
 
 /**

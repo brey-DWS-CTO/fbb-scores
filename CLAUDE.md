@@ -67,6 +67,11 @@ place and the dev server then serves nothing.
   addresses live in the database.
 - TypeScript is strict: `erasableSyntaxOnly`, `noUnusedLocals`, no enums, and
   there is no underscore escape for an unused variable.
+- **Every JSON import needs `with { type: 'json' }`**, in `src/lib` as much
+  as in `server`. Vite and tsx forgive a bare import; the Vercel function
+  runs real Node ESM and dies on cold start with
+  `ERR_IMPORT_ATTRIBUTE_MISSING`. Tests and the build both pass, so nothing
+  catches it before production. It took the API down on 28 September 2026.
 
 ## Writing
 

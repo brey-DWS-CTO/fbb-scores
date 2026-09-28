@@ -1,4 +1,4 @@
-import rawRulebook from '../../data/source/rulebook-2027.json';
+import rawRulebook from '../../data/source/rulebook-2027.json' with { type: 'json' };
 import { buildRulebookIndex, type Rulebook } from './rulebook.js';
 
 /**
