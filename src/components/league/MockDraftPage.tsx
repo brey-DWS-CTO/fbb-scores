@@ -408,7 +408,8 @@ export default function MockDraftPage() {
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet, so everyone is valued on last season. <Link to="/admin">Fetch them in Commish Mode.</Link></>
         )}
-        {' '}Projections save. Nothing else on this page does.
+        {' '}The seed is the number the random picks run from: same seed, same draft, and NEW rolls another.
+        Projections save. Nothing else on this page does.
       </div>
 
       <section className="panel mock-controls">
@@ -500,7 +501,14 @@ export default function MockDraftPage() {
         <ul className="mock-guesses">
           {guessRows.map((row) => (
             <li key={row.owner} className={editing === row.owner ? 'is-editing' : undefined}>
-              <span className="mock-guess-owner">{row.owner}</span>
+              <div className="mock-guess-head">
+                <span className="mock-guess-owner">{row.owner}</span>
+                {!revealed && editing !== row.owner && (
+                  <button type="button" className="tap-btn mock-edit" onClick={() => setEditing(row.owner)}>
+                    {row.guess.length > 0 ? 'edit projection' : 'project'}
+                  </button>
+                )}
+              </div>
               <span className="mock-guess-players">
                 {row.keepers.length === 0
                   ? <span className="mock-live">{revealed ? 'none' : row.entered && useEntered ? 'entered, but the picks stay live' : 'not projected'}</span>
@@ -524,11 +532,6 @@ export default function MockDraftPage() {
                   </label>
                 )}
               </span>
-              {!revealed && editing !== row.owner && (
-                <button type="button" className="tap-btn mock-edit" onClick={() => setEditing(row.owner)}>
-                  {row.guess.length > 0 ? 'edit projection' : 'project'}
-                </button>
-              )}
               {!revealed && editing === row.owner && identity && (
                 <GuessEditor
                   owner={row.owner}

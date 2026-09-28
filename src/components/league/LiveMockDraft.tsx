@@ -5,7 +5,7 @@ import type { PreparedMock } from '../../lib/league/mockDraft.js';
 import NavIcon from './NavIcon.js';
 
 /** Seconds on the clock at the person's pick. */
-const PICK_CLOCK = 60;
+const PICK_CLOCK = 120;
 /** Gap between one team's pick and the next on screen. */
 const REVEAL_MS = 450;
 const LIST_LIMIT = 40;
@@ -27,27 +27,28 @@ interface Props {
  * change, so undo is dropping a choice and nothing is ever saved.
  */
 export default function LiveMockDraft({ prepared, values, person, seed, onNewSeed }: Props) {
+  const [started, setStarted] = useState(false);
   const [choices, setChoices] = useState<LiveChoices>({});
   const [revealed, setRevealed] = useState(0);
   const [search, setSearch] = useState('');
-  const [clock, setClock] = useState<{ overall: number; deadline: number } | null>(null);
+  const [clock, setClock] = useState<{ overall: number; deadline: number; pausedAt: number | null } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const logRef = useRef<HTMLOListElement | null>(null);
 
   const live = useMemo(() => replayLive(prepared, seed, person, choices), [prepared, seed, person, choices]);
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
   const caughtUp = revealed >= live.picks.length;
-  const myTurn = caughtUp && live.waitingOn !== null;
-  const over = caughtUp && live.over;
+  const myTurn = started && caughtUp && live.waitingOn !== null;
+  const over = started && caughtUp && live.over;
 
   // Reveal the other teams' picks one at a time. Keepers and picks already
   // made show at once; they were never in doubt.
   useEffect(() => {
-    if (caughtUp) return;
+    if (!started || caughtUp) return;
     const delay = live.picks[revealed]?.how === 'pick' ? REVEAL_MS : 0;
     const timer = setTimeout(() => setRevealed((current) => Math.min(current + 1, live.picks.length)), delay);
     return () => clearTimeout(timer);
-  }, [caughtUp, revealed, live.picks]);
+  }, [started, caughtUp, revealed, live.picks]);
 
   useEffect(() => {
     const log = logRef.current;
@@ -64,13 +65,13 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
       return () => clearTimeout(stop);
     }
     if (clock?.overall === waitingOverall) return;
-    const start = setTimeout(() => setClock({ overall: waitingOverall, deadline: Date.now() + PICK_CLOCK * 1000 }), 0);
+    const start = setTimeout(() => setClock({ overall: waitingOverall, deadline: Date.now() + PICK_CLOCK * 1000, pausedAt: null }), 0);
     return () => clearTimeout(start);
   }, [myTurn, waitingOverall, clock]);
 
   // Tick while the clock runs. At zero the pick goes to the best value on the board.
   useEffect(() => {
-    if (!clock) return;
+    if (!clock || clock.pausedAt !== null) return;
     const tick = setInterval(() => {
       const at = Date.now();
       setNow(at);
@@ -81,7 +82,19 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
     }, 250);
     return () => clearInterval(tick);
   }, [clock, live]);
-  const secondsLeft = clock ? Math.min(PICK_CLOCK, Math.max(0, Math.ceil((clock.deadline - now) / 1000))) : null;
+  const secondsLeft = clock
+    ? Math.min(PICK_CLOCK, Math.max(0, Math.ceil((clock.deadline - (clock.pausedAt ?? now)) / 1000)))
+    : null;
+  const paused = clock?.pausedAt !== null && clock?.pausedAt !== undefined;
+  const togglePause = () =>
+    setClock((current) => {
+      if (!current) return current;
+      const at = Date.now();
+      return current.pausedAt === null
+        ? { ...current, pausedAt: at }
+        : { ...current, deadline: current.deadline + (at - current.pausedAt), pausedAt: null };
+    });
+  const clockLabel = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
   const odds = useMemo(
     () => (myTurn ? oddsGoneByNextPick(prepared, seed, person, live, 60) : new Map<string, number>()),
@@ -103,6 +116,7 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
     setRevealed(Math.min(revealed, last - 1));
   };
   const restart = () => {
+    setStarted(false);
     setChoices({});
     setRevealed(0);
   };
@@ -116,7 +130,7 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
     })
     : available).slice(0, LIST_LIMIT);
 
-  const shownPicks = live.picks.slice(0, revealed);
+  const shownPicks = started ? live.picks.slice(0, revealed) : [];
   // Whose turn the screen says it is: the person's waiting slot, or the next pick still to show.
   const nextUp: { label: string; owner: string } | null = caughtUp
     ? live.waitingOn
@@ -136,6 +150,11 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
         <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>
           THE DRAFT
           <small>seed {seed}{over ? ', finished' : nextUp ? `, on the clock: ${nextUp.owner}` : ''}</small>
+        </div>
+        <div className="live-actions">
+          <button type="button" className="tap-btn mock-mini-btn" onClick={restart}>CLEAR AND RESTART</button>
+          <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={madeCount === 0}>UNDO MY LAST PICK</button>
+          <button type="button" className="tap-btn mock-mini-btn" onClick={onNewSeed}>NEW SEED</button>
         </div>
         <ol className="live-log" ref={logRef}>
           {shownPicks.map((pick) => (
@@ -159,7 +178,7 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
               </span>
             </li>
           ))}
-          {!caughtUp && nextUp && (
+          {started && !caughtUp && nextUp && (
             <li className="live-pick live-pick-thinking">
               <span className="mock-slot-label">{nextUp.label}</span>
               <span className="mock-slot-owner">{nextUp.owner}</span>
@@ -168,15 +187,17 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
             </li>
           )}
         </ol>
-        <div className="live-actions">
-          <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={madeCount === 0}>UNDO MY LAST PICK</button>
-          <button type="button" className="tap-btn mock-mini-btn" onClick={restart}>RESTART</button>
-          <button type="button" className="tap-btn mock-mini-btn" onClick={onNewSeed}>NEW SEED</button>
-        </div>
       </section>
 
       <section className={`panel live-turn-panel${myTurn ? ' is-mine' : ''}`}>
-        {over ? (
+        {!started ? (
+          <div className="live-start">
+            <div className="mock-note">
+              Nine teams, one seat for you. Their picks roll in on their own; at your turn you get {PICK_CLOCK / 60} minutes on the clock.
+            </div>
+            <button type="button" className="tap-btn live-start-btn" onClick={() => setStarted(true)}>START DRAFT</button>
+          </div>
+        ) : over ? (
           <Finished prepared={prepared} live={live} person={person} byKey={byKey} />
         ) : myTurn && live.waitingOn ? (
           <>
@@ -185,8 +206,13 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
                 <NavIcon name="target" size={14} className="icon-in-heading" />
                 YOUR PICK, {live.waitingOn.pick.round}.{live.waitingOn.pick.slot}
               </div>
-              <div className={`live-clock${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}`} aria-live="polite">
-                {secondsLeft ?? PICK_CLOCK}s
+              <div className="live-clock-side">
+                <div className={`live-clock${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
+                  {clockLabel(secondsLeft ?? PICK_CLOCK)}
+                </div>
+                <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>
+                  {paused ? 'RESUME' : 'PAUSE'}
+                </button>
               </div>
             </div>
             <input
