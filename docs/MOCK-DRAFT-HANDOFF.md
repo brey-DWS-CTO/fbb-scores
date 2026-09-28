@@ -478,6 +478,20 @@ Rules for trade what-ifs:
 - Show plainly which assumptions are on. A board built on three guesses and a
   hypothetical trade must not look like fact.
 
+**Built: `src/lib/league/whatIf.ts`, `buildWorld()`.** Trades switch on in
+the order they are switched; the second offer to move a pick is skipped and
+names the first. A moved pick that pays for a keeper resets that owner's
+keepers, real or guessed, and the reset is reported with the names. Two
+things the plan above did not say:
+
+- **The viewer's own what-if is a re-pick, so it lands after the trades.**
+  "If I keep Cade" while a trade moves the pick paying for Cade means: the
+  trade resets the real keepers, then Cade is kept on the pick that came in.
+  Applied before the trade, the what-if was wiped by its own reset.
+- **The server refuses a scenario entry for the viewer's own team**, so the
+  own what-if lives in the screen's state and is never saved. Only other
+  teams' guesses go through the private scenario.
+
 ### 5. The screen that answers the text message
 
 This is the acceptance test. Build it so Brey never types that message again.
@@ -496,6 +510,46 @@ are **assumed** and which are **known**, and never leak a real keeper into a
 view meant to be a guess. There is a live precedent for how carefully this is
 handled: the `detailed` flag in `previewProposal`, and the test named "what a
 hidden keeper costs does not leak through the summary".
+
+**Built: `src/components/league/MockDraftPage.tsx` at `/mock`, commissioner
+only.** Two worlds side by side: "as things stand" on the left, "what if" on
+the right with the pending trades as switches and the viewer's own keeper
+pair to try. Each world shows round one as slots (keeper, guess, or live,
+with what one run took), and how often each player was still there at the
+viewer's chosen pick across 100, 200 or 500 seeded drafts. Guesses are
+edited on the team's keeper page, not here; this page links to it. Things
+that turned out differently:
+
+- **The commissioner cannot see into other members' offers.** The server
+  strips picks from a pending offer the commissioner is not party to, so only
+  the viewer's own offers are switches. Others are listed as "open, picks
+  private". The handoff's "inbox or sent box" was right; "every offer" was
+  not.
+- **200 drafts take about half a second in the browser**, so both worlds run
+  on every change with no worker and no spinner.
+- **The watched pick is "your Nth live pick", not a fixed slot.** In the
+  what-if world 1.9 may belong to Kyle. Watching by the viewer's own picks
+  keeps the two columns comparable.
+- **The commissioner uses what teams have entered.** Brey's call, 26
+  September 2026: "it's my benefit for building this app." A switch on the
+  page, on by default, reads each team's entered keepers as known before the
+  reveal and falls back to his guess only where a team has entered nothing.
+  Off, it is guesses only, as the handoff first said. The switch does
+  nothing for anyone but the commissioner, since the server redacts other
+  teams' entries for everyone else. Projections are not edited on the mock
+  page: PROJECT opens that team's projection screen. Brey's rule, after an
+  in-place editor was built and pulled the same day: "just go to the
+  projection screen. Don't make it complicated."
+- **A live draft, not only odds.** Brey's first reaction to the odds was
+  "I can't just run a mock draft and see CPU selections?" He wanted to sit
+  in one. `src/lib/league/liveMock.ts` replays a draft from the seed and
+  the person's choices: the other nine pick under the same rules and random
+  stream as the odds, and the person's slots wait. Undo is dropping a choice.
+  The pick engine in `mockDraft.ts` was split into `createMockRun`, one
+  pick at a time, so the odds and the live draft share one set of rules.
+  The screen has a VIEW switch: ODDS or DRAFT LIVE, with a 60 second clock
+  that runs out to the best value on the board and a "gone by your next
+  pick" column from 60 runs ahead of the current pick.
 
 ## Rules you must not break
 

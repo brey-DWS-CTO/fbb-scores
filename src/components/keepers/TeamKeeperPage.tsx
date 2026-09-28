@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { DatasetPlayer, KeeperSelection, ResolvedKeeper } from '../../lib/keeper/types.js';
 import { keeperCandidateError, pickLabel, resolveTeamKeepers } from '../../lib/keeper/engine.js';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
+import { projectedOwners } from '../../lib/league/keeperScenario.js';
 import {
   apiErrorMessage,
   resetKeeperScenarioTarget,
@@ -306,6 +307,74 @@ function KeeperCard({
   );
 }
 
+/** Every team on one line: keepers in, and whether you have a projection saved for them. */
+function WhosIn({
+  owner,
+  viewer,
+  revealed,
+  keeperStatus,
+  projected,
+}: {
+  owner: string;
+  viewer: string | null;
+  revealed: boolean;
+  keeperStatus: Record<string, number> | undefined;
+  /** Owners the viewer has a private projection saved for. */
+  projected: Set<string>;
+}) {
+  const inCount = OWNERS.filter((o) => (keeperStatus?.[o] ?? 0) > 0).length;
+  const note = !viewer
+    ? 'Sign in to project a team’s keepers.'
+    : revealed
+      ? 'Tap a team to open its worksheet.'
+      : 'Tap a team to project it. Names stay private until the reveal.';
+  return (
+    <section className="panel whos-in" aria-label="Who's in">
+      <div className="whos-in-head">
+        <span className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)' }}>
+          WHO'S IN
+        </span>
+        <span className="whos-in-tally">
+          {inCount} of {OWNERS.length} in
+          {projected.size > 0 && ` · ${projected.size} projected`}
+        </span>
+      </div>
+      <div className="whos-in-note">{note}</div>
+      <div className="whos-in-grid">
+        {OWNERS.map((o) => {
+          const n = keeperStatus?.[o] ?? 0;
+          const inYet = n > 0;
+          const isMine = o === viewer;
+          const isCurrent = o === owner;
+          const hasProjection = projected.has(o);
+          const action = isCurrent ? 'OPEN' : isMine ? 'MINE' : revealed ? 'VIEW' : 'PROJECT';
+          return (
+            <Link
+              key={o}
+              to={`/keepers/${encodeURIComponent(o)}`}
+              aria-current={isCurrent ? 'page' : undefined}
+              aria-label={isMine
+                ? 'Open my keeper options'
+                : revealed
+                  ? `View ${o}'s keeper options`
+                  : `Project ${o}'s keepers${hasProjection ? ' (projection saved)' : ''}`}
+              className={`whos-in-row${isCurrent ? ' is-open' : ''}${inYet ? ' is-in' : ''}`}
+            >
+              <span className="whos-in-name">{o}</span>
+              {hasProjection && <span className="whos-in-proj">projected</span>}
+              <span className={inYet ? 'whos-in-count is-in' : 'whos-in-count'}>
+                {inYet ? `✓ ${n} in` : '—'}
+              </span>
+              <span className="whos-in-action">{action}</span>
+              <span className="whos-in-chevron" aria-hidden="true">›</span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /** /keepers/:owner — one team's keeper worksheet (the old Excel sheet, but alive). */
 export default function TeamKeeperPage() {
   const headerRef = useRef<HTMLDivElement>(null);
@@ -340,6 +409,7 @@ export default function TeamKeeperPage() {
     () => scenarioQuery.scenario[owner] ?? [],
     [owner, scenarioQuery.scenario],
   );
+  const projectedTeams = useMemo(() => projectedOwners(scenarioQuery.scenario), [scenarioQuery.scenario]);
   const [browseBannerOpen, setBrowseBannerOpen] = useState(true);
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
 
@@ -653,6 +723,15 @@ export default function TeamKeeperPage() {
           )}
         </div>
       )}
+
+      {/* ── Who's in: every team, right under the team picker ──── */}
+      <WhosIn
+        owner={owner}
+        viewer={identity?.owner ?? null}
+        revealed={meta?.revealed === true}
+        keeperStatus={meta?.keeperStatus}
+        projected={projectedTeams}
+      />
 
       {/* ── Access banners ─────────────────────────────────────── */}
       {projectionMode && browseBannerOpen && (
@@ -1007,66 +1086,6 @@ export default function TeamKeeperPage() {
               onTap={() => toggleKeeper(p)}
             />
           ))}
-        </div>
-      </section>
-
-      {/* ── League status: who has keepers in (names only) ─────── */}
-      <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
-        <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)', marginBottom: 6 }}>
-          WHO'S IN
-        </div>
-        {meta && !meta.revealed && (
-          <div style={{ color: 'var(--text-mid)', fontSize: '0.72rem', marginBottom: 10 }}>
-            <NavIcon name="hidden" size={14} className="icon-in-heading" />
-            Saved keeper names stay private until the commish reveals them.
-          </div>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
-          {OWNERS.map((o) => {
-            const n = meta?.keeperStatus[o] ?? 0;
-            const inYet = n > 0;
-            const isMine = o === identity?.owner;
-            const row = (
-              <span
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  padding: '6px 10px',
-                  borderRadius: 8,
-                  border: '1px solid var(--panel-border)',
-                  background: inYet ? 'rgba(0,255,204,0.05)' : 'transparent',
-                }}
-              >
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontWeight: o === owner ? 800 : 600, color: o === owner ? 'var(--neon-teal)' : 'var(--text-hi)', fontSize: '0.85rem' }}>
-                    {o}
-                  </span>
-                  <span style={{ display: 'block', marginTop: 2, color: 'var(--text-dim)', fontSize: '0.58rem', fontWeight: 800 }}>
-                    {o === owner ? 'OPEN' : isMine ? 'MY TEAM' : meta?.revealed ? 'VIEW →' : 'PROJECT →'}
-                  </span>
-                </span>
-                <span style={{ color: inYet ? 'var(--neon-teal)' : 'var(--text-faint)', fontSize: '0.78rem', fontWeight: 700 }}>
-                  {inYet ? `✓ ${n} in` : '—'}
-                </span>
-              </span>
-            );
-            return (
-              <Link
-                key={o}
-                to={`/keepers/${encodeURIComponent(o)}`}
-                aria-label={isMine
-                  ? 'Open my keeper options'
-                  : meta?.revealed
-                    ? `View ${o}'s keeper options`
-                    : `Project ${o}'s keepers`}
-                style={{ textDecoration: 'none' }}
-              >
-                {row}
-              </Link>
-            );
-          })}
         </div>
       </section>
 

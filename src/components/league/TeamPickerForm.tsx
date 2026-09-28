@@ -224,7 +224,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
                   <span className="identity-label">{needsRepeat ? 'NEW PIN' : 'PIN'}</span>
                   <input
                     className="identity-pin-input"
-                    type="tel"
+                    type="password"
                     inputMode="numeric"
                     autoComplete="current-password"
                     placeholder="••••"
@@ -239,7 +239,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
                     <span className="identity-label">REPEAT PIN</span>
                     <input
                       className="identity-pin-input"
-                      type="tel"
+                      type="password"
                       inputMode="numeric"
                       autoComplete="new-password"
                       placeholder="••••"
