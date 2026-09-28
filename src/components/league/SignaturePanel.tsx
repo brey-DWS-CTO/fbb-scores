@@ -32,7 +32,8 @@ export default function SignaturePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!data) return null;
+  // Nothing published means nothing to sign. The page already says so.
+  if (!data || !data.versionId) return null;
 
   const status = signatureStatus(data.members, data.signed, data.versionId);
   const mine = identity ? data.signed.find((s) => s.owner === identity.owner) : undefined;
@@ -60,10 +61,6 @@ export default function SignaturePanel({
         <span className="hub-heading sign-title">SIGNATURES</span>
         <span className="sign-count">{describeSignatures(status)}</span>
       </div>
-
-      {!data.versionId && (
-        <p className="sign-line">Nothing to sign yet.</p>
-      )}
 
       {data.versionId && (
         <>

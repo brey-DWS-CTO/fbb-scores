@@ -161,16 +161,23 @@ function Clause({
   editor?: React.ReactNode;
 }) {
   const body = entry.text ? resolveRefs(entry.text, index) : '';
-  const indent = breadcrumb === undefined ? Math.min(entry.depth - 1, 4) * 14 : 0;
+  const depth = breadcrumb === undefined ? Math.min(entry.depth - 1, 4) : 0;
+  const classes = ['rules-clause'];
+  if (breadcrumb !== undefined) classes.push('rules-clause-hit');
+  if (entry.depth === 1 && breadcrumb === undefined) classes.push('rules-clause-top');
+  if (entry.kind === 'example') classes.push('rules-clause-example');
+  if (!body && entry.title) classes.push('rules-clause-subhead');
 
   return (
     <div
       id={anchorFor(entry.id)}
-      className={breadcrumb === undefined ? 'rules-clause' : 'rules-clause rules-clause-hit'}
-      style={{ marginLeft: indent }}
+      className={classes.join(' ')}
+      style={{ '--rules-depth': depth } as React.CSSProperties}
     >
       {breadcrumb ? <div className="rules-breadcrumb">{breadcrumb}</div> : null}
-      <p className={body ? 'rules-clause-text' : 'rules-clause-text rules-clause-heading'}>
+      {/* Number and text sit in two columns, so a wrapped line lines up under
+          the words and the numbers stay easy to scan down the page. */}
+      <div className={body ? 'rules-clause-row' : 'rules-clause-row rules-clause-heading'}>
         <button
           type="button"
           className={open ? 'rules-number rules-number-open tap-btn' : 'rules-number tap-btn'}
@@ -178,17 +185,19 @@ function Clause({
           aria-expanded={open}
           title={`Actions for rule ${entry.number}`}
         >
-          {copied ? 'LINK COPIED' : entry.number}
+          {copied ? 'COPIED' : entry.number}
         </button>
-        {entry.title && (
-          <span className="rules-clause-title">
-            <Marked text={entry.title} term={term} />
-            {body ? '. ' : ''}
-          </span>
-        )}
-        {entry.kind === 'example' && <span className="rules-example-tag">EXAMPLE</span>}
-        {body && <Marked text={body} term={term} />}
-      </p>
+        <p className="rules-clause-text">
+          {entry.title && (
+            <span className="rules-clause-title">
+              <Marked text={entry.title} term={term} />
+              {body ? '. ' : ''}
+            </span>
+          )}
+          {entry.kind === 'example' && <span className="rules-example-tag">EXAMPLE</span>}
+          {body && <Marked text={body} term={term} />}
+        </p>
+      </div>
       <ClauseTable entry={entry} term={term} />
       {open && (
         <div className="rules-actions">
@@ -386,6 +395,18 @@ export default function RulesPage() {
   };
 
   const allShut = collapsed.size >= sections.length;
+
+  // Open the article if it is shut, then bring its heading to the top.
+  const jumpTo = (id: string) => {
+    if (collapsed.has(id)) {
+      const next = new Set(collapsed);
+      next.delete(id);
+      setCollapsedAnd(next);
+    }
+    requestAnimationFrame(() => {
+      document.getElementById(anchorFor(id))?.scrollIntoView({ block: 'start' });
+    });
+  };
 
   // Jump to a deep-linked rule. Its section is already open, because
   // initialCollapsed resolved the anchor before the first render.
@@ -590,10 +611,10 @@ export default function RulesPage() {
       )}
 
       {!editing && !historical && !publishedMeta.published && (
-        <div className="panel rules-status">
-          <span className="hub-heading">NOT YET PUBLISHED</span>
-          <p>Revision {book.revision} is a working draft. Nobody has signed it.</p>
-        </div>
+        <p className="rules-published-line rules-unpublished">
+          <span className="rules-unpublished-dot" aria-hidden="true" />
+          Revision {book.revision} is a working draft. It is not published or signed yet.
+        </p>
       )}
 
       {!editing && !historical && publishedMeta.published && (
@@ -740,6 +761,25 @@ export default function RulesPage() {
           <span aria-hidden="true">⤓</span>
         </button>
       </div>
+
+      {!results && (
+        <nav className="rules-jump" aria-label="Jump to an article">
+          {sections.map((section) => (
+            <button
+              key={section.heading.id}
+              type="button"
+              className="rules-jump-chip tap-btn"
+              onClick={() => jumpTo(section.heading.id)}
+            >
+              <span className="rules-jump-number">
+                {section.heading.number.replace('Appendix ', '')}
+              </span>
+              {/* "Fees, Winnings and Payout" reads as "Fees" on a chip. */}
+              {section.heading.title?.split(/,| \(/)[0]}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {showHistory && (
         <section className="panel rules-history">
