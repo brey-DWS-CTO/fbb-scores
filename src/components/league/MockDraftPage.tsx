@@ -49,7 +49,7 @@ function sampleTake(run: MockDraftResult | null, overall: number): string | null
 function KeeperTag({ status }: { status: 'known' | 'assumed' }) {
   return (
     <span className={`mock-tag ${status === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>
-      {status === 'known' ? 'keeper' : 'guess'}
+      {status === 'known' ? 'keeper' : 'projected'}
     </span>
   );
 }
@@ -66,7 +66,7 @@ interface GuessEditorProps {
   onClose: () => void;
 }
 
-/** Edit one team's guessed keepers in place. Saves through the private scenario, the same as the keeper page. */
+/** Edit one team's projected keepers in place. Saves through the private scenario, the same as the keeper page. */
 function GuessEditor({ owner, candidates, guess, identity, onSaved, onClose }: GuessEditorProps) {
   const [picks, setPicks] = useState<[string, string]>([guess[0]?.playerKey ?? '', guess[1]?.playerKey ?? '']);
   const [busy, setBusy] = useState(false);
@@ -103,7 +103,7 @@ function GuessEditor({ owner, candidates, guess, identity, onSaved, onClose }: G
         <select
           key={index}
           className="hub-input mock-select"
-          aria-label={`${owner} guess ${index + 1}`}
+          aria-label={`${owner} projection ${index + 1}`}
           value={picks[index]}
           disabled={busy}
           onChange={(event) => {
@@ -163,7 +163,7 @@ function WorldColumn({ title, color, world, results, viewer, watchIndex, childre
           {world.resets.map((reset) => (
             <div key={`${reset.proposalId}-${reset.owner}`}>
               <NavIcon name="warning" size={13} className="icon-in-heading" />
-              {reset.owner}&apos;s {reset.status === 'known' ? 'keepers' : 'guessed keepers'} reset
+              {reset.owner}&apos;s {reset.status === 'known' ? 'keepers' : 'projected keepers'} reset
               {reset.players.length > 0 ? ` (${reset.players.join(', ')})` : ''}: the trade moves the pick paying for them.
             </div>
           ))}
@@ -174,7 +174,7 @@ function WorldColumn({ title, color, world, results, viewer, watchIndex, childre
       ))}
       {world.board.rejected.map((rejected) => (
         <div key={rejected.owner} className="mock-note mock-note-bad">
-          {rejected.owner}&apos;s {rejected.status === 'known' ? 'keepers' : 'guessed keepers'} do not fit the rules, so the picks stay live: {rejected.errors.join(' ')}
+          {rejected.owner}&apos;s {rejected.status === 'known' ? 'keepers' : 'projected keepers'} do not fit the rules, so the picks stay live: {rejected.errors.join(' ')}
         </div>
       ))}
 
@@ -251,7 +251,7 @@ function WorldColumn({ title, color, world, results, viewer, watchIndex, childre
 }
 
 /**
- * Commissioner tool: the mock draft. Round one as it stands, your guesses at
+ * Commissioner tool: the mock draft. Round one as it stands, your projections of
  * other teams' keepers, pending trades as switches, and how often each player
  * is still there at your pick across many seeded drafts. Two worlds side by
  * side, so "if I keep Cade" can sit next to "if I make this trade".
@@ -395,7 +395,7 @@ export default function MockDraftPage() {
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet, so everyone is valued on last season. <Link to="/admin">Fetch them in Commish Mode.</Link></>
         )}
-        {' '}Nothing on this page is saved.
+        {' '}Projections save. Nothing else on this page does.
       </div>
 
       <section className="panel mock-controls">
@@ -450,20 +450,20 @@ export default function MockDraftPage() {
 
       <section className="panel mock-assumptions">
         <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>
-          {revealed ? 'KEEPERS' : 'YOUR GUESSES AT THEIR KEEPERS'}
+          THEIR KEEPERS
         </div>
         {!revealed && (
           <>
             <label className="mock-use-entered">
               <input type="checkbox" checked={useEntered} onChange={(event) => setUseEntered(event.target.checked)} />
               <span>
-                Use what teams have already entered ({enteredCount} of {guessRows.length} so far). Your guess covers the rest.
+                Use what teams have already entered ({enteredCount} of {guessRows.length} so far). Your projections cover the rest.
               </span>
             </label>
             <div className="mock-note mock-note-dim">
               {useEntered
-                ? 'Entered picks are tagged KEEPER, your guesses GUESS. Only you can see the entered ones before the reveal.'
-                : 'Both worlds use your guesses only, never what anyone has entered.'}
+                ? 'Entered picks are tagged KEEPER, your projections PROJECTED. Only you can see the entered ones before the reveal.'
+                : 'Both worlds use your projections only, never what anyone has entered.'}
             </div>
           </>
         )}
@@ -473,7 +473,7 @@ export default function MockDraftPage() {
               <span className="mock-guess-owner">{row.owner}</span>
               <span className="mock-guess-players">
                 {row.keepers.length === 0
-                  ? <span className="mock-live">{revealed ? 'none' : row.entered && useEntered ? 'entered, but the picks stay live' : 'no guess'}</span>
+                  ? <span className="mock-live">{revealed ? 'none' : row.entered && useEntered ? 'entered, but the picks stay live' : 'not projected'}</span>
                   : row.keepers.map((keeper) => (
                     <span key={keeper.playerKey}>{keeper.playerName} <KeeperTag status={keeper.status} /></span>
                   ))}
@@ -486,7 +486,7 @@ export default function MockDraftPage() {
                       onChange={() => toggleGuessInstead(row.owner)}
                     />
                     <span>
-                      use my guess instead
+                      use my projection instead
                       {guessInstead.includes(row.owner)
                         ? ' (entered picks set aside)'
                         : row.guess.length > 0 ? ` (${row.guess.map((k) => k.playerName).join(', ')})` : ''}
@@ -496,7 +496,7 @@ export default function MockDraftPage() {
               </span>
               {!revealed && editing !== row.owner && (
                 <button type="button" className="tap-btn mock-edit" onClick={() => setEditing(row.owner)}>
-                  {row.guess.length > 0 ? 'edit guess' : 'guess'}
+                  {row.guess.length > 0 ? 'edit projection' : 'project'}
                 </button>
               )}
               {!revealed && editing === row.owner && identity && (
