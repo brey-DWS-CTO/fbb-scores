@@ -36,3 +36,12 @@ export function projectedPlayerKeys(scenario: KeeperScenario): Set<string> {
     Object.values(scenario).flatMap((selections) => selections.map((selection) => selection.playerKey)),
   );
 }
+
+/** Owners the viewer has projected at least one keeper for. */
+export function projectedOwners(scenario: KeeperScenario): Set<string> {
+  return new Set(
+    Object.entries(scenario)
+      .filter(([, selections]) => selections.length > 0)
+      .map(([owner]) => owner),
+  );
+}

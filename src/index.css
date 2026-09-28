@@ -2916,6 +2916,83 @@ th.schedule-col-active {
 .rank-admin-down { color: var(--neon-red); }
 .rank-admin-note { color: var(--text-dim); font-size: 0.68rem; margin-top: 9px; }
 
+/* ─── Who's in: one tight line per team ─────────────────────────────── */
+.whos-in { padding: 8px 10px 9px; border-radius: 10px; margin-bottom: 12px; }
+.whos-in-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.whos-in-tally {
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.whos-in-note { color: var(--text-dim); font-size: 0.64rem; line-height: 1.3; margin: 2px 0 6px; }
+.whos-in-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+.whos-in-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 1px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  background: var(--input-bg);
+  color: var(--text-hi);
+  text-decoration: none;
+  font-size: 0.74rem;
+  -webkit-tap-highlight-color: transparent;
+}
+.whos-in-row.is-in { background: rgba(0, 255, 204, 0.05); }
+.whos-in-row.is-open { border-color: var(--neon-teal); color: var(--neon-teal); }
+.whos-in-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.whos-in-row.is-open .whos-in-name { font-weight: 800; }
+.whos-in-proj {
+  color: var(--neon-purple);
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.whos-in-count {
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.whos-in-count.is-in { color: var(--neon-teal); }
+.whos-in-action {
+  color: var(--text-dim);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.whos-in-chevron { display: none; color: var(--text-dim); font-size: 0.95rem; line-height: 1; }
+/* A phone column is too narrow for the word. The chevron says "tap me"; the
+   note above says what the tap does. */
+@media (max-width: 479px) {
+  .whos-in-action { display: none; }
+  .whos-in-chevron { display: inline; }
+}
+
 /* ─── Mock draft (commissioner) ───────────────────────────────────────── */
 /* Two worlds side by side on a desktop, stacked on a phone. Each world is a
    panel tinted by its own colour: teal for things as they stand, purple for
