@@ -115,6 +115,19 @@ export function dueReminders(input: ReminderInput): DueReminder[] {
   return due;
 }
 
+/**
+ * Whether any reminder window is open right now, whoever it is for.
+ *
+ * The clock asks this before it opens the database. Outside the week before
+ * the draft the answer is no, and the hourly run ends without waking it.
+ */
+export function anyReminderWindowOpen(now: Date, draftAt: Date): boolean {
+  return REMINDERS.some((window) => {
+    const target = targetFor(window.kind, draftAt).getTime();
+    return now.getTime() >= target - window.hoursBefore * HOUR && now.getTime() < target;
+  });
+}
+
 /** How long is left, for a person to read. "3 days", "6 hours", "under an hour". */
 export function humanCountdown(hoursLeft: number): string {
   if (hoursLeft < 1) return 'under an hour';
