@@ -15,6 +15,7 @@ import { valueBoard } from '../../lib/league/draftValue.js';
 import {
   availabilityAt,
   defaultMockSettings,
+  prepareMock,
   simulateMany,
   type MockDraftResult,
   type MockMode,
@@ -25,6 +26,7 @@ import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { buildWorld, privateTrades, switchableTrades, tradeConflicts, type World } from '../../lib/league/whatIf.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
+import LiveMockDraft from './LiveMockDraft.js';
 import NavIcon from './NavIcon.js';
 
 const RUN_CHOICES = [100, 200, 500] as const;
@@ -277,6 +279,7 @@ export default function MockDraftPage() {
     refetchOnWindowFocus: true,
   });
 
+  const [view, setView] = useState<'odds' | 'live'>('odds');
   const [mode, setMode] = useState<MockMode>('realistic');
   const [runs, setRuns] = useState<number>(200);
   const [seed, setSeed] = useState(7);
@@ -331,12 +334,22 @@ export default function MockDraftPage() {
   const settings = useMemo(() => defaultMockSettings(mode, owners, seed), [mode, owners, seed]);
   const canRun = values.entries.length > 0;
   const nowRuns = useMemo(
-    () => (canRun ? simulateMany({ board: now.board, values, settings }, runs) : null),
-    [canRun, now.board, values, settings, runs],
+    () => (canRun && view === 'odds' ? simulateMany({ board: now.board, values, settings }, runs) : null),
+    [canRun, view, now.board, values, settings, runs],
   );
   const whatIfRuns = useMemo(
-    () => (canRun ? simulateMany({ board: whatIf.board, values, settings }, runs) : null),
-    [canRun, whatIf.board, values, settings, runs],
+    () => (canRun && view === 'odds' ? simulateMany({ board: whatIf.board, values, settings }, runs) : null),
+    [canRun, view, whatIf.board, values, settings, runs],
+  );
+  const livePrepared = useMemo(
+    () => (canRun ? prepareMock({ board: whatIf.board, values, settings }) : null),
+    [canRun, whatIf.board, values, settings],
+  );
+  // A different board, room or seed is a different draft: remount the live one.
+  const liveKey = useMemo(
+    () => `${seed}:${mode}:${whatIf.board.slots.map((slot) =>
+      `${slot.pick.currentOwner}${slot.keeper ? '=' + slot.keeper.playerKey : slot.made ? '+' + slot.made.playerKey : ''}`).join(',')}`,
+    [seed, mode, whatIf.board],
   );
 
   if (!isCommish || !viewer) {
@@ -399,6 +412,23 @@ export default function MockDraftPage() {
       </div>
 
       <section className="panel mock-controls">
+        <div className="mock-control">
+          <span className="hub-heading mock-control-label">VIEW</span>
+          <div className="mock-seg" role="radiogroup" aria-label="Odds or a live draft">
+            {(['odds', 'live'] as const).map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                role="radio"
+                aria-checked={view === choice}
+                className={`tap-btn mock-seg-btn${view === choice ? ' is-on' : ''}`}
+                onClick={() => setView(choice)}
+              >
+                {choice === 'odds' ? 'ODDS' : 'DRAFT LIVE'}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="mock-control">
           <span className="hub-heading mock-control-label">ROOM</span>
           <div className="mock-seg" role="radiogroup" aria-label="How the room drafts">
@@ -514,7 +544,28 @@ export default function MockDraftPage() {
         </ul>
       </section>
 
-      <div className="mock-worlds">
+      {view === 'live' && (
+        <>
+          <div className="mock-note mock-note-dim" style={{ marginBottom: 10 }}>
+            You draft from the what-if world{whatIfLabel ? ` (${whatIfLabel})` : ''}. Flip to ODDS to change the switches.
+            The other nine pick on their own, {mode === 'sharp' ? 'to our value' : 'the way a real room reaches'}.
+          </div>
+          {livePrepared ? (
+            <LiveMockDraft
+              key={liveKey}
+              prepared={livePrepared}
+              values={values}
+              person={viewer}
+              seed={seed}
+              onNewSeed={() => setSeed(Math.floor(Math.random() * 100_000))}
+            />
+          ) : (
+            <div className="mock-note">No players to draft yet.</div>
+          )}
+        </>
+      )}
+
+      <div className="mock-worlds" hidden={view !== 'odds'}>
         <WorldColumn title="AS THINGS STAND" color="var(--neon-teal)" world={now} results={nowRuns} viewer={viewer} watchIndex={watchIndex}>
           <div className="mock-note mock-note-dim">
             Your real keepers{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => k.playerName).join(', ')})` : ' (none yet)'}, no pending trades.

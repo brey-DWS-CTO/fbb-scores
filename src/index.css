@@ -3066,6 +3066,61 @@ th.schedule-col-active {
 .mock-guess-instead { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 0.68rem; font-weight: 600; color: var(--text-dim); cursor: pointer; }
 .mock-guess-instead input { accent-color: var(--neon-purple); }
 
+/* ─── Live mock draft ────────────────────────────────────────────────── */
+/* The pick log on the left runs on its own; the right panel is the person's
+   turn (search, list, draft) or, between turns, whose pick it is. */
+.live-mock { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; align-items: start; }
+@media (max-width: 839px) { .live-mock { grid-template-columns: 1fr; } }
+.live-log-panel, .live-turn-panel { padding: 12px 14px 14px; border-radius: 10px; }
+.live-turn-panel.is-mine { border-color: var(--neon-teal); box-shadow: 0 0 0 1px rgba(0,255,204,0.25), 0 0 24px rgba(0,255,204,0.12); }
+.live-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 62vh; overflow-y: auto; }
+.live-pick {
+  display: grid;
+  grid-template-columns: 34px 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  background: var(--input-bg);
+  font-size: 0.75rem;
+}
+.live-pick-mine { border-color: var(--neon-teal); }
+.live-pick-thinking { opacity: 0.7; }
+.live-pick .mock-slot-player small { color: var(--text-dim); font-weight: 600; margin-left: 2px; }
+.live-pick-why { color: var(--text-faint); font-size: 0.62rem; font-weight: 700; white-space: nowrap; }
+.live-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.live-clock-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.live-turn-title { font-size: 0.7rem; color: var(--neon-teal); }
+.live-clock { font-size: 1.4rem; font-weight: 900; color: var(--neon-teal); font-variant-numeric: tabular-nums; }
+.live-clock.is-low { color: var(--neon-red); }
+.live-search { width: 100%; margin-top: 10px; padding: 8px 10px; font-size: 0.85rem; font-weight: 700; min-height: 40px; }
+.live-list-head, .live-list li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 46px 46px 62px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+.live-list-head { margin-top: 8px; color: var(--text-faint); font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.live-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 48vh; overflow-y: auto; }
+.live-list li { border: 1px solid var(--panel-border); border-radius: 7px; background: var(--input-bg); }
+.live-list li:first-child { border-color: var(--neon-teal); }
+.live-num { color: var(--text-body); font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+.live-num.is-hot { color: var(--neon-orange); }
+.live-list .mock-mini-btn { min-height: 28px; padding: 0 8px; font-size: 0.58rem; }
+.live-roster { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.live-roster li { display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: 8px; padding: 3px 8px; font-size: 0.74rem; }
+.live-rosters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+.live-team { padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--input-bg); font-size: 0.72rem; }
+.live-team.is-mine { border-color: var(--neon-teal); }
+.live-team ul { list-style: none; margin: 4px 0 0; padding: 0; color: var(--text-body); }
+@media (max-width: 480px) {
+  .live-list-head, .live-list li { grid-template-columns: 20px minmax(0, 1fr) 42px 56px auto; }
+  .live-list-head span:nth-child(4), .live-list li > span:nth-child(4) { display: none; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

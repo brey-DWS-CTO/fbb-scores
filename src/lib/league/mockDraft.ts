@@ -389,7 +389,7 @@ interface TeamState {
   picksLeft: number;
 }
 
-interface PreparedMock {
+export interface PreparedMock {
   input: MockDraftInput;
   roster: RosterSettings;
   pool: MockCandidate[];
@@ -460,8 +460,33 @@ function wouldFill(team: TeamState, positions: Eligible, slots: readonly Starter
   return seated;
 }
 
-/** Run one draft from a prepared mock with one seed. */
-export function runMock(prepared: PreparedMock, seed: number): MockDraftResult {
+/**
+ * One draft in progress, a pick at a time. `runMock` drives it to the end for
+ * the odds; the live mock drives it with a person at one of the tables.
+ * Either way every team's pick comes from the same rules and the same random
+ * stream, so a live draft with seed 7 lines up with the odds for seed 7.
+ */
+export interface MockRun {
+  seed: number;
+  /** Picks made so far, keepers and picks already made included, in order. */
+  readonly picks: readonly MockPick[];
+  /** The slot the next call to `next` fills, or null when the draft is over. */
+  nextSlot(): MockSlot | null;
+  /**
+   * Fill the next slot. The team picks for itself unless `forced` names a
+   * player, which is how a person drafts. A forced player who is gone or
+   * unknown throws: the screen offers only players on the board.
+   */
+  next(forced?: string): MockPick;
+  /** Everyone still on the board, best value first. */
+  available(): MockCandidate[];
+  /** How a team's starting lineup stands right now. */
+  lineupOf(owner: string): LineupFit;
+  /** The draft as it stands, with rosters and lineups, finished or not. */
+  result(): MockDraftResult;
+}
+
+export function createMockRun(prepared: PreparedMock, seed: number): MockRun {
   const { input, roster, pool, byKey, orderByOwner, tendencies } = prepared;
   const random = seededRandom(seed);
   const slots = starterSlotList(roster);
@@ -477,9 +502,11 @@ export function runMock(prepared: PreparedMock, seed: number): MockDraftResult {
   };
   const warnings: MockWarning[] = [];
   const warnedShort = new Set<string>();
+  const picks: MockPick[] = [];
+  const board = input.board.slots;
 
   // Keepers and picks already made fill their slots before anyone drafts.
-  for (const slot of input.board.slots) {
+  for (const slot of board) {
     const team = teamOf(slot.pick.currentOwner);
     const fixed = slot.keeper ?? slot.made;
     if (fixed) {
@@ -490,7 +517,7 @@ export function runMock(prepared: PreparedMock, seed: number): MockDraftResult {
     }
   }
 
-  const picks: MockPick[] = input.board.slots.map((slot) => {
+  const fill = (slot: MockSlot, forced?: string): MockPick => {
     const owner = slot.pick.currentOwner;
     const team = teamOf(owner);
     const shared = {
@@ -524,6 +551,25 @@ export function runMock(prepared: PreparedMock, seed: number): MockDraftResult {
         keeperStatus: null,
         valueRank: known?.valueRank ?? null,
         roomRank: known?.roomRank ?? null,
+      };
+    }
+
+    if (forced !== undefined) {
+      const picked = byKey.get(forced);
+      if (!picked) throw new Error(`No such player on the board: ${forced}`);
+      if (gone.has(forced)) throw new Error(`${picked.playerName} is already gone`);
+      gone.add(picked.playerKey);
+      addToTeam(team, picked.playerKey, picked.positions, slots);
+      team.picksLeft -= 1;
+      return {
+        ...shared,
+        playerKey: picked.playerKey,
+        playerName: picked.playerName,
+        positions: picked.positions,
+        how: 'pick',
+        keeperStatus: null,
+        valueRank: picked.valueRank,
+        roomRank: picked.roomRank,
       };
     }
 
@@ -614,20 +660,49 @@ export function runMock(prepared: PreparedMock, seed: number): MockDraftResult {
       valueRank: picked.valueRank,
       roomRank: picked.roomRank,
     };
-  });
+  };
 
-  const rosters: Record<string, string[]> = {};
-  const lineups: Record<string, LineupFit> = {};
-  for (const [owner, team] of teams) {
-    rosters[owner] = [...team.keys];
-    const fit: LineupFit = { filled: team.seat.filter((index) => index !== -1).length, open: openSlots(team, slots) };
-    lineups[owner] = fit;
-    if (fit.open.length > 0) {
-      warnings.push({ owner, overall: null, message: `${owner} ends the draft unable to start a ${fit.open.join(' or ')}.` });
-    }
-  }
+  const lineupOf = (owner: string): LineupFit => {
+    const team = teamOf(owner);
+    return { filled: team.seat.filter((index) => index !== -1).length, open: openSlots(team, slots) };
+  };
 
-  return { seed, mode: input.settings.mode, picks, rosters, lineups, warnings, pool };
+  return {
+    seed,
+    picks,
+    nextSlot: () => board[picks.length] ?? null,
+    next: (forced) => {
+      const slot = board[picks.length];
+      if (!slot) throw new Error('The draft is over');
+      const pick = fill(slot, forced);
+      picks.push(pick);
+      return pick;
+    },
+    available: () => pool.filter((candidate) => !gone.has(candidate.playerKey)),
+    lineupOf,
+    result: () => {
+      const rosters: Record<string, string[]> = {};
+      const lineups: Record<string, LineupFit> = {};
+      const endWarnings = [...warnings];
+      const over = picks.length >= board.length;
+      for (const [owner, team] of teams) {
+        rosters[owner] = [...team.keys];
+        const fit = lineupOf(owner);
+        lineups[owner] = fit;
+        if (over && fit.open.length > 0) {
+          endWarnings.push({ owner, overall: null, message: `${owner} ends the draft unable to start a ${fit.open.join(' or ')}.` });
+        }
+      }
+      return { seed, mode: input.settings.mode, picks: [...picks], rosters, lineups, warnings: endWarnings, pool };
+    },
+  };
+}
+
+/** Run one draft from a prepared mock with one seed. */
+export function runMock(prepared: PreparedMock, seed: number): MockDraftResult {
+  const run = createMockRun(prepared, seed);
+  while (run.nextSlot()) run.next();
+  return run.result();
 }
 
 /** One draft. Same input and seed, same picks. */

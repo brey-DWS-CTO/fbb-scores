@@ -538,6 +538,16 @@ that turned out differently:
   nothing for anyone but the commissioner, since the server redacts other
   teams' entries for everyone else. Guesses are edited on the page too, in
   place, through the same private scenario the keeper pages write.
+- **A live draft, not only odds.** Brey's first reaction to the odds was
+  "I can't just run a mock draft and see CPU selections?" He wanted to sit
+  in one. `src/lib/league/liveMock.ts` replays a draft from the seed and
+  the person's choices: the other nine pick under the same rules and random
+  stream as the odds, and the person's slots wait. Undo is dropping a choice.
+  The pick engine in `mockDraft.ts` was split into `createMockRun`, one
+  pick at a time, so the odds and the live draft share one set of rules.
+  The screen has a VIEW switch: ODDS or DRAFT LIVE, with a 60 second clock
+  that runs out to the best value on the board and a "gone by your next
+  pick" column from 60 runs ahead of the current pick.
 
 ## Rules you must not break
 
