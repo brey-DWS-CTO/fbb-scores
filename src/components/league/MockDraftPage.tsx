@@ -2,14 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import {
-  apiErrorMessage,
-  fetchDraftRankings,
-  fetchPickTrades,
-  resetKeeperScenarioTarget,
-  saveKeeperScenarioTarget,
-  type Credentials,
-} from '../../lib/league/api.js';
+import { fetchDraftRankings, fetchPickTrades } from '../../lib/league/api.js';
 import { rankSourceLabel } from '../../lib/league/draftRankings.js';
 import { valueBoard } from '../../lib/league/draftValue.js';
 import {
@@ -53,79 +46,6 @@ function KeeperTag({ status }: { status: 'known' | 'assumed' }) {
     <span className={`mock-tag ${status === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>
       {status === 'known' ? 'keeper' : 'projected'}
     </span>
-  );
-}
-
-const keeperOption = (player: DatasetPlayer) =>
-  `${player.name} · R${player.keeper.round ?? '?'} · ${player.keeper.effectiveAvg?.toFixed(1) ?? '–'}`;
-
-interface GuessEditorProps {
-  owner: string;
-  candidates: DatasetPlayer[];
-  guess: KeeperSelection[];
-  identity: Credentials;
-  onSaved: (scenario: Record<string, KeeperSelection[]>) => void;
-  onClose: () => void;
-}
-
-/** Edit one team's projected keepers in place. Saves through the private scenario, the same as the keeper page. */
-function GuessEditor({ owner, candidates, guess, identity, onSaved, onClose }: GuessEditorProps) {
-  const [picks, setPicks] = useState<[string, string]>([guess[0]?.playerKey ?? '', guess[1]?.playerKey ?? '']);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const byKey = new Map(candidates.map((player) => [player.key, player]));
-
-  const run = async (action: () => Promise<{ scenario: Record<string, KeeperSelection[]> }>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await action();
-      onSaved(response.scenario);
-      onClose();
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const save = () => {
-    const selections = picks
-      .filter((key, index) => key !== '' && picks.indexOf(key) === index)
-      .map((key) => byKey.get(key))
-      .filter((player): player is DatasetPlayer => player !== undefined)
-      .map((player) => ({ playerKey: player.key, playerName: player.name }));
-    return selections.length === 0
-      ? run(() => resetKeeperScenarioTarget(identity, owner))
-      : run(() => saveKeeperScenarioTarget(identity, owner, selections));
-  };
-
-  return (
-    <div className="mock-guess-editor">
-      {[0, 1].map((index) => (
-        <select
-          key={index}
-          className="hub-input mock-select"
-          aria-label={`${owner} projection ${index + 1}`}
-          value={picks[index]}
-          disabled={busy}
-          onChange={(event) => {
-            const next: [string, string] = [...picks] as [string, string];
-            next[index] = event.target.value;
-            setPicks(next);
-          }}
-        >
-          <option value="">Nobody</option>
-          {candidates.map((player) => (
-            <option key={player.key} value={player.key}>{keeperOption(player)}</option>
-          ))}
-        </select>
-      ))}
-      <div className="mock-guess-actions">
-        <button type="button" className="tap-btn mock-mini-btn is-primary" disabled={busy} onClick={save}>SAVE</button>
-        <button type="button" className="tap-btn mock-mini-btn" disabled={busy} onClick={onClose}>CANCEL</button>
-      </div>
-      {error && <div className="mock-note mock-note-bad">{error}</div>}
-    </div>
   );
 }
 
@@ -289,7 +209,6 @@ export default function MockDraftPage() {
   const [tryPicks, setTryPicks] = useState<[string, string]>(['', '']);
   const [useEntered, setUseEntered] = useState(true);
   const [guessInstead, setGuessInstead] = useState<string[]>([]);
-  const [editing, setEditing] = useState<string | null>(null);
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
@@ -380,10 +299,6 @@ export default function MockDraftPage() {
       rejected: now.board.rejected.find((entry) => entry.owner === owner) ?? null,
     }));
   const enteredCount = guessRows.filter((row) => row.entered).length;
-  const candidatesFor = (owner: string) =>
-    dataset.players
-      .filter((player) => player.fantasyTeam === owner && player.keeper.eligible)
-      .sort((a, b) => (b.keeper.effectiveAvg ?? -1) - (a.keeper.effectiveAvg ?? -1));
 
   const toggleTrade = (id: string) =>
     setTradesOn((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
@@ -493,20 +408,20 @@ export default function MockDraftPage() {
             </label>
             <div className="mock-note mock-note-dim">
               {useEntered
-                ? 'Entered picks are tagged KEEPER, your projections PROJECTED. Only you can see the entered ones before the reveal.'
-                : 'Both worlds use your projections only, never what anyone has entered.'}
+                ? 'Entered picks are tagged KEEPER, your projections PROJECTED. Only you can see the entered ones before the reveal. PROJECT opens the projection screen for that team.'
+                : 'Both worlds use your projections only, never what anyone has entered. PROJECT opens the projection screen for that team.'}
             </div>
           </>
         )}
         <ul className="mock-guesses">
           {guessRows.map((row) => (
-            <li key={row.owner} className={editing === row.owner ? 'is-editing' : undefined}>
+            <li key={row.owner}>
               <div className="mock-guess-head">
                 <span className="mock-guess-owner">{row.owner}</span>
-                {!revealed && editing !== row.owner && (
-                  <button type="button" className="tap-btn mock-edit" onClick={() => setEditing(row.owner)}>
+                {!revealed && (
+                  <Link className="mock-edit" to={`/keepers/${encodeURIComponent(row.owner)}`}>
                     {row.guess.length > 0 ? 'edit projection' : 'project'}
-                  </button>
+                  </Link>
                 )}
               </div>
               <span className="mock-guess-players">
@@ -532,16 +447,6 @@ export default function MockDraftPage() {
                   </label>
                 )}
               </span>
-              {!revealed && editing === row.owner && identity && (
-                <GuessEditor
-                  owner={row.owner}
-                  candidates={candidatesFor(row.owner)}
-                  guess={row.guess}
-                  identity={identity}
-                  onSaved={scenarioQuery.setScenario}
-                  onClose={() => setEditing(null)}
-                />
-              )}
             </li>
           ))}
         </ul>

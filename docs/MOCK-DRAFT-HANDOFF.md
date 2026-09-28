@@ -536,8 +536,10 @@ that turned out differently:
   reveal and falls back to his guess only where a team has entered nothing.
   Off, it is guesses only, as the handoff first said. The switch does
   nothing for anyone but the commissioner, since the server redacts other
-  teams' entries for everyone else. Guesses are edited on the page too, in
-  place, through the same private scenario the keeper pages write.
+  teams' entries for everyone else. Projections are not edited on the mock
+  page: PROJECT opens that team's projection screen. Brey's rule, after an
+  in-place editor was built and pulled the same day: "just go to the
+  projection screen. Don't make it complicated."
 - **A live draft, not only odds.** Brey's first reaction to the odds was
   "I can't just run a mock draft and see CPU selections?" He wanted to sit
   in one. `src/lib/league/liveMock.ts` replays a draft from the seed and
