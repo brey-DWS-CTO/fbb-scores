@@ -332,7 +332,7 @@ test('the right secret runs the clock, and each reminder goes out once', async (
   assert.equal(mails().length, 0, 'ten people must not read the same warning twice');
 });
 
-test('the daily name refresh needs the secret, and says why when ESPN is away', async () => {
+test('the weekly name refresh needs the secret, and says why when ESPN is away', async () => {
   process.env.CRON_SECRET = 'open-sesame';
   const wrong = await request('/api/notify/team-names', { headers: { authorization: 'Bearer nope' } });
   assert.equal(wrong.status, 401);

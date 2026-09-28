@@ -9,7 +9,7 @@
   ],
   "crons": [
     { "path": "/api/notify/tick", "schedule": "0 * * * *" },
-    { "path": "/api/notify/team-names", "schedule": "0 14 * * *" }
+    { "path": "/api/notify/team-names", "schedule": "0 14 * * 1" }
   ],
   "functions": {
     "api/index.ts": {

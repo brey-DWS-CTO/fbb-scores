@@ -4,12 +4,12 @@
  * Two jobs on two schedules (see vercel.json), both behind
  * `Authorization: Bearer $CRON_SECRET`:
  *  - GET /api/notify/tick, every hour: send whatever reminders are due.
- *  - GET /api/notify/team-names, once a day: refresh the ESPN team names.
+ *  - GET /api/notify/team-names, Mondays: refresh the ESPN team names.
  *
  * They are split because the database sleeps when nobody asks it anything,
  * and every hourly question woke it. The hourly run now ends without a query
  * unless a reminder window is open, and names change rarely enough that once
- * a day is plenty. Everything the reminder run decides lives in
+ * a week is plenty. Everything the reminder run decides lives in
  * src/lib/league/notifications.ts; this route only guards the door and reports
  * what went out.
  */
@@ -60,7 +60,7 @@ router.get('/tick', async (req: Request, res: Response) => {
 /**
  * GET /api/notify/team-names: pick up new ESPN team names.
  *
- * Best effort. If ESPN is down the last known names stay, and tomorrow's run
+ * Best effort. If ESPN is down the last known names stay, and next week's run
  * tries again.
  */
 router.get('/team-names', async (req: Request, res: Response) => {
@@ -73,7 +73,7 @@ router.get('/team-names', async (req: Request, res: Response) => {
     res.json({ changed: refreshed.changed });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    console.error('[teams] daily refresh failed:', reason);
+    console.error('[teams] weekly refresh failed:', reason);
     res.json({ changed: 0, error: reason });
   }
 });

@@ -175,7 +175,7 @@ export async function refreshTeamNamesNow(): Promise<TeamNameRefreshResult> {
     draft.teamNames = { ...prepared.preview.nextNames };
   });
   // A team name is not personal data, and this is the only trail for "when did
-  // that change". Silent when nothing moved, so a daily job stays quiet.
+  // that change". Silent when nothing moved, so a weekly job stays quiet.
   for (const change of prepared.preview.changes) {
     console.log(`[teams] ${change.owner}: ${change.before} -> ${change.after}`);
   }
