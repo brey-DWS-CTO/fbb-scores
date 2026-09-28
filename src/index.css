@@ -2916,6 +2916,64 @@ th.schedule-col-active {
 .rank-admin-down { color: var(--neon-red); }
 .rank-admin-note { color: var(--text-dim); font-size: 0.68rem; margin-top: 9px; }
 
+/* ─── Collapsible desktop sidebar ─────────────────────────────────────── */
+/* The button at the foot of the sidebar shrinks it to icons only. The choice
+   is a class on <html> so the page shell outside the nav widens with it.
+   Phones never see any of this: the sidebar itself is hidden below 840px. */
+@media screen and (min-width: 840px) {
+  .nav-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 12px;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-mid);
+    font-size: 0.64rem;
+    white-space: nowrap;
+    transition: color 0.15s;
+  }
+  .nav-collapse-btn:hover { background: var(--cell-bg); color: var(--text-hi); }
+  .nav-collapse-btn:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+  .nav-collapse-icon { transition: transform 0.15s; }
+  .nav-collapse-icon.flipped { transform: rotate(180deg); }
+  .app-shell-nav { transition: padding-left 0.15s; }
+  .top-nav { transition: width 0.15s; }
+
+  html.nav-collapsed .app-shell-nav { padding-left: 64px; }
+  html.nav-collapsed .top-nav { width: 64px; }
+  html.nav-collapsed .top-nav-inner { padding: 18px 8px; }
+  html.nav-collapsed .top-nav-brand { justify-content: center; }
+  html.nav-collapsed .top-nav-brand span:last-child { display: none; }
+  html.nav-collapsed .top-nav-brand img { width: 40px; height: 40px; }
+  html.nav-collapsed .top-nav-label { display: none; }
+  html.nav-collapsed .top-nav-link,
+  html.nav-collapsed .nav-collapse-btn {
+    position: relative;
+    justify-content: center;
+    padding: 0;
+  }
+  /* The waiting-offers count rides the corner of the icon. */
+  html.nav-collapsed .top-nav-link .nav-pill {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+  html.nav-collapsed .identity-chip-nav {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  html.nav-collapsed .identity-chip-nav .identity-chip-name { display: none; }
+  html.nav-collapsed .identity-chip-nav button { padding-left: 6px !important; padding-right: 6px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell-nav, .top-nav, .nav-collapse-icon { transition: none; }
+}
+
 /* ─── Rule book, easier to read ──────────────────────────────────────── */
 /* Each level steps in by one unit. Phones get a smaller step so deep rules
    keep room for their words. */
