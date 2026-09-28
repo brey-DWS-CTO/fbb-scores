@@ -132,6 +132,17 @@ export default function AdminPage() {
       <section className="panel commish-schedule-link">
         <div>
           <div className="hub-heading">
+            <NavIcon name="target" size={14} className="icon-in-heading" />
+            MOCK DRAFT
+          </div>
+          <p>Round one as it stands, pending trades as switches, and who is likely there at your pick across 200 drafts.</p>
+        </div>
+        <Link className="tap-btn" to="/mock">OPEN MOCK DRAFT →</Link>
+      </section>
+
+      <section className="panel commish-schedule-link">
+        <div>
+          <div className="hub-heading">
             <NavIcon name="calendar" size={14} className="icon-in-heading" />
             SCHEDULE
           </div>
