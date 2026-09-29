@@ -36,6 +36,14 @@ export interface ProjectedLine {
   blk: number;
   threes: number;
   to: number;
+  min: number;
+  fgm: number;
+  fga: number;
+  /** Made over attempted, as a percent. Null with no attempts. */
+  fgPct: number | null;
+  ftm: number;
+  fta: number;
+  ftPct: number | null;
 }
 
 export interface PlayerProjection {
@@ -76,6 +84,12 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
 
 function lineOf(perGame: Readonly<Record<string, number>>): ProjectedLine {
   const stat = (id: string) => round1(perGame[id] ?? 0);
+  // Percentages come from makes over attempts. ESPN's own percent fields are
+  // season ratios, and dividing them by games like a count would ruin them.
+  const pct = (made: string, tried: string) => {
+    const attempts = perGame[tried] ?? 0;
+    return attempts > 0 ? round1(((perGame[made] ?? 0) / attempts) * 100) : null;
+  };
   return {
     pts: stat('0'),
     reb: stat('6'),
@@ -84,6 +98,13 @@ function lineOf(perGame: Readonly<Record<string, number>>): ProjectedLine {
     blk: stat('1'),
     threes: stat('17'),
     to: stat('11'),
+    min: stat('40'),
+    fgm: stat('13'),
+    fga: stat('14'),
+    fgPct: pct('13', '14'),
+    ftm: stat('15'),
+    fta: stat('16'),
+    ftPct: pct('15', '16'),
   };
 }
 
@@ -163,7 +184,8 @@ export function buildProjections(
 
 export type ProjectionColumnId =
   | 'valueRank' | 'name' | 'proTeam' | 'positions' | 'tag' | 'games' | 'fppg' | 'base' | 'bonus'
-  | 'ddOdds' | 'tdOdds' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to'
+  | 'ddOdds' | 'tdOdds' | 'min' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to'
+  | 'fgm' | 'fga' | 'fgPct' | 'ftm' | 'fta' | 'ftPct'
   | 'lastSeason' | 'change' | 'espnRank' | 'adp';
 
 export interface ProjectionColumn {
@@ -191,6 +213,7 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'ddOdds', label: 'DD%', header: 'Double-double odds', firstDir: 'desc', value: (row) => row.ddOdds },
   { id: 'tdOdds', label: 'TD%', header: 'Triple-double odds', firstDir: 'desc', value: (row) => row.tdOdds },
   { id: 'games', label: 'GP', header: 'Projected games', firstDir: 'desc', value: (row) => row.games },
+  { id: 'min', label: 'MIN', header: 'Minutes', firstDir: 'desc', value: (row) => row.line?.min ?? null },
   { id: 'pts', label: 'PTS', header: 'Points', firstDir: 'desc', value: (row) => row.line?.pts ?? null },
   { id: 'reb', label: 'REB', header: 'Rebounds', firstDir: 'desc', value: (row) => row.line?.reb ?? null },
   { id: 'ast', label: 'AST', header: 'Assists', firstDir: 'desc', value: (row) => row.line?.ast ?? null },
@@ -198,6 +221,12 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'blk', label: 'BLK', header: 'Blocks', firstDir: 'desc', value: (row) => row.line?.blk ?? null },
   { id: 'threes', label: '3PM', header: 'Threes made', firstDir: 'desc', value: (row) => row.line?.threes ?? null },
   { id: 'to', label: 'TO', header: 'Turnovers', firstDir: 'asc', value: (row) => row.line?.to ?? null },
+  { id: 'fgm', label: 'FGM', header: 'Field goals made', firstDir: 'desc', value: (row) => row.line?.fgm ?? null },
+  { id: 'fga', label: 'FGA', header: 'Field goals tried', firstDir: 'desc', value: (row) => row.line?.fga ?? null },
+  { id: 'fgPct', label: 'FG%', header: 'Field goal percent', firstDir: 'desc', value: (row) => row.line?.fgPct ?? null },
+  { id: 'ftm', label: 'FTM', header: 'Free throws made', firstDir: 'desc', value: (row) => row.line?.ftm ?? null },
+  { id: 'fta', label: 'FTA', header: 'Free throws tried', firstDir: 'desc', value: (row) => row.line?.fta ?? null },
+  { id: 'ftPct', label: 'FT%', header: 'Free throw percent', firstDir: 'desc', value: (row) => row.line?.ftPct ?? null },
   { id: 'lastSeason', label: 'LAST', header: 'Last season FPPG', firstDir: 'desc', value: (row) => row.lastSeason },
   { id: 'change', label: '+/-', header: 'Change', firstDir: 'desc', value: (row) => row.change },
   { id: 'espnRank', label: 'ESPN RK', header: 'ESPN rank', firstDir: 'asc', value: (row) => row.espnRank },

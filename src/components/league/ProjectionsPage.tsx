@@ -71,6 +71,13 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
     case 'blk': return { text: one(row.line?.blk ?? null) };
     case 'threes': return { text: one(row.line?.threes ?? null) };
     case 'to': return { text: one(row.line?.to ?? null) };
+    case 'min': return { text: one(row.line?.min ?? null) };
+    case 'fgm': return { text: one(row.line?.fgm ?? null) };
+    case 'fga': return { text: one(row.line?.fga ?? null) };
+    case 'fgPct': return { text: one(row.line?.fgPct ?? null) };
+    case 'ftm': return { text: one(row.line?.ftm ?? null) };
+    case 'fta': return { text: one(row.line?.fta ?? null) };
+    case 'ftPct': return { text: one(row.line?.ftPct ?? null) };
     case 'lastSeason': return { text: one(row.lastSeason) };
     case 'change': return { text: signed(row.change), className: toneClass(changeTone(row.change)).trim() };
     case 'espnRank': return { text: whole(row.espnRank) };
@@ -147,7 +154,7 @@ export default function ProjectionsPage() {
   const [exporting, setExporting] = useState(false);
 
   const values = useMemo(
-    () => valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027 }),
+    () => valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true }),
     [dataset.players, snapshot],
   );
   const keeperSets = useMemo(
@@ -211,7 +218,7 @@ export default function ProjectionsPage() {
         Every player&apos;s projected points a game in our scoring: ESPN&apos;s line, plus the double- and
         triple-double bonus ESPN leaves out. {projected} players have an ESPN projection
         {fetchedOn ? `, fetched ${fetchedOn}` : ''}. <span className="proj-fallback">Grey</span> numbers have none
-        and come from ESPN&apos;s rank or last season. Tap a player to see how his number is built.
+        and come from ESPN&apos;s rank. Last season is shown for comparison only. Tap a player to see how his number is built.
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet. <Link to="/admin">Fetch them in Commish Mode.</Link></>
         )}
