@@ -3448,6 +3448,8 @@ th.schedule-col-active {
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
+}
+
 /* ─── Projections table (commissioner only) ─────────────────────────── */
 .proj-page { max-width: 1400px; }
 .proj-controls { align-items: center; }
