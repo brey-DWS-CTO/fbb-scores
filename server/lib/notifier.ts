@@ -17,6 +17,7 @@ import rawDataset from '../../src/data/league-2027.json' with { type: 'json' };
 import type { LeagueDataset, PickRef, PickTradeProposal } from '../../src/lib/keeper/types.js';
 import { describeTrade, exactPickLabel } from '../../src/lib/league/pickTrades.js';
 import {
+  anyReminderWindowOpen,
   dueReminders,
   keeperDeadline,
   reminderCopy,
@@ -297,6 +298,9 @@ export interface ReminderRun {
  * worse than missing one, and the app itself still shows the deadline.
  */
 export async function runDueReminders(now: Date, origin: string): Promise<ReminderRun> {
+  // Most hours of the year nothing can be due. Say so without a query, so
+  // the database can stay asleep.
+  if (!anyReminderWindowOpen(now, new Date(DRAFT_AT_ISO))) return { due: 0, sent: 0 };
   const { state } = await getState();
   const book = await addressBook();
   const withKeepers = Object.entries(state.keepers)

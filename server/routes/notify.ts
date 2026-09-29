@@ -1,11 +1,15 @@
 /**
- * The clock that sends reminders. Mounted at /api/notify.
+ * The clocks. Mounted at /api/notify.
  *
- * It does two jobs: refresh the ESPN team names, then send whatever
- * reminders are due. Names are best effort; reminders are not.
+ * Two jobs on two schedules (see vercel.json), both behind
+ * `Authorization: Bearer $CRON_SECRET`:
+ *  - GET /api/notify/tick, every hour: send whatever reminders are due.
+ *  - GET /api/notify/team-names, Mondays: refresh the ESPN team names.
  *
- * Vercel calls GET /api/notify/tick every hour (see vercel.json) with
- * `Authorization: Bearer $CRON_SECRET`. Everything the run decides lives in
+ * They are split because the database sleeps when nobody asks it anything,
+ * and every hourly question woke it. The hourly run now ends without a query
+ * unless a reminder window is open, and names change rarely enough that once
+ * a week is plenty. Everything the reminder run decides lives in
  * src/lib/league/notifications.ts; this route only guards the door and reports
  * what went out.
  */
@@ -36,33 +40,41 @@ function allowed(req: Request): boolean {
   return fromLocalhost(req);
 }
 
-/** GET /api/notify/tick — send whatever the clock says is due. */
+/** GET /api/notify/tick: send whatever the clock says is due. */
 router.get('/tick', async (req: Request, res: Response) => {
   if (!allowed(req)) {
     res.status(401).json({ error: 'Not for you' });
     return;
   }
   try {
-    // Team names first, and never at the reminders' expense. If ESPN is down
-    // the last known names stay and the mail still goes out, because a stale
-    // name costs nothing and a missed keeper warning costs somebody a keeper.
-    let teamNames: { changed: number; error?: string } = { changed: 0 };
-    try {
-      const refreshed = await refreshTeamNamesNow();
-      teamNames = { changed: refreshed.changed };
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      console.error('[teams] hourly refresh failed:', reason);
-      teamNames = { changed: 0, error: reason };
-    }
-
     const run = await runDueReminders(new Date(), appOrigin(req));
     // Counts only. Who was mailed is not something a log needs to carry.
     console.log(`[notify] tick: ${run.sent} of ${run.due} due reminders sent`);
-    res.json({ ...run, teamNames });
+    res.json(run);
   } catch (err) {
     console.error('[notify] tick failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'The reminder run failed' });
+  }
+});
+
+/**
+ * GET /api/notify/team-names: pick up new ESPN team names.
+ *
+ * Best effort. If ESPN is down the last known names stay, and next week's run
+ * tries again.
+ */
+router.get('/team-names', async (req: Request, res: Response) => {
+  if (!allowed(req)) {
+    res.status(401).json({ error: 'Not for you' });
+    return;
+  }
+  try {
+    const refreshed = await refreshTeamNamesNow();
+    res.json({ changed: refreshed.changed });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error('[teams] weekly refresh failed:', reason);
+    res.json({ changed: 0, error: reason });
   }
 });
 

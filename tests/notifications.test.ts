@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  anyReminderWindowOpen,
   dueReminders,
   humanCountdown,
   keeperDeadline,
@@ -160,4 +161,29 @@ test('hoursLeft counts to the right deadline for each kind', () => {
   const draftOne = list.find((r) => r.kind === 'draft-week');
   assert.equal(keeperOne?.hoursLeft, 12, 'keepers close in twelve hours');
   assert.equal(draftOne?.hoursLeft, 36, 'the draft is still a day and a half away');
+});
+
+/* ─── Whether the clock needs the database at all ─────────────────────── */
+
+test('no window is open more than a week out, so the clock stays off the database', () => {
+  assert.equal(anyReminderWindowOpen(before(24 * 7 + 1), DRAFT_AT), false);
+  assert.equal(anyReminderWindowOpen(new Date('2026-09-28T12:00:00Z'), DRAFT_AT), false);
+});
+
+test('the week warning opens the first window, to the hour', () => {
+  assert.equal(anyReminderWindowOpen(before(24 * 7), DRAFT_AT), true);
+  assert.equal(anyReminderWindowOpen(before(30), DRAFT_AT), true);
+  assert.equal(anyReminderWindowOpen(before(1), DRAFT_AT), true);
+});
+
+test('once the draft starts, every window is shut', () => {
+  assert.equal(anyReminderWindowOpen(before(0), DRAFT_AT), false);
+  assert.equal(anyReminderWindowOpen(before(-5), DRAFT_AT), false);
+});
+
+test('the window check agrees with the reminder list at every hour of draft week', () => {
+  for (let hours = 24 * 8; hours >= -2; hours -= 1) {
+    const due = run({ hoursBeforeDraft: hours }).length > 0;
+    assert.equal(anyReminderWindowOpen(before(hours), DRAFT_AT), due, `${hours} hours out`);
+  }
 });

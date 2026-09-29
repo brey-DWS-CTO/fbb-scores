@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
   { to: '/league', label: 'LEAGUE HQ', icon: 'home' },
   { to: '/history', label: 'HISTORY', icon: 'trophy' },
   { to: '/mock', label: 'MOCK DRAFT', icon: 'target', commishOnly: true },
+  { to: '/projections', label: 'PROJECTIONS', icon: 'chart', commishOnly: true },
   { to: '/schedule', label: 'SCHEDULE', icon: 'calendar', commishOnly: true },
   { to: '/admin', label: 'COMMISH', icon: 'shield', commishOnly: true },
 ];
@@ -35,7 +36,7 @@ type MenuId = 'league' | 'rules' | 'commish';
 const MENU_GROUPS: Array<{ id: MenuId; label: string; routes: string[] }> = [
   { id: 'league', label: 'LEAGUE', routes: ['/league', '/history'] },
   { id: 'rules', label: 'RULES', routes: ['/rules', '/votes'] },
-  { id: 'commish', label: 'COMMISH', routes: ['/admin', '/mock', '/schedule'] },
+  { id: 'commish', label: 'COMMISH', routes: ['/admin', '/mock', '/projections', '/schedule'] },
 ];
 
 function TradeBadge({ count }: { count: number }) {
