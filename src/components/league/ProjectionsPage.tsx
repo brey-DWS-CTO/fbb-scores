@@ -218,6 +218,15 @@ export default function ProjectionsPage() {
         {' '}<Link to="/mock">Open the mock draft →</Link>
       </div>
 
+      {snapshot && snapshot.players.length > 0 && projected === 0 && (
+        <div className="panel proj-stale" role="status">
+          <NavIcon name="warning" size={15} className="icon-in-heading" />
+          Your saved ESPN numbers are from {fetchedOn}, before ESPN posted its projections, so the
+          projection columns are empty. <Link to="/admin">Update from ESPN in Commish Mode</Link>, save, and
+          this page fills in.
+        </div>
+      )}
+
       <section className="panel mock-controls proj-controls">
         <div className="proj-search">
           <input

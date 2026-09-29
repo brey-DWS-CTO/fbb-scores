@@ -3483,6 +3483,17 @@ th.schedule-col-active {
 .proj-detail p { margin: 0 0 6px; color: var(--text-body); font-size: 0.8rem; line-height: 1.5; }
 .proj-detail strong { color: var(--text-max); }
 .proj-empty { text-align: center !important; color: var(--text-mid); padding: 20px !important; }
+.proj-stale {
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  border-color: var(--neon-yellow);
+  color: var(--neon-yellow);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.proj-stale a { color: var(--neon-teal); }
 .proj-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .proj-count { color: var(--text-mid); font-size: 0.78rem; font-weight: 700; }
 .proj-pages { display: flex; align-items: center; gap: 4px; }
