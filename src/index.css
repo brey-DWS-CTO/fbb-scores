@@ -3378,6 +3378,133 @@ th.schedule-col-active {
 .mock-guess-players > span { display: inline-flex; align-items: center; gap: 6px; }
 .mock-guess-editor { margin-top: 6px; }
 
+/* ─── Projections table (commissioner only) ─────────────────────────── */
+.proj-page { max-width: 1400px; }
+.proj-controls { align-items: center; }
+.proj-search { position: relative; flex: 1 1 240px; min-width: 0; }
+.proj-search .hub-input { width: 100%; padding: 8px 34px 8px 10px; font-size: 0.85rem; min-height: 38px; }
+.proj-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.proj-check { display: inline-flex; align-items: center; gap: 6px; color: var(--text-body); font-size: 0.78rem; font-weight: 700; }
+.proj-export { display: flex; gap: 6px; margin-left: auto; }
+.proj-table-wrap {
+  border-radius: 10px;
+  overflow: auto;
+  max-height: max(360px, calc(100vh - 260px));
+  margin-bottom: 10px;
+}
+.proj-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8rem; white-space: nowrap; }
+.proj-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--panel-border);
+  padding: 0;
+  text-align: right;
+}
+.proj-table th button {
+  width: 100%;
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 7px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.proj-table th[aria-sort='ascending'] button,
+.proj-table th[aria-sort='descending'] button { color: var(--neon-teal); }
+.proj-caret { font-size: 0.55rem; opacity: 0.45; }
+.proj-caret.is-on { opacity: 1; }
+.proj-table td {
+  padding: 6px 7px;
+  text-align: right;
+  color: var(--text-body);
+  border-bottom: 1px solid var(--cell-border);
+  font-variant-numeric: tabular-nums;
+}
+.proj-table th.proj-col-name button,
+.proj-table th.proj-col-proTeam button,
+.proj-table th.proj-col-positions button,
+.proj-table th.proj-col-tag button { justify-content: flex-start; }
+.proj-table td.proj-col-name,
+.proj-table td.proj-col-proTeam,
+.proj-table td.proj-col-positions,
+.proj-table td.proj-col-tag { text-align: left; }
+/* Rank and name stay put while the numbers scroll sideways. */
+.proj-table .proj-col-valueRank { position: sticky; left: 0; z-index: 1; width: 48px; min-width: 48px; max-width: 48px; box-sizing: border-box; }
+.proj-table .proj-col-name { position: sticky; left: 48px; z-index: 1; }
+.proj-table th.proj-col-valueRank,
+.proj-table th.proj-col-name { z-index: 3; }
+.proj-row { cursor: pointer; }
+.proj-row td { background: var(--panel-bg); }
+.proj-row:nth-child(4n + 3) td { background: var(--cell-bg); }
+.proj-row:hover td, .proj-row.is-open td { background: rgba(0,255,204,0.06); }
+.proj-row.is-kept td.proj-col-name .proj-name { color: var(--text-mid); }
+.proj-name {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-hi);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.proj-fppg { color: var(--text-max) !important; font-weight: 800; }
+.proj-fallback { color: var(--text-dim) !important; font-weight: 600; }
+.proj-open { color: var(--text-faint); font-size: 0.7rem; }
+.proj-good { color: var(--neon-teal) !important; font-weight: 800; }
+.proj-warn { color: var(--neon-yellow) !important; font-weight: 800; }
+.proj-bad { color: var(--neon-red) !important; font-weight: 800; }
+.proj-detail-row td { text-align: left; white-space: normal; background: var(--cell-bg); padding: 0; }
+.proj-detail { padding: 10px 14px; max-width: 720px; position: sticky; left: 0; }
+.proj-detail p { margin: 0 0 6px; color: var(--text-body); font-size: 0.8rem; line-height: 1.5; }
+.proj-detail strong { color: var(--text-max); }
+.proj-empty { text-align: center !important; color: var(--text-mid); padding: 20px !important; }
+.proj-stale {
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  border-color: var(--neon-yellow);
+  color: var(--neon-yellow);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.proj-stale a { color: var(--neon-teal); }
+.proj-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.proj-count { color: var(--text-mid); font-size: 0.78rem; font-weight: 700; }
+.proj-pages { display: flex; align-items: center; gap: 4px; }
+.proj-pages .mock-mini-btn { min-width: 36px; }
+@media (max-width: 839px) {
+  .proj-export { margin-left: 0; }
+  .proj-name { max-width: 120px; }
+  .proj-table-wrap { max-height: calc(100vh - 200px); }
+  .proj-controls .mock-seg-btn, .proj-pager .mock-seg-btn, .proj-pages .mock-mini-btn { min-height: 40px; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

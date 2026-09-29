@@ -325,6 +325,7 @@ export default function MockDraftPage() {
         )}
         {' '}The seed is the number the random picks run from: same seed, same draft, and NEW rolls another.
         Projections save. Nothing else on this page does.
+        {' '}<Link to="/projections">See every player&apos;s projection →</Link>
       </div>
 
       <section className="panel mock-controls">
