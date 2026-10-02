@@ -33,8 +33,7 @@ export default function SplashPage() {
         <section className="panel splash-login-card" aria-labelledby="sign-in-title">
           <div className="splash-login-heading">
             <div>
-              <div className="splash-step">OWNER ACCESS</div>
-              <h2 id="sign-in-title">Who are you?</h2>
+              <h2 id="sign-in-title">Sign in</h2>
             </div>
             <div className="splash-lock"><NavIcon name="lock" size={20} /></div>
           </div>

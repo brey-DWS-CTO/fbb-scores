@@ -39,8 +39,8 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
       >
         <div className="account-sheet-header">
           <div>
-            <div className="splash-step">{identity ? 'YOUR ACCOUNT' : 'OWNER ACCESS'}</div>
-            <h2 id="account-sheet-title">{identity ? identity.owner : 'Who are you?'}</h2>
+            {identity && <div className="splash-step">YOUR ACCOUNT</div>}
+            <h2 id="account-sheet-title">{identity ? identity.owner : 'Sign in'}</h2>
             {team && <p>{team}</p>}
           </div>
           <button className="tap-btn account-close" type="button" onClick={onClose} aria-label="Close account menu">

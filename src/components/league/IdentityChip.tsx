@@ -64,7 +64,7 @@ export default function IdentityChip({ placement = 'page' }: Props) {
             <span aria-hidden="true" style={{ fontSize: '0.65rem', opacity: 0.75 }}>▼</span>
           </>
         ) : (
-          <span>Who are you?</span>
+          <span>Sign in</span>
         )}
       </button>
       {open && (
