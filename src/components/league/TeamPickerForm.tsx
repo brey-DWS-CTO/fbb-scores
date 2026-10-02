@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { OWNERS } from '../../lib/league/data.js';
+
+/** Names read A to Z here; OWNERS itself stays in draft order for the board. */
+const OWNERS_A_TO_Z = [...OWNERS].sort((a, b) => a.localeCompare(b));
 import { useIdentity } from '../../hooks/useLeague.js';
 import {
   changePin,
@@ -127,7 +130,7 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
             onChange={(event) => chooseOwner(event.target.value)}
           >
             <option value="">Pick your name…</option>
-            {OWNERS.map((candidate) => (
+            {OWNERS_A_TO_Z.map((candidate) => (
               <option key={candidate} value={candidate}>{candidate}</option>
             ))}
           </select>
