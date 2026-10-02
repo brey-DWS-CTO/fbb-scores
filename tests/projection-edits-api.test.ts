@@ -98,3 +98,39 @@ test('the first read writes the two injury estimates once; save, change and rese
   assert.equal(bad.status, 400);
   assert.match(String(bad.body.error), /between 0 and 82/);
 });
+
+const result = (n: number) => ({
+  id: `mock-test${n}-${n}`,
+  seed: n,
+  mode: 'realistic',
+  grade: { grade: 'B', rank: 5, teams: 10, points: 10000 + n, average: 10000, standings: [], roster: [], openSlots: [], steal: null, reach: null },
+});
+
+test('mock results: your own only, saved once, members keep ten, the commish keeps all', async () => {
+  assert.equal((await request('/api/league/mock-results')).status, 401);
+  for (let n = 1; n <= 12; n += 1) {
+    const saved = await request('/api/league/mock-results', { method: 'POST', headers: auth('Joel'), body: JSON.stringify(result(n)) });
+    assert.equal(saved.status, 200);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  // The same draft again is not a second save.
+  await request('/api/league/mock-results', { method: 'POST', headers: auth('Joel'), body: JSON.stringify(result(12)) });
+  const joel = (await request('/api/league/mock-results', { headers: auth('Joel') })).body.results as Array<{ id: string; owner: string }>;
+  assert.equal(joel.length, 10);
+  assert.equal(joel[0].id, 'mock-test12-12', 'newest first');
+  assert.ok(joel.every((entry) => entry.owner === 'Joel'));
+
+  for (let n = 1; n <= 12; n += 1) {
+    await request('/api/league/mock-results', { method: 'POST', headers: auth(commissioner), body: JSON.stringify(result(n)) });
+  }
+  const mine = (await request('/api/league/mock-results', { headers: auth(commissioner) })).body.results as unknown[];
+  assert.equal(mine.length, 12);
+
+  assert.equal((await request('/api/league/mock-results/mock-test12-12', { method: 'DELETE', headers: auth('Joel') })).status, 200);
+  const after = (await request('/api/league/mock-results', { headers: auth('Joel') })).body.results as unknown[];
+  assert.equal(after.length, 9);
+  assert.equal(((await request('/api/league/mock-results', { headers: auth(commissioner) })).body.results as unknown[]).length, 12);
+
+  const bad = await request('/api/league/mock-results', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ ...result(1), mode: 'wild' }) });
+  assert.equal(bad.status, 400);
+});

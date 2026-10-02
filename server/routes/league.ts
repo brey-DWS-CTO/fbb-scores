@@ -101,10 +101,14 @@ import {
   deleteProjectionEdit,
   listProjectionEdits,
   saveProjectionEdit,
+  deleteMockResult,
+  listMockResults,
+  saveMockResult,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
+import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import { sendLoginLink } from '../lib/mailer.js';
 import {
@@ -696,6 +700,39 @@ router.post('/team-names/accept', requireAuth, requireCommissioner, async (req, 
 // ESPN's ADP, draft ranks and projections, frozen the same way as the player
 // pool. Commissioner-only end to end until the mock draft is good enough to
 // show the league.
+
+// ─── Mock draft history ──────────────────────────────────────────────────────
+//
+// Each signed-in member keeps their own finished, graded mocks. The owner
+// comes from the sign-in, never the body. The commissioner keeps every one;
+// everyone else keeps their latest ten.
+
+/** GET /api/league/mock-results — your saved mocks, newest first. */
+router.get('/mock-results', requireAuth, async (_req, res) => {
+  const rows = await listMockResults(leagueDataset.season, res.locals.owner as string);
+  res.json({ results: rows.map((row) => row.result) });
+});
+
+/** POST /api/league/mock-results — save a finished mock. The same draft saves once. */
+router.post('/mock-results', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  let record;
+  try {
+    record = parseMockResult(owner, req.body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'That result is not valid' });
+    return;
+  }
+  const keep = res.locals.isCommissioner === true ? null : MEMBER_MOCK_LIMIT;
+  await saveMockResult({ season: leagueDataset.season, owner, id: record.id, result: record, createdAt: record.finishedAt }, keep);
+  res.json({ result: record });
+});
+
+/** DELETE /api/league/mock-results/:id — forget one of your mocks. */
+router.delete('/mock-results/:id', requireAuth, async (req, res) => {
+  await deleteMockResult(leagueDataset.season, res.locals.owner as string, String(req.params.id));
+  res.json({ ok: true });
+});
 
 // ─── Projection edits ────────────────────────────────────────────────────────
 //

@@ -135,6 +135,16 @@ export class PlayerPoolAcceptError extends Error {
   }
 }
 
+/** One finished, graded mock draft. Each owner keeps their own. */
+export interface MockResultRow {
+  season: number;
+  owner: string;
+  id: string;
+  /** The record as `src/lib/league/mockGrade.ts` defines it; stored whole. */
+  result: unknown;
+  createdAt: string;
+}
+
 /** One commissioner edit to a player's ESPN projection. */
 export interface ProjectionEditRow {
   season: number;
@@ -436,6 +446,10 @@ interface StoreBackend {
     acceptedAt: string,
     acceptedBy: string,
   ): Promise<MutateResult>;
+  listMockResults(season: number, owner: string): Promise<MockResultRow[]>;
+  /** Insert unless the same id is already there. Then keep only the newest `keep`, or all when null. */
+  saveMockResult(row: MockResultRow, keep: number | null): Promise<void>;
+  deleteMockResult(season: number, owner: string, id: string): Promise<void>;
   listProjectionEdits(season: number): Promise<ProjectionEditRow[]>;
   saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow>;
   deleteProjectionEdit(season: number, espnId: number): Promise<void>;
@@ -705,6 +719,14 @@ class NeonBackend implements StoreBackend {
       reason text not null,
       published_at timestamptz not null,
       published_by text not null
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS mock_results (
+      season int not null,
+      owner text not null,
+      id text not null,
+      data jsonb not null,
+      created_at timestamptz not null default now(),
+      primary key (season, owner, id)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS projection_edits (
       season int not null,
@@ -1158,6 +1180,36 @@ class NeonBackend implements StoreBackend {
     throw new DraftRankingAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
   }
 
+  async listMockResults(season: number, owner: string): Promise<MockResultRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, data, created_at FROM mock_results
+      WHERE season = ${season} AND owner = ${owner} ORDER BY created_at DESC`) as Array<{
+      id: string;
+      data: unknown;
+      created_at: string | Date;
+    }>;
+    return rows.map((row) => ({ season, owner, id: row.id, result: row.data, createdAt: new Date(row.created_at).toISOString() }));
+  }
+
+  async saveMockResult(row: MockResultRow, keep: number | null): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO mock_results (season, owner, id, data, created_at)
+      VALUES (${row.season}, ${row.owner}, ${row.id}, ${JSON.stringify(row.result)}::jsonb, ${row.createdAt})
+      ON CONFLICT (season, owner, id) DO NOTHING`;
+    if (keep !== null) {
+      await this.sql`DELETE FROM mock_results WHERE season = ${row.season} AND owner = ${row.owner}
+        AND id NOT IN (
+          SELECT id FROM mock_results WHERE season = ${row.season} AND owner = ${row.owner}
+          ORDER BY created_at DESC LIMIT ${keep}
+        )`;
+    }
+  }
+
+  async deleteMockResult(season: number, owner: string, id: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM mock_results WHERE season = ${season} AND owner = ${owner} AND id = ${id}`;
+  }
+
   async listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT espn_id, data, updated_at, updated_by
@@ -1535,6 +1587,7 @@ interface FileDoc {
     updatedAt: string;
   }>;
   projectionEdits: ProjectionEditRow[];
+  mockResults: MockResultRow[];
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
@@ -1560,6 +1613,7 @@ function emptyDoc(): FileDoc {
     draftRankingSnapshots: [],
     keeperScenarios: [],
     projectionEdits: [],
+    mockResults: [],
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
@@ -1616,6 +1670,7 @@ class FileBackend implements StoreBackend {
         draftRankingSnapshots: Array.isArray(doc.draftRankingSnapshots) ? doc.draftRankingSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
         projectionEdits: Array.isArray(doc.projectionEdits) ? doc.projectionEdits : [],
+        mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
@@ -1959,6 +2014,34 @@ class FileBackend implements StoreBackend {
       doc.updatedAt = acceptedAt;
       this.writeDoc(doc);
       return { state: doc.state, version: doc.version };
+    });
+  }
+
+  async listMockResults(season: number, owner: string): Promise<MockResultRow[]> {
+    await this.ensureInit();
+    return this.readDoc().mockResults
+      .filter((row) => row.season === season && row.owner === owner)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async saveMockResult(row: MockResultRow, keep: number | null): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const mine = (entry: MockResultRow) => entry.season === row.season && entry.owner === row.owner;
+      if (!doc.mockResults.some((entry) => mine(entry) && entry.id === row.id)) doc.mockResults.push(row);
+      if (keep !== null) {
+        const newest = doc.mockResults.filter(mine).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, keep);
+        doc.mockResults = doc.mockResults.filter((entry) => !mine(entry) || newest.includes(entry));
+      }
+      this.writeDoc(doc);
+    });
+  }
+
+  async deleteMockResult(season: number, owner: string, id: string): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.mockResults = doc.mockResults.filter((entry) => !(entry.season === season && entry.owner === owner && entry.id === id));
+      this.writeDoc(doc);
     });
   }
 
@@ -2638,6 +2721,18 @@ export async function acceptPlayerPoolSnapshot(
     acceptedAt,
     acceptedBy,
   );
+}
+
+export async function listMockResults(season: number, owner: string): Promise<MockResultRow[]> {
+  return getBackend().listMockResults(season, owner);
+}
+
+export async function saveMockResult(row: MockResultRow, keep: number | null): Promise<void> {
+  return getBackend().saveMockResult(row, keep);
+}
+
+export async function deleteMockResult(season: number, owner: string, id: string): Promise<void> {
+  return getBackend().deleteMockResult(season, owner, id);
 }
 
 export async function listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
