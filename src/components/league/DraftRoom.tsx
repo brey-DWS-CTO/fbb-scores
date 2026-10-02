@@ -100,6 +100,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const live = useMemo(() => replaySaved(prepared, seed, person, choices).live, [prepared, seed, person, choices]);
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
   const caughtUp = revealed >= live.picks.length;
+  // The draft halts at each of the person's own keeper slots, so they can see
+  // who would still be there, then SKIP on. The keeper itself never changes.
+  const [skipped, setSkipped] = useState<ReadonlySet<number>>(() => new Set());
+  const nextUp = live.picks[revealed];
+  const atMyKeeper = started && !caughtUp && nextUp?.how === 'keeper' && nextUp.owner === person && !skipped.has(nextUp.overall)
+    ? nextUp
+    : null;
   const myTurn = started && caughtUp && live.waitingOn !== null;
   const over = started && caughtUp && live.over;
   const slots = prepared.input.board.slots;
@@ -136,11 +143,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
 
   // ── The other teams pick, one at a time ──────────────────────────────────
   useEffect(() => {
-    if (!started || caughtUp) return;
+    if (!started || caughtUp || atMyKeeper) return;
     const delay = live.picks[revealed]?.how === 'pick' ? REVEAL_MS : 0;
     const timer = setTimeout(() => setRevealed((current) => Math.min(current + 1, live.picks.length)), delay);
     return () => clearTimeout(timer);
-  }, [started, caughtUp, revealed, live.picks]);
+  }, [started, caughtUp, revealed, live.picks, atMyKeeper]);
 
   // ── The clock ────────────────────────────────────────────────────────────
   const waitingOverall = live.waitingOn?.pick.overall ?? null;
@@ -314,7 +321,18 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                   </div>
                 )}
               </div>
-              {myTurn ? (
+              {atMyKeeper ? (
+                <div className="room-turn is-keeper">
+                  <span>Your keeper, {atMyKeeper.label}: <strong>{atMyKeeper.playerName}</strong>. The list shows who else is still there.</span>
+                  <button
+                    type="button"
+                    className="tap-btn mock-mini-btn is-primary"
+                    onClick={() => setSkipped((current) => new Set(current).add(atMyKeeper.overall))}
+                  >
+                    SKIP
+                  </button>
+                </div>
+              ) : myTurn ? (
                 <div className="room-turn is-mine">
                   YOUR PICK
                   <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>
@@ -363,6 +381,14 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           onDraft={() => { draft(focus); setSelected(null); }}
           onQueue={() => setQueue((current) => toggleQueued(current, focus))}
         />}
+
+        {started && (
+          <div className="live-actions room-actions">
+            <button type="button" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART</button>
+            <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={Object.keys(choices).length === 0}>UNDO MY LAST PICK</button>
+            <button type="button" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
+          </div>
+        )}
 
         <div className="room-tabs" role="tablist">
           {(['players', 'teams', 'results'] as const).map((tab) => (
@@ -567,13 +593,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           </>
         )}
 
-        {started && (
-          <div className="live-actions room-actions">
-            <button type="button" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART</button>
-            <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={Object.keys(choices).length === 0}>UNDO MY LAST PICK</button>
-            <button type="button" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
-          </div>
-        )}
       </main>
 
       {/* ── Right: queue, team, updates ── */}

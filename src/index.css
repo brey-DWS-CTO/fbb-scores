@@ -3855,7 +3855,7 @@ th.schedule-col-active {
 .room-grid-label { display: block; color: var(--text-faint); font-size: 0.6rem; font-weight: 800; }
 .room-grid-name { display: block; color: var(--text-hi); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-grid td small { color: var(--text-dim); font-size: 0.62rem; }
-.room-actions { margin: 4px 0 0; }
+.room-actions { margin: 0; }
 
 /* Right column */
 .room-queue-list, .room-update-list, .room-slots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -3931,6 +3931,10 @@ th.schedule-col-active {
   .room-card:not(.is-picked) { display: none; }
 
 }
+
+/* The stop at your own keeper slot. */
+.room-turn.is-keeper { background: color-mix(in srgb, var(--neon-purple) 14%, var(--cell-bg)); color: var(--text-hi); font-weight: 700; line-height: 1.4; }
+.room-turn.is-keeper strong { color: var(--text-max); }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
