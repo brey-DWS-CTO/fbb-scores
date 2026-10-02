@@ -102,10 +102,23 @@ export default function AppNav() {
     <>
       <header className="top-nav" id="app-sidebar">
         <div className="top-nav-inner">
-          <NavLink to="/keepers" className="top-nav-brand hub-heading">
-            <img src="/logo.png" alt="" aria-hidden="true" />
-            <span>FBB Scores</span>
-          </NavLink>
+          <div className="top-nav-head">
+            <NavLink to="/keepers" className="top-nav-brand hub-heading">
+              <img src="/logo.png" alt="" aria-hidden="true" />
+              <span>FBB Scores</span>
+            </NavLink>
+            <button
+              type="button"
+              className="nav-collapse-btn tap-btn"
+              aria-expanded={!collapsed}
+              aria-controls="app-sidebar"
+              title={collapsed ? 'Show the menu' : 'Hide the menu'}
+              aria-label={collapsed ? 'Show the menu' : 'Hide the menu'}
+              onClick={toggleSidebar}
+            >
+              <NavIcon name="menu" />
+            </button>
+          </div>
           <nav className="top-nav-links" aria-label="Main">
             {items.map((t) => (
               <NavLink
@@ -123,18 +136,6 @@ export default function AppNav() {
               </NavLink>
             ))}
           </nav>
-          <button
-            type="button"
-            className="nav-collapse-btn tap-btn hub-heading"
-            aria-expanded={!collapsed}
-            aria-controls="app-sidebar"
-            title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
-            aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
-            onClick={toggleSidebar}
-          >
-            <span aria-hidden="true"><NavIcon name="chevrons" className={collapsed ? 'nav-collapse-icon flipped' : 'nav-collapse-icon'} /></span>
-            <span className="top-nav-label">{collapsed ? 'EXPAND' : 'COLLAPSE'}</span>
-          </button>
           <div className="top-nav-account">
             <IdentityChip placement="nav" />
           </div>

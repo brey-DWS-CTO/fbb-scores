@@ -3589,6 +3589,25 @@ th.schedule-col-active {
 }
 .proj-table td.proj-col-pos { color: var(--text-mid); }
 
+/* ─── Sidebar menu button: a plain three-line icon, top right ─────── */
+/* Replaces the COLLAPSE row at the foot of the sidebar. On the narrow rail
+   the button sits on top and the logo under it, both centred. */
+.top-nav-head { display: contents; }
+@media screen and (min-width: 840px) {
+  .top-nav-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .nav-collapse-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    border-radius: 8px;
+  }
+  html.nav-collapsed .top-nav-head { flex-direction: column-reverse; gap: 12px; }
+  html.nav-collapsed .nav-collapse-btn { width: 44px; height: 44px; }
+}
+
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
