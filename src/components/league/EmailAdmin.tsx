@@ -83,10 +83,7 @@ export default function EmailAdmin() {
   const byOwner = new Map((rows ?? []).map((row) => [row.owner, row]));
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
-      <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-purple)', marginBottom: 4 }}>
-        SIGN-IN EMAILS
-      </div>
+    <div>
       <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginBottom: 10 }}>
         Links go to these addresses. One marked NOT USED YET has never signed anyone in, so it
         might be wrong.

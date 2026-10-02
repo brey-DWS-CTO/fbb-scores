@@ -3,6 +3,7 @@ import { sandboxActive } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
 import NavIcon from './components/league/NavIcon.js'
 import ActingAsBanner from './components/league/ActingAsBanner.js';
+import SectionTabs from './components/league/SectionTabs.js'
 import SplashPage from './components/league/SplashPage.js'
 import SignInLinkPage from './components/league/SignInLinkPage.js'
 import KeepersPage from './components/keepers/KeepersPage.js'
@@ -57,6 +58,7 @@ function App() {
       )}
       {!bareMode && <AppNav />}
       <ActingAsBanner />
+      {!bareMode && <SectionTabs />}
       <Routes>
         <Route path="/" element={<SplashPage />} />
         <Route path="/sign-in/:token" element={<SignInLinkPage />} />
