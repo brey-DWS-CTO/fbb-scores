@@ -183,10 +183,11 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
                 if (event.key === 'Enter' && shown[0]) choose(shown[0].playerKey);
               }}
             />
-            <div className="live-list-head" aria-hidden="true">
-              <span>#</span><span>Player</span><span>FPPG</span><span>ADP</span><span>Gone by next</span><span />
-            </div>
             <ul className="live-list">
+              {/* The header scrolls with the rows, so a scrollbar never shifts one and not the other. */}
+              <li className="live-list-head" aria-hidden="true">
+                <span>#</span><span>Player</span><span>FPPG</span><span>ADP</span><span>Gone</span><span />
+              </li>
               {shown.map((candidate) => {
                 const entry = byKey.get(candidate.playerKey);
                 const gone = odds.get(candidate.playerKey) ?? 0;
