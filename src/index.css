@@ -3991,6 +3991,8 @@ th.schedule-col-active {
 .proj-keeper-link:hover .proj-open { color: var(--neon-teal); text-decoration: underline; }
 .proj-edit-btn { margin-bottom: 8px; }
 .proj-edit { padding: 4px 0 10px; max-width: 760px; }
+/* The detail sits in a sideways-scrolling table; keep it inside the screen. */
+@media (max-width: 839px) { .proj-detail { max-width: calc(100vw - 48px); } }
 .proj-edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
 .proj-edit-field { display: flex; flex-direction: column; gap: 3px; }
 .proj-edit-field .hub-input { width: 100%; min-height: 36px; padding: 4px 8px; font-size: 0.9rem; font-weight: 700; }
@@ -4028,6 +4030,32 @@ th.schedule-col-active {
 .room .is-tappable { cursor: pointer; }
 .room-grid td.is-tappable:hover { filter: brightness(1.15); }
 .room-slots li.is-tappable:hover, .room-update-list li.is-tappable:hover, .room-results-list li.is-tappable:hover { background: color-mix(in srgb, var(--neon-teal) 8%, var(--cell-bg)); }
+
+/* ─── Mock draft grades and history ──────────────────────────────────── */
+.mock-grade-head { display: flex; align-items: center; gap: 12px; }
+.mock-grade-letter { font-size: 2rem; font-weight: 900; line-height: 1; min-width: 2.2ch; color: var(--text-max); }
+.mock-grade-letter.grade-a { color: var(--neon-teal) !important; }
+.mock-grade-letter.grade-b { color: var(--neon-blue) !important; }
+.mock-grade-letter.grade-c { color: var(--neon-yellow) !important; }
+.mock-grade-letter.grade-d, .mock-grade-letter.grade-f { color: var(--neon-red) !important; }
+.mock-grade-line { color: var(--text-hi); font-size: 0.88rem; font-weight: 700; line-height: 1.4; }
+.mock-grade-notes { margin: 8px 0 0; padding-left: 18px; color: var(--text-body); font-size: 0.8rem; line-height: 1.5; }
+.mock-grade-notes strong { color: var(--text-max); }
+.mock-grade-tables { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-top: 10px; }
+@media (max-width: 839px) { .mock-grade-tables { grid-template-columns: 1fr; } }
+.mock-grade-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.mock-grade-table th { text-align: left; color: var(--text-dim); font-size: 0.6rem; font-weight: 800; padding: 4px 6px; border-bottom: 1px solid var(--panel-border); }
+.mock-grade-table td { padding: 4px 6px; color: var(--text-body); border-bottom: 1px solid var(--cell-border); }
+.mock-grade-table td small { color: var(--text-dim); }
+.mock-grade-table tr.is-mine td { color: var(--neon-teal); font-weight: 800; }
+.mock-grade-table tr.is-tappable { cursor: pointer; }
+.room .room-grade { border-color: var(--neon-teal); }
+.mock-history { margin-top: 14px; }
+.mock-history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.mock-history-list > li { padding: 10px 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.mock-history-row { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+.mock-history-line { display: flex; flex-direction: column; gap: 2px; color: var(--text-hi); font-size: 0.85rem; font-weight: 700; }
+.mock-history-line small { color: var(--text-dim); font-weight: 600; font-size: 0.72rem; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

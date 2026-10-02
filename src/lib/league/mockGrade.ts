@@ -167,6 +167,15 @@ export function gradeMock(
   };
 }
 
+const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 10 === 2 && n % 100 !== 12 ? `${n}nd` : n % 10 === 3 && n % 100 !== 13 ? `${n}rd` : `${n}th`);
+
+/** One line on how the draft went, in plain words. */
+export function gradeSummary(grade: MockGrade): string {
+  const gap = grade.points - grade.average;
+  const versus = gap === 0 ? 'right at' : `${Math.abs(gap).toLocaleString()} ${gap > 0 ? 'above' : 'below'}`;
+  return `${ordinal(grade.rank)} of ${grade.teams}: ${grade.points.toLocaleString()} projected points from your best ten, ${versus} the room's average.`;
+}
+
 // ─── The saved record ───────────────────────────────────────────────────────
 
 export interface MockResultRecord {

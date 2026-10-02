@@ -265,7 +265,7 @@ function GridCell({
         <>
           {traded && (
             <span className="board-traded-tag" style={{ fontSize: tv ? 'clamp(7px, 0.7vw, 10px)' : '0.55rem' }}>
-              {cell.pick.currentOwner.toUpperCase()}'S PICK
+              → {cell.pick.currentOwner.toUpperCase()}
             </span>
           )}
           <span
@@ -328,7 +328,7 @@ function GridCell({
           </span>
           {traded && (
             <span className="board-traded-tag" style={{ fontSize: tv ? 'clamp(8px, 0.8vw, 12px)' : '0.6rem' }}>
-              → {cell.pick.currentOwner.toUpperCase()}'S PICK
+              → {cell.pick.currentOwner.toUpperCase()}
             </span>
           )}
         </>

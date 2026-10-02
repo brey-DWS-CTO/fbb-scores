@@ -14,6 +14,8 @@ import {
   upcomingPicks,
 } from '../../lib/league/draftRoom.js';
 import NavIcon from './NavIcon.js';
+import MockGradeCard from './MockGradeCard.js';
+import { gradeMock, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
 import { positionColor, positionTheme } from '../draft/boardUtils.js';
 
 /** A position code in the board's own colour for it. */
@@ -44,6 +46,8 @@ interface Props {
   saved: RoomProgress | null;
   onProgress: (progress: RoomProgress) => void;
   onNewDraft: () => void;
+  /** Called once when the last pick lands, with the draft's grade. */
+  onFinished: (finished: { choices: Record<number, string>; grade: MockGrade }) => void;
 }
 
 type CenterTab = 'players' | 'teams' | 'results';
@@ -72,7 +76,7 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 
  * before. What is new is that it is saved as it goes, so leaving the page and
  * coming back finds it where it was, with the clock paused.
  */
-export default function DraftRoom({ prepared, values, projections, person, seed, saved, onProgress, onNewDraft }: Props) {
+export default function DraftRoom({ prepared, values, projections, person, seed, saved, onProgress, onNewDraft, onFinished }: Props) {
   // Only the first render restores; after that the room owns its state.
   const [restored] = useState(() => replaySaved(prepared, seed, person, saved?.choices ?? {}));
   const [started, setStarted] = useState(saved?.started === true);
@@ -289,6 +293,20 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     myPicks.filter((key) => shownPicks.some((pick) => pick.playerKey === key)).map((key) => ({ playerKey: key, positions: byKey.get(key)?.positions ?? [] })),
     prepared.roster,
   );
+  // The grade, once the last pick lands, and one report of it to be saved.
+  const grade = useMemo((): MockGrade | null => {
+    if (!over) return null;
+    const players = new Map<string, GradePlayer>();
+    for (const [key, row] of projections) players.set(key, { name: row.name, positions: row.positions, total: row.total, adp: row.adp });
+    return gradeMock(live.picks, person, players, prepared.roster);
+  }, [over, projections, live.picks, person, prepared.roster]);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!grade || reported.current) return;
+    reported.current = true;
+    onFinished({ choices: { ...choices }, grade });
+  }, [grade, choices, onFinished]);
+
   // When the last pick lands, show the board.
   const [sawEnd, setSawEnd] = useState(false);
   if (over && !sawEnd) {
@@ -328,8 +346,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             </>
           ) : over ? (
             <>
-              <div className="room-clock-big">DONE</div>
-              <div className="room-clock-meta">Draft complete. <button type="button" className="room-link" onClick={() => { setCenter('results'); setPhone('draft'); }}>See the board</button></div>
+              <div className="room-clock-row">
+                <div className={`room-clock-big mock-grade-letter grade-${(grade?.grade ?? 'c')[0].toLowerCase()}`}>{grade?.grade ?? 'DONE'}</div>
+                <div className="room-clock-meta">Draft complete.<br />Saved to Past mocks.</div>
+              </div>
+              <button type="button" className="room-link" onClick={() => { setCenter('results'); setPhone('draft'); }}>See the board</button>
             </>
           ) : (
             <>
@@ -398,6 +419,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
 
       {/* ── Center: the player card and the lists ── */}
       <main className="room-center">
+        {grade && (
+          <section className="panel room-grade">
+            <div className="hub-heading room-head">HOW YOU DID</div>
+            <MockGradeCard grade={grade} person={person} onPlayer={(key) => setSelected(key)} />
+          </section>
+        )}
+
         {started && shownPicks.length > 0 && (() => {
           const last = shownPicks[shownPicks.length - 1];
           return (
@@ -624,7 +652,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                             >
                               <span className="room-grid-label">
                                 {cell.round}.{cell.slot}
-                                {cell.via && <span className="board-traded-tag">{cell.owner.toUpperCase()}&apos;S PICK</span>}
+                                {cell.via && <span className="board-traded-tag" title={`${cell.owner} holds ${cell.via}'s pick`}>→ {cell.owner.toUpperCase()}</span>}
                                 {cell.pick?.how === 'keeper' && <NavIcon name="lock" size={10} className="room-grid-lock" />}
                               </span>
                               {cell.pick?.playerName

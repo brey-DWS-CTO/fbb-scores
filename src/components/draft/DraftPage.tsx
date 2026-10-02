@@ -85,12 +85,14 @@ function PickRow({
         gap: 10,
         padding: '9px 10px',
         borderBottom: '1px solid var(--panel-border)',
-        boxShadow: d ? `inset 3px 0 0 ${d.color}` : undefined,
+        boxShadow: d
+          ? `inset 3px 0 0 ${d.color}${cell.pick.viaTradeFrom ? ', inset -3px 0 0 var(--neon-yellow)' : ''}`
+          : cell.pick.viaTradeFrom ? 'inset 3px 0 0 var(--neon-yellow)' : undefined,
         background: cell.onClock
           ? 'rgba(0,255,204,0.06)'
           : d
             ? `linear-gradient(100deg, ${theme.deepBackground} 0%, ${theme.background} 100%)`
-            : 'transparent',
+            : cell.pick.viaTradeFrom ? 'rgba(255,230,0,0.06)' : 'transparent',
         outline: cell.onClock ? '2px solid var(--neon-teal)' : undefined,
         outlineOffset: cell.onClock ? -2 : undefined,
         border: projected ? '1px dashed var(--neon-purple)' : undefined,
@@ -116,14 +118,10 @@ function PickRow({
                 e.stopPropagation();
                 setShowTrade((v) => !v);
               }}
-              style={{
-                color: 'var(--neon-yellow)',
-                fontSize: '0.65rem',
-                textDecoration: 'underline dotted',
-                cursor: 'pointer',
-              }}
+              className="board-traded-tag"
+              style={{ fontSize: '0.62rem', cursor: 'pointer' }}
             >
-              via {cell.pick.viaTradeFrom} ⓘ
+              TRADED · via {cell.pick.viaTradeFrom} ⓘ
             </span>
           )}
         </div>
