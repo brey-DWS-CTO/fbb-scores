@@ -3522,14 +3522,16 @@ th.schedule-col-active {
 .proj-table td.proj-col-positions,
 .proj-table td.proj-col-tag { text-align: left; }
 /* Rank and name stay put while the numbers scroll sideways. */
-.proj-table .proj-col-valueRank { position: sticky; left: 0; z-index: 1; width: 48px; min-width: 48px; max-width: 48px; box-sizing: border-box; }
+.proj-table .proj-col-pos { position: sticky; left: 0; z-index: 1; width: 48px; min-width: 48px; max-width: 48px; box-sizing: border-box; }
 .proj-table .proj-col-name { position: sticky; left: 48px; z-index: 1; }
-.proj-table th.proj-col-valueRank,
+.proj-table th.proj-col-pos,
 .proj-table th.proj-col-name { z-index: 3; }
 .proj-row { cursor: pointer; }
 .proj-row td { background: var(--panel-bg); }
 .proj-row:nth-child(4n + 3) td { background: var(--cell-bg); }
-.proj-row:hover td, .proj-row.is-open td { background: rgba(0,255,204,0.06); }
+/* Solid, not see-through: the pinned # and name cells sit over the cells
+   that scroll under them, and a clear tint lets those show through. */
+.proj-row:hover td, .proj-row.is-open td { background: color-mix(in srgb, var(--neon-teal) 7%, var(--panel-bg)); }
 .proj-row.is-kept td.proj-col-name .proj-name { color: var(--text-mid); }
 .proj-name {
   border: 0;
@@ -3577,6 +3579,35 @@ th.schedule-col-active {
   .proj-controls .mock-seg-btn, .proj-pager .mock-seg-btn, .proj-pages .mock-mini-btn { min-height: 40px; }
 }
 
+/* The # column counts rows in the current sort; it is not a sort itself. */
+.proj-table th.proj-col-pos span {
+  display: block;
+  padding: 9px 7px;
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+.proj-table td.proj-col-pos { color: var(--text-mid); }
+
+/* ─── Sidebar menu button: a plain three-line icon, top right ─────── */
+/* Replaces the COLLAPSE row at the foot of the sidebar. On the narrow rail
+   the button sits on top and the logo under it, both centred. */
+.top-nav-head { display: contents; }
+@media screen and (min-width: 840px) {
+  .top-nav-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .nav-collapse-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    border-radius: 8px;
+  }
+  html.nav-collapsed .top-nav-head { flex-direction: column-reverse; gap: 12px; }
+  html.nav-collapsed .nav-collapse-btn { width: 44px; height: 44px; }
+}
+
+
 /* ─── Sign in: name and PIN first, email underneath ──────────────── */
 .identity-pin-input:disabled { opacity: 0.45; cursor: not-allowed; }
 .identity-or {
@@ -3592,6 +3623,7 @@ th.schedule-col-active {
 .identity-or::before,
 .identity-or::after { content: ''; flex: 1; border-top: 1px solid var(--panel-border); }
 .identity-submit-quiet { background: transparent !important; }
+
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

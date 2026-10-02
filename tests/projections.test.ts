@@ -150,6 +150,42 @@ test('CSV has a header, one line per row, and quotes what needs it', () => {
   const sample = [{ ...find(rows, 'Nikola Jokic'), name: 'Jokic, "The Joker"' }];
   const lines = projectionsToCsv(sample).trimEnd().split('\r\n');
   assert.equal(lines.length, 2);
-  assert.ok(lines[0].startsWith('Board rank,Player,Team'));
+  assert.ok(lines[0].startsWith('#,Player,Team'));
+  assert.ok(lines[1].startsWith('1,'));
   assert.ok(lines[1].includes('"Jokic, ""The Joker"""'));
+});
+
+test('the full stat line: minutes, shooting, and percents from makes over tries', () => {
+  const line = find(rows, 'Nikola Jokic').line!;
+  // Season totals over 72 games: 2563.2 min, 762/1325 FG, 388/475 FT.
+  assert.equal(line.min, 35.6);
+  assert.equal(line.fgm, 10.6);
+  assert.equal(line.fga, 18.4);
+  assert.equal(line.fgPct, 57.5);
+  assert.equal(line.ftm, 5.4);
+  assert.equal(line.fta, 6.6);
+  assert.equal(line.ftPct, 81.7);
+});
+
+test('on the forecast alone, last season ranks nobody', () => {
+  const forecast = valueBoard(dataset.players, fixture, { schedule: leagueSchedule2027, projectionsOnly: true });
+  assert.ok(forecast.entries.length > 250);
+  assert.ok(forecast.entries.every((entry) => entry.source === 'projection' || entry.source === 'espn-rank'));
+  assert.ok(forecast.entries.every((entry) => entry.fppg !== null));
+  assert.deepEqual(forecast.entries.map((entry) => entry.rank), forecast.entries.map((_, index) => index + 1));
+  assert.ok(forecast.counts['last-season'] === 0);
+  // The default still falls back, for anything that wants history.
+  assert.ok(values.counts['last-season'] > 0);
+  // No ESPN numbers at all: nobody is valued, rather than valued on last season.
+  assert.equal(valueBoard(dataset.players, null, { projectionsOnly: true }).entries.length, 0);
+});
+
+test('season total is FPPG times projected games, and sorts', () => {
+  const jokic = find(rows, 'Nikola Jokic');
+  assert.equal(jokic.total, Math.round(jokic.fppg! * 72));
+  const bare = rows.find((row) => row.games === null);
+  assert.equal(bare?.total ?? null, null);
+  const byTotal = sortProjections(rows, { column: 'total', dir: 'desc' });
+  const totals = byTotal.filter((row) => row.total !== null).map((row) => row.total!);
+  assert.deepEqual(totals, [...totals].sort((a, b) => b - a));
 });
