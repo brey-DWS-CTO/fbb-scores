@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { OWNERS, teamByOwner } from '../../lib/league/data.js';
+import { OWNERS } from '../../lib/league/data.js';
 import { useIdentity } from '../../hooks/useLeague.js';
-import { useTeamName } from '../../hooks/useTeamNames.js';
 import {
   changePin,
   claimPin,
@@ -12,19 +11,16 @@ import {
 } from '../../lib/league/api.js';
 
 /**
- * Sign in. The email link is the front door: type your address, tap the link
- * we send, you're in. The old owner-and-PIN path sits underneath so anyone who
- * hasn't used a link yet is never locked out.
+ * Sign in: pick your name, type your PIN. An emailed link sits underneath for
+ * anyone who would rather not remember a PIN.
  */
 export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
   const { signIn } = useIdentity();
-  const teamName = useTeamName();
   const [email, setEmail] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
-  const [pinMode, setPinMode] = useState(false);
   const [owner, setOwner] = useState('');
   const [claimed, setClaimed] = useState<Record<string, boolean> | null>(null);
   const [pin, setPin] = useState('');
@@ -33,15 +29,15 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [tempPin, setTempPin] = useState<string | null>(null);
 
+  const pinRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    // Only the PIN path needs this, so don't spend the call until it's open.
-    if (!pinMode) return;
+    // Whose PIN is still unclaimed, so a first visit asks for it twice.
     fetchPinStatus()
       .then((rows) => setClaimed(Object.fromEntries(rows.map((row) => [row.owner, row.claimed]))))
       .catch(() => setClaimed(null));
-  }, [pinMode]);
+  }, []);
 
-  const team = owner ? teamByOwner.get(owner) : null;
   const isFirstTime = owner !== '' && claimed !== null && claimed[owner] === false;
   const changing = tempPin !== null;
   const needsRepeat = isFirstTime || changing;
@@ -115,10 +111,82 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
     setPin2('');
     setError(null);
     setTempPin(null);
+    // The box is disabled until a name is picked; wait for that render.
+    if (nextOwner) setTimeout(() => pinRef.current?.focus(), 0);
   };
 
   return (
     <div className="identity-form">
+      <form onSubmit={submit}>
+        <label className="identity-label" htmlFor="identity-owner">YOUR NAME</label>
+        <div className="identity-select-wrap">
+          <select
+            id="identity-owner"
+            className="identity-select"
+            value={owner}
+            onChange={(event) => chooseOwner(event.target.value)}
+          >
+            <option value="">Pick your name…</option>
+            {OWNERS.map((candidate) => (
+              <option key={candidate} value={candidate}>{candidate}</option>
+            ))}
+          </select>
+        </div>
+
+        {changing && (
+          <div className="identity-notice identity-notice-ok">
+            Temporary PIN accepted. Choose your own 4–8 digit PIN.
+          </div>
+        )}
+        {!changing && isFirstTime && (
+          <div className="identity-notice">
+            First visit: choose a 4–8 digit PIN, then enter it again.
+          </div>
+        )}
+
+        {/* The PIN box is always here, so picking a name never resizes the sheet. */}
+        <div className={needsRepeat ? 'identity-pin-grid identity-pin-grid-repeat' : 'identity-pin-grid'}>
+          <label>
+            <span className="identity-label">{needsRepeat ? 'NEW PIN' : 'PIN'}</span>
+            <input
+              ref={pinRef}
+              className="identity-pin-input"
+              type="password"
+              inputMode="numeric"
+              autoComplete="current-password"
+              placeholder="••••"
+              value={pin}
+              maxLength={8}
+              disabled={owner === ''}
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
+            />
+          </label>
+          {needsRepeat && (
+            <label>
+              <span className="identity-label">REPEAT PIN</span>
+              <input
+                className="identity-pin-input"
+                type="password"
+                inputMode="numeric"
+                autoComplete="new-password"
+                placeholder="••••"
+                value={pin2}
+                maxLength={8}
+                onChange={(event) => setPin2(event.target.value.replace(/\D/g, ''))}
+              />
+            </label>
+          )}
+        </div>
+
+        <button className="tap-btn identity-submit" type="submit" disabled={!ready || busy}>
+          {busy ? 'CHECKING…' : needsRepeat ? 'SET PIN & SIGN IN' : 'SIGN IN'}
+        </button>
+        {error && <div className="identity-error" role="alert">{error}</div>}
+        <p className="identity-help">Forgot your PIN? Ask Brey, or get a link by email below.</p>
+      </form>
+
+      <div className="identity-or"><span>OR BY EMAIL</span></div>
+
       {sentTo === null ? (
         <form onSubmit={sendLink}>
           <label className="identity-label" htmlFor="identity-email">YOUR EMAIL</label>
@@ -134,13 +202,11 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <button className="tap-btn identity-submit" type="submit" disabled={!emailReady || linkBusy}>
+          <button className="tap-btn identity-submit identity-submit-quiet" type="submit" disabled={!emailReady || linkBusy}>
             {linkBusy ? 'SENDING…' : 'SEND ME A LINK'}
           </button>
           {linkError && <div className="identity-error" role="alert">{linkError}</div>}
-          <p className="identity-help">
-            We send you a link. Tap it on this phone and you're in. No PIN to remember.
-          </p>
+          <p className="identity-help">Tap the link we send and you&apos;re in. No PIN needed.</p>
         </form>
       ) : (
         <div className="identity-notice identity-notice-ok" role="status">
@@ -159,112 +225,6 @@ export default function TeamPickerForm({ onDone }: { onDone: () => void }) {
             Send it again
           </button>
         </div>
-      )}
-
-      <div className="identity-alt-row">
-        <button
-          className="identity-alt-link"
-          type="button"
-          onClick={() => setPinMode(!pinMode)}
-        >
-          {pinMode ? 'Sign in with an email link instead' : 'Sign in with a PIN instead'}
-        </button>
-      </div>
-
-      {pinMode && (
-        <form onSubmit={submit}>
-          <label className="identity-label" htmlFor="identity-owner">YOUR NAME</label>
-          <div className="identity-select-wrap">
-            <select
-              id="identity-owner"
-              className="identity-select"
-              value={owner}
-              onChange={(event) => chooseOwner(event.target.value)}
-            >
-              <option value="">Select your name…</option>
-              {OWNERS.map((candidate) => {
-                const isNew = claimed !== null && claimed[candidate] === false;
-                return (
-                  <option key={candidate} value={candidate}>
-                    {candidate} · {teamName(candidate)}{isNew ? ' · NEW' : ''}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {team && (
-            <div className="identity-team-card">
-              <div>
-                <strong>{team.owner}</strong>
-                <span>{teamName(team.owner)}</span>
-              </div>
-              <div className="identity-draft-slot">
-                <span>DRAFT</span>
-                <strong>#{team.draftPosition}</strong>
-              </div>
-            </div>
-          )}
-
-          {owner && (
-            <>
-              {changing && (
-                <div className="identity-notice identity-notice-ok">
-                  Temporary PIN accepted. Choose your own 4–8 digit PIN.
-                </div>
-              )}
-              {!changing && isFirstTime && (
-                <div className="identity-notice">
-                  First visit: choose a 4–8 digit PIN, then enter it again.
-                </div>
-              )}
-
-              <div className={needsRepeat ? 'identity-pin-grid identity-pin-grid-repeat' : 'identity-pin-grid'}>
-                <label>
-                  <span className="identity-label">{needsRepeat ? 'NEW PIN' : 'PIN'}</span>
-                  <input
-                    className="identity-pin-input"
-                    type="password"
-                    inputMode="numeric"
-                    autoComplete="current-password"
-                    placeholder="••••"
-                    value={pin}
-                    maxLength={8}
-                    onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
-                    autoFocus
-                  />
-                </label>
-                {needsRepeat && (
-                  <label>
-                    <span className="identity-label">REPEAT PIN</span>
-                    <input
-                      className="identity-pin-input"
-                      type="password"
-                      inputMode="numeric"
-                      autoComplete="new-password"
-                      placeholder="••••"
-                      value={pin2}
-                      maxLength={8}
-                      onChange={(event) => setPin2(event.target.value.replace(/\D/g, ''))}
-                    />
-                  </label>
-                )}
-              </div>
-
-              <button className="tap-btn identity-submit" type="submit" disabled={!ready || busy}>
-                {busy ? 'CHECKING…' : needsRepeat ? 'SET PIN & ENTER' : 'ENTER LEAGUE'}
-              </button>
-            </>
-          )}
-
-          {error && <div className="identity-error" role="alert">{error}</div>}
-
-          <p className="identity-help">
-            {isFirstTime
-              ? 'Your keeper picks stay hidden until the commish reveals them.'
-              : 'Forgot your PIN? Ask Brey to reset it in Commish Mode.'}
-          </p>
-        </form>
       )}
     </div>
   );

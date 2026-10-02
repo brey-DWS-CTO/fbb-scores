@@ -3577,6 +3577,22 @@ th.schedule-col-active {
   .proj-controls .mock-seg-btn, .proj-pager .mock-seg-btn, .proj-pages .mock-mini-btn { min-height: 40px; }
 }
 
+/* ─── Sign in: name and PIN first, email underneath ──────────────── */
+.identity-pin-input:disabled { opacity: 0.45; cursor: not-allowed; }
+.identity-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 12px;
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+.identity-or::before,
+.identity-or::after { content: ''; flex: 1; border-top: 1px solid var(--panel-border); }
+.identity-submit-quiet { background: transparent !important; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
