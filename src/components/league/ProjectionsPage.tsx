@@ -195,11 +195,11 @@ export default function ProjectionsPage() {
     setExporting(true);
     try {
       const { default: writeXlsxFile } = await import('write-excel-file/browser');
-      const header = PROJECTION_COLUMNS.map((column) => ({ value: column.header, fontWeight: 'bold' as const }));
-      const body = shown.map((row) => PROJECTION_COLUMNS.map((column) => {
+      const header = [{ value: '#', fontWeight: 'bold' as const }, ...PROJECTION_COLUMNS.map((column) => ({ value: column.header, fontWeight: 'bold' as const }))];
+      const body = shown.map((row, index) => [{ value: index + 1 }, ...PROJECTION_COLUMNS.map((column) => {
         const value = column.value(row);
         return value === null ? null : { value };
-      }));
+      })]);
       await writeXlsxFile([header, ...body], { stickyRowsCount: 1 }).toFile('projections.xlsx');
     } finally {
       setExporting(false);
@@ -283,6 +283,7 @@ export default function ProjectionsPage() {
         <table className="proj-table">
           <thead>
             <tr>
+              <th className="proj-col-pos" title="Place in this sort"><span>#</span></th>
               {PROJECTION_COLUMNS.map((column) => {
                 const sorted = sort?.column === column.id ? sort.dir : null;
                 return (
@@ -304,7 +305,7 @@ export default function ProjectionsPage() {
             </tr>
           </thead>
           <tbody>
-            {current.rows.map((row) => {
+            {current.rows.map((row, index) => {
               const isOpen = open === row.key;
               return (
                 <Fragment key={row.key}>
@@ -312,6 +313,7 @@ export default function ProjectionsPage() {
                     className={`proj-row${isOpen ? ' is-open' : ''}${row.tag !== 'open' ? ' is-kept' : ''}`}
                     onClick={() => setOpen(isOpen ? null : row.key)}
                   >
+                    <td className="proj-col-pos">{current.from + index}</td>
                     {PROJECTION_COLUMNS.map((column) => {
                       const { text, className } = cell(row, column.id);
                       return (
@@ -325,7 +327,7 @@ export default function ProjectionsPage() {
                   </tr>
                   {isOpen && (
                     <tr className="proj-detail-row">
-                      <td colSpan={PROJECTION_COLUMNS.length}>
+                      <td colSpan={PROJECTION_COLUMNS.length + 1}>
                         <Detail row={row} season={dataset.season} />
                       </td>
                     </tr>
@@ -335,7 +337,7 @@ export default function ProjectionsPage() {
             })}
             {current.rows.length === 0 && (
               <tr>
-                <td colSpan={PROJECTION_COLUMNS.length} className="proj-empty">No players match.</td>
+                <td colSpan={PROJECTION_COLUMNS.length + 1} className="proj-empty">No players match.</td>
               </tr>
             )}
           </tbody>

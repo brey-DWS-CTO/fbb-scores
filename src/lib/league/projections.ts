@@ -206,7 +206,6 @@ export interface ProjectionColumn {
 const tagLabel: Record<KeeperTag, string> = { keeper: 'Keeper', projected: 'Projected keeper', open: 'Open' };
 
 export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
-  { id: 'valueRank', label: '#', header: 'Board rank', firstDir: 'asc', value: (row) => row.valueRank },
   { id: 'name', label: 'PLAYER', header: 'Player', firstDir: 'asc', value: (row) => row.name },
   { id: 'proTeam', label: 'TM', header: 'Team', firstDir: 'asc', value: (row) => row.proTeam },
   { id: 'positions', label: 'POS', header: 'Positions', firstDir: 'asc', value: (row) => row.positions.join('/') },
@@ -236,6 +235,7 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'change', label: 'VS LAST', header: 'Change from last season', firstDir: 'desc', value: (row) => row.change },
   { id: 'espnRank', label: 'ESPN RK', header: 'ESPN rank', firstDir: 'asc', value: (row) => row.espnRank },
   { id: 'adp', label: 'ADP', header: 'ADP', firstDir: 'asc', value: (row) => row.adp },
+  { id: 'valueRank', label: 'BOARD', header: 'Board rank', firstDir: 'asc', value: (row) => row.valueRank },
 ];
 
 const COLUMN_BY_ID = new Map(PROJECTION_COLUMNS.map((column) => [column.id, column]));
@@ -361,9 +361,11 @@ function csvCell(value: string | number | null): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** Every column, every row given, in the order given. */
+/** Every column, every row given, in the order given, numbered from 1. */
 export function projectionsToCsv(rows: readonly PlayerProjection[]): string {
-  const lines = [PROJECTION_COLUMNS.map((column) => csvCell(column.header)).join(',')];
-  for (const row of rows) lines.push(PROJECTION_COLUMNS.map((column) => csvCell(column.value(row))).join(','));
+  const lines = [['#', ...PROJECTION_COLUMNS.map((column) => csvCell(column.header))].join(',')];
+  rows.forEach((row, index) => {
+    lines.push([String(index + 1), ...PROJECTION_COLUMNS.map((column) => csvCell(column.value(row)))].join(','));
+  });
   return `${lines.join('\r\n')}\r\n`;
 }

@@ -150,7 +150,8 @@ test('CSV has a header, one line per row, and quotes what needs it', () => {
   const sample = [{ ...find(rows, 'Nikola Jokic'), name: 'Jokic, "The Joker"' }];
   const lines = projectionsToCsv(sample).trimEnd().split('\r\n');
   assert.equal(lines.length, 2);
-  assert.ok(lines[0].startsWith('Board rank,Player,Team'));
+  assert.ok(lines[0].startsWith('#,Player,Team'));
+  assert.ok(lines[1].startsWith('1,'));
   assert.ok(lines[1].includes('"Jokic, ""The Joker"""'));
 });
 
