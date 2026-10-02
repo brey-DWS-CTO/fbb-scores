@@ -361,6 +361,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               )}
             </>
           )}
+          {started && (
+            <div className="live-actions room-actions">
+              <button type="button" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART</button>
+              <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={Object.keys(choices).length === 0}>UNDO</button>
+              <button type="button" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
+            </div>
+          )}
         </div>
 
         <div className="panel room-now">
@@ -408,13 +415,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           onQueue={() => setQueue((current) => toggleQueued(current, focus))}
         />}
 
-        {started && (
-          <div className="live-actions room-actions">
-            <button type="button" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART</button>
-            <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={Object.keys(choices).length === 0}>UNDO MY LAST PICK</button>
-            <button type="button" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
-          </div>
-        )}
 
         <div className="room-tabs" role="tablist">
           {(['players', 'teams', 'results'] as const).map((tab) => (

@@ -3961,6 +3961,10 @@ th.schedule-col-active {
 }
 @media (prefers-reduced-motion: reduce) { .room .room-latest { animation: none; } }
 
+/* Restart, undo and new draft live in the clock box. */
+.room-clock .room-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.room-clock .room-actions .mock-mini-btn { flex: 1 1 auto; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
