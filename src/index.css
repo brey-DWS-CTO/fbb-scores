@@ -3529,7 +3529,9 @@ th.schedule-col-active {
 .proj-row { cursor: pointer; }
 .proj-row td { background: var(--panel-bg); }
 .proj-row:nth-child(4n + 3) td { background: var(--cell-bg); }
-.proj-row:hover td, .proj-row.is-open td { background: rgba(0,255,204,0.06); }
+/* Solid, not see-through: the pinned # and name cells sit over the cells
+   that scroll under them, and a clear tint lets those show through. */
+.proj-row:hover td, .proj-row.is-open td { background: color-mix(in srgb, var(--neon-teal) 7%, var(--panel-bg)); }
 .proj-row.is-kept td.proj-col-name .proj-name { color: var(--text-mid); }
 .proj-name {
   border: 0;
