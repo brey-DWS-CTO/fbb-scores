@@ -199,7 +199,7 @@ export default function MockDraftPage() {
     refetchOnWindowFocus: true,
   });
 
-  const [view, setView] = useState<'odds' | 'live'>('odds');
+  const [view, setView] = useState<'odds' | 'live'>('live');
   const [mode, setMode] = useState<MockMode>('realistic');
   const [runs, setRuns] = useState<number>(200);
   const [seed, setSeed] = useState(7);
@@ -303,6 +303,19 @@ export default function MockDraftPage() {
   const toggleTrade = (id: string) =>
     setTradesOn((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
 
+  const keptCounts = guessRows.reduce(
+    (sum, row) => {
+      for (const keeper of row.keepers) sum[keeper.status] += 1;
+      return sum;
+    },
+    { known: 0, assumed: 0 },
+  );
+  const setupSummary = [
+    `Their keepers: ${keptCounts.known} real, ${keptCounts.assumed} projected`,
+    whatIf.applied.length > 0 ? `${whatIf.applied.length} trade${whatIf.applied.length === 1 ? '' : 's'} on` : 'no trades on',
+    ownKeepers !== null ? 'trying a different pair of your own' : null,
+  ].filter(Boolean).join(' · ');
+
   const whatIfLabel = [
     whatIf.applied.length > 0 ? `${whatIf.applied.length} trade${whatIf.applied.length === 1 ? '' : 's'} on` : null,
     ownKeepers !== null ? (ownKeepers.length > 0 ? `you keep ${ownKeepers.map((k) => k.playerName).join(' and ')}` : 'you keep nobody') : null,
@@ -318,22 +331,16 @@ export default function MockDraftPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Nine other teams draft against you on {mode === 'sharp' ? 'our value model' : 'ESPN’s draft position, the way a real room reaches'}.
-        Values come from ESPN&apos;s {rankSourceLabel('projection', dataset.season)}s in this league&apos;s scoring.
-        A player ESPN ranks but has not projected is valued off his rank. Last season plays no part.
+        Draft against nine teams valued on ESPN&apos;s {rankSourceLabel('projection', dataset.season)}s in our scoring.
         {values.counts.projection === 0 && (
           <> ESPN projections are not saved yet, so nobody can be valued. <Link to="/admin">Update from ESPN in Commish Mode.</Link></>
         )}
-        {' '}The seed is the number the random picks run from: same seed, same draft, and NEW rolls another.
-        Projections save. Nothing else on this page does.
-        {' '}<Link to="/projections">See every player&apos;s projection →</Link>
       </div>
 
       <section className="panel mock-controls">
         <div className="mock-control">
-          <span className="hub-heading mock-control-label">VIEW</span>
-          <div className="mock-seg" role="radiogroup" aria-label="Odds or a live draft">
-            {(['odds', 'live'] as const).map((choice) => (
+          <div className="mock-seg" role="radiogroup" aria-label="Draft or odds">
+            {(['live', 'odds'] as const).map((choice) => (
               <button
                 key={choice}
                 type="button"
@@ -342,7 +349,7 @@ export default function MockDraftPage() {
                 className={`tap-btn mock-seg-btn${view === choice ? ' is-on' : ''}`}
                 onClick={() => setView(choice)}
               >
-                {choice === 'odds' ? 'ODDS' : 'DRAFT LIVE'}
+                {choice === 'odds' ? 'ODDS' : 'DRAFT'}
               </button>
             ))}
           </div>
@@ -364,6 +371,7 @@ export default function MockDraftPage() {
             ))}
           </div>
         </div>
+        {view === 'odds' && (<>
         <div className="mock-control">
           <label className="hub-heading mock-control-label" htmlFor="mock-runs">DRAFTS</label>
           <select id="mock-runs" className="hub-input mock-select" value={runs} onChange={(event) => setRuns(Number(event.target.value))}>
@@ -394,12 +402,46 @@ export default function MockDraftPage() {
             ))}
           </select>
         </div>
+        </>)}
       </section>
 
-      <section className="panel mock-assumptions">
-        <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>
-          THEIR KEEPERS
-        </div>
+      {view === 'live' && (
+        <>
+          {livePrepared ? (
+            <LiveMockDraft
+              key={liveKey}
+              prepared={livePrepared}
+              values={values}
+              person={viewer}
+              seed={seed}
+              onNewSeed={() => setSeed(Math.floor(Math.random() * 100_000))}
+            />
+          ) : (
+            <div className="mock-note">No players to draft yet.</div>
+          )}
+        </>
+      )}
+
+      <div className="mock-worlds" hidden={view !== 'odds'}>
+        <WorldColumn title="AS THINGS STAND" color="var(--neon-teal)" world={now} results={nowRuns} viewer={viewer} watchIndex={watchIndex}>
+          <div className="mock-note mock-note-dim">
+            Your real keepers{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => k.playerName).join(', ')})` : ' (none yet)'}, no pending trades.
+          </div>
+        </WorldColumn>
+
+        <WorldColumn title="WHAT IF" color="var(--neon-purple)" world={whatIf} results={whatIfRuns} viewer={viewer} watchIndex={watchIndex}>
+          <div className="mock-note mock-note-dim">{whatIfLabel || 'Same as the left until you switch something on.'}</div>
+
+        </WorldColumn>
+      </div>
+
+      <details className="commish-fold mock-setup">
+        <summary className="hub-heading">
+          DRAFT SETUP
+          <small>{setupSummary}</small>
+        </summary>
+        <section className="panel mock-assumptions">
+        <div className="hub-heading mock-sub">THEIR KEEPERS</div>
         {!revealed && (
           <>
             <label className="mock-use-entered">
@@ -452,39 +494,6 @@ export default function MockDraftPage() {
             </li>
           ))}
         </ul>
-      </section>
-
-      {view === 'live' && (
-        <>
-          <div className="mock-note mock-note-dim" style={{ marginBottom: 10 }}>
-            You draft from the what-if world{whatIfLabel ? ` (${whatIfLabel})` : ''}. Flip to ODDS to change the switches.
-            The other nine pick on their own, {mode === 'sharp' ? 'to our value' : 'the way a real room reaches'}.
-          </div>
-          {livePrepared ? (
-            <LiveMockDraft
-              key={liveKey}
-              prepared={livePrepared}
-              values={values}
-              person={viewer}
-              seed={seed}
-              onNewSeed={() => setSeed(Math.floor(Math.random() * 100_000))}
-            />
-          ) : (
-            <div className="mock-note">No players to draft yet.</div>
-          )}
-        </>
-      )}
-
-      <div className="mock-worlds" hidden={view !== 'odds'}>
-        <WorldColumn title="AS THINGS STAND" color="var(--neon-teal)" world={now} results={nowRuns} viewer={viewer} watchIndex={watchIndex}>
-          <div className="mock-note mock-note-dim">
-            Your real keepers{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => k.playerName).join(', ')})` : ' (none yet)'}, no pending trades.
-          </div>
-        </WorldColumn>
-
-        <WorldColumn title="WHAT IF" color="var(--neon-purple)" world={whatIf} results={whatIfRuns} viewer={viewer} watchIndex={watchIndex}>
-          <div className="mock-note mock-note-dim">{whatIfLabel || 'Same as the left until you switch something on.'}</div>
-
           <div className="hub-heading mock-sub">PENDING TRADES</div>
           {switchable.length === 0 && (
             <div className="mock-note">
@@ -522,7 +531,7 @@ export default function MockDraftPage() {
             </div>
           )}
 
-          <div className="hub-heading mock-sub">YOUR KEEPERS IN THIS WORLD</div>
+          <div className="hub-heading mock-sub">YOUR KEEPERS</div>
           <div className="mock-own">
             <label>
               <input type="radio" name="mock-own" checked={!tryKeepers} onChange={() => setTryKeepers(false)} />
@@ -557,8 +566,8 @@ export default function MockDraftPage() {
               </div>
             )}
           </div>
-        </WorldColumn>
-      </div>
+        </section>
+      </details>
     </div>
   );
 }
