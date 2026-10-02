@@ -95,6 +95,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const [showDrafted, setShowDrafted] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'rank', dir: 1 });
   const [teamView, setTeamView] = useState(person);
+  // Tap a player anywhere (updates, a roster, the board) to see him in the card.
+  const look = (key: string | null | undefined) => {
+    if (!key) return;
+    setSelected(key);
+    setPhone('draft');
+  };
   const [resultsView, setResultsView] = useState<'board' | 'list'>('board');
 
   const live = useMemo(() => replaySaved(prepared, seed, person, choices).live, [prepared, seed, person, choices]);
@@ -395,7 +401,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
         {started && shownPicks.length > 0 && (() => {
           const last = shownPicks[shownPicks.length - 1];
           return (
-            <div key={last.overall} className={`panel room-latest${last.owner === person ? ' is-mine' : ''}`} aria-live="polite">
+            <div key={last.overall} className={`panel room-latest is-tappable${last.owner === person ? ' is-mine' : ''}`} aria-live="polite" onClick={() => look(last.playerKey)}>
               <span className="room-upcoming-num">{last.label}</span>
               <span><strong>{last.owner}</strong> {last.how === 'keeper' ? 'keeps' : 'takes'} <strong>{last.playerName ?? 'nobody'}</strong> <small><Pos positions={last.positions} /></small></span>
             </div>
@@ -543,7 +549,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     const pick = fill.playerKey ? takenBy.get(fill.playerKey) ?? null : null;
                     const line = projection?.line ?? null;
                     return (
-                      <tr key={`${fill.slot}-${index}`} className={fill.slot === 'BE' ? 'is-bench' : ''} onClick={() => fill.playerKey && setSelected(fill.playerKey)}>
+                      <tr key={`${fill.slot}-${index}`} className={fill.slot === 'BE' ? 'is-bench' : ''} onClick={() => look(fill.playerKey)}>
                         <td className="room-slot-col">{fill.slot === 'BE' ? 'Bench' : fill.slot}</td>
                         <td className="room-player-col">
                           {candidate ? (
@@ -601,22 +607,24 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                   <tbody>
                     {grid.rounds.map((row, index) => (
                       <tr key={index}>
-                        <th>R{index + 1}<small>{index % 2 === 0 ? '→' : '←'}</small></th>
+                        <th>R{index + 1}<span className="room-grid-arrow" aria-label={index % 2 === 0 ? 'left to right' : 'right to left'}>{index % 2 === 0 ? '→' : '←'}</span></th>
                         {row.map((cell) => {
                           const theme = cell.pick?.playerName ? positionTheme([...cell.pick.positions]) : null;
                           const projected = cell.pick?.how === 'keeper' && cell.pick.keeperStatus === 'assumed';
                           return (
                             <td
                               key={cell.overall}
-                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${projected ? ' is-projected' : ''}`}
+                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${projected ? ' is-projected' : ''}${cell.via ? ' is-traded' : ''}${cell.pick?.playerKey ? ' is-tappable' : ''}`}
+                              onClick={() => look(cell.pick?.playerKey)}
                               style={theme ? {
                                 background: `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`,
-                                borderColor: theme.border,
+                                borderColor: cell.via ? undefined : theme.border,
                                 boxShadow: `inset 3px 0 0 ${theme.color}`,
                               } : undefined}
                             >
                               <span className="room-grid-label">
-                                {cell.round}.{cell.slot}{cell.via ? ` ${cell.owner}` : ''}
+                                {cell.round}.{cell.slot}
+                                {cell.via && <span className="board-traded-tag">{cell.owner.toUpperCase()}&apos;S PICK</span>}
                                 {cell.pick?.how === 'keeper' && <NavIcon name="lock" size={10} className="room-grid-lock" />}
                               </span>
                               {cell.pick?.playerName
@@ -636,7 +644,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             ) : (
               <ol className="room-team-list room-results-list">
                 {shownPicks.map((pick) => (
-                  <li key={pick.overall} className={pick.owner === person ? 'is-mine' : ''}>
+                  <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                     <span className="room-upcoming-num">{pick.label}</span>
                     <span className="room-player-name">{pick.playerName ?? 'nobody'}</span>
                     <small><Pos positions={pick.positions} /></small>
@@ -668,7 +676,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 return (
                   <li key={key} className={taken ? 'is-taken' : ''}>
                     <span className="room-upcoming-num">{index + 1}</span>
-                    <button type="button" className="room-queue-name" onClick={() => setSelected(key)}>
+                    <button type="button" className="room-queue-name" onClick={() => look(key)}>
                       {candidate?.playerName ?? key}<small>{candidate?.positions.join('/')}{taken ? ` · gone ${taken.label}` : ''}</small>
                     </button>
                     <button type="button" className="room-icon-btn" aria-label="Move up" disabled={index === 0} onClick={() => setQueue((current) => moveQueued(current, key, -1))}>↑</button>
@@ -687,7 +695,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             {myRoster.map((fill, index) => {
               const candidate = fill.playerKey ? prepared.byKey.get(fill.playerKey) : null;
               return (
-                <li key={`${fill.slot}-${index}`}>
+                <li key={`${fill.slot}-${index}`} className={fill.playerKey ? 'is-tappable' : ''} onClick={() => look(fill.playerKey)}>
                   <span className="room-slot-name">{fill.slot === 'BE' ? 'Bench' : fill.slot}</span>
                   <span>{candidate ? candidate.playerName : <span className="mock-live">empty</span>}</span>
                   <span className="room-num">{candidate ? one(projections.get(candidate.playerKey)?.fppg) : ''}</span>
@@ -701,7 +709,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           <div className="hub-heading room-head">UPDATES</div>
           <ol className="room-update-list">
             {[...shownPicks].reverse().slice(0, 12).map((pick) => (
-              <li key={pick.overall} className={pick.owner === person ? 'is-mine' : ''}>
+              <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                 <span className="room-upcoming-num">{pick.label}</span>
                 <span>{pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small></span>
                 <span className="room-update-owner">{pick.owner}</span>
@@ -763,7 +771,7 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
       <div className="room-card-table-wrap">
         <table className="room-card-table">
           <thead>
-            <tr><th>Season</th><th>FPPG</th><th>Total</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>3PM</th><th>TO</th></tr>
+            <tr><th aria-label="Season" /><th>FPPG</th><th>Total</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>3PM</th><th>TO</th></tr>
           </thead>
           <tbody>
             <tr>
