@@ -228,7 +228,7 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'fta', label: 'FTA', header: 'Free throws tried', firstDir: 'desc', value: (row) => row.line?.fta ?? null },
   { id: 'ftPct', label: 'FT%', header: 'Free throw percent', firstDir: 'desc', value: (row) => row.line?.ftPct ?? null },
   { id: 'lastSeason', label: 'LAST', header: 'Last season FPPG', firstDir: 'desc', value: (row) => row.lastSeason },
-  { id: 'change', label: '+/-', header: 'Change', firstDir: 'desc', value: (row) => row.change },
+  { id: 'change', label: 'VS LAST', header: 'Change from last season', firstDir: 'desc', value: (row) => row.change },
   { id: 'espnRank', label: 'ESPN RK', header: 'ESPN rank', firstDir: 'asc', value: (row) => row.espnRank },
   { id: 'adp', label: 'ADP', header: 'ADP', firstDir: 'asc', value: (row) => row.adp },
 ];
