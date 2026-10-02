@@ -3984,6 +3984,27 @@ th.schedule-col-active {
 .proj-column-pick:has(input:not(:checked)) { color: var(--text-faint); }
 
 
+/* ─── Projection edits ─────────────────────────────────────────────────── */
+.proj-edited { color: var(--neon-yellow); font-size: 0.8rem; cursor: help; }
+.proj-edited-line { color: var(--neon-yellow) !important; }
+.proj-keeper-link { text-decoration: none; }
+.proj-keeper-link:hover .proj-open { color: var(--neon-teal); text-decoration: underline; }
+.proj-edit-btn { margin-bottom: 8px; }
+.proj-edit { padding: 4px 0 10px; max-width: 760px; }
+.proj-edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.proj-edit-field { display: flex; flex-direction: column; gap: 3px; }
+.proj-edit-field .hub-input { width: 100%; min-height: 36px; padding: 4px 8px; font-size: 0.9rem; font-weight: 700; }
+.proj-edit-label { color: var(--text-dim); font-size: 0.6rem; font-weight: 800; letter-spacing: 0.06em; }
+.proj-edit-field small { color: var(--text-faint); font-size: 0.66rem; }
+.proj-edit-field small.is-changed { color: var(--neon-yellow); }
+.proj-edit-note { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; }
+.proj-edit-note .hub-input { min-height: 36px; padding: 4px 8px; font-size: 0.85rem; }
+.proj-edit-result { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; color: var(--text-body); font-size: 0.85rem; }
+.proj-edit-result strong { color: var(--text-max); }
+.proj-edit-result .proj-edit-new { color: var(--neon-teal); }
+.proj-edit-arrow { color: var(--text-dim); }
+.proj-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

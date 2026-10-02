@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import { fetchDraftRankings, fetchPickTrades } from '../../lib/league/api.js';
+import { fetchPickTrades } from '../../lib/league/api.js';
+import { useProjectionData } from '../../hooks/useProjectionData.js';
 import { rankSourceLabel } from '../../lib/league/draftRankings.js';
 import { valueBoard } from '../../lib/league/draftValue.js';
 import {
@@ -198,12 +199,8 @@ export default function MockDraftPage() {
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
 
-  const rankingsQuery = useQuery({
-    queryKey: ['mock-draft-rankings', viewer ?? 'anon', meta?.draftRankings?.activeSnapshotId ?? 'none'],
-    queryFn: () => fetchDraftRankings(identity as NonNullable<typeof identity>),
-    enabled: isCommish,
-    staleTime: 30_000,
-  });
+  // ESPN's numbers with the commissioner's projection edits laid over them.
+  const { snapshot, original, edits } = useProjectionData();
   const tradesQuery = useQuery({
     queryKey: ['pick-trades', viewer ?? 'anon'],
     queryFn: () => fetchPickTrades(identity as NonNullable<typeof identity>),
@@ -254,7 +251,6 @@ export default function MockDraftPage() {
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
-  const snapshot = rankingsQuery.data?.snapshot ?? null;
   const fetchedProposals = tradesQuery.data?.proposals;
   const proposals = useMemo((): PickTradeProposal[] => fetchedProposals ?? [], [fetchedProposals]);
   const scenario = scenarioQuery.scenario;
@@ -267,8 +263,8 @@ export default function MockDraftPage() {
   // Every player's projected line, for the room's player list and card.
   const projections = useMemo((): ReadonlyMap<string, PlayerProjection> => {
     const kept = keepersForMock(dataset, { viewer, state, scenario: scenarioQuery.scenario, useEntered: true });
-    return new Map(buildProjections(values, snapshot, kept).map((row) => [row.key, row]));
-  }, [dataset, viewer, state, scenarioQuery.scenario, values, snapshot]);
+    return new Map(buildProjections(values, snapshot, kept, edits, original).map((row) => [row.key, row]));
+  }, [dataset, viewer, state, scenarioQuery.scenario, values, snapshot, edits, original]);
 
   const ownCandidates = useMemo(
     () => viewer

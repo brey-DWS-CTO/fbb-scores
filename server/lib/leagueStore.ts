@@ -135,6 +135,16 @@ export class PlayerPoolAcceptError extends Error {
   }
 }
 
+/** One commissioner edit to a player's ESPN projection. */
+export interface ProjectionEditRow {
+  season: number;
+  espnId: number;
+  /** The edit as `src/lib/league/projectionEdits.ts` defines it; stored whole. */
+  edit: unknown;
+  updatedAt: string;
+  updatedBy: string;
+}
+
 /** The commissioner's working copy of the rulebook, with a version for safe writes. */
 export interface RulebookDraftRow {
   season: number;
@@ -426,6 +436,9 @@ interface StoreBackend {
     acceptedAt: string,
     acceptedBy: string,
   ): Promise<MutateResult>;
+  listProjectionEdits(season: number): Promise<ProjectionEditRow[]>;
+  saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow>;
+  deleteProjectionEdit(season: number, espnId: number): Promise<void>;
   getRulebookDraft(season: number): Promise<RulebookDraftRow | null>;
   saveRulebookDraft(
     season: number,
@@ -692,6 +705,14 @@ class NeonBackend implements StoreBackend {
       reason text not null,
       published_at timestamptz not null,
       published_by text not null
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS projection_edits (
+      season int not null,
+      espn_id int not null,
+      data jsonb not null,
+      updated_at timestamptz not null default now(),
+      updated_by text not null,
+      primary key (season, espn_id)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_draft (
       season int primary key,
@@ -1137,6 +1158,38 @@ class NeonBackend implements StoreBackend {
     throw new DraftRankingAcceptError('snapshot-conflict', 'The snapshot ID conflicts with stored content');
   }
 
+  async listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT espn_id, data, updated_at, updated_by
+      FROM projection_edits WHERE season = ${season} ORDER BY espn_id`) as Array<{
+      espn_id: number;
+      data: unknown;
+      updated_at: string | Date;
+      updated_by: string;
+    }>;
+    return rows.map((row) => ({
+      season,
+      espnId: row.espn_id,
+      edit: row.data,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      updatedBy: row.updated_by,
+    }));
+  }
+
+  async saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO projection_edits (season, espn_id, data, updated_at, updated_by)
+      VALUES (${row.season}, ${row.espnId}, ${JSON.stringify(row.edit)}::jsonb, ${row.updatedAt}, ${row.updatedBy})
+      ON CONFLICT (season, espn_id) DO UPDATE
+        SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
+    return row;
+  }
+
+  async deleteProjectionEdit(season: number, espnId: number): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM projection_edits WHERE season = ${season} AND espn_id = ${espnId}`;
+  }
+
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -1481,6 +1534,7 @@ interface FileDoc {
     selections: KeeperSelection[];
     updatedAt: string;
   }>;
+  projectionEdits: ProjectionEditRow[];
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
@@ -1505,6 +1559,7 @@ function emptyDoc(): FileDoc {
     scheduleSnapshots: [],
     draftRankingSnapshots: [],
     keeperScenarios: [],
+    projectionEdits: [],
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
@@ -1560,6 +1615,7 @@ class FileBackend implements StoreBackend {
         scheduleSnapshots: Array.isArray(doc.scheduleSnapshots) ? doc.scheduleSnapshots : [],
         draftRankingSnapshots: Array.isArray(doc.draftRankingSnapshots) ? doc.draftRankingSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
+        projectionEdits: Array.isArray(doc.projectionEdits) ? doc.projectionEdits : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
@@ -1903,6 +1959,31 @@ class FileBackend implements StoreBackend {
       doc.updatedAt = acceptedAt;
       this.writeDoc(doc);
       return { state: doc.state, version: doc.version };
+    });
+  }
+
+  async listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
+    await this.ensureInit();
+    return this.readDoc().projectionEdits
+      .filter((row) => row.season === season)
+      .sort((a, b) => a.espnId - b.espnId);
+  }
+
+  async saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === row.season && entry.espnId === row.espnId));
+      doc.projectionEdits.push(row);
+      this.writeDoc(doc);
+      return row;
+    });
+  }
+
+  async deleteProjectionEdit(season: number, espnId: number): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === season && entry.espnId === espnId));
+      this.writeDoc(doc);
     });
   }
 
@@ -2557,6 +2638,18 @@ export async function acceptPlayerPoolSnapshot(
     acceptedAt,
     acceptedBy,
   );
+}
+
+export async function listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
+  return getBackend().listProjectionEdits(season);
+}
+
+export async function saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
+  return getBackend().saveProjectionEdit(row);
+}
+
+export async function deleteProjectionEdit(season: number, espnId: number): Promise<void> {
+  return getBackend().deleteProjectionEdit(season, espnId);
 }
 
 export async function getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {

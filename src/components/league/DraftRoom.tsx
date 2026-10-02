@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, type LiveChoices } from '../../lib/league/liveMock.js';
 import type { MockCandidate, PreparedMock } from '../../lib/league/mockDraft.js';
-import type { PlayerProjection } from '../../lib/league/projections.js';
+import { editTitle, type PlayerProjection } from '../../lib/league/projections.js';
 import {
   draftGrid,
   moveQueued,
@@ -490,7 +490,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         </td>
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
-                        <td className="room-num" title={projection?.gamesNote ?? undefined}>{projection?.games ?? '–'}{projection?.gamesNote ? '*' : ''}</td>
+                        <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -770,7 +770,7 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
               <th>Projected</th>
               <td>{one(projection?.fppg)}</td>
               <td>{projection?.total?.toLocaleString() ?? '–'}</td>
-              <td title={projection?.gamesNote ?? undefined}>{projection?.games ?? '–'}{projection?.gamesNote ? '*' : ''}</td>
+              <td title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
               <td>{one(line?.min)}</td><td>{one(line?.pts)}</td><td>{one(line?.reb)}</td><td>{one(line?.ast)}</td>
               <td>{one(line?.stl)}</td><td>{one(line?.blk)}</td><td>{one(line?.threes)}</td><td>{one(line?.to)}</td>
             </tr>

@@ -202,22 +202,3 @@ test('columns: VS LAST sits beside ESPN; hidden ones drop out; the player always
   const csv = projectionsToCsv(rows.slice(0, 1), visibleColumns(new Set(['proTeam']))).split('\r\n')[0];
   assert.ok(csv.startsWith('#,Player,Positions'));
 });
-
-test('commissioner games estimates cut total and value, not points per game', async () => {
-  const { GAMES_OVERRIDES } = await import('../src/lib/league/gamesOverrides.ts');
-  for (const override of GAMES_OVERRIDES) {
-    const row = rows.find((entry) => entry.name === override.name);
-    if (!row) continue;
-    assert.equal(row.games, override.games);
-    assert.ok(row.gamesNote);
-    assert.equal(row.total, Math.round(row.fppg! * override.games));
-    const espnGames = fixture.players.find((player) => player.espnId === override.espnId)!.projection!.stats['42'];
-    // Same per-game points as ESPN's line, fewer games.
-    assert.ok(override.games < espnGames);
-  }
-  const porzingis = rows.find((entry) => entry.name === 'Kristaps Porzingis');
-  const withoutOverride = valueBoard(dataset.players, fixture, { schedule: leagueSchedule2027 });
-  assert.ok(porzingis, 'Porzingis is on the board');
-  const before = withoutOverride.entries.find((entry) => entry.player.espnId === 3102531)!;
-  assert.ok(before.availability < 0.31, `availability ${before.availability}`);
-});

@@ -13,9 +13,9 @@
  */
 import { computeFpts, round1 } from '../espn/calculations.js';
 import { bonusOdds } from './doubleDoubles.js';
-import { gamesOverride } from './gamesOverrides.js';
 import {
   lastSeasonFppg,
+  projectedFppg,
   projectedPerGame,
   type DraftRankingPlayer,
   type DraftRankingSnapshot,
@@ -24,6 +24,7 @@ import {
 import { realAdp, type Position, type ValueBoard } from './draftValue.js';
 import type { KeeperStatus } from './mockDraft.js';
 import type { KeeperSelection } from '../keeper/types.js';
+import type { ProjectionEdit, ProjectionEdits } from './projectionEdits.js';
 
 /** Where a player stands for the draft. */
 export type KeeperTag = 'keeper' | 'projected' | 'open';
@@ -49,6 +50,7 @@ export interface ProjectedLine {
 
 export interface PlayerProjection {
   key: string;
+  espnId: number | null;
   name: string;
   proTeam: string;
   positions: Position[];
@@ -72,8 +74,10 @@ export interface PlayerProjection {
   tdOdds: number | null;
   /** Games ESPN projects him to play, or the commissioner's estimate. */
   games: number | null;
-  /** Set when the games are the commissioner's estimate, not ESPN's. */
-  gamesNote: string | null;
+  /** The commissioner's edit behind these numbers, if any. */
+  edit: ProjectionEdit | null;
+  /** ESPN's own FPPG and games, kept for an edited player so the screen can compare. */
+  espn: { fppg: number | null; games: number | null } | null;
   line: ProjectedLine | null;
   lastSeason: number | null;
   /** This season's number less last season's. */
@@ -137,7 +141,12 @@ export function buildProjections(
   values: Pick<ValueBoard, 'entries'>,
   snapshot: Pick<DraftRankingSnapshot, 'players' | 'scoringItems'> | null,
   keepers: KeeperSets,
+  edits?: ProjectionEdits,
+  /** ESPN's snapshot before edits, to show what an edit changed. */
+  original?: Pick<DraftRankingSnapshot, 'players'> | null,
 ): PlayerProjection[] {
+  const originalById = new Map<number, DraftRankingPlayer>();
+  for (const entry of original?.players ?? []) originalById.set(entry.espnId, entry);
   const byEspnId = new Map<number, DraftRankingPlayer>();
   for (const entry of snapshot?.players ?? []) byEspnId.set(entry.espnId, entry);
   const scoringItems = snapshot?.scoringItems ?? [];
@@ -155,13 +164,14 @@ export function buildProjections(
       : null;
     const odds = perGame ? bonusOdds(perGame) : null;
     const rawGames = espn?.projection?.stats['42'];
-    const override = gamesOverride(player.espnId);
-    const games = override ? override.games : rawGames !== undefined && Number.isFinite(rawGames) ? rawGames : null;
+    const games = rawGames !== undefined && Number.isFinite(rawGames) ? rawGames : null;
+    const edit = player.espnId !== null ? edits?.get(player.espnId) ?? null : null;
     const keeper = kept.get(player.key) ?? null;
     const lastSeason = lastSeasonFppg(player);
 
     return {
       key: player.key,
+      espnId: player.espnId,
       name: player.fullName ?? player.name,
       proTeam: player.proTeam,
       positions: entry.positions,
@@ -176,7 +186,17 @@ export function buildProjections(
       ddOdds: odds ? round2(odds.doubleDouble) : null,
       tdOdds: odds ? round2(odds.tripleDouble) : null,
       games,
-      gamesNote: override ? `${override.note} ESPN had ${rawGames ?? 'no'} games.` : null,
+      edit,
+      espn: edit && player.espnId !== null
+        ? (() => {
+          const before = originalById.get(player.espnId!)?.projection ?? null;
+          const beforeGames = before?.stats['42'];
+          return {
+            fppg: projectedFppg(before, scoringItems),
+            games: beforeGames !== undefined && Number.isFinite(beforeGames) ? beforeGames : null,
+          };
+        })()
+        : null,
       line: perGame ? lineOf(perGame) : null,
       lastSeason,
       change: entry.fppg !== null && lastSeason !== null && entry.source !== 'last-season'
@@ -277,6 +297,8 @@ export interface ProjectionFilter {
   position?: Position | 'ALL';
   /** Leave out keepers and projected keepers: only who can be drafted. */
   hideKept?: boolean;
+  /** Only players the commissioner has edited. */
+  editedOnly?: boolean;
 }
 
 export function filterProjections(rows: readonly PlayerProjection[], filter: ProjectionFilter): PlayerProjection[] {
@@ -284,6 +306,7 @@ export function filterProjections(rows: readonly PlayerProjection[], filter: Pro
   return rows.filter((row) => {
     if (filter.position && filter.position !== 'ALL' && !row.positions.includes(filter.position)) return false;
     if (filter.hideKept && row.tag !== 'open') return false;
+    if (filter.editedOnly && !row.edit) return false;
     if (words.length === 0) return true;
     const haystack = PROJECTION_COLUMNS
       .map((column) => column.value(row))
@@ -359,6 +382,15 @@ export type Tone = 'good' | 'warn' | 'bad' | null;
 
 /** A swing of three points a game either way is worth a second look. */
 export const CHANGE_STEP = 3;
+
+/** Hover text for an edited player: what was changed and what ESPN said. */
+export function editTitle(row: Pick<PlayerProjection, 'edit' | 'espn'>): string | null {
+  if (!row.edit) return null;
+  const espn = row.espn
+    ? ` ESPN: ${row.espn.fppg?.toFixed(1) ?? 'no'} FPPG over ${row.espn.games ?? 'no'} games.`
+    : '';
+  return `Your edit${row.edit.note ? ` (${row.edit.note})` : ''}.${espn}`;
+}
 
 export function changeTone(change: number | null): Tone {
   if (change === null) return null;

@@ -1,3 +1,4 @@
+import type { ProjectionEdit } from './projectionEdits.js';
 import axios from 'axios';
 import type {
   KeeperSelection,
@@ -555,6 +556,27 @@ export async function acceptTeamNames(
     { headers: authHeaders(c) },
   );
   return data;
+}
+
+/** The commissioner's edits to ESPN's projections. */
+export async function fetchProjectionEdits(c: Credentials): Promise<ProjectionEdit[]> {
+  const { data } = await axios.get('/api/league/projection-edits', { headers: authHeaders(c) });
+  return data.edits as ProjectionEdit[];
+}
+
+/** Save one player's edit. */
+export async function saveProjectionEdit(
+  c: Credentials,
+  espnId: number,
+  edit: Pick<ProjectionEdit, 'name' | 'games' | 'perGame' | 'note'>,
+): Promise<ProjectionEdit> {
+  const { data } = await axios.put(`/api/league/projection-edits/${espnId}`, edit, { headers: authHeaders(c) });
+  return data.edit as ProjectionEdit;
+}
+
+/** Drop a player's edit, back to ESPN's projection. */
+export async function deleteProjectionEdit(c: Credentials, espnId: number): Promise<void> {
+  await axios.delete(`/api/league/projection-edits/${espnId}`, { headers: authHeaders(c) });
 }
 
 /** The accepted ESPN draft rankings, or the empty fallback. Commissioner-only for now. */
