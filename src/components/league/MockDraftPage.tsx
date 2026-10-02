@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
@@ -8,6 +8,7 @@ import { valueBoard } from '../../lib/league/draftValue.js';
 import {
   availabilityAt,
   defaultMockSettings,
+  keepersForMock,
   prepareMock,
   simulateMany,
   type MockDraftResult,
@@ -15,14 +16,26 @@ import {
   type MockSlot,
 } from '../../lib/league/mockDraft.js';
 import { describeTrade } from '../../lib/league/pickTrades.js';
+import { buildProjections, type PlayerProjection } from '../../lib/league/projections.js';
+import { mockSaveKey, parseMockSave, type MockSave } from '../../lib/league/draftRoom.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { buildWorld, privateTrades, switchableTrades, tradeConflicts, type World } from '../../lib/league/whatIf.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
-import LiveMockDraft from './LiveMockDraft.js';
+import DraftRoom, { type RoomProgress } from './DraftRoom.js';
 import NavIcon from './NavIcon.js';
 
 const RUN_CHOICES = [100, 200, 500] as const;
+
+/** This person's saved mock draft, or null. Storage can be off; that is no save. */
+function readSave(owner: string | null): MockSave | null {
+  if (!owner) return null;
+  try {
+    return parseMockSave(window.localStorage.getItem(mockSaveKey(owner)));
+  } catch {
+    return null;
+  }
+}
 const ROWS_SHOWN = 12;
 
 const pct = (share: number) => `${Math.round(share * 100)}%`;
@@ -199,16 +212,45 @@ export default function MockDraftPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Each person's mock draft is kept on their own device, so leaving the page
+  // and coming back finds it where it was.
+  const [saved] = useState(() => readSave(viewer));
   const [view, setView] = useState<'odds' | 'live'>('live');
-  const [mode, setMode] = useState<MockMode>('realistic');
+  const [mode, setMode] = useState<MockMode>(saved?.mode ?? 'realistic');
   const [runs, setRuns] = useState<number>(200);
-  const [seed, setSeed] = useState(7);
+  const [seed, setSeed] = useState(saved?.seed ?? 7);
   const [watchIndex, setWatchIndex] = useState(0);
-  const [tradesOn, setTradesOn] = useState<string[]>([]);
-  const [tryKeepers, setTryKeepers] = useState(false);
-  const [tryPicks, setTryPicks] = useState<[string, string]>(['', '']);
-  const [useEntered, setUseEntered] = useState(true);
-  const [guessInstead, setGuessInstead] = useState<string[]>([]);
+  const [tradesOn, setTradesOn] = useState<string[]>(saved?.tradesOn ?? []);
+  const [tryKeepers, setTryKeepers] = useState(saved?.tryKeepers ?? false);
+  const [tryPicks, setTryPicks] = useState<[string, string]>(saved?.tryPicks ?? ['', '']);
+  const [useEntered, setUseEntered] = useState(saved?.useEntered ?? true);
+  const [guessInstead, setGuessInstead] = useState<string[]>(saved?.guessInstead ?? []);
+  const [progress, setProgress] = useState<RoomProgress | null>(() => (saved
+    ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft }
+    : null));
+  const onProgress = useCallback((next: RoomProgress) => setProgress(next), []);
+  useEffect(() => {
+    if (!viewer) return;
+    const save: MockSave = {
+      version: 1,
+      seed,
+      mode,
+      started: progress?.started ?? false,
+      choices: progress?.choices ?? {},
+      queue: progress?.queue ?? [],
+      clockLeft: progress?.clockLeft ?? null,
+      tradesOn,
+      tryKeepers,
+      tryPicks,
+      useEntered,
+      guessInstead,
+    };
+    try {
+      window.localStorage.setItem(mockSaveKey(viewer), JSON.stringify(save));
+    } catch {
+      /* no storage: the draft just does not survive leaving */
+    }
+  }, [viewer, seed, mode, progress, tradesOn, tryKeepers, tryPicks, useEntered, guessInstead]);
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
@@ -221,6 +263,12 @@ export default function MockDraftPage() {
     () => valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true }),
     [dataset.players, snapshot],
   );
+
+  // Every player's projected line, for the room's player list and card.
+  const projections = useMemo((): ReadonlyMap<string, PlayerProjection> => {
+    const kept = keepersForMock(dataset, { viewer, state, scenario: scenarioQuery.scenario, useEntered: true });
+    return new Map(buildProjections(values, snapshot, kept).map((row) => [row.key, row]));
+  }, [dataset, viewer, state, scenarioQuery.scenario, values, snapshot]);
 
   const ownCandidates = useMemo(
     () => viewer
@@ -408,13 +456,19 @@ export default function MockDraftPage() {
       {view === 'live' && (
         <>
           {livePrepared ? (
-            <LiveMockDraft
+            <DraftRoom
               key={liveKey}
               prepared={livePrepared}
               values={values}
+              projections={projections}
               person={viewer}
               seed={seed}
-              onNewSeed={() => setSeed(Math.floor(Math.random() * 100_000))}
+              saved={progress}
+              onProgress={onProgress}
+              onNewDraft={() => {
+                setProgress(null);
+                setSeed(Math.floor(Math.random() * 100_000));
+              }}
             />
           ) : (
             <div className="mock-note">No players to draft yet.</div>
