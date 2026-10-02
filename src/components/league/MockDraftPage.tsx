@@ -385,6 +385,8 @@ export default function MockDraftPage() {
         )}
       </div>
 
+      {/* Once a draft is under way the switches only get in the way. */}
+      {!(view === 'live' && progress?.started) && (
       <section className="panel mock-controls">
         <div className="mock-control">
           <div className="mock-seg" role="radiogroup" aria-label="Draft or odds">
@@ -452,6 +454,7 @@ export default function MockDraftPage() {
         </div>
         </>)}
       </section>
+      )}
 
       {view === 'live' && (
         <>

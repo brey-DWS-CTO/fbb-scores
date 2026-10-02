@@ -14,6 +14,12 @@ import {
   upcomingPicks,
 } from '../../lib/league/draftRoom.js';
 import NavIcon from './NavIcon.js';
+import { positionColor, positionTheme } from '../draft/boardUtils.js';
+
+/** A position code in the board's own colour for it. */
+function Pos({ positions }: { positions: readonly string[] }) {
+  return <span style={{ color: positionColor([...positions]), fontWeight: 800 }}>{positions.join('/')}</span>;
+}
 
 /** Seconds on the clock at the person's pick. */
 const PICK_CLOCK = 120;
@@ -89,6 +95,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const [showDrafted, setShowDrafted] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'rank', dir: 1 });
   const [teamView, setTeamView] = useState(person);
+  const [resultsView, setResultsView] = useState<'board' | 'list'>('board');
 
   const live = useMemo(() => replaySaved(prepared, seed, person, choices).live, [prepared, seed, person, choices]);
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
@@ -263,7 +270,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     ? untilTurn
     : null;
 
-  const suggestions = availableNow.slice(0, 5);
   const focus = selected ?? (myTurn ? queuedPick(queue, availableNow)?.playerKey ?? null : null) ?? availableNow[0]?.playerKey ?? null;
   const myPicks = live.run.result().rosters[person] ?? [];
   const myRoster = rosterBySlot(
@@ -343,7 +349,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
         </div>
       </aside>
 
-      {/* ── Center: the player card, suggestions and the lists ── */}
+      {/* ── Center: the player card and the lists ── */}
       <main className="room-center">
         {focus && <PlayerCard
           playerKey={focus}
@@ -352,25 +358,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           takenBy={takenBy.get(focus) ?? null}
           queued={queue.includes(focus)}
           canDraft={myTurn && !takenBy.has(focus)}
-          onDraft={() => draft(focus)}
+          picked={selected !== null}
+          onClose={() => setSelected(null)}
+          onDraft={() => { draft(focus); setSelected(null); }}
           onQueue={() => setQueue((current) => toggleQueued(current, focus))}
         />}
-
-        <div className="room-suggest">
-          <div className="hub-heading room-head">SUGGESTIONS</div>
-          <div className="room-suggest-row">
-            {suggestions.map((candidate, index) => {
-              const projection = projections.get(candidate.playerKey);
-              return (
-                <button type="button" key={candidate.playerKey} className="panel room-suggest-card" onClick={() => setSelected(candidate.playerKey)}>
-                  <span className="room-suggest-rank">{ordinal(index + 1)}</span>
-                  <strong>{candidate.playerName}</strong>
-                  <small>{projection?.proTeam ?? ''} · {candidate.positions.join('/')} · {one(projection?.fppg)}</small>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <div className="room-tabs" role="tablist">
           {(['players', 'teams', 'results'] as const).map((tab) => (
@@ -441,7 +433,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num">{one(projection?.adp)}</td>
                         <td className="room-player-col">
                           <span className="room-player-name">{projection?.name ?? candidate.playerName}</span>
-                          <small>{projection?.proTeam ?? ''} – {candidate.positions.join('/')}</small>
+                          <small>{projection?.proTeam ?? ''} – <Pos positions={candidate.positions} /></small>
                           {taken && <small className="room-taken"> {taken.label} {taken.owner}</small>}
                         </td>
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
@@ -486,7 +478,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 <li key={pick.overall}>
                   <span className="room-upcoming-num">{pick.label}</span>
                   <span className="room-player-name">{pick.playerName}</span>
-                  <small>{pick.positions.join('/')}</small>
+                  <small><Pos positions={pick.positions} /></small>
                   {pick.how === 'keeper' && <span className={`mock-tag ${pick.keeperStatus === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>{pick.keeperStatus === 'known' ? 'keeper' : 'projected'}</span>}
                   <span className="room-num">{one(projections.get(pick.playerKey!)?.fppg)}</span>
                 </li>
@@ -497,37 +489,82 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
         )}
 
         {center === 'results' && (
-          <div className="room-grid-wrap">
-            <table className="room-grid">
-              <thead>
-                <tr>
-                  <th />
-                  {owners.map((owner) => <th key={owner} className={owner === person ? 'is-mine' : ''}>{owner}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {grid.rounds.map((row, index) => (
-                  <tr key={index}>
-                    <th>R{index + 1}<small>{index % 2 === 0 ? '→' : '←'}</small></th>
-                    {row.map((cell) => (
-                      <td
-                        key={cell.overall}
-                        className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${cell.pick?.how === 'keeper' ? ' is-keeper' : ''}`}
-                      >
-                        <span className="room-grid-label">{cell.round}.{cell.slot}{cell.via ? ` ${cell.owner}` : ''}</span>
-                        {cell.pick?.playerName
-                          ? <>
-                            <span className="room-grid-name">{cell.pick.playerName}</span>
-                            <small>{cell.pick.positions.join('/')}</small>
-                          </>
-                          : cell.current ? <span className="room-grid-name mock-live">on the clock</span> : null}
-                      </td>
+          <>
+            <div className="mock-seg room-results-switch" role="radiogroup" aria-label="Board or list">
+              {(['board', 'list'] as const).map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  role="radio"
+                  aria-checked={resultsView === choice}
+                  className={`tap-btn mock-seg-btn${resultsView === choice ? ' is-on' : ''}`}
+                  onClick={() => setResultsView(choice)}
+                >
+                  {choice === 'board' ? 'BOARD' : 'LIST'}
+                </button>
+              ))}
+            </div>
+            {resultsView === 'board' ? (
+              <div className="room-grid-wrap">
+                <table className="room-grid">
+                  <thead>
+                    <tr>
+                      <th />
+                      {owners.map((owner) => <th key={owner} className={owner === person ? 'is-mine' : ''}>{owner}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grid.rounds.map((row, index) => (
+                      <tr key={index}>
+                        <th>R{index + 1}<small>{index % 2 === 0 ? '→' : '←'}</small></th>
+                        {row.map((cell) => {
+                          const theme = cell.pick?.playerName ? positionTheme([...cell.pick.positions]) : null;
+                          const projected = cell.pick?.how === 'keeper' && cell.pick.keeperStatus === 'assumed';
+                          return (
+                            <td
+                              key={cell.overall}
+                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${projected ? ' is-projected' : ''}`}
+                              style={theme ? {
+                                background: `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`,
+                                borderColor: theme.border,
+                                boxShadow: `inset 3px 0 0 ${theme.color}`,
+                              } : undefined}
+                            >
+                              <span className="room-grid-label">
+                                {cell.round}.{cell.slot}{cell.via ? ` ${cell.owner}` : ''}
+                                {cell.pick?.how === 'keeper' && <NavIcon name="lock" size={10} className="room-grid-lock" />}
+                              </span>
+                              {cell.pick?.playerName
+                                ? <>
+                                  <span className="room-grid-name">{cell.pick.playerName}</span>
+                                  <small style={{ color: theme?.color }}>{cell.pick.positions.join('/')}</small>
+                                </>
+                                : cell.current ? <span className="room-grid-name mock-live">on the clock</span> : null}
+                            </td>
+                          );
+                        })}
+                      </tr>
                     ))}
-                  </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ol className="room-team-list room-results-list">
+                {shownPicks.map((pick) => (
+                  <li key={pick.overall} className={pick.owner === person ? 'is-mine' : ''}>
+                    <span className="room-upcoming-num">{pick.label}</span>
+                    <span className="room-player-name">{pick.playerName ?? 'nobody'}</span>
+                    <small><Pos positions={pick.positions} /></small>
+                    {pick.how === 'keeper'
+                      ? <span className={`mock-tag ${pick.keeperStatus === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>{pick.keeperStatus === 'known' ? 'keeper' : 'projected'}</span>
+                      : <span />}
+                    <span className="room-update-owner">{pick.owner}</span>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                {shownPicks.length === 0 && <li className="mock-live">No picks yet.</li>}
+              </ol>
+            )}
+          </>
         )}
 
         {started && (
@@ -588,7 +625,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             {[...shownPicks].reverse().slice(0, 12).map((pick) => (
               <li key={pick.overall} className={pick.owner === person ? 'is-mine' : ''}>
                 <span className="room-upcoming-num">{pick.label}</span>
-                <span>{pick.playerName ?? 'nobody'} <small>{pick.positions.join('/')}</small></span>
+                <span>{pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small></span>
                 <span className="room-update-owner">{pick.owner}</span>
               </li>
             ))}
@@ -616,15 +653,18 @@ interface CardProps {
   takenBy: { label: string; owner: string } | null;
   queued: boolean;
   canDraft: boolean;
+  /** Tapped on purpose, rather than the default player shown. */
+  picked: boolean;
+  onClose: () => void;
   onDraft: () => void;
   onQueue: () => void;
 }
 
-function PlayerCard({ projection, entry, takenBy, queued, canDraft, onDraft, onQueue }: CardProps) {
+function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onClose, onDraft, onQueue }: CardProps) {
   const last = entry?.player.stats2026 ?? entry?.player.api2026 ?? null;
   const line = projection?.line ?? null;
   return (
-    <section className="panel room-card">
+    <section className={`panel room-card${picked ? ' is-picked' : ''}`}>
       <div className="room-card-head">
         <div>
           <div className="room-card-name">{projection?.name ?? entry?.player.name ?? 'Player'}</div>
@@ -639,6 +679,7 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, onDraft, onQ
             ? <span className="room-card-taken">Drafted {takenBy.label} by {takenBy.owner}</span>
             : canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
           <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>
+          {picked && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
         </div>
       </div>
       <div className="room-card-table-wrap">
@@ -660,7 +701,7 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, onDraft, onQ
               <td>{one(last && last.gp > 0 ? last.avg : null)}</td>
               <td>{last && last.gp > 0 ? Math.round(last.total).toLocaleString() : '–'}</td>
               <td>{last?.gp ?? '–'}</td>
-              <td colSpan={8} className="room-card-note">{projection?.bonus ? `Projection includes +${projection.bonus.toFixed(1)} a game for double-doubles.` : ''}</td>
+              <td colSpan={8} />
             </tr>
           </tbody>
         </table>
