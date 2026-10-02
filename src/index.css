@@ -3690,6 +3690,281 @@ th.schedule-col-active {
   .live-list .mock-mini-btn { min-height: 36px; }
 }
 
+/* ─── Mock draft room, laid out like Yahoo's ──────────────────────────── */
+/* Laptop: clock and who is up on the left, the player card and lists in the
+   middle, queue, team and the latest picks on the right. Phone: the clock
+   pins on top and four tabs choose what sits under it. */
+.mock-page { max-width: 1500px; }
+.room { display: grid; grid-template-columns: 240px minmax(0, 1fr) 290px; gap: 12px; align-items: start; }
+.room-left, .room-right { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 12px; }
+.room-center { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.room .panel { border-radius: 10px; padding: 12px; }
+.room-head { display: flex; align-items: baseline; gap: 8px; font-size: 0.62rem; color: var(--text-mid); margin-bottom: 8px; }
+.room-head small { color: var(--text-faint); font-weight: 700; letter-spacing: 0; }
+.room-num { text-align: right; font-variant-numeric: tabular-nums; }
+.room-link { border: 0; background: none; padding: 0; color: var(--neon-teal); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* The clock */
+.room-clock { display: flex; flex-direction: column; gap: 10px; }
+.room-clock.is-mine { border-color: var(--neon-teal); box-shadow: 0 0 0 1px rgba(0,255,204,0.25), 0 0 24px rgba(0,255,204,0.12); }
+.room-clock-row { display: flex; align-items: center; gap: 12px; }
+.room-clock-big { font-size: 2.6rem; font-weight: 900; line-height: 1; color: var(--text-max); font-variant-numeric: tabular-nums; }
+.room-clock.is-mine .room-clock-big { color: var(--neon-teal); }
+.room-clock-big.is-low { color: var(--neon-red) !important; }
+.room-clock-big.is-paused { color: var(--neon-yellow) !important; }
+.room-clock-meta { color: var(--text-body); font-size: 0.74rem; font-weight: 700; line-height: 1.35; }
+.room-turn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--cell-bg);
+  color: var(--text-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.room-turn small { color: var(--text-dim); }
+.room-turn.is-mine { background: rgba(0,255,204,0.1); color: var(--neon-teal); font-weight: 900; letter-spacing: 0.06em; }
+
+/* Drafting now */
+.room-upcoming { list-style: none; margin: 0; padding: 0; max-height: 52vh; overflow-y: auto; }
+.room-round { padding: 8px 0 4px; color: var(--text-hi); font-size: 0.7rem; font-weight: 800; text-align: center; border-top: 1px solid var(--panel-border); }
+.room-upcoming-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; font-size: 0.8rem; color: var(--text-body); }
+.room-upcoming li.is-now .room-upcoming-row { background: var(--cell-bg); color: var(--text-max); font-weight: 800; }
+.room-upcoming li.is-mine .room-upcoming-row { color: var(--neon-teal); font-weight: 800; }
+.room-upcoming-num { min-width: 26px; color: var(--text-dim); font-weight: 800; font-variant-numeric: tabular-nums; font-size: 0.72rem; }
+.room-upcoming-owner { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Player card */
+.room-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.room-card-name { font-size: 1.25rem; font-weight: 900; color: var(--text-max); }
+.room-card-meta { color: var(--text-mid); font-size: 0.78rem; font-weight: 700; margin-top: 2px; }
+.room-card-actions { display: flex; align-items: center; gap: 8px; }
+.room-card-actions .live-start-btn { min-height: 40px; }
+.room-card-taken { padding: 6px 10px; border-radius: 999px; background: var(--cell-bg); color: var(--text-body); font-size: 0.75rem; font-weight: 700; }
+.room-card-table-wrap { overflow-x: auto; margin-top: 10px; }
+.room-card-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; white-space: nowrap; }
+.room-card-table th, .room-card-table td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--cell-border); }
+.room-card-table thead th { color: var(--text-dim); font-size: 0.62rem; font-weight: 800; }
+.room-card-table tbody th { text-align: left; color: var(--text-hi); font-weight: 800; }
+.room-card-table td { color: var(--text-body); font-variant-numeric: tabular-nums; }
+.room-card-note { text-align: left !important; color: var(--text-dim) !important; font-size: 0.7rem; }
+
+/* Suggestions */
+.room-suggest-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.room-suggest-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-hi);
+  font-size: 0.8rem;
+  padding: 8px 10px !important;
+  min-width: 0;
+}
+.room-suggest-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-suggest-card small { color: var(--text-dim); font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-suggest-rank { color: var(--neon-yellow); font-size: 0.6rem; font-weight: 900; }
+
+/* Center tabs */
+.room-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--panel-border); }
+.room-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--text-mid);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.room-tabs button.is-on { color: var(--text-max); font-weight: 900; border-bottom-color: var(--neon-teal); }
+
+/* Players */
+.room-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.room-search { flex: 1 1 200px; min-height: 38px; padding: 6px 10px; font-size: 0.85rem; }
+.room-table-wrap { overflow: auto; max-height: 64vh; border: 1px solid var(--panel-border); border-radius: 10px; }
+.room-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8rem; white-space: nowrap; }
+.room-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel-bg);
+  padding: 0;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-align: left;
+}
+.room-table th.room-player-col { padding: 8px 6px; }
+.room-table th button {
+  width: 100%;
+  padding: 8px 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+.room-table th.is-sorted { color: var(--neon-teal); }
+.room-table td { padding: 6px; border-bottom: 1px solid var(--cell-border); color: var(--text-body); background: var(--panel-bg); }
+.room-table tbody tr:nth-child(even) td { background: var(--cell-bg); }
+.room-table tbody tr { cursor: pointer; }
+.room-table tbody tr:hover td, .room-table tbody tr.is-focus td { background: color-mix(in srgb, var(--neon-teal) 7%, var(--panel-bg)); }
+.room-table tr.is-taken td { color: var(--text-faint); }
+.room-table tr.room-pickline td {
+  padding: 2px 8px;
+  border-top: 2px solid var(--neon-orange);
+  border-bottom: 0;
+  background: var(--panel-bg) !important;
+  color: var(--neon-orange);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+.room-table td.room-player-col { min-width: 150px; }
+.room-player-name { color: var(--text-max); font-weight: 700; margin-right: 6px; }
+.room-table tr.is-taken .room-player-name { color: var(--text-dim); }
+.room-player-col small, .room-team-list small { color: var(--text-dim); font-size: 0.68rem; }
+.room-taken { color: var(--neon-orange) !important; }
+.room-strong { color: var(--text-max) !important; font-weight: 800; }
+.room-table .is-hot { color: var(--neon-orange); font-weight: 800; }
+.room-star { width: 30px; text-align: center !important; }
+.room-star button { border: 0; background: none; color: var(--text-dim); font-size: 1rem; cursor: pointer; padding: 2px 6px; }
+.room-star button.is-on { color: var(--neon-yellow); }
+.room-draft-col { width: 70px; }
+.room-draft-col .mock-mini-btn { width: 100%; }
+
+/* Teams and the grid */
+.room-team-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.room-team-list li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto 48px; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--cell-bg); font-size: 0.8rem; }
+.room-grid-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--panel-border); border-radius: 10px; }
+.room-grid { border-collapse: separate; border-spacing: 3px; min-width: 900px; width: 100%; table-layout: fixed; font-size: 0.72rem; }
+.room-grid thead th { position: sticky; top: 0; z-index: 1; background: var(--panel-bg); color: var(--neon-teal); font-size: 0.6rem; font-weight: 800; padding: 6px 2px; text-align: center; text-transform: uppercase; }
+.room-grid thead th.is-mine { color: var(--neon-yellow); }
+.room-grid tbody th { width: 36px; color: var(--text-dim); font-size: 0.68rem; font-weight: 800; }
+.room-grid tbody th small { display: block; color: var(--text-faint); }
+.room-grid td { vertical-align: top; padding: 5px 6px; border-radius: 6px; background: var(--cell-bg); border: 1px solid var(--cell-border); height: 46px; overflow: hidden; }
+.room-grid td.is-mine { border-color: color-mix(in srgb, var(--neon-yellow) 45%, var(--cell-border)); }
+.room-grid td.is-now { border-color: var(--neon-teal); box-shadow: 0 0 0 1px var(--neon-teal); }
+.room-grid td.is-keeper { background: color-mix(in srgb, var(--neon-purple) 10%, var(--cell-bg)); }
+.room-grid-label { display: block; color: var(--text-faint); font-size: 0.6rem; font-weight: 800; }
+.room-grid-name { display: block; color: var(--text-hi); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-grid td small { color: var(--text-dim); font-size: 0.62rem; }
+.room-actions { margin: 0; }
+
+/* Right column */
+.room-queue-list, .room-update-list, .room-slots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.room-queue-list li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 8px; background: var(--cell-bg); }
+.room-queue-list li.is-taken { opacity: 0.5; }
+.room-queue-name { border: 0; background: none; padding: 0; text-align: left; color: var(--text-hi); font-weight: 700; font-size: 0.8rem; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-queue-name small { display: block; color: var(--text-dim); font-size: 0.66rem; font-weight: 600; }
+.room-icon-btn { width: 30px; height: 30px; border: 1px solid var(--panel-border); border-radius: 6px; background: var(--input-bg); color: var(--text-mid); cursor: pointer; }
+.room-icon-btn:disabled { opacity: 0.35; cursor: default; }
+.room-slots li { display: grid; grid-template-columns: 42px minmax(0, 1fr) 40px; gap: 8px; padding: 4px 6px; font-size: 0.8rem; color: var(--text-hi); border-bottom: 1px solid var(--cell-border); }
+.room-slot-name { color: var(--text-dim); font-weight: 800; font-size: 0.7rem; }
+.room-update-list li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--cell-bg); font-size: 0.78rem; color: var(--text-hi); }
+.room-update-list li.is-mine { border: 1px solid var(--neon-teal); }
+.room-update-list small { color: var(--text-dim); font-size: 0.66rem; }
+.room-update-owner { color: var(--text-mid); font-size: 0.72rem; font-weight: 700; }
+.room-phone-tabs { display: none; }
+
+@media (max-width: 1400px) {
+  .room { grid-template-columns: 220px minmax(0, 1fr); }
+  .room-right { grid-column: 1 / -1; position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .room-suggest-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .room-suggest-row > :nth-child(n+4) { display: none; }
+}
+@media (max-width: 839px) {
+  .room { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .room-left, .room-right { display: contents; }
+  .room-clock { order: 0; position: sticky; top: 0; z-index: 5; }
+  .room-phone-tabs {
+    order: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .room-phone-tabs button {
+    min-height: 44px;
+    border: 0;
+    background: var(--input-bg);
+    color: var(--text-mid);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+  }
+  .room-phone-tabs button.is-on { background: rgba(0,255,204,0.12); color: var(--neon-teal); }
+  .room-center { order: 2; }
+  .room-now { order: 3; }
+  .room-queue, .room-team, .room-updates { order: 2; }
+  .room-now, .room-queue, .room-team, .room-updates { display: none; }
+  .room-phone-queue .room-queue,
+  .room-phone-team .room-team,
+  .room-phone-picks .room-updates,
+  .room-phone-picks .room-now { display: block; }
+  .room-phone-queue .room-center,
+  .room-phone-team .room-center,
+  .room-phone-picks .room-center { display: none; }
+  .room-clock-big { font-size: 2rem; }
+  .room-suggest-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .room-suggest-row > :nth-child(n+3) { display: none; }
+  .room-table-wrap { max-height: 58vh; }
+  .room-card-name { font-size: 1.05rem; }
+}
+
+/* ─── Draft room results: board or list, in the board's position colours ─ */
+.room-results-switch { align-self: flex-start; }
+.room-grid td.is-projected { border-style: dashed !important; opacity: 0.8; }
+.room-grid-lock { margin-left: 4px; vertical-align: -1px; }
+.room-results-list li { grid-template-columns: 40px minmax(0, 1fr) auto auto auto; }
+.room-results-list li.is-mine { border: 1px solid var(--neon-teal); }
+
+/* On a phone the player list comes first; the card shows only for a tapped player. */
+@media (max-width: 839px) {
+  .room-card:not(.is-picked) { display: none; }
+
+}
+
+/* The stop at your own keeper slot. */
+.room-turn.is-keeper { background: color-mix(in srgb, var(--neon-purple) 14%, var(--cell-bg)); color: var(--text-hi); font-weight: 700; line-height: 1.4; }
+.room-turn.is-keeper strong { color: var(--text-max); }
+
+/* Teams tab: a roster table the way ESPN and Yahoo lay one out. */
+.room-roster-wrap { margin-top: 8px; max-height: none; }
+.room-roster .room-th { display: block; padding: 8px 6px; text-align: right; }
+.room-roster .room-slot-col { width: 54px; color: var(--text-mid); font-weight: 800; font-size: 0.72rem; padding-left: 10px; }
+.room-roster tr.is-bench td { background: var(--input-bg); }
+.room-roster tr.is-bench .room-slot-col { color: var(--text-dim); }
+
+/* The pick that just landed, flashed in as each one comes in. */
+.room .room-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: var(--text-body);
+  animation: room-latest-in 0.35s ease-out;
+}
+.room-latest strong { color: var(--text-max); }
+.room-latest.is-mine { border-color: var(--neon-teal); }
+@keyframes room-latest-in {
+  from { background: color-mix(in srgb, var(--neon-yellow) 18%, var(--panel-bg)); }
+  to { background: var(--panel-bg); }
+}
+@media (prefers-reduced-motion: reduce) { .room .room-latest { animation: none; } }
+
+/* Restart, undo and new draft live in the clock box. */
+.room-clock .room-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.room-clock .room-actions .mock-mini-btn { flex: 1 1 auto; }
+
 /* ─── Projections: choose which columns show ─────────────────────────── */
 .proj-columns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; }
 .proj-column-pick {
@@ -3707,6 +3982,7 @@ th.schedule-col-active {
   cursor: pointer;
 }
 .proj-column-pick:has(input:not(:checked)) { color: var(--text-faint); }
+
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

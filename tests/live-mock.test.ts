@@ -79,7 +79,7 @@ test('a gone or unknown player cannot be forced', () => {
   assert.throws(() => replayLive(prepared, 7, 'Brey', { 12: 'nobody' }), /No such player/);
 });
 
-test('the draft runs to the end with the person always taking the best value', () => {
+test('the draft runs to the end with the clock picking every time', () => {
   const choices: Record<number, string> = {};
   let live = replayLive(prepared, 7, 'Brey', choices);
   let guard = 0;
@@ -92,7 +92,7 @@ test('the draft runs to the end with the person always taking the best value', (
   assert.equal(live.waitingOn, null);
   assert.equal(live.picks.length, board.slots.length);
   const result = live.run.result();
-  assert.equal(result.lineups.Brey.open.length, 0, 'best value each time still fills a legal lineup');
+  assert.equal(result.lineups.Brey.open.length, 0, 'the clock pick fills open starting slots first');
 });
 
 test('odds of a player being gone by the next pick are between 0 and 1 and never count his own pick', () => {

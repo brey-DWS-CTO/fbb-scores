@@ -37,6 +37,7 @@ import {
   type DraftRankingSnapshot,
   type RankSource,
 } from './draftRankings.js';
+import { gamesOverride } from './gamesOverrides.js';
 import { NBA_TEAMS, nbaTeamIdForProTeam, type LeagueSchedulePeriod, type SchedulePhase } from './schedule.js';
 
 // ─── Positions and roster slots ─────────────────────────────────────────────
@@ -402,8 +403,13 @@ export function roomRankOf(
   return espnRank !== null ? Math.max(espnRank, undraftedAdp) : null;
 }
 
-/** Projected share of the season from a projection's games played, else all of it. */
+/**
+ * Projected share of the season from a projection's games played, else all
+ * of it. A commissioner games estimate wins over ESPN's.
+ */
 function availabilityOf(espn: DraftRankingPlayer | null): number {
+  const override = gamesOverride(espn?.espnId);
+  if (override) return Math.min(1, override.games / 82);
   const games = espn?.projection?.stats['42'];
   if (games === undefined || !Number.isFinite(games) || games < 0) return 1;
   return Math.min(1, games / 82);
