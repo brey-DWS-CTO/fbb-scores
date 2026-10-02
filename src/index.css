@@ -3936,6 +3936,31 @@ th.schedule-col-active {
 .room-turn.is-keeper { background: color-mix(in srgb, var(--neon-purple) 14%, var(--cell-bg)); color: var(--text-hi); font-weight: 700; line-height: 1.4; }
 .room-turn.is-keeper strong { color: var(--text-max); }
 
+/* Teams tab: a roster table the way ESPN and Yahoo lay one out. */
+.room-roster-wrap { margin-top: 8px; max-height: none; }
+.room-roster .room-th { display: block; padding: 8px 6px; text-align: right; }
+.room-roster .room-slot-col { width: 54px; color: var(--text-mid); font-weight: 800; font-size: 0.72rem; padding-left: 10px; }
+.room-roster tr.is-bench td { background: var(--input-bg); }
+.room-roster tr.is-bench .room-slot-col { color: var(--text-dim); }
+
+/* The pick that just landed, flashed in as each one comes in. */
+.room .room-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: var(--text-body);
+  animation: room-latest-in 0.35s ease-out;
+}
+.room-latest strong { color: var(--text-max); }
+.room-latest.is-mine { border-color: var(--neon-teal); }
+@keyframes room-latest-in {
+  from { background: color-mix(in srgb, var(--neon-yellow) 18%, var(--panel-bg)); }
+  to { background: var(--panel-bg); }
+}
+@media (prefers-reduced-motion: reduce) { .room .room-latest { animation: none; } }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

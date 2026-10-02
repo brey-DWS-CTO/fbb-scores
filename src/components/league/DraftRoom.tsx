@@ -169,7 +169,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       setNow(at);
       if (at >= clock.deadline) {
         // Time is up: the top of the queue, else the best value left.
-        const pick = queuedPick(queue, live.run.available()) ?? autoPick(live);
+        const pick = queuedPick(queue, live.run.available(), autoPick(live));
         if (pick) setChoices((current) => ({ ...current, [clock.overall]: pick.playerKey }));
       }
     }, 250);
@@ -283,6 +283,22 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     myPicks.filter((key) => shownPicks.some((pick) => pick.playerKey === key)).map((key) => ({ playerKey: key, positions: byKey.get(key)?.positions ?? [] })),
     prepared.roster,
   );
+  // When the last pick lands, show the board.
+  const [sawEnd, setSawEnd] = useState(false);
+  if (over && !sawEnd) {
+    setSawEnd(true);
+    setCenter('results');
+    setResultsView('board');
+    setPhone('draft');
+  }
+  if (!over && sawEnd) setSawEnd(false);
+  const rosterOf = (owner: string) => rosterBySlot(
+    shownPicks
+      .filter((pick) => pick.owner === owner && pick.playerKey)
+      .map((pick) => ({ playerKey: pick.playerKey!, positions: pick.positions })),
+    prepared.roster,
+  );
+  const teamRoster = rosterOf(teamView);
   const grid = draftGrid(slots, shownPicks, myTurn || !over ? currentOverall : null);
   const owners = grid.owners;
 
@@ -369,6 +385,16 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
 
       {/* ── Center: the player card and the lists ── */}
       <main className="room-center">
+        {started && shownPicks.length > 0 && (() => {
+          const last = shownPicks[shownPicks.length - 1];
+          return (
+            <div key={last.overall} className={`panel room-latest${last.owner === person ? ' is-mine' : ''}`} aria-live="polite">
+              <span className="room-upcoming-num">{last.label}</span>
+              <span><strong>{last.owner}</strong> {last.how === 'keeper' ? 'keeps' : 'takes'} <strong>{last.playerName ?? 'nobody'}</strong> <small><Pos positions={last.positions} /></small></span>
+            </div>
+          );
+        })()}
+
         {focus && <PlayerCard
           playerKey={focus}
           projection={projections.get(focus) ?? null}
@@ -464,7 +490,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         </td>
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
-                        <td className="room-num">{projection?.games ?? '–'}</td>
+                        <td className="room-num" title={projection?.gamesNote ?? undefined}>{projection?.games ?? '–'}{projection?.gamesNote ? '*' : ''}</td>
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -499,18 +525,51 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             <select className="hub-input mock-select" aria-label="Team" value={teamView} onChange={(event) => setTeamView(event.target.value)}>
               {owners.map((owner) => <option key={owner} value={owner}>{owner}{owner === person ? ' (you)' : ''}</option>)}
             </select>
-            <ol className="room-team-list">
-              {shownPicks.filter((pick) => pick.owner === teamView && pick.playerKey).map((pick) => (
-                <li key={pick.overall}>
-                  <span className="room-upcoming-num">{pick.label}</span>
-                  <span className="room-player-name">{pick.playerName}</span>
-                  <small><Pos positions={pick.positions} /></small>
-                  {pick.how === 'keeper' && <span className={`mock-tag ${pick.keeperStatus === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>{pick.keeperStatus === 'known' ? 'keeper' : 'projected'}</span>}
-                  <span className="room-num">{one(projections.get(pick.playerKey!)?.fppg)}</span>
-                </li>
-              ))}
-              {!shownPicks.some((pick) => pick.owner === teamView && pick.playerKey) && <li className="mock-live">Nobody yet.</li>}
-            </ol>
+            <div className="room-table-wrap room-roster-wrap">
+              <table className="room-table room-roster">
+                <thead>
+                  <tr>
+                    <th className="room-slot-col">Slot</th>
+                    <th className="room-player-col">Player</th>
+                    {['FPPG', 'TOTAL', 'GP', 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
+                      <th key={label} className="room-num"><span className="room-th">{label}</span></th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamRoster.map((fill, index) => {
+                    const projection = fill.playerKey ? projections.get(fill.playerKey) ?? null : null;
+                    const candidate = fill.playerKey ? prepared.byKey.get(fill.playerKey) ?? null : null;
+                    const pick = fill.playerKey ? takenBy.get(fill.playerKey) ?? null : null;
+                    const line = projection?.line ?? null;
+                    return (
+                      <tr key={`${fill.slot}-${index}`} className={fill.slot === 'BE' ? 'is-bench' : ''} onClick={() => fill.playerKey && setSelected(fill.playerKey)}>
+                        <td className="room-slot-col">{fill.slot === 'BE' ? 'Bench' : fill.slot}</td>
+                        <td className="room-player-col">
+                          {candidate ? (
+                            <>
+                              <span className="room-player-name">{projection?.name ?? candidate.playerName}</span>
+                              <small>{projection?.proTeam ?? ''} <Pos positions={candidate.positions} />{pick ? ` · ${pick.label}` : ''}</small>
+                            </>
+                          ) : <span className="mock-live">Empty</span>}
+                        </td>
+                        <td className="room-num room-strong">{candidate ? one(projection?.fppg) : '–'}</td>
+                        <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
+                        <td className="room-num">{projection?.games ?? '–'}</td>
+                        <td className="room-num">{one(line?.min)}</td>
+                        <td className="room-num">{one(line?.pts)}</td>
+                        <td className="room-num">{one(line?.reb)}</td>
+                        <td className="room-num">{one(line?.ast)}</td>
+                        <td className="room-num">{one(line?.stl)}</td>
+                        <td className="room-num">{one(line?.blk)}</td>
+                        <td className="room-num">{one(line?.threes)}</td>
+                        <td className="room-num">{one(line?.to)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -629,7 +688,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               const candidate = fill.playerKey ? prepared.byKey.get(fill.playerKey) : null;
               return (
                 <li key={`${fill.slot}-${index}`}>
-                  <span className="room-slot-name">{fill.slot}</span>
+                  <span className="room-slot-name">{fill.slot === 'BE' ? 'Bench' : fill.slot}</span>
                   <span>{candidate ? candidate.playerName : <span className="mock-live">empty</span>}</span>
                   <span className="room-num">{candidate ? one(projections.get(candidate.playerKey)?.fppg) : ''}</span>
                 </li>
@@ -711,7 +770,7 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
               <th>Projected</th>
               <td>{one(projection?.fppg)}</td>
               <td>{projection?.total?.toLocaleString() ?? '–'}</td>
-              <td>{projection?.games ?? '–'}</td>
+              <td title={projection?.gamesNote ?? undefined}>{projection?.games ?? '–'}{projection?.gamesNote ? '*' : ''}</td>
               <td>{one(line?.min)}</td><td>{one(line?.pts)}</td><td>{one(line?.reb)}</td><td>{one(line?.ast)}</td>
               <td>{one(line?.stl)}</td><td>{one(line?.blk)}</td><td>{one(line?.threes)}</td><td>{one(line?.to)}</td>
             </tr>

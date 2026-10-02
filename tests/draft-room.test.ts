@@ -71,9 +71,9 @@ test('roster by slot fills the most fitting open slot, then the bench', () => {
   assert.equal(fills.length, 10 + DEFAULT_ROSTER.bench);
   assert.equal(at('c1'), 'C');
   assert.equal(at('c2'), 'FLEX');
-  assert.equal(at('g1'), 'SG');
+  assert.equal(at('g1'), 'PG');
   assert.equal(at('c5'), 'BE');
-  assert.deepEqual(fills.slice(0, 10).map((fill) => fill.slot), ['C', 'PF', 'SF', 'SG', 'PG', 'F', 'G', 'FLEX', 'FLEX', 'FLEX']);
+  assert.deepEqual(fills.slice(0, 10).map((fill) => fill.slot), ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'FLEX', 'FLEX', 'FLEX']);
 });
 
 test('queue: add, remove, reorder, and the first one still on the board', () => {

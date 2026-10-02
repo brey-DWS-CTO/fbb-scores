@@ -6,7 +6,7 @@
  *
  * Pure. No server, no browser. Storage is passed in.
  */
-import { STARTER_SLOTS, fillsSlot, type Position, type RosterSettings, type StarterSlot } from './draftValue.js';
+import { fillsSlot, type Position, type RosterSettings, type StarterSlot } from './draftValue.js';
 import { replayLive, type LiveChoices, type LiveState } from './liveMock.js';
 import type { MockCandidate, MockMode, MockPick, MockSlot, PreparedMock } from './mockDraft.js';
 
@@ -64,14 +64,17 @@ export function picksUntilTurn(slots: readonly MockSlot[], fromOverall: number, 
 
 export type RosterSlotName = StarterSlot | 'BE';
 
+/** The order a roster reads in, guards first, the way ESPN and Yahoo list it. */
+export const ROSTER_ORDER: readonly StarterSlot[] = ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'FLEX'];
+
 export interface RosterSlotFill {
   slot: RosterSlotName;
   playerKey: string | null;
 }
 
 /**
- * The person's roster laid out the way a draft room shows it: C, PF, SF, SG,
- * PG, F, G, FLEX, FLEX, FLEX, then the bench. Players go in draft order, each
+ * A roster laid out the way a draft room shows it: PG, SG, SF, PF, C, G, F,
+ * FLEX, FLEX, FLEX, then the bench. Players go in draft order, each
  * into the first open starting slot he can fill, else the bench. A display,
  * not the lineup maths; the mock's own matching still decides needs.
  */
@@ -79,7 +82,7 @@ export function rosterBySlot(
   players: readonly { playerKey: string; positions: readonly Position[] }[],
   roster: RosterSettings,
 ): RosterSlotFill[] {
-  const fills: RosterSlotFill[] = STARTER_SLOTS.flatMap((slot) =>
+  const fills: RosterSlotFill[] = ROSTER_ORDER.flatMap((slot) =>
     Array.from({ length: roster.starters[slot] ?? 0 }, () => ({ slot: slot as RosterSlotName, playerKey: null as string | null })));
   const bench: RosterSlotFill[] = Array.from({ length: roster.bench }, () => ({ slot: 'BE' as const, playerKey: null }));
   for (const player of players) {
@@ -111,14 +114,18 @@ export function moveQueued(queue: readonly string[], key: string, by: -1 | 1): s
   return next;
 }
 
-/** The first queued player still on the board, else the best value left. */
-export function queuedPick(queue: readonly string[], available: readonly MockCandidate[]): MockCandidate | null {
+/** The first queued player still on the board, else `fallback` (the best value left). */
+export function queuedPick(
+  queue: readonly string[],
+  available: readonly MockCandidate[],
+  fallback: MockCandidate | null = available[0] ?? null,
+): MockCandidate | null {
   const open = new Map(available.map((candidate) => [candidate.playerKey, candidate]));
   for (const key of queue) {
     const candidate = open.get(key);
     if (candidate) return candidate;
   }
-  return available[0] ?? null;
+  return fallback;
 }
 
 // ─── The grid ───────────────────────────────────────────────────────────────

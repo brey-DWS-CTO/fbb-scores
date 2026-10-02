@@ -64,7 +64,10 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
     case 'bonus': return { text: row.bonus === null ? '—' : `+${row.bonus.toFixed(1)}` };
     case 'ddOdds': return { text: pct(row.ddOdds), className: toneClass(oddsTone(row.ddOdds)).trim() };
     case 'tdOdds': return { text: pct(row.tdOdds), className: toneClass(oddsTone(row.tdOdds)).trim() };
-    case 'games': return { text: whole(row.games), className: toneClass(gamesTone(row.games)).trim() };
+    case 'games': return {
+      text: row.gamesNote ? <span title={row.gamesNote}>{whole(row.games)}*</span> : whole(row.games),
+      className: toneClass(gamesTone(row.games)).trim(),
+    };
     case 'pts': return { text: one(row.line?.pts ?? null) };
     case 'reb': return { text: one(row.line?.reb ?? null) };
     case 'ast': return { text: one(row.line?.ast ?? null) };

@@ -8,6 +8,7 @@
  * the person's slots take their saved choice or stop and wait. Undo is
  * dropping the last choice. Same seed and same choices, same draft.
  */
+import { fillsSlot } from './draftValue.js';
 import { createMockRun, runSeed, type MockCandidate, type MockPick, type MockRun, type MockSlot, type PreparedMock } from './mockDraft.js';
 
 /** The person's picks, by overall pick number. */
@@ -92,7 +93,16 @@ export function oddsGoneByNextPick(
   return gone;
 }
 
-/** The player the team would take for the person, when the clock runs out. */
+/**
+ * The player the team would take for the person, when the clock runs out:
+ * the best value who fills a starting slot still open, else the best value.
+ */
 export function autoPick(state: LiveState): MockCandidate | null {
-  return state.waitingOn ? state.run.available()[0] ?? null : null;
+  if (!state.waitingOn) return null;
+  const available = state.run.available();
+  const open = state.run.lineupOf(state.waitingOn.pick.currentOwner).open;
+  const fits = open.length > 0
+    ? available.find((candidate) => open.some((slot) => fillsSlot(candidate.positions, slot)))
+    : undefined;
+  return fits ?? available[0] ?? null;
 }
