@@ -13,6 +13,7 @@
  */
 import { computeFpts, round1 } from '../espn/calculations.js';
 import { bonusOdds } from './doubleDoubles.js';
+import { gamesOverride } from './gamesOverrides.js';
 import {
   lastSeasonFppg,
   projectedPerGame,
@@ -69,8 +70,10 @@ export interface PlayerProjection {
   /** Odds per game of a double-double and a triple-double. */
   ddOdds: number | null;
   tdOdds: number | null;
-  /** Games ESPN projects him to play. */
+  /** Games ESPN projects him to play, or the commissioner's estimate. */
   games: number | null;
+  /** Set when the games are the commissioner's estimate, not ESPN's. */
+  gamesNote: string | null;
   line: ProjectedLine | null;
   lastSeason: number | null;
   /** This season's number less last season's. */
@@ -152,7 +155,8 @@ export function buildProjections(
       : null;
     const odds = perGame ? bonusOdds(perGame) : null;
     const rawGames = espn?.projection?.stats['42'];
-    const games = rawGames !== undefined && Number.isFinite(rawGames) ? rawGames : null;
+    const override = gamesOverride(player.espnId);
+    const games = override ? override.games : rawGames !== undefined && Number.isFinite(rawGames) ? rawGames : null;
     const keeper = kept.get(player.key) ?? null;
     const lastSeason = lastSeasonFppg(player);
 
@@ -172,6 +176,7 @@ export function buildProjections(
       ddOdds: odds ? round2(odds.doubleDouble) : null,
       tdOdds: odds ? round2(odds.tripleDouble) : null,
       games,
+      gamesNote: override ? `${override.note} ESPN had ${rawGames ?? 'no'} games.` : null,
       line: perGame ? lineOf(perGame) : null,
       lastSeason,
       change: entry.fppg !== null && lastSeason !== null && entry.source !== 'last-season'
