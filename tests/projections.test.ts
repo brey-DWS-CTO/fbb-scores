@@ -178,3 +178,13 @@ test('on the forecast alone, last season ranks nobody', () => {
   // No ESPN numbers at all: nobody is valued, rather than valued on last season.
   assert.equal(valueBoard(dataset.players, null, { projectionsOnly: true }).entries.length, 0);
 });
+
+test('season total is FPPG times projected games, and sorts', () => {
+  const jokic = find(rows, 'Nikola Jokic');
+  assert.equal(jokic.total, Math.round(jokic.fppg! * 72));
+  const bare = rows.find((row) => row.games === null);
+  assert.equal(bare?.total ?? null, null);
+  const byTotal = sortProjections(rows, { column: 'total', dir: 'desc' });
+  const totals = byTotal.filter((row) => row.total !== null).map((row) => row.total!);
+  assert.deepEqual(totals, [...totals].sort((a, b) => b - a));
+});

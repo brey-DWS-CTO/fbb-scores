@@ -60,6 +60,8 @@ export interface PlayerProjection {
   source: RankSource;
   /** Points per game in this league's scoring, bonus included. */
   fppg: number | null;
+  /** Points for the season: FPPG times the games ESPN projects. Null without games. */
+  total: number | null;
   /** ESPN's projected line scored our way, before the bonus. */
   base: number | null;
   /** The double- and triple-double bonus we add, per game. */
@@ -149,7 +151,8 @@ export function buildProjections(
       ? round1(entry.fppg - base)
       : null;
     const odds = perGame ? bonusOdds(perGame) : null;
-    const games = espn?.projection?.stats['42'];
+    const rawGames = espn?.projection?.stats['42'];
+    const games = rawGames !== undefined && Number.isFinite(rawGames) ? rawGames : null;
     const keeper = kept.get(player.key) ?? null;
     const lastSeason = lastSeasonFppg(player);
 
@@ -163,11 +166,12 @@ export function buildProjections(
       keptBy: keeper?.owner ?? null,
       source: entry.source,
       fppg: entry.fppg,
+      total: entry.fppg !== null && games !== null ? Math.round(entry.fppg * games) : null,
       base,
       bonus,
       ddOdds: odds ? round2(odds.doubleDouble) : null,
       tdOdds: odds ? round2(odds.tripleDouble) : null,
-      games: games !== undefined && Number.isFinite(games) ? games : null,
+      games,
       line: perGame ? lineOf(perGame) : null,
       lastSeason,
       change: entry.fppg !== null && lastSeason !== null && entry.source !== 'last-season'
@@ -183,7 +187,7 @@ export function buildProjections(
 // ─── Columns ────────────────────────────────────────────────────────────────
 
 export type ProjectionColumnId =
-  | 'valueRank' | 'name' | 'proTeam' | 'positions' | 'tag' | 'games' | 'fppg' | 'base' | 'bonus'
+  | 'valueRank' | 'name' | 'proTeam' | 'positions' | 'tag' | 'games' | 'fppg' | 'total' | 'base' | 'bonus'
   | 'ddOdds' | 'tdOdds' | 'min' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to'
   | 'fgm' | 'fga' | 'fgPct' | 'ftm' | 'fta' | 'ftPct'
   | 'lastSeason' | 'change' | 'espnRank' | 'adp';
@@ -208,6 +212,7 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'positions', label: 'POS', header: 'Positions', firstDir: 'asc', value: (row) => row.positions.join('/') },
   { id: 'tag', label: 'STATUS', header: 'Status', firstDir: 'asc', value: (row) => (row.keptBy ? `${tagLabel[row.tag]} (${row.keptBy})` : tagLabel[row.tag]) },
   { id: 'fppg', label: 'FPPG', header: 'Projected FPPG', firstDir: 'desc', value: (row) => row.fppg },
+  { id: 'total', label: 'TOTAL', header: 'Projected season points', firstDir: 'desc', value: (row) => row.total },
   { id: 'base', label: 'ESPN', header: 'ESPN line, our scoring', firstDir: 'desc', value: (row) => row.base },
   { id: 'bonus', label: '+DD', header: 'Double-double bonus', firstDir: 'desc', value: (row) => row.bonus },
   { id: 'ddOdds', label: 'DD%', header: 'Double-double odds', firstDir: 'desc', value: (row) => row.ddOdds },

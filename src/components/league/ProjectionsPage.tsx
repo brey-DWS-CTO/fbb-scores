@@ -59,6 +59,7 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
         text: one(row.fppg),
         className: row.source === 'projection' ? 'proj-fppg' : 'proj-fppg proj-fallback',
       };
+    case 'total': return { text: row.total === null ? '—' : row.total.toLocaleString(), className: 'proj-fppg' };
     case 'base': return { text: one(row.base) };
     case 'bonus': return { text: row.bonus === null ? '—' : `+${row.bonus.toFixed(1)}` };
     case 'ddOdds': return { text: pct(row.ddOdds), className: toneClass(oddsTone(row.ddOdds)).trim() };
