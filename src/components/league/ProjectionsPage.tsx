@@ -6,6 +6,7 @@ import { rankSourceLabel } from '../../lib/league/draftRankings.js';
 import { POSITIONS, valueBoard, type Position } from '../../lib/league/draftValue.js';
 import { keepersForMock } from '../../lib/league/mockDraft.js';
 import {
+  FIXED_COLUMNS,
   PROJECTION_COLUMNS,
   buildProjections,
   changeTone,
@@ -14,7 +15,9 @@ import {
   nextSort,
   oddsTone,
   pageOf,
+  parseHiddenColumns,
   projectionsToCsv,
+  visibleColumns,
   sortProjections,
   type PlayerProjection,
   type ProjectionColumnId,
@@ -27,6 +30,15 @@ import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 
 const PAGE_SIZES = [20, 50, 100, 200, 500] as const;
+const HIDDEN_KEY = 'nerds.projections.hidden';
+
+function readHidden(): Set<ProjectionColumnId> {
+  try {
+    return parseHiddenColumns(window.localStorage.getItem(HIDDEN_KEY));
+  } catch {
+    return new Set();
+  }
+}
 
 const one = (value: number | null) => (value === null ? '—' : value.toFixed(1));
 const pct = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
@@ -156,6 +168,20 @@ export default function ProjectionsPage() {
   const [pageSize, setPageSize] = useState<number>(50);
   const [open, setOpen] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [hidden, setHidden] = useState<Set<ProjectionColumnId>>(readHidden);
+  const [picking, setPicking] = useState(false);
+  const columns = useMemo(() => visibleColumns(hidden), [hidden]);
+  const toggleColumn = (id: ProjectionColumnId) => {
+    const next = new Set(hidden);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setHidden(next);
+    try {
+      window.localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
+    } catch {
+      /* no storage: the choice lasts until the page reloads */
+    }
+  };
 
   const values = useMemo(
     () => valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true }),
@@ -192,14 +218,14 @@ export default function ProjectionsPage() {
     : null;
 
   const exportCsv = () => {
-    download(new Blob([projectionsToCsv(shown)], { type: 'text/csv;charset=utf-8' }), 'projections.csv');
+    download(new Blob([projectionsToCsv(shown, columns)], { type: 'text/csv;charset=utf-8' }), 'projections.csv');
   };
   const exportXlsx = async () => {
     setExporting(true);
     try {
       const { default: writeXlsxFile } = await import('write-excel-file/browser');
-      const header = [{ value: '#', fontWeight: 'bold' as const }, ...PROJECTION_COLUMNS.map((column) => ({ value: column.header, fontWeight: 'bold' as const }))];
-      const body = shown.map((row, index) => [{ value: index + 1 }, ...PROJECTION_COLUMNS.map((column) => {
+      const header = [{ value: '#', fontWeight: 'bold' as const }, ...columns.map((column) => ({ value: column.header, fontWeight: 'bold' as const }))];
+      const body = shown.map((row, index) => [{ value: index + 1 }, ...columns.map((column) => {
         const value = column.value(row);
         return value === null ? null : { value };
       })]);
@@ -273,6 +299,9 @@ export default function ProjectionsPage() {
           Hide keepers
         </label>
         <div className="proj-export">
+          <button type="button" className={`tap-btn mock-mini-btn${picking ? ' is-on' : ''}`} aria-expanded={picking} onClick={() => setPicking(!picking)}>
+            COLUMNS{hidden.size > 0 ? ` (${PROJECTION_COLUMNS.length - hidden.size} of ${PROJECTION_COLUMNS.length})` : ''}
+          </button>
           <button type="button" className="tap-btn mock-mini-btn" onClick={exportCsv} disabled={shown.length === 0}>
             EXPORT CSV
           </button>
@@ -282,12 +311,35 @@ export default function ProjectionsPage() {
         </div>
       </section>
 
+      {picking && (
+        <section className="panel proj-columns" aria-label="Columns to show">
+          {PROJECTION_COLUMNS.filter((column) => !FIXED_COLUMNS.has(column.id)).map((column) => (
+            <label key={column.id} className="proj-column-pick" title={column.header}>
+              <input type="checkbox" checked={!hidden.has(column.id)} onChange={() => toggleColumn(column.id)} />
+              {column.label}
+            </label>
+          ))}
+          {hidden.size > 0 && (
+            <button
+              type="button"
+              className="tap-btn mock-mini-btn"
+              onClick={() => {
+                setHidden(new Set());
+                try { window.localStorage.removeItem(HIDDEN_KEY); } catch { /* nothing to clear */ }
+              }}
+            >
+              SHOW ALL
+            </button>
+          )}
+        </section>
+      )}
+
       <div className="panel proj-table-wrap">
         <table className="proj-table">
           <thead>
             <tr>
               <th className="proj-col-pos" title="Place in this sort"><span>#</span></th>
-              {PROJECTION_COLUMNS.map((column) => {
+              {columns.map((column) => {
                 const sorted = sort?.column === column.id ? sort.dir : null;
                 return (
                   <th
@@ -317,7 +369,7 @@ export default function ProjectionsPage() {
                     onClick={() => setOpen(isOpen ? null : row.key)}
                   >
                     <td className="proj-col-pos">{current.from + index}</td>
-                    {PROJECTION_COLUMNS.map((column) => {
+                    {columns.map((column) => {
                       const { text, className } = cell(row, column.id);
                       return (
                         <td key={column.id} className={`proj-col-${column.id}${className ? ` ${className}` : ''}`}>
@@ -330,7 +382,7 @@ export default function ProjectionsPage() {
                   </tr>
                   {isOpen && (
                     <tr className="proj-detail-row">
-                      <td colSpan={PROJECTION_COLUMNS.length + 1}>
+                      <td colSpan={columns.length + 1}>
                         <Detail row={row} season={dataset.season} />
                       </td>
                     </tr>
@@ -340,7 +392,7 @@ export default function ProjectionsPage() {
             })}
             {current.rows.length === 0 && (
               <tr>
-                <td colSpan={PROJECTION_COLUMNS.length + 1} className="proj-empty">No players match.</td>
+                <td colSpan={columns.length + 1} className="proj-empty">No players match.</td>
               </tr>
             )}
           </tbody>

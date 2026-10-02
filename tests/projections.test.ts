@@ -190,6 +190,19 @@ test('season total is FPPG times projected games, and sorts', () => {
   assert.deepEqual(totals, [...totals].sort((a, b) => b - a));
 });
 
+test('columns: VS LAST sits beside ESPN; hidden ones drop out; the player always stays', async () => {
+  const { PROJECTION_COLUMNS, visibleColumns, parseHiddenColumns } = await import('../src/lib/league/projections.ts');
+  const ids = PROJECTION_COLUMNS.map((column) => column.id);
+  assert.equal(ids.indexOf('change'), ids.indexOf('base') + 1);
+  const shown = visibleColumns(new Set(['pts', 'name', 'fgPct'])).map((column) => column.id);
+  assert.ok(!shown.includes('pts') && !shown.includes('fgPct'));
+  assert.ok(shown.includes('name'));
+  assert.deepEqual([...parseHiddenColumns(JSON.stringify(['pts', 'name', 'nope', 3]))], ['pts']);
+  assert.equal(parseHiddenColumns('garbage').size, 0);
+  const csv = projectionsToCsv(rows.slice(0, 1), visibleColumns(new Set(['proTeam']))).split('\r\n')[0];
+  assert.ok(csv.startsWith('#,Player,Positions'));
+});
+
 test('commissioner games estimates cut total and value, not points per game', async () => {
   const { GAMES_OVERRIDES } = await import('../src/lib/league/gamesOverrides.ts');
   for (const override of GAMES_OVERRIDES) {

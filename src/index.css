@@ -3965,6 +3965,25 @@ th.schedule-col-active {
 .room-clock .room-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .room-clock .room-actions .mock-mini-btn { flex: 1 1 auto; }
 
+/* ─── Projections: choose which columns show ─────────────────────────── */
+.proj-columns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; }
+.proj-column-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--input-bg);
+  color: var(--text-body);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.proj-column-pick:has(input:not(:checked)) { color: var(--text-faint); }
+
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
