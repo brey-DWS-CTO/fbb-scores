@@ -218,7 +218,7 @@ export default function MockDraftPage() {
   const scenario = scenarioQuery.scenario;
 
   const values = useMemo(
-    () => valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027 }),
+    () => valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true }),
     [dataset.players, snapshot],
   );
 
@@ -319,9 +319,10 @@ export default function MockDraftPage() {
       </div>
       <div className="mock-intro">
         Nine other teams draft against you on {mode === 'sharp' ? 'our value model' : 'ESPN’s draft position, the way a real room reaches'}.
-        Values come from {rankSourceLabel(values.primary, dataset.season)} in this league&apos;s scoring.
-        {!snapshot?.players.length && (
-          <> No ESPN numbers are accepted yet, so everyone is valued on last season. <Link to="/admin">Fetch them in Commish Mode.</Link></>
+        Values come from ESPN&apos;s {rankSourceLabel('projection', dataset.season)}s in this league&apos;s scoring.
+        A player ESPN ranks but has not projected is valued off his rank. Last season plays no part.
+        {values.counts.projection === 0 && (
+          <> ESPN projections are not saved yet, so nobody can be valued. <Link to="/admin">Update from ESPN in Commish Mode.</Link></>
         )}
         {' '}The seed is the number the random picks run from: same seed, same draft, and NEW rolls another.
         Projections save. Nothing else on this page does.

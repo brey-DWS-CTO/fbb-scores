@@ -36,6 +36,14 @@ export interface ProjectedLine {
   blk: number;
   threes: number;
   to: number;
+  min: number;
+  fgm: number;
+  fga: number;
+  /** Made over attempted, as a percent. Null with no attempts. */
+  fgPct: number | null;
+  ftm: number;
+  fta: number;
+  ftPct: number | null;
 }
 
 export interface PlayerProjection {
@@ -52,6 +60,8 @@ export interface PlayerProjection {
   source: RankSource;
   /** Points per game in this league's scoring, bonus included. */
   fppg: number | null;
+  /** Points for the season: FPPG times the games ESPN projects. Null without games. */
+  total: number | null;
   /** ESPN's projected line scored our way, before the bonus. */
   base: number | null;
   /** The double- and triple-double bonus we add, per game. */
@@ -76,6 +86,12 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
 
 function lineOf(perGame: Readonly<Record<string, number>>): ProjectedLine {
   const stat = (id: string) => round1(perGame[id] ?? 0);
+  // Percentages come from makes over attempts. ESPN's own percent fields are
+  // season ratios, and dividing them by games like a count would ruin them.
+  const pct = (made: string, tried: string) => {
+    const attempts = perGame[tried] ?? 0;
+    return attempts > 0 ? round1(((perGame[made] ?? 0) / attempts) * 100) : null;
+  };
   return {
     pts: stat('0'),
     reb: stat('6'),
@@ -84,6 +100,13 @@ function lineOf(perGame: Readonly<Record<string, number>>): ProjectedLine {
     blk: stat('1'),
     threes: stat('17'),
     to: stat('11'),
+    min: stat('40'),
+    fgm: stat('13'),
+    fga: stat('14'),
+    fgPct: pct('13', '14'),
+    ftm: stat('15'),
+    fta: stat('16'),
+    ftPct: pct('15', '16'),
   };
 }
 
@@ -128,7 +151,8 @@ export function buildProjections(
       ? round1(entry.fppg - base)
       : null;
     const odds = perGame ? bonusOdds(perGame) : null;
-    const games = espn?.projection?.stats['42'];
+    const rawGames = espn?.projection?.stats['42'];
+    const games = rawGames !== undefined && Number.isFinite(rawGames) ? rawGames : null;
     const keeper = kept.get(player.key) ?? null;
     const lastSeason = lastSeasonFppg(player);
 
@@ -142,11 +166,12 @@ export function buildProjections(
       keptBy: keeper?.owner ?? null,
       source: entry.source,
       fppg: entry.fppg,
+      total: entry.fppg !== null && games !== null ? Math.round(entry.fppg * games) : null,
       base,
       bonus,
       ddOdds: odds ? round2(odds.doubleDouble) : null,
       tdOdds: odds ? round2(odds.tripleDouble) : null,
-      games: games !== undefined && Number.isFinite(games) ? games : null,
+      games,
       line: perGame ? lineOf(perGame) : null,
       lastSeason,
       change: entry.fppg !== null && lastSeason !== null && entry.source !== 'last-season'
@@ -162,8 +187,9 @@ export function buildProjections(
 // ─── Columns ────────────────────────────────────────────────────────────────
 
 export type ProjectionColumnId =
-  | 'valueRank' | 'name' | 'proTeam' | 'positions' | 'tag' | 'games' | 'fppg' | 'base' | 'bonus'
-  | 'ddOdds' | 'tdOdds' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to'
+  | 'valueRank' | 'name' | 'proTeam' | 'positions' | 'tag' | 'games' | 'fppg' | 'total' | 'base' | 'bonus'
+  | 'ddOdds' | 'tdOdds' | 'min' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to'
+  | 'fgm' | 'fga' | 'fgPct' | 'ftm' | 'fta' | 'ftPct'
   | 'lastSeason' | 'change' | 'espnRank' | 'adp';
 
 export interface ProjectionColumn {
@@ -180,17 +206,18 @@ export interface ProjectionColumn {
 const tagLabel: Record<KeeperTag, string> = { keeper: 'Keeper', projected: 'Projected keeper', open: 'Open' };
 
 export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
-  { id: 'valueRank', label: '#', header: 'Board rank', firstDir: 'asc', value: (row) => row.valueRank },
   { id: 'name', label: 'PLAYER', header: 'Player', firstDir: 'asc', value: (row) => row.name },
   { id: 'proTeam', label: 'TM', header: 'Team', firstDir: 'asc', value: (row) => row.proTeam },
   { id: 'positions', label: 'POS', header: 'Positions', firstDir: 'asc', value: (row) => row.positions.join('/') },
   { id: 'tag', label: 'STATUS', header: 'Status', firstDir: 'asc', value: (row) => (row.keptBy ? `${tagLabel[row.tag]} (${row.keptBy})` : tagLabel[row.tag]) },
   { id: 'fppg', label: 'FPPG', header: 'Projected FPPG', firstDir: 'desc', value: (row) => row.fppg },
+  { id: 'total', label: 'TOTAL', header: 'Projected season points', firstDir: 'desc', value: (row) => row.total },
   { id: 'base', label: 'ESPN', header: 'ESPN line, our scoring', firstDir: 'desc', value: (row) => row.base },
   { id: 'bonus', label: '+DD', header: 'Double-double bonus', firstDir: 'desc', value: (row) => row.bonus },
   { id: 'ddOdds', label: 'DD%', header: 'Double-double odds', firstDir: 'desc', value: (row) => row.ddOdds },
   { id: 'tdOdds', label: 'TD%', header: 'Triple-double odds', firstDir: 'desc', value: (row) => row.tdOdds },
   { id: 'games', label: 'GP', header: 'Projected games', firstDir: 'desc', value: (row) => row.games },
+  { id: 'min', label: 'MIN', header: 'Minutes', firstDir: 'desc', value: (row) => row.line?.min ?? null },
   { id: 'pts', label: 'PTS', header: 'Points', firstDir: 'desc', value: (row) => row.line?.pts ?? null },
   { id: 'reb', label: 'REB', header: 'Rebounds', firstDir: 'desc', value: (row) => row.line?.reb ?? null },
   { id: 'ast', label: 'AST', header: 'Assists', firstDir: 'desc', value: (row) => row.line?.ast ?? null },
@@ -198,10 +225,17 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'blk', label: 'BLK', header: 'Blocks', firstDir: 'desc', value: (row) => row.line?.blk ?? null },
   { id: 'threes', label: '3PM', header: 'Threes made', firstDir: 'desc', value: (row) => row.line?.threes ?? null },
   { id: 'to', label: 'TO', header: 'Turnovers', firstDir: 'asc', value: (row) => row.line?.to ?? null },
+  { id: 'fgm', label: 'FGM', header: 'Field goals made', firstDir: 'desc', value: (row) => row.line?.fgm ?? null },
+  { id: 'fga', label: 'FGA', header: 'Field goals tried', firstDir: 'desc', value: (row) => row.line?.fga ?? null },
+  { id: 'fgPct', label: 'FG%', header: 'Field goal percent', firstDir: 'desc', value: (row) => row.line?.fgPct ?? null },
+  { id: 'ftm', label: 'FTM', header: 'Free throws made', firstDir: 'desc', value: (row) => row.line?.ftm ?? null },
+  { id: 'fta', label: 'FTA', header: 'Free throws tried', firstDir: 'desc', value: (row) => row.line?.fta ?? null },
+  { id: 'ftPct', label: 'FT%', header: 'Free throw percent', firstDir: 'desc', value: (row) => row.line?.ftPct ?? null },
   { id: 'lastSeason', label: 'LAST', header: 'Last season FPPG', firstDir: 'desc', value: (row) => row.lastSeason },
-  { id: 'change', label: '+/-', header: 'Change', firstDir: 'desc', value: (row) => row.change },
+  { id: 'change', label: 'VS LAST', header: 'Change from last season', firstDir: 'desc', value: (row) => row.change },
   { id: 'espnRank', label: 'ESPN RK', header: 'ESPN rank', firstDir: 'asc', value: (row) => row.espnRank },
   { id: 'adp', label: 'ADP', header: 'ADP', firstDir: 'asc', value: (row) => row.adp },
+  { id: 'valueRank', label: 'BOARD', header: 'Board rank', firstDir: 'asc', value: (row) => row.valueRank },
 ];
 
 const COLUMN_BY_ID = new Map(PROJECTION_COLUMNS.map((column) => [column.id, column]));
@@ -327,9 +361,11 @@ function csvCell(value: string | number | null): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** Every column, every row given, in the order given. */
+/** Every column, every row given, in the order given, numbered from 1. */
 export function projectionsToCsv(rows: readonly PlayerProjection[]): string {
-  const lines = [PROJECTION_COLUMNS.map((column) => csvCell(column.header)).join(',')];
-  for (const row of rows) lines.push(PROJECTION_COLUMNS.map((column) => csvCell(column.value(row))).join(','));
+  const lines = [['#', ...PROJECTION_COLUMNS.map((column) => csvCell(column.header))].join(',')];
+  rows.forEach((row, index) => {
+    lines.push([String(index + 1), ...PROJECTION_COLUMNS.map((column) => csvCell(column.value(row)))].join(','));
+  });
   return `${lines.join('\r\n')}\r\n`;
 }
