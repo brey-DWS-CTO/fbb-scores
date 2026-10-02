@@ -3659,6 +3659,37 @@ th.schedule-col-active {
 }
 
 
+/* ─── Mock draft: the live draft first, setup folded ───────────────── */
+/* Your pick sits left on a laptop and first on a phone; the pick log goes
+   beside it once the draft starts. Before that the start card stands alone. */
+@media (min-width: 840px) {
+  .live-mock { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+}
+.live-mock.is-idle { grid-template-columns: 1fr; }
+.mock-setup { margin-top: 14px; }
+.mock-setup .mock-assumptions { margin-bottom: 0; }
+
+/* ─── Mock pick list: columns that line up ─────────────────────────── */
+/* Every column has a fixed width, so the header and each row (each its own
+   grid) agree. The header is the list's sticky first row. */
+.live-list-head, .live-list li { grid-template-columns: 24px minmax(0, 1fr) 44px 44px 44px 62px; }
+.live-list li.live-list-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  border-color: transparent;
+  background: var(--panel-bg);
+}
+.live-list li:first-child { border-color: var(--panel-border); }
+.live-list-head + li { border-color: var(--neon-teal); }
+.live-list-head span:nth-child(n+3) { text-align: right; }
+.live-list .mock-mini-btn { width: 100%; padding: 0; }
+@media (max-width: 480px) {
+  .live-list-head, .live-list li { grid-template-columns: 20px minmax(0, 1fr) 40px 40px 58px; gap: 6px; }
+  .live-list .mock-mini-btn { min-height: 36px; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

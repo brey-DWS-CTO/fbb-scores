@@ -145,50 +145,7 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
   const madeCount = Object.keys(choices).length;
 
   return (
-    <div className="live-mock">
-      <section className="panel live-log-panel">
-        <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>
-          THE DRAFT
-          <small>seed {seed}{over ? ', finished' : nextUp ? `, on the clock: ${nextUp.owner}` : ''}</small>
-        </div>
-        <div className="live-actions">
-          <button type="button" className="tap-btn mock-mini-btn" onClick={restart}>CLEAR AND RESTART</button>
-          <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={madeCount === 0}>UNDO MY LAST PICK</button>
-          <button type="button" className="tap-btn mock-mini-btn" onClick={onNewSeed}>NEW SEED</button>
-        </div>
-        <ol className="live-log" ref={logRef}>
-          {shownPicks.map((pick) => (
-            <li key={pick.overall} className={pick.owner === person ? 'live-pick live-pick-mine' : 'live-pick'}>
-              <span className="mock-slot-label">{pick.label}</span>
-              <span className="mock-slot-owner">{pick.owner}</span>
-              <span className="mock-slot-player">
-                {pick.playerName ?? 'nobody'}
-                <small>{pick.positions.join('/')}</small>
-                {pick.how === 'keeper' && (
-                  <span className={`mock-tag ${pick.keeperStatus === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>
-                    {pick.keeperStatus === 'known' ? 'keeper' : 'projected'}
-                  </span>
-                )}
-                {pick.how === 'made' && <span className="mock-tag mock-tag-known">picked</span>}
-              </span>
-              <span className="live-pick-why">
-                {pick.how === 'pick' && pick.owner !== person && pick.valueRank !== null && (
-                  pick.roomRank !== null && pick.roomRank < pick.valueRank ? `ADP ${pick.roomRank}` : `value #${pick.valueRank}`
-                )}
-              </span>
-            </li>
-          ))}
-          {started && !caughtUp && nextUp && (
-            <li className="live-pick live-pick-thinking">
-              <span className="mock-slot-label">{nextUp.label}</span>
-              <span className="mock-slot-owner">{nextUp.owner}</span>
-              <span className="mock-slot-player"><span className="mock-live">picking…</span></span>
-              <span />
-            </li>
-          )}
-        </ol>
-      </section>
-
+    <div className={started ? 'live-mock' : 'live-mock is-idle'}>
       <section className={`panel live-turn-panel${myTurn ? ' is-mine' : ''}`}>
         {!started ? (
           <div className="live-start">
@@ -226,10 +183,11 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
                 if (event.key === 'Enter' && shown[0]) choose(shown[0].playerKey);
               }}
             />
-            <div className="live-list-head" aria-hidden="true">
-              <span>#</span><span>Player</span><span>FPPG</span><span>ADP</span><span>Gone by next</span><span />
-            </div>
             <ul className="live-list">
+              {/* The header scrolls with the rows, so a scrollbar never shifts one and not the other. */}
+              <li className="live-list-head" aria-hidden="true">
+                <span>#</span><span>Player</span><span>FPPG</span><span>ADP</span><span>Gone</span><span />
+              </li>
               {shown.map((candidate) => {
                 const entry = byKey.get(candidate.playerKey);
                 const gone = odds.get(candidate.playerKey) ?? 0;
@@ -277,6 +235,51 @@ export default function LiveMockDraft({ prepared, values, person, seed, onNewSee
           {myKeys.length === 0 && <li className="mock-live">nobody yet</li>}
         </ul>
       </section>
+      {started && (
+      <section className="panel live-log-panel">
+        <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>
+          THE DRAFT
+          <small>{over ? 'finished' : nextUp ? `on the clock: ${nextUp.owner}` : ''}</small>
+        </div>
+        <div className="live-actions">
+          <button type="button" className="tap-btn mock-mini-btn" onClick={restart}>RESTART</button>
+          <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={madeCount === 0}>UNDO MY LAST PICK</button>
+          <button type="button" className="tap-btn mock-mini-btn" onClick={onNewSeed}>NEW DRAFT</button>
+        </div>
+        <ol className="live-log" ref={logRef}>
+          {shownPicks.map((pick) => (
+            <li key={pick.overall} className={pick.owner === person ? 'live-pick live-pick-mine' : 'live-pick'}>
+              <span className="mock-slot-label">{pick.label}</span>
+              <span className="mock-slot-owner">{pick.owner}</span>
+              <span className="mock-slot-player">
+                {pick.playerName ?? 'nobody'}
+                <small>{pick.positions.join('/')}</small>
+                {pick.how === 'keeper' && (
+                  <span className={`mock-tag ${pick.keeperStatus === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>
+                    {pick.keeperStatus === 'known' ? 'keeper' : 'projected'}
+                  </span>
+                )}
+                {pick.how === 'made' && <span className="mock-tag mock-tag-known">picked</span>}
+              </span>
+              <span className="live-pick-why">
+                {pick.how === 'pick' && pick.owner !== person && pick.valueRank !== null && (
+                  pick.roomRank !== null && pick.roomRank < pick.valueRank ? `ADP ${pick.roomRank}` : `value #${pick.valueRank}`
+                )}
+              </span>
+            </li>
+          ))}
+          {started && !caughtUp && nextUp && (
+            <li className="live-pick live-pick-thinking">
+              <span className="mock-slot-label">{nextUp.label}</span>
+              <span className="mock-slot-owner">{nextUp.owner}</span>
+              <span className="mock-slot-player"><span className="mock-live">picking…</span></span>
+              <span />
+            </li>
+          )}
+        </ol>
+      </section>
+
+      )}
     </div>
   );
 }
