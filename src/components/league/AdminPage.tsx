@@ -117,9 +117,9 @@ export default function AdminPage() {
         </div>
       )}
 
-      <CommissionerPanel />
-
       <EspnSyncPanel />
+
+      <CommissionerPanel />
 
       {/* ── Test mode ──────────────────────────────────────────── */}
       <section

@@ -2,42 +2,9 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
-import NavIcon, { type NavIconName } from './NavIcon.js';
+import NavIcon from './NavIcon.js';
 import { readSidebarCollapsed, writeSidebarCollapsed } from '../../lib/league/sidebar.js';
-
-type NavItem = {
-  to: string;
-  label: string;
-  icon: NavIconName;
-  primary?: boolean;
-  commishOnly?: boolean;
-};
-
-// One list drives both bars. `primary` items sit on the phone's bottom bar;
-// the rest live behind MORE. Desktop shows every page in the sidebar.
-const NAV: NavItem[] = [
-  { to: '/keepers', label: 'KEEPERS', icon: 'lock', primary: true },
-  { to: '/draft', label: 'DRAFT', icon: 'target', primary: true },
-  { to: '/teams', label: 'TEAMS', icon: 'people', primary: true },
-  { to: '/trades', label: 'TRADES', icon: 'arrows', primary: true },
-  { to: '/rules', label: 'RULEBOOK', icon: 'book' },
-  { to: '/votes', label: 'VOTES', icon: 'ballot' },
-  { to: '/league', label: 'LEAGUE HQ', icon: 'home' },
-  { to: '/history', label: 'HISTORY', icon: 'trophy' },
-  { to: '/mock', label: 'MOCK DRAFT', icon: 'target', commishOnly: true },
-  { to: '/projections', label: 'PROJECTIONS', icon: 'chart', commishOnly: true },
-  { to: '/schedule', label: 'SCHEDULE', icon: 'calendar', commishOnly: true },
-  { to: '/admin', label: 'COMMISH', icon: 'shield', commishOnly: true },
-];
-
-
-type MenuId = 'league' | 'rules' | 'commish';
-
-const MENU_GROUPS: Array<{ id: MenuId; label: string; routes: string[] }> = [
-  { id: 'league', label: 'LEAGUE', routes: ['/league', '/history'] },
-  { id: 'rules', label: 'RULES', routes: ['/rules', '/votes'] },
-  { id: 'commish', label: 'COMMISH', routes: ['/admin', '/mock', '/projections', '/schedule'] },
-];
+import { onPath, sectionFor, sectionHome, visibleSections } from '../../lib/league/navSections.js';
 
 function TradeBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -78,10 +45,13 @@ export default function AppNav() {
     writeSidebarCollapsed(window.localStorage, next);
   };
 
-  const items = NAV.filter((t) => !t.commishOnly || identity?.isCommissioner);
-  const primary = items.filter((t) => t.primary);
-  const secondary = items.filter((t) => !t.primary);
-  const moreActive = secondary.some((t) => location.pathname.startsWith(t.to));
+  // One list drives both bars. `primary` sections sit on the phone's bottom
+  // bar; the rest live behind MORE. Desktop shows every section.
+  const sections = visibleSections(identity?.isCommissioner === true);
+  const current = sectionFor(location.pathname, sections);
+  const primary = sections.filter((section) => section.primary);
+  const secondary = sections.filter((section) => !section.primary);
+  const moreActive = current !== null && !current.primary;
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -120,15 +90,15 @@ export default function AppNav() {
             </button>
           </div>
           <nav className="top-nav-links" aria-label="Main">
-            {items.map((t) => (
+            {sections.map((t) => (
               <NavLink
-                key={t.to}
-                to={t.to}
-                className={({ isActive }) => (isActive ? 'top-nav-link hub-heading active' : 'top-nav-link hub-heading')}
+                key={t.id}
+                to={sectionHome(t)}
+                className={current?.id === t.id ? 'top-nav-link hub-heading active' : 'top-nav-link hub-heading'}
                 {...(collapsed ? { title: t.label, 'aria-label': t.label } : {})}
               >
                 <span aria-hidden="true"><NavIcon name={t.icon} /></span><span className="top-nav-label">{t.label}</span>
-                {t.to === '/trades' && pendingTrades > 0 && (
+                {t.id === 'trades' && pendingTrades > 0 && (
                   <span className="nav-pill" aria-label={`${pendingTrades} offers waiting`}>
                     {pendingTrades}
                   </span>
@@ -146,13 +116,13 @@ export default function AppNav() {
       <nav className="bottom-nav" aria-label="Main">
         {primary.map((t) => (
           <NavLink
-            key={t.to}
-            to={t.to}
-            className={({ isActive }) => (isActive ? 'bottom-nav-tab active' : 'bottom-nav-tab')}
+            key={t.id}
+            to={sectionHome(t)}
+            className={current?.id === t.id ? 'bottom-nav-tab active' : 'bottom-nav-tab'}
           >
             <span className="bottom-nav-icon" aria-hidden="true">
               <NavIcon name={t.icon} />
-              {t.to === '/trades' && <TradeBadge count={pendingTrades} />}
+              {t.id === 'trades' && <TradeBadge count={pendingTrades} />}
             </span>
             <span className="hub-heading bottom-nav-label">{t.label}</span>
           </NavLink>
@@ -185,26 +155,22 @@ export default function AppNav() {
               </button>
             </div>
             <div className="more-list">
-              {MENU_GROUPS.map((group) => {
-                const groupItems = secondary.filter((item) => group.routes.includes(item.to));
-                if (groupItems.length === 0) return null;
-                return (
-                  <section className="more-section" key={group.id} aria-labelledby={`more-${group.id}`}>
-                    <h2 className="more-section-title hub-heading" id={`more-${group.id}`}>{group.label}</h2>
-                    {groupItems.map((item) => (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={({ isActive }) => (isActive ? 'more-item active' : 'more-item')}
-                        onClick={() => setMoreOpen(false)}
-                      >
-                        <span className="more-item-icon" aria-hidden="true"><NavIcon name={item.icon} /></span>
-                        <span className="hub-heading more-item-label">{item.label === 'LEAGUE' ? 'LEAGUE HQ' : item.label === 'RULES' ? 'RULEBOOK' : item.label}</span>
-                      </NavLink>
-                    ))}
-                  </section>
-                );
-              })}
+              {secondary.map((section) => (
+                <section className="more-section" key={section.id} aria-labelledby={`more-${section.id}`}>
+                  <h2 className="more-section-title hub-heading" id={`more-${section.id}`}>{section.label}</h2>
+                  {section.tabs.map((tab) => (
+                    <NavLink
+                      key={tab.to}
+                      to={tab.to}
+                      className={onPath(location.pathname, tab.to) ? 'more-item active' : 'more-item'}
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      <span className="more-item-icon" aria-hidden="true"><NavIcon name={section.icon} /></span>
+                      <span className="hub-heading more-item-label">{tab.label}</span>
+                    </NavLink>
+                  ))}
+                </section>
+              ))}
             </div>
           </div>
         </>

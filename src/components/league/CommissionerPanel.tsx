@@ -209,7 +209,13 @@ export default function CommissionerPanel() {
 
       {/* Sign-in emails */}
       <ActAsPanel />
-      <EmailAdmin />
+      <details className="commish-fold commish-fold-inner">
+        <summary className="hub-heading">
+          SIGN-IN EMAILS
+          <small>Where each owner&apos;s sign-in link goes</small>
+        </summary>
+        <EmailAdmin />
+      </details>
 
       {/* PINs — still here, and still needed until everyone has used a link */}
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>

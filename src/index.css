@@ -3595,6 +3595,39 @@ th.schedule-col-active {
   html.nav-collapsed .nav-collapse-btn { width: 44px; height: 44px; }
 }
 
+/* ─── Section tabs: the pages inside one sidebar item ──────────────── */
+.section-tabs {
+  display: flex;
+  gap: 4px;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 12px 12px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.section-tabs::-webkit-scrollbar { display: none; }
+.section-tab {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--text-mid);
+  font-size: 0.64rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.section-tab:hover { color: var(--text-hi); }
+.commish-fold-inner { margin: 14px 0 0; }
+.commish-fold-inner > summary { background: transparent; }
+.section-tab.active {
+  border-color: var(--neon-teal);
+  background: rgba(0,255,204,0.08);
+  color: var(--neon-teal);
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
