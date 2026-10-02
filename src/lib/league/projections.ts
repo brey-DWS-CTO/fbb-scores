@@ -213,6 +213,7 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'fppg', label: 'FPPG', header: 'Projected FPPG', firstDir: 'desc', value: (row) => row.fppg },
   { id: 'total', label: 'TOTAL', header: 'Projected season points', firstDir: 'desc', value: (row) => row.total },
   { id: 'base', label: 'ESPN', header: 'ESPN line, our scoring', firstDir: 'desc', value: (row) => row.base },
+  { id: 'change', label: 'VS LAST', header: 'Change from last season', firstDir: 'desc', value: (row) => row.change },
   { id: 'bonus', label: '+DD', header: 'Double-double bonus', firstDir: 'desc', value: (row) => row.bonus },
   { id: 'ddOdds', label: 'DD%', header: 'Double-double odds', firstDir: 'desc', value: (row) => row.ddOdds },
   { id: 'tdOdds', label: 'TD%', header: 'Triple-double odds', firstDir: 'desc', value: (row) => row.tdOdds },
@@ -232,13 +233,33 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'fta', label: 'FTA', header: 'Free throws tried', firstDir: 'desc', value: (row) => row.line?.fta ?? null },
   { id: 'ftPct', label: 'FT%', header: 'Free throw percent', firstDir: 'desc', value: (row) => row.line?.ftPct ?? null },
   { id: 'lastSeason', label: 'LAST', header: 'Last season FPPG', firstDir: 'desc', value: (row) => row.lastSeason },
-  { id: 'change', label: 'VS LAST', header: 'Change from last season', firstDir: 'desc', value: (row) => row.change },
   { id: 'espnRank', label: 'ESPN RK', header: 'ESPN rank', firstDir: 'asc', value: (row) => row.espnRank },
   { id: 'adp', label: 'ADP', header: 'ADP', firstDir: 'asc', value: (row) => row.adp },
   { id: 'valueRank', label: 'BOARD', header: 'Board rank', firstDir: 'asc', value: (row) => row.valueRank },
 ];
 
 const COLUMN_BY_ID = new Map(PROJECTION_COLUMNS.map((column) => [column.id, column]));
+
+/** The player column cannot be hidden: a row needs a name. */
+export const FIXED_COLUMNS: ReadonlySet<ProjectionColumnId> = new Set(['name']);
+
+/** The columns to show, in table order, with the hidden ones left out. */
+export function visibleColumns(hidden: ReadonlySet<string>): ProjectionColumn[] {
+  return PROJECTION_COLUMNS.filter((column) => FIXED_COLUMNS.has(column.id) || !hidden.has(column.id));
+}
+
+/** Hidden column ids from storage. Anything unknown or malformed is ignored. */
+export function parseHiddenColumns(raw: string | null): Set<ProjectionColumnId> {
+  if (!raw) return new Set();
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value)) return new Set();
+    return new Set(value.filter((id): id is ProjectionColumnId =>
+      typeof id === 'string' && COLUMN_BY_ID.has(id as ProjectionColumnId) && !FIXED_COLUMNS.has(id as ProjectionColumnId)));
+  } catch {
+    return new Set();
+  }
+}
 
 export function projectionColumn(id: ProjectionColumnId): ProjectionColumn {
   return COLUMN_BY_ID.get(id)!;
@@ -362,10 +383,13 @@ function csvCell(value: string | number | null): string {
 }
 
 /** Every column, every row given, in the order given, numbered from 1. */
-export function projectionsToCsv(rows: readonly PlayerProjection[]): string {
-  const lines = [['#', ...PROJECTION_COLUMNS.map((column) => csvCell(column.header))].join(',')];
+export function projectionsToCsv(
+  rows: readonly PlayerProjection[],
+  columns: readonly ProjectionColumn[] = PROJECTION_COLUMNS,
+): string {
+  const lines = [['#', ...columns.map((column) => csvCell(column.header))].join(',')];
   rows.forEach((row, index) => {
-    lines.push([String(index + 1), ...PROJECTION_COLUMNS.map((column) => csvCell(column.value(row)))].join(','));
+    lines.push([String(index + 1), ...columns.map((column) => csvCell(column.value(row)))].join(','));
   });
   return `${lines.join('\r\n')}\r\n`;
 }
