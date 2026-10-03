@@ -636,15 +636,32 @@ export async function acceptDraftRankings(
   return data;
 }
 
-export async function fetchPins(
-  c: Credentials,
-): Promise<Array<{ owner: string; pin: string; temp?: boolean }>> {
+/** Whether an owner has a PIN. The commissioner never gets the value. */
+export type PinState = 'set' | 'temp' | 'none';
+
+export async function fetchPins(c: Credentials): Promise<Array<{ owner: string; state: PinState }>> {
   const { data } = await axios.get('/api/league/pins', { headers: authHeaders(c) });
   return data;
 }
 
-export async function setPin(c: Credentials, owner: string, pin: string): Promise<void> {
-  await axios.post(`/api/league/pins/${encodeURIComponent(owner)}`, { pin }, { headers: authHeaders(c) });
+export interface SetPinResult {
+  ok: boolean;
+  /** The new PIN went to the owner's inbox. */
+  emailed: boolean;
+  /** The server wrote it to its log instead, which is local work. */
+  logged?: boolean;
+  /** Why nothing went out, when nothing did. */
+  reason?: string;
+}
+
+/** Set an owner's PIN and mail it to them, or "" to clear it. */
+export async function setPin(c: Credentials, owner: string, pin: string): Promise<SetPinResult> {
+  const { data } = await axios.post<SetPinResult>(
+    `/api/league/pins/${encodeURIComponent(owner)}`,
+    { pin },
+    { headers: authHeaders(c) },
+  );
+  return data;
 }
 
 // ─── Sign-in links ───────────────────────────────────────────────────────────

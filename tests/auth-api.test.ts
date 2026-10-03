@@ -344,3 +344,68 @@ test('a fourth link in the window is refused with a wait', async () => {
   const refused = await linkFor('amy@example.com');
   assert.equal(refused.status, 429);
 });
+
+// ─── Commissioner-set PINs ───────────────────────────────────────────────────
+
+const setPinFor = (owner: string, pin: string, headers = auth(commissioner)) => {
+  mailLog = [];
+  return request(`/api/league/pins/${owner}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ pin }),
+  });
+};
+
+test('the PIN list says who has one, never what it is', async () => {
+  const { status, body } = await request('/api/league/pins', { headers: auth(commissioner) });
+  assert.equal(status, 200);
+  const rows = body as Array<Record<string, unknown>>;
+  assert.equal(rows.length, 10);
+  assert.ok(rows.every((row) => !('pin' in row)));
+  assert.equal(rows.find((row) => row.owner === 'Joel')?.state, 'set');
+  assert.equal(rows.find((row) => row.owner === 'Kyle')?.state, 'none');
+});
+
+test('a member may not set anyone a PIN', async () => {
+  const refused = await setPinFor('Amy', '4321', auth('Joel'));
+  assert.equal(refused.status, 403);
+});
+
+test('a PIN must be 4 to 8 digits', async () => {
+  assert.equal((await setPinFor('Kyle', '12ab')).status, 400);
+  assert.equal((await setPinFor('Kyle', '123')).status, 400);
+});
+
+test('with no address the PIN saves and says nothing went out', async () => {
+  const { status, body } = await setPinFor('Kyle', '5555');
+  assert.equal(status, 200);
+  assert.equal(asRecord(body).emailed, false);
+  assert.match(String(asRecord(body).reason), /no email/);
+  assert.equal(mailLog.some((line) => line.startsWith('[pin]')), false);
+});
+
+test('a set PIN is mailed with a sign-in link and works at once', async () => {
+  await setEmail('Kyle', 'kyle@example.com');
+  const { status, body } = await setPinFor('Kyle', '24680');
+  assert.equal(status, 200);
+  assert.equal(asRecord(body).emailed, true);
+  const line = mailLog.find((entry) => entry.startsWith('[pin]'));
+  assert.ok(line, 'the PIN email went out');
+  assert.match(line, /\/sign-in\//);
+  assert.equal(line.includes('24680'), false, 'the PIN stays out of the log');
+
+  const signedIn = await request('/api/league/verify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-owner': 'Kyle', 'x-pin': '24680' },
+  });
+  assert.equal(signedIn.status, 200);
+});
+
+test('a rate-limited address still gets the PIN, with a plain link', async () => {
+  // Amy used up her links in the rate-limit test above.
+  const { body } = await setPinFor('Amy', '1357');
+  assert.equal(asRecord(body).emailed, true);
+  const line = mailLog.find((entry) => entry.startsWith('[pin]'));
+  assert.ok(line);
+  assert.equal(line.includes('/sign-in/'), false);
+});

@@ -2681,6 +2681,19 @@ export async function getPins(): Promise<Array<{ owner: string; pin: string; tem
     .sort((a, b) => (order.get(a.owner) ?? Infinity) - (order.get(b.owner) ?? Infinity));
 }
 
+/** What the commissioner sees for each PIN: whether one is set, never the value. */
+export type PinState = 'set' | 'temp' | 'none';
+
+/** Every owner's PIN state, in league order. */
+export async function getPinStates(): Promise<Array<{ owner: string; state: PinState }>> {
+  const byOwner = new Map((await getPins()).map((r) => [r.owner, r]));
+  return OWNERS.map((owner) => {
+    const row = byOwner.get(owner);
+    const state: PinState = !row || row.pin === UNCLAIMED ? 'none' : row.temp ? 'temp' : 'set';
+    return { owner, state };
+  });
+}
+
 export async function setPin(owner: string, pin: string, temp = false): Promise<void> {
   return getBackend().setPin(owner, temp && pin !== UNCLAIMED ? TEMP_PREFIX + pin : pin);
 }
