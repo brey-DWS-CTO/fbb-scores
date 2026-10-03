@@ -4006,6 +4006,25 @@ th.schedule-col-active {
 .room-grid td.is-keeper.is-projected { outline-style: dashed; opacity: 1; }
 .room-update-list li.is-keeper { box-shadow: inset 3px 0 0 var(--neon-teal); }
 .mock-setup.is-before { margin-bottom: 12px; }
+/* Mock draft: build a trade that is never sent. */
+.mock-trade-builder { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 12px; }
+.mock-trade-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 839px) { .mock-trade-sides { grid-template-columns: 1fr; } }
+.mock-trade-side { display: flex; flex-direction: column; gap: 4px; }
+.mock-trade-side small { color: var(--text-dim); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.mock-trade-picks { display: flex; flex-wrap: wrap; gap: 4px; }
+.mock-trade-picks label { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid var(--panel-border); border-radius: 6px; font-size: 0.75rem; color: var(--text-mid); cursor: pointer; }
+.mock-trade-picks label.is-on { border-color: var(--neon-teal); color: var(--neon-teal); }
+.mock-trade-picks input { margin: 0; }
+.mock-trade-add { display: flex; align-items: center; gap: 10px; }
+.mock-switches li { display: flex; align-items: flex-start; gap: 6px; }
+
+/* The DRAFT button: last column on a wide screen, first on a phone. */
+.room-draft-col.is-first { display: none; }
+@media (max-width: 839px) {
+  .room-draft-col.is-first { display: table-cell; }
+  .room-draft-col.is-last { display: none; }
+}
 /* A keeper on a better pick than his round. */
 .keeper-early { color: var(--neon-orange); font-weight: 900; font-size: 0.8rem; line-height: 1; margin-left: 3px; cursor: help; }
 .keeper-back-to-mock {
