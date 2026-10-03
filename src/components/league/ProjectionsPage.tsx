@@ -92,6 +92,9 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
         className: row.source === 'projection' ? 'proj-fppg' : 'proj-fppg proj-fallback',
       };
     case 'total': return { text: row.total === null ? '—' : row.total.toLocaleString(), className: 'proj-fppg' };
+    case 'postPoints': return { text: row.postPoints === null ? '—' : row.postPoints.toLocaleString() };
+    case 'playInGames': return { text: whole(row.playInGames) };
+    case 'playoffGames': return { text: whole(row.playoffGames) };
     case 'base': return { text: one(row.base) };
     case 'bonus': return { text: row.bonus === null ? '—' : `+${row.bonus.toFixed(1)}` };
     case 'ddOdds': return { text: pct(row.ddOdds), className: toneClass(oddsTone(row.ddOdds)).trim() };
@@ -475,15 +478,15 @@ export default function ProjectionsPage() {
                         {open && statId !== undefined ? (
                           <input
                             className="proj-cell-input"
-                            type="number"
+                            type="text"
                             inputMode="decimal"
-                            step={column.id === 'games' ? 1 : 0.1}
-                            min={0}
+                            autoComplete="off"
                             autoFocus={column.id === 'games'}
                             aria-label={`${row.name} ${column.header}`}
                             value={rowEdit.values[column.id] ?? ''}
                             onFocus={(event) => event.currentTarget.select()}
-                            onChange={(event) => setRowEdit({ ...rowEdit, values: { ...rowEdit.values, [column.id]: event.target.value } })}
+                            // Typed numbers only: no spinner, wheel or arrow keys can change a value.
+                            onChange={(event) => setRowEdit({ ...rowEdit, values: { ...rowEdit.values, [column.id]: event.target.value.replace(/[^0-9.]/g, '') } })}
                             onKeyDown={(event) => {
                               if (event.key === 'Escape') { event.preventDefault(); setRowEdit(null); }
                               if (event.key === 'Enter') { event.preventDefault(); void commitRow(); }
