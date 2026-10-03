@@ -37,6 +37,7 @@ import {
   type ValueBoard,
 } from './draftValue.js';
 import type { KeeperScenario } from './keeperScenario.js';
+import { earlyKeeperNote } from './keeperEarly.js';
 
 // ─── Seeded randomness ──────────────────────────────────────────────────────
 
@@ -72,6 +73,8 @@ export type KeeperStatus = 'known' | 'assumed';
 export interface MockKeeper extends KeeperSelection {
   /** Known: the real keeper, visible to the viewer. Assumed: a guess. */
   status: KeeperStatus;
+  /** Why he sits on a better pick than his round, or null when he does not. */
+  early: string | null;
 }
 
 export interface MockSlot {
@@ -201,6 +204,7 @@ export function buildMockBoard(dataset: LeagueDataset, input: MockBoardInput): M
           playerKey: cell.keeper.selection.playerKey,
           playerName: cell.keeper.selection.playerName,
           status: status[cell.pick.currentOwner] ?? 'assumed',
+          early: earlyKeeperNote(cell.keeper, pickLabel(cell.pick)),
         }
       : null,
     made: cell.selection?.playerKey
@@ -348,6 +352,8 @@ export interface MockPick {
   positions: Position[];
   how: 'keeper' | 'made' | 'pick' | 'empty';
   keeperStatus: KeeperStatus | null;
+  /** A keeper on a better pick than his round: why, for a tooltip. */
+  keeperEarly?: string | null;
   valueRank: number | null;
   roomRank: number | null;
 }
@@ -536,6 +542,7 @@ export function createMockRun(prepared: PreparedMock, seed: number): MockRun {
         positions: known?.positions ?? [],
         how: 'keeper',
         keeperStatus: slot.keeper.status,
+        keeperEarly: slot.keeper.early,
         valueRank: known?.valueRank ?? null,
         roomRank: known?.roomRank ?? null,
       };

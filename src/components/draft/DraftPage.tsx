@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
+import { earlyKeeperNote } from '../../lib/league/keeperEarly.js';
 import {
   useApplyStateResponse,
   useDraftData,
@@ -161,6 +162,9 @@ function PickRow({
             >
               {projected ? 'PROJECTED' : 'KEEPER'} · R{d.keeperRound ?? '?'}
             </span>
+            {cell.keeper.bumped && (
+              <span className="keeper-early-note">↑ {earlyKeeperNote(cell.keeper, pickLabel(cell.pick))}</span>
+            )}
           </div>
         ) : d ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -191,7 +195,7 @@ export default function DraftPage() {
   const teamName = useTeamName();
   const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
-  const [view, setView] = useState<'list' | 'grid'>('list');
+  const [view, setView] = useState<'list' | 'grid'>('grid');
   const [pickTarget, setPickTarget] = useState<BoardCell | null>(null);
   const [clearTarget, setClearTarget] = useState<BoardCell | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
@@ -558,7 +562,7 @@ export default function DraftPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        {(['list', 'grid'] as const).map((v) => (
+        {(['grid', 'list'] as const).map((v) => (
           <button
             key={v}
             className="tap-btn hub-heading"
@@ -574,7 +578,7 @@ export default function DraftPage() {
               cursor: 'pointer',
             }}
           >
-            {v.toUpperCase()}
+            {v === 'grid' ? 'BOARD' : 'LIST'}
           </button>
         ))}
       </div>

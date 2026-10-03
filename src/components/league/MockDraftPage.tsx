@@ -191,7 +191,16 @@ function WorldColumn({ title, color, world, results, viewer, watchIndex, childre
  * is still there at your pick across many seeded drafts. Two worlds side by
  * side, so "if I keep Cade" can sit next to "if I make this trade".
  */
+/**
+ * One mock per person: switching who you are (Act As, or back) starts the
+ * page over with that person's own draft.
+ */
 export default function MockDraftPage() {
+  const { identity } = useIdentity();
+  return <MockDraftScreen key={identity?.owner ?? 'anon'} />;
+}
+
+function MockDraftScreen() {
   const { identity } = useIdentity();
   const { state, dataset, meta } = useDraftData();
   const scenarioQuery = useKeeperScenario();
@@ -215,7 +224,9 @@ export default function MockDraftPage() {
 
   // Each person's mock draft is kept on their own device, so leaving the page
   // and coming back finds it where it was.
-  const [saved] = useState(() => readSave(viewer));
+  // A mock run while acting as someone is never saved: it ends when you switch back.
+  const acting = Boolean(identity?.impersonatedBy);
+  const [saved] = useState(() => (acting ? null : readSave(viewer)));
   const [view, setView] = useState<'odds' | 'live'>('live');
   const [mode, setMode] = useState<MockMode>(saved?.mode ?? 'realistic');
   const [runs, setRuns] = useState<number>(200);
@@ -231,7 +242,7 @@ export default function MockDraftPage() {
     : null));
   const onProgress = useCallback((next: RoomProgress) => setProgress(next), []);
   useEffect(() => {
-    if (!viewer) return;
+    if (!viewer || acting) return;
     const save: MockSave = {
       version: 1,
       seed,
@@ -251,7 +262,7 @@ export default function MockDraftPage() {
     } catch {
       /* no storage: the draft just does not survive leaving */
     }
-  }, [viewer, seed, mode, progress, tradesOn, tryKeepers, tryPicks, useEntered, guessInstead]);
+  }, [viewer, acting, seed, mode, progress, tradesOn, tryKeepers, tryPicks, useEntered, guessInstead]);
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
@@ -370,131 +381,11 @@ export default function MockDraftPage() {
     ownKeepers !== null ? (ownKeepers.length > 0 ? `you keep ${ownKeepers.map((k) => k.playerName).join(' and ')}` : 'you keep nobody') : null,
   ].filter(Boolean).join(', ');
 
-  return (
-    <div className="mock-page">
-      <div className="mock-head">
-        <h1 className="hub-heading glow-teal" style={{ fontSize: '0.85rem', color: 'var(--neon-teal)', margin: 0, lineHeight: 1.6 }}>
-          <NavIcon name="target" size={16} className="icon-in-heading" />
-          MOCK DRAFT
-        </h1>
-        <IdentityChip />
-      </div>
-      <div className="mock-intro">
-        Draft against nine teams valued on ESPN&apos;s {rankSourceLabel('projection', dataset.season)}s in our scoring.
-        {values.counts.projection === 0 && (
-          <> ESPN projections are not saved yet, so nobody can be valued.{' '}
-            {isCommish ? <Link to="/admin">Update from ESPN in Commish Mode.</Link> : 'The commish will load them soon.'}</>
-        )}
-      </div>
-
-      {/* Once a draft is under way the switches only get in the way. */}
-      {!(view === 'live' && progress?.started) && (
-      <section className="panel mock-controls">
-        <div className="mock-control">
-          <div className="mock-seg" role="radiogroup" aria-label="Draft or odds">
-            {(['live', 'odds'] as const).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                role="radio"
-                aria-checked={view === choice}
-                className={`tap-btn mock-seg-btn${view === choice ? ' is-on' : ''}`}
-                onClick={() => setView(choice)}
-              >
-                {choice === 'odds' ? 'ODDS' : 'DRAFT'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mock-control">
-          <span className="hub-heading mock-control-label">ROOM</span>
-          <div className="mock-seg" role="radiogroup" aria-label="How the room drafts">
-            {(['realistic', 'sharp'] as MockMode[]).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                role="radio"
-                aria-checked={mode === choice}
-                className={`tap-btn mock-seg-btn${mode === choice ? ' is-on' : ''}`}
-                onClick={() => setMode(choice)}
-              >
-                {choice === 'realistic' ? 'REALISTIC' : 'SHARP'}
-              </button>
-            ))}
-          </div>
-        </div>
-        {view === 'odds' && (<>
-        <div className="mock-control">
-          <label className="hub-heading mock-control-label" htmlFor="mock-runs">DRAFTS</label>
-          <select id="mock-runs" className="hub-input mock-select" value={runs} onChange={(event) => setRuns(Number(event.target.value))}>
-            {RUN_CHOICES.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
-          </select>
-        </div>
-        <div className="mock-control">
-          <label className="hub-heading mock-control-label" htmlFor="mock-seed">SEED</label>
-          <input
-            id="mock-seed"
-            className="hub-input mock-select"
-            type="number"
-            inputMode="numeric"
-            value={seed}
-            onChange={(event) => setSeed(Number(event.target.value) || 0)}
-          />
-          <button type="button" className="tap-btn mock-mini-btn" onClick={() => setSeed(Math.floor(Math.random() * 100_000))}>
-            NEW
-          </button>
-        </div>
-        <div className="mock-control">
-          <label className="hub-heading mock-control-label" htmlFor="mock-watch">WATCH</label>
-          <select id="mock-watch" className="hub-input mock-select" value={watchIndex} onChange={(event) => setWatchIndex(Number(event.target.value))}>
-            {(myLivePicks.length > 0 ? myLivePicks : ownPicks(now, viewer)).slice(0, 6).map((slot, index) => (
-              <option key={slot.pick.overall} value={index}>
-                Your {ordinal(index + 1)} live pick ({slot.pick.round}.{slot.pick.slot} now)
-              </option>
-            ))}
-          </select>
-        </div>
-        </>)}
-      </section>
-      )}
-
-      {view === 'live' && (
-        <>
-          {livePrepared ? (
-            <DraftRoom
-              key={liveKey}
-              prepared={livePrepared}
-              values={values}
-              projections={projections}
-              person={viewer}
-              seed={seed}
-              saved={progress}
-              onProgress={onProgress}
-              onNewDraft={() => {
-                setProgress(null);
-                setSeed(Math.floor(Math.random() * 100_000));
-              }}
-            />
-          ) : (
-            <div className="mock-note">No players to draft yet.</div>
-          )}
-        </>
-      )}
-
-      <div className="mock-worlds" hidden={view !== 'odds'}>
-        <WorldColumn title="AS THINGS STAND" color="var(--neon-teal)" world={now} results={nowRuns} viewer={viewer} watchIndex={watchIndex}>
-          <div className="mock-note mock-note-dim">
-            Your real keepers{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => k.playerName).join(', ')})` : ' (none yet)'}, no pending trades.
-          </div>
-        </WorldColumn>
-
-        <WorldColumn title="WHAT IF" color="var(--neon-purple)" world={whatIf} results={whatIfRuns} viewer={viewer} watchIndex={watchIndex}>
-          <div className="mock-note mock-note-dim">{whatIfLabel || 'Same as the left until you switch something on.'}</div>
-
-        </WorldColumn>
-      </div>
-
-      <details className="commish-fold mock-setup">
+  // Before a live draft starts, the setup sits on top and open: keepers and
+  // trades change the board, and changing them later restarts the draft.
+  const setupFirst = view === 'live' && !progress?.started;
+  const setup = (
+      <details key={setupFirst ? 'before' : 'after'} className={`commish-fold mock-setup${setupFirst ? ' is-before' : ''}`} open={setupFirst}>
         <summary className="hub-heading">
           DRAFT SETUP
           <small>{setupSummary}</small>
@@ -523,7 +414,7 @@ export default function MockDraftPage() {
               <div className="mock-guess-head">
                 <span className="mock-guess-owner">{row.owner}</span>
                 {!revealed && (
-                  <Link className="mock-edit" to={`/keepers/${encodeURIComponent(row.owner)}`}>
+                  <Link className="mock-edit" to={`/keepers/${encodeURIComponent(row.owner)}`} state={{ from: 'mock' }}>
                     {row.guess.length > 0 ? 'edit projection' : 'project'}
                   </Link>
                 )}
@@ -628,6 +519,135 @@ export default function MockDraftPage() {
           </div>
         </section>
       </details>
+  );
+
+  return (
+    <div className="mock-page">
+      <div className="mock-head">
+        <h1 className="hub-heading glow-teal" style={{ fontSize: '0.85rem', color: 'var(--neon-teal)', margin: 0, lineHeight: 1.6 }}>
+          <NavIcon name="target" size={16} className="icon-in-heading" />
+          MOCK DRAFT
+        </h1>
+        <IdentityChip />
+      </div>
+      <div className="mock-intro">
+        Draft against nine teams valued on ESPN&apos;s {rankSourceLabel('projection', dataset.season)}s in our scoring.
+        {values.counts.projection === 0 && (
+          <> ESPN projections are not saved yet, so nobody can be valued.{' '}
+            {isCommish ? <Link to="/admin">Update from ESPN in Commish Mode.</Link> : 'The commish will load them soon.'}</>
+        )}
+      </div>
+
+      {/* Once a draft is under way the switches only get in the way. */}
+      {!(view === 'live' && progress?.started) && (
+      <section className="panel mock-controls">
+        <div className="mock-control">
+          <div className="mock-seg" role="radiogroup" aria-label="Draft or odds">
+            {(['live', 'odds'] as const).map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                role="radio"
+                aria-checked={view === choice}
+                className={`tap-btn mock-seg-btn${view === choice ? ' is-on' : ''}`}
+                onClick={() => setView(choice)}
+              >
+                {choice === 'odds' ? 'ODDS' : 'DRAFT'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mock-control">
+          <span className="hub-heading mock-control-label">ROOM</span>
+          <div className="mock-seg" role="radiogroup" aria-label="How the room drafts">
+            {(['realistic', 'sharp'] as MockMode[]).map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                role="radio"
+                aria-checked={mode === choice}
+                className={`tap-btn mock-seg-btn${mode === choice ? ' is-on' : ''}`}
+                onClick={() => setMode(choice)}
+              >
+                {choice === 'realistic' ? 'REALISTIC' : 'SHARP'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {view === 'odds' && (<>
+        <div className="mock-control">
+          <label className="hub-heading mock-control-label" htmlFor="mock-runs">DRAFTS</label>
+          <select id="mock-runs" className="hub-input mock-select" value={runs} onChange={(event) => setRuns(Number(event.target.value))}>
+            {RUN_CHOICES.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+          </select>
+        </div>
+        <div className="mock-control">
+          <label className="hub-heading mock-control-label" htmlFor="mock-seed">SEED</label>
+          <input
+            id="mock-seed"
+            className="hub-input mock-select"
+            type="number"
+            inputMode="numeric"
+            value={seed}
+            onChange={(event) => setSeed(Number(event.target.value) || 0)}
+          />
+          <button type="button" className="tap-btn mock-mini-btn" onClick={() => setSeed(Math.floor(Math.random() * 100_000))}>
+            NEW
+          </button>
+        </div>
+        <div className="mock-control">
+          <label className="hub-heading mock-control-label" htmlFor="mock-watch">WATCH</label>
+          <select id="mock-watch" className="hub-input mock-select" value={watchIndex} onChange={(event) => setWatchIndex(Number(event.target.value))}>
+            {(myLivePicks.length > 0 ? myLivePicks : ownPicks(now, viewer)).slice(0, 6).map((slot, index) => (
+              <option key={slot.pick.overall} value={index}>
+                Your {ordinal(index + 1)} live pick ({slot.pick.round}.{slot.pick.slot} now)
+              </option>
+            ))}
+          </select>
+        </div>
+        </>)}
+      </section>
+      )}
+
+      {setupFirst && setup}
+
+      {view === 'live' && (
+        <>
+          {livePrepared ? (
+            <DraftRoom
+              key={liveKey}
+              prepared={livePrepared}
+              values={values}
+              projections={projections}
+              person={viewer}
+              seed={seed}
+              saved={progress}
+              onProgress={onProgress}
+              onNewDraft={() => {
+                setProgress(null);
+                setSeed(Math.floor(Math.random() * 100_000));
+              }}
+            />
+          ) : (
+            <div className="mock-note">No players to draft yet.</div>
+          )}
+        </>
+      )}
+
+      <div className="mock-worlds" hidden={view !== 'odds'}>
+        <WorldColumn title="AS THINGS STAND" color="var(--neon-teal)" world={now} results={nowRuns} viewer={viewer} watchIndex={watchIndex}>
+          <div className="mock-note mock-note-dim">
+            Your real keepers{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => k.playerName).join(', ')})` : ' (none yet)'}, no pending trades.
+          </div>
+        </WorldColumn>
+
+        <WorldColumn title="WHAT IF" color="var(--neon-purple)" world={whatIf} results={whatIfRuns} viewer={viewer} watchIndex={watchIndex}>
+          <div className="mock-note mock-note-dim">{whatIfLabel || 'Same as the left until you switch something on.'}</div>
+
+        </WorldColumn>
+      </div>
+
+      {!setupFirst && setup}
     </div>
   );
 }
