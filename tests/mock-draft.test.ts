@@ -6,23 +6,25 @@ import type { DatasetPlayer, LeagueDataset, LeagueDynamicState, PickSlot } from 
 import { DEFAULT_ROSTER, valueBoard, type RosterSettings } from '../src/lib/league/draftValue.ts';
 import {
   MODE_PRESETS,
-  availabilityAt,
   baseScore,
   buildMockBoard,
   defaultMockSettings,
-  describeAvailability,
-  describeRound,
   gaussian,
   keepersForMock,
   lineupFit,
   runSeed,
   seededRandom,
   simulateDraft,
-  simulateMany,
   tendencyFor,
   type MockBoard,
   type MockDraftSettings,
 } from '../src/lib/league/mockDraft.ts';
+import {
+  availabilityAt,
+  describeAvailability,
+  describeRound,
+  simulateMany,
+} from './support/mockOdds.ts';
 import { leagueSchedule2027 } from '../src/lib/league/scheduleData.ts';
 
 const dataset = rawDataset as unknown as LeagueDataset;

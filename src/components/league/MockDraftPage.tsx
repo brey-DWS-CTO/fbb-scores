@@ -9,27 +9,21 @@ import { useProjectionData } from '../../hooks/useProjectionData.js';
 import { rankSourceLabel } from '../../lib/league/draftRankings.js';
 import { valueBoard } from '../../lib/league/draftValue.js';
 import {
-  availabilityAt,
   defaultMockSettings,
   keepersForMock,
   prepareMock,
-  simulateMany,
-  type MockDraftResult,
   type MockMode,
-  type MockSlot,
 } from '../../lib/league/mockDraft.js';
 import { describeTrade } from '../../lib/league/pickTrades.js';
 import { buildProjections, type PlayerProjection } from '../../lib/league/projections.js';
 import { mockSaveKey, parseMockSave, type MockSave } from '../../lib/league/draftRoom.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
-import { buildWorld, privateTrades, switchableTrades, tradeConflicts, type World } from '../../lib/league/whatIf.js';
+import { buildWorld, privateTrades, switchableTrades, tradeConflicts } from '../../lib/league/whatIf.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
 import DraftRoom, { type RoomProgress } from './DraftRoom.js';
 import type { MockGrade } from '../../lib/league/mockGrade.js';
 import NavIcon from './NavIcon.js';
-
-const RUN_CHOICES = [100, 200, 500] as const;
 
 /** This person's saved mock draft, or null. Storage can be off; that is no save. */
 function readSave(owner: string | null): MockSave | null {
@@ -40,23 +34,9 @@ function readSave(owner: string | null): MockSave | null {
     return null;
   }
 }
-const ROWS_SHOWN = 12;
 
-const pct = (share: number) => `${Math.round(share * 100)}%`;
-const ordinal = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
-
-/** The viewer's picks in a world, best first. */
-function ownPicks(world: World, viewer: string): MockSlot[] {
-  return world.board.slots
-    .filter((slot) => slot.pick.currentOwner === viewer)
-    .sort((a, b) => a.pick.overall - b.pick.overall);
-}
-
-/** Who a run took at a pick, or null when the slot was a keeper or empty. */
-function sampleTake(run: MockDraftResult | null, overall: number): string | null {
-  const pick = run?.picks.find((entry) => entry.overall === overall);
-  return pick && pick.how === 'pick' ? pick.playerName : null;
-}
+/** What a room is called on screen. The stored name stays `realistic` so saved drafts still load. */
+const roomLabel = (mode: MockMode) => (mode === 'sharp' ? 'sharp' : 'normal');
 
 function KeeperTag({ status }: { status: 'known' | 'assumed' }) {
   return (
@@ -66,136 +46,10 @@ function KeeperTag({ status }: { status: 'known' | 'assumed' }) {
   );
 }
 
-interface WorldColumnProps {
-  title: string;
-  color: string;
-  world: World;
-  results: MockDraftResult[] | null;
-  viewer: string;
-  watchIndex: number;
-  children?: React.ReactNode;
-}
-
-function WorldColumn({ title, color, world, results, viewer, watchIndex, children }: WorldColumnProps) {
-  const mine = ownPicks(world, viewer);
-  const live = mine.filter((slot) => !slot.keeper && !slot.made);
-  const watched = live[Math.min(watchIndex, Math.max(live.length - 1, 0))] ?? mine[0] ?? null;
-  const report = useMemo(
-    () => (results && results.length > 0 && watched ? availabilityAt(results, watched.pick.overall) : null),
-    [results, watched],
-  );
-  const sample = results?.[0] ?? null;
-  const roundOne = world.board.slots.filter((slot) => slot.pick.round === 1);
-  const rows = report?.rows.filter((row) => row.availableShare >= 0.005).slice(0, ROWS_SHOWN) ?? [];
-  const takes = report
-    ? [...report.rows].filter((row) => row.takenHere > 0).sort((a, b) => b.takenHere - a.takenHere).slice(0, 3)
-    : [];
-  const warnings = results ? results.reduce((sum, run) => sum + run.warnings.length, 0) : 0;
-
-  return (
-    <section className="panel mock-world" style={{ '--world-color': color } as React.CSSProperties}>
-      <div className="hub-heading mock-world-title">{title}</div>
-      {children}
-
-      {world.resets.length > 0 && (
-        <div className="mock-note mock-note-warn">
-          {world.resets.map((reset) => (
-            <div key={`${reset.proposalId}-${reset.owner}`}>
-              <NavIcon name="warning" size={13} className="icon-in-heading" />
-              {reset.owner}&apos;s {reset.status === 'known' ? 'keepers' : 'projected keepers'} reset
-              {reset.players.length > 0 ? ` (${reset.players.join(', ')})` : ''}: the trade moves the pick paying for them.
-            </div>
-          ))}
-        </div>
-      )}
-      {world.skipped.filter((entry) => entry.reason !== 'private').map((entry) => (
-        <div key={entry.id} className="mock-note mock-note-warn">{entry.message}</div>
-      ))}
-      {world.board.rejected.map((rejected) => (
-        <div key={rejected.owner} className="mock-note mock-note-bad">
-          {rejected.owner}&apos;s {rejected.status === 'known' ? 'keepers' : 'projected keepers'} do not fit the rules, so the picks stay live: {rejected.errors.join(' ')}
-        </div>
-      ))}
-
-      <div className="hub-heading mock-sub">ROUND ONE</div>
-      <ol className="mock-slots">
-        {roundOne.map((slot) => {
-          const isMine = slot.pick.currentOwner === viewer;
-          const took = sampleTake(sample, slot.pick.overall);
-          return (
-            <li key={slot.pick.overall} className={isMine ? 'mock-slot mock-slot-mine' : 'mock-slot'}>
-              <span className="mock-slot-label">{slot.pick.round}.{slot.pick.slot}</span>
-              <span className="mock-slot-owner">
-                {slot.pick.currentOwner}
-                {slot.pick.viaTradeFrom && <small> via {slot.pick.viaTradeFrom}</small>}
-              </span>
-              <span className="mock-slot-player">
-                {slot.keeper ? (
-                  <>
-                    {slot.keeper.playerName} <KeeperTag status={slot.keeper.status} />
-                  </>
-                ) : slot.made ? (
-                  <>{slot.made.playerName} <span className="mock-tag mock-tag-known">picked</span></>
-                ) : (
-                  <>
-                    <span className="mock-live">live</span>
-                    {took && <small className="mock-sample"> one run: {took}</small>}
-                  </>
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-
-      {watched && (
-        <>
-          <div className="hub-heading mock-sub">
-            LIKELY THERE AT {watched.pick.round}.{watched.pick.slot}
-            <small>your {ordinal(Math.min(watchIndex, Math.max(live.length - 1, 0)) + 1)} live pick{watched.keeper ? ', a keeper slot' : ''}</small>
-          </div>
-          {!results && <div className="mock-note">No players to draft yet.</div>}
-          {report && (
-            <>
-              <ul className="mock-odds">
-                {rows.map((row) => (
-                  <li key={row.playerKey}>
-                    <span className="mock-odds-rank">{row.valueRank}</span>
-                    <span className="mock-odds-name">
-                      {row.playerName}
-                      <small>{row.positions.join('/')}</small>
-                    </span>
-                    <span className="mock-odds-bar" aria-hidden="true">
-                      <span style={{ width: pct(row.availableShare) }} />
-                    </span>
-                    <span className="mock-odds-pct">{pct(row.availableShare)}</span>
-                  </li>
-                ))}
-              </ul>
-              {takes.length > 0 && (
-                <div className="mock-note">
-                  You most often take {takes.map((row) => `${row.playerName} ${pct(row.takenHereShare)}`).join(', ')}.
-                </div>
-              )}
-              <div className="mock-note mock-note-dim">
-                {report.runs} drafts. A number is how often the player was still on the board when this pick came up.
-                {warnings > 0 && ` ${warnings} lineup warnings across the runs.`}
-              </div>
-            </>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
-
 /**
- * The mock draft. Round one as it stands, your projections of
- * other teams' keepers, pending trades as switches, and how often each player
- * is still there at your pick across many seeded drafts. Two worlds side by
- * side, so "if I keep Cade" can sit next to "if I make this trade".
- */
-/**
+ * The mock draft: you draft live against nine computer teams, with your
+ * projections of other teams' keepers and your pending trades as switches.
+ *
  * One mock per person: switching who you are (Act As, or back) starts the
  * page over with that person's own draft.
  */
@@ -227,11 +81,8 @@ function MockDraftScreen() {
   // A mock run while acting as someone is never saved: it ends when you switch back.
   const acting = Boolean(identity?.impersonatedBy);
   const [saved] = useState(() => (acting ? null : readSave(viewer)));
-  const [view, setView] = useState<'odds' | 'live'>('live');
-  const [mode, setMode] = useState<MockMode>(saved?.mode ?? 'realistic');
-  const [runs, setRuns] = useState<number>(200);
+  const [mode, setMode] = useState<MockMode>(saved?.mode ?? 'sharp');
   const [seed, setSeed] = useState(saved?.seed ?? 7);
-  const [watchIndex, setWatchIndex] = useState(0);
   const [tradesOn, setTradesOn] = useState<string[]>(saved?.tradesOn ?? []);
   const [tryKeepers, setTryKeepers] = useState(saved?.tryKeepers ?? false);
   const [tryPicks, setTryPicks] = useState<[string, string]>(saved?.tryPicks ?? ['', '']);
@@ -332,14 +183,6 @@ function MockDraftScreen() {
   const owners = useMemo(() => dataset.teams.map((team) => team.owner), [dataset.teams]);
   const settings = useMemo(() => defaultMockSettings(mode, owners, seed), [mode, owners, seed]);
   const canRun = values.entries.length > 0;
-  const nowRuns = useMemo(
-    () => (canRun && view === 'odds' ? simulateMany({ board: now.board, values, settings }, runs) : null),
-    [canRun, view, now.board, values, settings, runs],
-  );
-  const whatIfRuns = useMemo(
-    () => (canRun && view === 'odds' ? simulateMany({ board: whatIf.board, values, settings }, runs) : null),
-    [canRun, view, whatIf.board, values, settings, runs],
-  );
   const livePrepared = useMemo(
     () => (canRun ? prepareMock({ board: whatIf.board, values, settings }) : null),
     [canRun, whatIf.board, values, settings],
@@ -368,7 +211,6 @@ function MockDraftScreen() {
   const hidden = privateTrades(proposals);
   const conflicts = tradeConflicts(proposals);
   const revealed = meta?.revealed === true || state.keepersRevealed === true;
-  const myLivePicks = ownPicks(now, viewer).filter((slot) => !slot.keeper && !slot.made);
   const guessRows = owners
     .filter((owner) => owner !== viewer)
     .map((owner) => ({
@@ -396,14 +238,9 @@ function MockDraftScreen() {
     ownKeepers !== null ? 'trying a different pair of your own' : null,
   ].filter(Boolean).join(' · ');
 
-  const whatIfLabel = [
-    whatIf.applied.length > 0 ? `${whatIf.applied.length} trade${whatIf.applied.length === 1 ? '' : 's'} on` : null,
-    ownKeepers !== null ? (ownKeepers.length > 0 ? `you keep ${ownKeepers.map((k) => k.playerName).join(' and ')}` : 'you keep nobody') : null,
-  ].filter(Boolean).join(', ');
-
   // Before a live draft starts, the setup sits on top and open: keepers and
   // trades change the board, and changing them later restarts the draft.
-  const setupFirst = view === 'live' && !progress?.started;
+  const setupFirst = !progress?.started;
   const setup = (
       <details key={setupFirst ? 'before' : 'after'} className={`commish-fold mock-setup${setupFirst ? ' is-before' : ''}`} open={setupFirst}>
         <summary className="hub-heading">
@@ -558,115 +395,53 @@ function MockDraftScreen() {
         )}
       </div>
 
-      {/* Once a draft is under way the switches only get in the way. */}
-      {!(view === 'live' && progress?.started) && (
+      {/* Once a draft is under way the switch only gets in the way. */}
+      {!progress?.started && (
       <section className="panel mock-controls">
-        <div className="mock-control">
-          <div className="mock-seg" role="radiogroup" aria-label="Draft or odds">
-            {(['live', 'odds'] as const).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                role="radio"
-                aria-checked={view === choice}
-                className={`tap-btn mock-seg-btn${view === choice ? ' is-on' : ''}`}
-                onClick={() => setView(choice)}
-              >
-                {choice === 'odds' ? 'ODDS' : 'DRAFT'}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="mock-control">
           <span className="hub-heading mock-control-label">ROOM</span>
           <div className="mock-seg" role="radiogroup" aria-label="How the room drafts">
-            {(['realistic', 'sharp'] as MockMode[]).map((choice) => (
+            {(['sharp', 'realistic'] as MockMode[]).map((choice) => (
               <button
                 key={choice}
                 type="button"
                 role="radio"
                 aria-checked={mode === choice}
                 className={`tap-btn mock-seg-btn${mode === choice ? ' is-on' : ''}`}
+                title={choice === 'realistic'
+                  ? 'Teams draft mostly by ADP, the way most rooms do.'
+                  : 'Teams draft by our projections, and mark down a little the players whose numbers swing.'}
                 onClick={() => setMode(choice)}
               >
-                {choice === 'realistic' ? 'REALISTIC' : 'SHARP'}
+                {roomLabel(choice).toUpperCase()}
               </button>
             ))}
           </div>
         </div>
-        {view === 'odds' && (<>
-        <div className="mock-control">
-          <label className="hub-heading mock-control-label" htmlFor="mock-runs">DRAFTS</label>
-          <select id="mock-runs" className="hub-input mock-select" value={runs} onChange={(event) => setRuns(Number(event.target.value))}>
-            {RUN_CHOICES.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
-          </select>
-        </div>
-        <div className="mock-control">
-          <label className="hub-heading mock-control-label" htmlFor="mock-seed">SEED</label>
-          <input
-            id="mock-seed"
-            className="hub-input mock-select"
-            type="number"
-            inputMode="numeric"
-            value={seed}
-            onChange={(event) => setSeed(Number(event.target.value) || 0)}
-          />
-          <button type="button" className="tap-btn mock-mini-btn" onClick={() => setSeed(Math.floor(Math.random() * 100_000))}>
-            NEW
-          </button>
-        </div>
-        <div className="mock-control">
-          <label className="hub-heading mock-control-label" htmlFor="mock-watch">WATCH</label>
-          <select id="mock-watch" className="hub-input mock-select" value={watchIndex} onChange={(event) => setWatchIndex(Number(event.target.value))}>
-            {(myLivePicks.length > 0 ? myLivePicks : ownPicks(now, viewer)).slice(0, 6).map((slot, index) => (
-              <option key={slot.pick.overall} value={index}>
-                Your {ordinal(index + 1)} live pick ({slot.pick.round}.{slot.pick.slot} now)
-              </option>
-            ))}
-          </select>
-        </div>
-        </>)}
       </section>
       )}
 
       {setupFirst && setup}
 
-      {view === 'live' && (
-        <>
-          {livePrepared ? (
-            <DraftRoom
-              key={liveKey}
-              prepared={livePrepared}
-              values={values}
-              projections={projections}
-              person={viewer}
-              seed={seed}
-              saved={progress}
-              onProgress={onProgress}
-              onFinished={onFinished}
-              onNewDraft={() => {
-                setProgress(null);
-                setSeed(Math.floor(Math.random() * 100_000));
-              }}
-            />
-          ) : (
-            <div className="mock-note">No players to draft yet.</div>
-          )}
-        </>
+      {livePrepared ? (
+        <DraftRoom
+          key={liveKey}
+          prepared={livePrepared}
+          values={values}
+          projections={projections}
+          person={viewer}
+          seed={seed}
+          saved={progress}
+          onProgress={onProgress}
+          onFinished={onFinished}
+          onNewDraft={() => {
+            setProgress(null);
+            setSeed(Math.floor(Math.random() * 100_000));
+          }}
+        />
+      ) : (
+        <div className="mock-note">No players to draft yet.</div>
       )}
-
-      <div className="mock-worlds" hidden={view !== 'odds'}>
-        <WorldColumn title="AS THINGS STAND" color="var(--neon-teal)" world={now} results={nowRuns} viewer={viewer} watchIndex={watchIndex}>
-          <div className="mock-note mock-note-dim">
-            Your real keepers{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => k.playerName).join(', ')})` : ' (none yet)'}, no pending trades.
-          </div>
-        </WorldColumn>
-
-        <WorldColumn title="WHAT IF" color="var(--neon-purple)" world={whatIf} results={whatIfRuns} viewer={viewer} watchIndex={watchIndex}>
-          <div className="mock-note mock-note-dim">{whatIfLabel || 'Same as the left until you switch something on.'}</div>
-
-        </WorldColumn>
-      </div>
 
       {!setupFirst && setup}
 
@@ -685,7 +460,7 @@ function MockDraftScreen() {
                   <span className={`mock-grade-letter grade-${record.grade.grade[0].toLowerCase()}`}>{record.grade.grade}</span>
                   <span className="mock-history-line">
                     {gradeSummary(record.grade)}
-                    <small>{new Date(record.finishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {record.mode === 'sharp' ? 'sharp room' : 'realistic room'}</small>
+                    <small>{new Date(record.finishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {roomLabel(record.mode)} room</small>
                   </span>
                 </button>
                 {openResult === record.id && (

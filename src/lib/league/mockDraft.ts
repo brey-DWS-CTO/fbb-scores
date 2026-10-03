@@ -1,6 +1,7 @@
 /**
- * The mock draft: a seeded simulation of this league's draft, run many times,
- * that answers "who is likely to be there at my pick".
+ * The mock draft: a seeded simulation of this league's draft. The person
+ * drafts live against nine computer teams (`liveMock.ts`); the tests run it
+ * hundreds of times to check those teams draft like a room would.
  *
  * It starts from the real board. `buildMockBoard` takes the picks with trade
  * ownership resolved, the keepers the viewer is allowed to know, and any
@@ -247,8 +248,11 @@ export interface OwnerTendency {
 export type MockMode = 'sharp' | 'realistic';
 
 export const MODE_PRESETS: Record<MockMode, OwnerTendency> = {
-  sharp: { adpWeight: 0, needWeight: 0.1, noise: 0.08, topK: 2, topBand: 0.05, positionBias: {} },
-  realistic: { adpWeight: 0.75, needWeight: 0.15, noise: 0.22, topK: 3, topBand: 0.25, positionBias: {} },
+  // Sharp teams agree on value but not to the pick: a player taken around
+  // 20th lands anywhere from about 10th to 27th. The commissioner found the
+  // old, tighter settings gave the same draft every time.
+  sharp: { adpWeight: 0, needWeight: 0.1, noise: 0.2, topK: 3, topBand: 0.12, positionBias: {} },
+  realistic: { adpWeight: 0.75, needWeight: 0.15, noise: 0.26, topK: 3, topBand: 0.28, positionBias: {} },
 };
 
 /** In the draw among close candidates, each next one has this share of the chance of the one before. */
@@ -336,6 +340,8 @@ export interface MockCandidate {
   positions: Position[];
   /** Place on the value board, best first. */
   valueRank: number;
+  /** Place once uncertain players are shaded down a little. Teams draft from this; screens show `valueRank`. */
+  riskRank?: number;
   roomRank: number | null;
   source: RankSource;
 }
@@ -417,6 +423,7 @@ export function prepareMock(input: MockDraftInput): PreparedMock {
       playerName: entry.player.name,
       positions: entry.positions,
       valueRank: entry.rank,
+      riskRank: entry.riskRank,
       roomRank: entry.roomRank,
       source: entry.source,
     }));
@@ -425,6 +432,7 @@ export function prepareMock(input: MockDraftInput): PreparedMock {
     playerName: entry.player.name,
     positions: entry.positions,
     valueRank: entry.rank,
+    riskRank: entry.riskRank,
     roomRank: entry.roomRank,
     source: entry.source,
   } satisfies MockCandidate]));
@@ -441,10 +449,16 @@ export function prepareMock(input: MockDraftInput): PreparedMock {
   return { input, roster, pool, byKey, orderByOwner, tendencies, owners };
 }
 
-/** Where a team puts a player before need and noise: our value, the room's ADP, or a blend. */
-export function baseScore(candidate: Pick<MockCandidate, 'valueRank' | 'roomRank'>, adpWeight: number): number {
-  const room = candidate.roomRank ?? candidate.valueRank;
-  return (1 - adpWeight) * candidate.valueRank + adpWeight * room;
+/**
+ * Where a team puts a player before need and noise: our value, the room's
+ * ADP, or a blend. Our value here is the risk-shaded order, so a sharp team
+ * knocks a player down a few places when our numbers for him disagree. ADP
+ * already prices risk the room's own way and is left alone.
+ */
+export function baseScore(candidate: Pick<MockCandidate, 'valueRank' | 'riskRank' | 'roomRank'>, adpWeight: number): number {
+  const value = candidate.riskRank ?? candidate.valueRank;
+  const room = candidate.roomRank ?? value;
+  return (1 - adpWeight) * value + adpWeight * room;
 }
 
 /** Add a player to a team and seat him if a starting slot can be found. */
@@ -715,99 +729,4 @@ export function runMock(prepared: PreparedMock, seed: number): MockDraftResult {
 /** One draft. Same input and seed, same picks. */
 export function simulateDraft(input: MockDraftInput, seed = input.settings.seed): MockDraftResult {
   return runMock(prepareMock(input), seed);
-}
-
-/** Many drafts from one seed, each with its own derived seed. */
-export function simulateMany(input: MockDraftInput, runs: number): MockDraftResult[] {
-  const prepared = prepareMock(input);
-  const results: MockDraftResult[] = [];
-  for (let run = 0; run < runs; run += 1) {
-    results.push(runMock(prepared, runSeed(input.settings.seed, run)));
-  }
-  return results;
-}
-
-// ─── What the runs say ──────────────────────────────────────────────────────
-
-export interface AvailabilityRow extends MockCandidate {
-  /** Runs in which he was still on the board at the pick. */
-  available: number;
-  /** The same as a share of runs, 0 to 1. */
-  availableShare: number;
-  /** Runs in which this very pick took him. */
-  takenHere: number;
-  takenHereShare: number;
-}
-
-export interface AvailabilityReport {
-  overall: number;
-  label: string;
-  owner: string;
-  runs: number;
-  /** Everyone who was there at least once, best value first. */
-  rows: AvailabilityRow[];
-}
-
-/**
- * For one pick, how often each player was still on the board across the
- * runs, and how often that pick took him. This distribution is the product.
- */
-export function availabilityAt(results: readonly MockDraftResult[], overall: number): AvailabilityReport {
-  if (results.length === 0) throw new Error('No runs to report on');
-  const first = results[0];
-  const slot = first.picks.find((pick) => pick.overall === overall);
-  if (!slot) throw new Error(`No pick ${overall} on the board`);
-
-  const available = new Map<string, number>();
-  const takenHere = new Map<string, number>();
-  for (const result of results) {
-    const gone = new Set<string>();
-    for (const pick of result.picks) {
-      if (pick.overall >= overall) break;
-      if (pick.playerKey) gone.add(pick.playerKey);
-    }
-    for (const candidate of result.pool) {
-      if (!gone.has(candidate.playerKey)) available.set(candidate.playerKey, (available.get(candidate.playerKey) ?? 0) + 1);
-    }
-    const here = result.picks.find((pick) => pick.overall === overall);
-    if (here?.playerKey) takenHere.set(here.playerKey, (takenHere.get(here.playerKey) ?? 0) + 1);
-  }
-
-  const runs = results.length;
-  const rows = first.pool
-    .filter((candidate) => (available.get(candidate.playerKey) ?? 0) > 0)
-    .map((candidate): AvailabilityRow => {
-      const there = available.get(candidate.playerKey) ?? 0;
-      const took = takenHere.get(candidate.playerKey) ?? 0;
-      return {
-        ...candidate,
-        available: there,
-        availableShare: there / runs,
-        takenHere: took,
-        takenHereShare: took / runs,
-      };
-    })
-    .sort((a, b) => a.valueRank - b.valueRank);
-
-  return { overall, label: slot.label, owner: slot.owner, runs, rows };
-}
-
-/** "1.9 (Brey), 200 runs: A. Davis 71%, L. James 64%, ..." */
-export function describeAvailability(report: AvailabilityReport, limit = 8): string {
-  const parts = report.rows
-    .slice(0, limit)
-    .map((row) => `${row.playerName} ${Math.round(row.availableShare * 100)}%`);
-  return `${report.label} (${report.owner}), ${report.runs} runs: ${parts.join(', ')}`;
-}
-
-/** One run as a list of lines, "1.1 Joel: N. Jokic (keeper)". */
-export function describeRound(result: MockDraftResult, round: number): string[] {
-  return result.picks
-    .filter((pick) => pick.round === round)
-    .map((pick) => {
-      const how = pick.how === 'keeper'
-        ? ` (${pick.keeperStatus === 'known' ? 'keeper' : 'assumed keeper'})`
-        : pick.how === 'made' ? ' (already picked)' : '';
-      return `${pick.label} ${pick.owner}: ${pick.playerName ?? 'nobody'}${how}`;
-    });
 }
