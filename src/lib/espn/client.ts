@@ -3,6 +3,7 @@ import type { AxiosInstance } from 'axios';
 import type { EspnLeagueResponse } from '../../types/index.js';
 import {
   projectionStatId,
+  seasonStatId,
   type DraftRankEntry,
   type EspnDraftRankingPlayer,
   type ScoringItem,
@@ -453,10 +454,11 @@ export class EspnClient {
    */
   async fetchDraftRankings(season: number): Promise<EspnDraftRankingPlayer[]> {
     const projectionId = projectionStatId(season);
+    const lastSeasonId = seasonStatId(season - 1);
     const entries = await this.fetchKonaEntries({
       filterStatsForTopScoringPeriodIds: {
         value: 2,
-        additionalValue: [`00${season}`, projectionId],
+        additionalValue: [`00${season}`, projectionId, lastSeasonId],
       },
     });
 
@@ -476,6 +478,9 @@ export class EspnClient {
       const projection = (raw.stats ?? []).find((row) =>
         String(row.id ?? '') === projectionId
         || (row.statSourceId === 1 && row.statSplitTypeId === 0 && row.seasonId === season)) ?? null;
+      const lastSeason = (raw.stats ?? []).find((row) =>
+        String(row.id ?? '') === lastSeasonId
+        || (row.statSourceId === 0 && row.statSplitTypeId === 0 && row.seasonId === season - 1)) ?? null;
       players.push({
         espnId,
         fullName,
@@ -486,6 +491,9 @@ export class EspnClient {
         roto: rankEntry(ranks.ROTO),
         projection: projection
           ? { id: projectionId, stats: projection.stats ?? {}, averageStats: projection.averageStats ?? null }
+          : null,
+        lastSeason: lastSeason
+          ? { id: lastSeasonId, stats: lastSeason.stats ?? {}, averageStats: lastSeason.averageStats ?? null }
           : null,
       });
     }

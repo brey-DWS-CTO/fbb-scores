@@ -227,6 +227,7 @@ export function parseDraftRankingCandidate(value: unknown): DraftRankingCandidat
       standard: parseRankEntry(player.standard, `${field}.standard`),
       roto: parseRankEntry(player.roto, `${field}.roto`),
       projection: parseProjection(player.projection, `${field}.projection`),
+      lastSeason: parseProjection(player.lastSeason, `${field}.lastSeason`),
     };
   });
 

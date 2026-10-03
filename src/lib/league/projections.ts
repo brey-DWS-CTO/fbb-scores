@@ -75,6 +75,8 @@ export interface PlayerProjection {
   /** Set when the games are the commissioner's estimate, not ESPN's. */
   gamesNote: string | null;
   line: ProjectedLine | null;
+  /** Last season's real per-game line, when ESPN's numbers carry it. */
+  lastLine: ProjectedLine | null;
   lastSeason: number | null;
   /** This season's number less last season's. */
   change: number | null;
@@ -147,6 +149,7 @@ export function buildProjections(
     const player = entry.player;
     const espn = player.espnId !== null ? byEspnId.get(player.espnId) ?? null : null;
     const perGame = projectedPerGame(espn?.projection ?? null);
+    const lastPerGame = projectedPerGame(espn?.lastSeason ?? null);
     const base = perGame !== null && scoringItems.length > 0 ? round1(computeFpts(perGame, [...scoringItems])) : null;
     // The bonus is whatever the projected total carries over ESPN's line, so
     // the two parts always add up to the number on screen.
@@ -178,6 +181,7 @@ export function buildProjections(
       games,
       gamesNote: override ? `${override.note} ESPN had ${rawGames ?? 'no'} games.` : null,
       line: perGame ? lineOf(perGame) : null,
+      lastLine: lastPerGame ? lineOf(lastPerGame) : null,
       lastSeason,
       change: entry.fppg !== null && lastSeason !== null && entry.source !== 'last-season'
         ? round1(entry.fppg - lastSeason)
