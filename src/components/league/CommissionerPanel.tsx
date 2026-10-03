@@ -11,9 +11,8 @@ import {
 import { draftYearLabel, tradeableSeason } from '../../lib/league/pickTrades.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import ActAsPanel from './ActAsPanel.js';
-import EmailAdmin from './EmailAdmin.js';
 import NavIcon from './NavIcon.js';
-import PinAdmin from './PinAdmin.js';
+import SignInAdmin from './SignInAdmin.js';
 
 const btnOutline = (color: string): CSSProperties => ({
   minHeight: 44,
@@ -186,22 +185,14 @@ export default function CommissionerPanel() {
         )}
       </div>
 
-      {/* Sign-in emails */}
+      {/* Sign-in: each owner's email and PIN */}
       <ActAsPanel />
       <details className="commish-fold commish-fold-inner">
         <summary className="hub-heading">
-          SIGN-IN EMAILS
-          <small>Where each owner&apos;s sign-in link goes</small>
+          SIGN-IN
+          <small>Each owner&apos;s email and PIN</small>
         </summary>
-        <EmailAdmin />
-      </details>
-
-      <details className="commish-fold commish-fold-inner">
-        <summary className="hub-heading">
-          PINS
-          <small>Set one and it goes to that owner by email</small>
-        </summary>
-        <PinAdmin />
+        <SignInAdmin />
       </details>
 
       {/* Close the draft — this is what opens next season's pick trades */}

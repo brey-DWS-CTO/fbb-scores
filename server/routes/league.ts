@@ -1443,7 +1443,7 @@ router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) =
 
   const row = (await getOwnerEmails()).find((entry) => entry.owner === target);
   if (!row || row.email === '') {
-    res.json({ ok: true, emailed: false, reason: `${target} has no email saved, so nothing went out. Add one under SIGN-IN EMAILS.` });
+    res.json({ ok: true, emailed: false, reason: `${target} has no email saved, so nothing went out. Add an email first.` });
     return;
   }
   // A link on top of the PIN, so one email gets them in either way. If the
