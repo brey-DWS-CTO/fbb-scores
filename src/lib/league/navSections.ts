@@ -37,6 +37,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { to: '/draft', label: 'BOARD' },
       { to: '/mock', label: 'MOCK DRAFT' },
       { to: '/projections', label: 'PROJECTIONS' },
+      { to: '/tiers', label: 'TIERS' },
     ],
   },
   { id: 'trades', label: 'TRADES', icon: 'arrows', primary: true, tabs: [{ to: '/trades', label: 'TRADES' }] },
