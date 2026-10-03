@@ -8,6 +8,7 @@
  */
 import { fillsSlot, type Position, type RosterSettings, type StarterSlot } from './draftValue.js';
 import { replayLive, type LiveChoices, type LiveState } from './liveMock.js';
+import { parseMockTrades, type MockTrade } from './mockTrades.js';
 import type { MockCandidate, MockKeeper, MockMode, MockPick, MockSlot, PreparedMock } from './mockDraft.js';
 
 // ─── Who is up ──────────────────────────────────────────────────────────────
@@ -201,6 +202,8 @@ export interface MockSave {
   tryPicks: [string, string];
   useEntered: boolean;
   guessInstead: string[];
+  /** Trades built in the mock and never sent. */
+  mockTrades: MockTrade[];
 }
 
 export function mockSaveKey(owner: string): string {
@@ -245,6 +248,7 @@ export function parseMockSave(raw: string | null): MockSave | null {
     tryPicks,
     useEntered: save.useEntered !== false,
     guessInstead: isStringList(save.guessInstead) ? save.guessInstead : [],
+    mockTrades: parseMockTrades(save.mockTrades),
   };
 }
 

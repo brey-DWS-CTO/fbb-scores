@@ -28,6 +28,8 @@ import IdentityChip from './IdentityChip.js';
 import DraftRoom, { type RoomProgress } from './DraftRoom.js';
 import type { MockGrade } from '../../lib/league/mockGrade.js';
 import NavIcon from './NavIcon.js';
+import MockTradeBuilder from './MockTradeBuilder.js';
+import { MOCK_TRADE_PREFIX, isMockTradeId, mockTradeProposal, type MockTrade } from '../../lib/league/mockTrades.js';
 
 const RUN_CHOICES = [100, 200, 500] as const;
 
@@ -237,6 +239,7 @@ function MockDraftScreen() {
   const [tryPicks, setTryPicks] = useState<[string, string]>(saved?.tryPicks ?? ['', '']);
   const [useEntered, setUseEntered] = useState(saved?.useEntered ?? true);
   const [guessInstead, setGuessInstead] = useState<string[]>(saved?.guessInstead ?? []);
+  const [mockTrades, setMockTrades] = useState<MockTrade[]>(saved?.mockTrades ?? []);
   const [progress, setProgress] = useState<RoomProgress | null>(() => (saved
     ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft }
     : null));
@@ -277,18 +280,32 @@ function MockDraftScreen() {
       tryPicks,
       useEntered,
       guessInstead,
+      mockTrades,
     };
     try {
       window.localStorage.setItem(mockSaveKey(viewer), JSON.stringify(save));
     } catch {
       /* no storage: the draft just does not survive leaving */
     }
-  }, [viewer, acting, seed, mode, progress, tradesOn, tryKeepers, tryPicks, useEntered, guessInstead]);
+  }, [viewer, acting, seed, mode, progress, tradesOn, tryKeepers, tryPicks, useEntered, guessInstead, mockTrades]);
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
   const fetchedProposals = tradesQuery.data?.proposals;
-  const proposals = useMemo((): PickTradeProposal[] => fetchedProposals ?? [], [fetchedProposals]);
+  // Real offers, then the trades built here and never sent.
+  const proposals = useMemo(
+    (): PickTradeProposal[] => [...(fetchedProposals ?? []), ...mockTrades.map((trade) => mockTradeProposal(trade, dataset.season))],
+    [fetchedProposals, mockTrades, dataset.season],
+  );
+  const addMockTrade = (trade: Omit<MockTrade, 'id'>) => {
+    const id = `${MOCK_TRADE_PREFIX}${Date.now().toString(36)}`;
+    setMockTrades((current) => [...current, { ...trade, id }]);
+    setTradesOn((current) => [...current, id]);
+  };
+  const removeMockTrade = (id: string) => {
+    setMockTrades((current) => current.filter((trade) => trade.id !== id));
+    setTradesOn((current) => current.filter((entry) => entry !== id));
+  };
   const scenario = scenarioQuery.scenario;
 
   const values = useMemo(
@@ -465,10 +482,10 @@ function MockDraftScreen() {
             </li>
           ))}
         </ul>
-          <div className="hub-heading mock-sub">PENDING TRADES</div>
+          <div className="hub-heading mock-sub">TRADES</div>
           {switchable.length === 0 && (
             <div className="mock-note">
-              No pending offer of yours to try. <Link to="/trades">Send one</Link> and it shows up here as a switch.
+              No trades to try yet. Build one below, or <Link to="/trades">send a real offer</Link>.
             </div>
           )}
           <ul className="mock-switches">
@@ -487,15 +504,22 @@ function MockDraftScreen() {
                     />
                     <span>
                       <strong>{proposal.proposer} to {proposal.recipient}:</strong> {describeTrade(proposal, dataset)}
+                      <small className="mock-live">{isMockTradeId(proposal.id) ? ' (mock only)' : ' (sent)'}</small>
                       {blockedBy && !on && blocker && (
                         <small> Moves a pick the {blocker.proposer} to {blocker.recipient} offer already moves. Only one can be on.</small>
                       )}
                     </span>
                   </label>
+                  {isMockTradeId(proposal.id) && (
+                    <button type="button" className="room-icon-btn" aria-label="Remove this mock trade" onClick={() => removeMockTrade(proposal.id)}>✕</button>
+                  )}
                 </li>
               );
             })}
           </ul>
+          <div className="hub-heading mock-sub">BUILD A TRADE</div>
+          <div className="mock-note mock-note-dim">For the mock only. Nobody sees it and nothing is sent.</div>
+          <MockTradeBuilder owners={owners} viewer={viewer} slots={now.board.slots} onAdd={addMockTrade} />
           {hidden.length > 0 && (
             <div className="mock-note mock-note-dim">
               {hidden.map((proposal) => `${proposal.proposer} and ${proposal.recipient}`).join('; ')} have an offer open. The picks are private to them, so it cannot be switched here.

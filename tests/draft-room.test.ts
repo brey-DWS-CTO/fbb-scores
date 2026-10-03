@@ -109,7 +109,7 @@ test('the grid is rounds by teams in first-round order, snake intact', () => {
 
 const save: MockSave = {
   version: 1, seed: 7, mode: 'sharp', started: true, choices: { 9: 'k1' }, queue: ['k2'], clockLeft: 80,
-  tradesOn: [], tryKeepers: false, tryPicks: ['', ''], useEntered: true, guessInstead: [],
+  tradesOn: [], tryKeepers: false, tryPicks: ['', ''], useEntered: true, guessInstead: [], mockTrades: [],
 };
 
 test('a save reads back, and junk reads as nothing', () => {

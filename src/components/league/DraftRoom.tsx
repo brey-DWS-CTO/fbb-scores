@@ -481,6 +481,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               <table className="room-table">
                 <thead>
                   <tr>
+                    {/* On a phone the DRAFT button sits first, so it is on screen without scrolling. */}
+                    {myTurn && <th className="room-draft-col is-first" />}
                     <th className="room-star" aria-label="Queue" />
                     {sortHead('rank', 'RK', 'Our board rank')}
                     {sortHead('adp', 'ADP')}
@@ -496,7 +498,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('threes', '3PM')}
                     {sortHead('to', 'TO')}
                     {myTurn && sortHead('gone', 'GONE BY NEXT', 'How often he goes before your next pick, across 60 drafts from here')}
-                    {myTurn && <th className="room-draft-col" />}
+                    {myTurn && <th className="room-draft-col is-last" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -507,12 +509,21 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     return (
                       <Fragment key={candidate.playerKey}>
                       {pickLineAt === index && myNext && (
-                        <tr className="room-pickline"><td colSpan={16}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
+                        <tr className="room-pickline"><td colSpan={17}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
                       )}
                       <tr
                         className={`${taken ? 'is-taken' : ''}${focus === candidate.playerKey ? ' is-focus' : ''}`}
                         onClick={() => setSelected(candidate.playerKey)}
                       >
+                        {myTurn && (
+                          <td className="room-draft-col is-first">
+                            {!taken && (
+                              <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={(event) => { event.stopPropagation(); draft(candidate.playerKey); }}>
+                                DRAFT
+                              </button>
+                            )}
+                          </td>
+                        )}
                         <td className="room-star">
                           <button
                             type="button"
@@ -548,7 +559,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num">{one(projection?.line?.to)}</td>
                         {myTurn && <td className={`room-num${gone >= 0.5 ? ' is-hot' : ''}`}>{taken ? '–' : pct(gone)}</td>}
                         {myTurn && (
-                          <td className="room-draft-col">
+                          <td className="room-draft-col is-last">
                             {!taken && (
                               <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={(event) => { event.stopPropagation(); draft(candidate.playerKey); }}>
                                 DRAFT
