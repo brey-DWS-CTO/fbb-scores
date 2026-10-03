@@ -161,3 +161,43 @@ export function previewEdit(
   const fppg = round1(computeFpts(perGame, [...scoringItems]) + bonus);
   return { fppg, total: games !== null ? Math.round(fppg * games) : null, games, bonus: round1(bonus) };
 }
+
+// ─── Editing one cell ───────────────────────────────────────────────────────
+
+/** Projections table columns that can be typed into, and the ESPN stat each one is. */
+export const EDITABLE_COLUMNS: Readonly<Record<string, string>> = {
+  games: '42', min: '40', pts: '0', reb: '6', ast: '3', stl: '2', blk: '1',
+  threes: '17', to: '11', fgm: '13', fga: '14', ftm: '15', fta: '16',
+};
+
+const sameTenth = (a: number | null | undefined, b: number | null | undefined) =>
+  a !== null && a !== undefined && b !== null && b !== undefined && Math.round(a * 10) === Math.round(b * 10);
+
+/**
+ * The edit after one cell changes, or null when nothing differs from ESPN
+ * any more (so the edit should go). A value equal to ESPN's drops that
+ * field rather than storing a copy of ESPN.
+ */
+export function withCellEdit(
+  current: Pick<ProjectionEdit, 'games' | 'perGame' | 'note'> | null,
+  espn: ProjectionRow | null,
+  statId: string,
+  value: number,
+): Pick<ProjectionEdit, 'games' | 'perGame' | 'note'> | null {
+  const games = statId === '42'
+    ? (sameTenth(value, projectionGames(espn)) ? null : Math.round(value))
+    : current?.games ?? null;
+  const perGame = { ...(current?.perGame ?? {}) };
+  if (statId !== '42') {
+    if (sameTenth(value, projectedPerGame(espn)?.[statId])) delete perGame[statId];
+    else perGame[statId] = Math.round(value * 10) / 10;
+  }
+  if (games === null && Object.keys(perGame).length === 0) return null;
+  return { games, perGame, note: current?.note ?? '' };
+}
+
+/** True when this cell of an edited player differs from ESPN. */
+export function cellEdited(edit: Pick<ProjectionEdit, 'games' | 'perGame'> | null, statId: string): boolean {
+  if (!edit) return false;
+  return statId === '42' ? edit.games !== null : edit.perGame[statId] !== undefined;
+}

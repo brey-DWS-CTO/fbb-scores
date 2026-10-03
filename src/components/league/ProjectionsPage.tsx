@@ -1,6 +1,6 @@
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { rankSourceLabel } from '../../lib/league/draftRankings.js';
+import { projectedPerGame } from '../../lib/league/draftRankings.js';
 import { POSITIONS, valueBoard, type Position } from '../../lib/league/draftValue.js';
 import { keepersForMock } from '../../lib/league/mockDraft.js';
 import {
@@ -10,6 +10,7 @@ import {
   changeTone,
   editTitle,
   filterProjections,
+  projectionColumn,
   gamesTone,
   nextSort,
   oddsTone,
@@ -25,8 +26,10 @@ import {
 } from '../../lib/league/projections.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
-import { useProjectionData } from '../../hooks/useProjectionData.js';
-import ProjectionEditForm from './ProjectionEditForm.js';
+import { PROJECTION_EDITS_KEY, useProjectionData } from '../../hooks/useProjectionData.js';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
+import { EDITABLE_COLUMNS, cellEdited, withCellEdit } from '../../lib/league/projectionEdits.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 
@@ -54,11 +57,7 @@ function toneClass(tone: Tone): string {
 function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.ReactNode; className?: string } {
   switch (id) {
     case 'valueRank': return { text: row.valueRank };
-    case 'name': return {
-      text: row.edit
-        ? <>{row.name} <span className="proj-edited" title={editTitle(row) ?? undefined} aria-label="Edited">✎</span></>
-        : row.name,
-    };
+    case 'name': return { text: row.name };
     case 'proTeam': return { text: row.proTeam };
     case 'positions': return { text: row.positions.join('/') || '—' };
     case 'tag':
@@ -97,10 +96,7 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
     case 'bonus': return { text: row.bonus === null ? '—' : `+${row.bonus.toFixed(1)}` };
     case 'ddOdds': return { text: pct(row.ddOdds), className: toneClass(oddsTone(row.ddOdds)).trim() };
     case 'tdOdds': return { text: pct(row.tdOdds), className: toneClass(oddsTone(row.tdOdds)).trim() };
-    case 'games': return {
-      text: row.edit?.games != null ? <span title={editTitle(row) ?? undefined}>{whole(row.games)}*</span> : whole(row.games),
-      className: toneClass(gamesTone(row.games)).trim(),
-    };
+    case 'games': return { text: whole(row.games), className: toneClass(gamesTone(row.games)).trim() };
     case 'pts': return { text: one(row.line?.pts ?? null) };
     case 'reb': return { text: one(row.line?.reb ?? null) };
     case 'ast': return { text: one(row.line?.ast ?? null) };
@@ -131,51 +127,6 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-interface DetailProps {
-  row: PlayerProjection;
-  season: number;
-  editing: boolean;
-  onEdit: () => void;
-  editor: React.ReactNode;
-}
-
-function Detail({ row, season, editing, onEdit, editor }: DetailProps) {
-  return (
-    <div className="proj-detail">
-      {row.espnId !== null && !editing && (
-        <button type="button" className="tap-btn mock-mini-btn proj-edit-btn" onClick={(event) => { event.stopPropagation(); onEdit(); }}>
-          ✎ {row.edit ? 'CHANGE YOUR EDIT' : 'EDIT PROJECTION'}
-        </button>
-      )}
-      {editing && editor}
-      {row.edit && !editing && <p className="proj-edited-line">{editTitle(row)}</p>}
-      {row.base !== null && row.bonus !== null && row.fppg !== null ? (
-        <p>
-          <strong>{row.base.toFixed(1)}</strong> from ESPN&apos;s line in our scoring,
-          plus <strong>{row.bonus.toFixed(1)}</strong> for double- and triple-doubles,
-          makes <strong>{row.fppg.toFixed(1)}</strong> a game.
-        </p>
-      ) : (
-        <p>
-          ESPN has no projection for him. His {one(row.fppg)} comes from the {rankSourceLabel(row.source, season)}.
-        </p>
-      )}
-      <p>
-        {row.ddOdds !== null && <>Double-double in {pct(row.ddOdds)} of games, triple-double in {pct(row.tdOdds)}. </>}
-        {row.games !== null && <>ESPN has him for {whole(row.games)} games. </>}
-        {row.lastSeason !== null ? <>Last season: {row.lastSeason.toFixed(1)}. </> : <>No games last season. </>}
-      </p>
-      <p>
-        Board rank {row.valueRank}
-        {row.espnRank !== null && <>, ESPN rank {row.espnRank}</>}
-        {row.adp !== null && <>, ADP {row.adp.toFixed(1)}</>}.
-        {row.lastTeam && <> On {row.lastTeam}&apos;s roster last season.</>}
-        {row.keptBy && <> {row.tag === 'keeper' ? 'Kept by' : 'Projected keeper for'} {row.keptBy}.</>}
-      </p>
-    </div>
-  );
-}
-
 /**
  * Commissioner tool: every player's projected season in this league's
  * scoring, with ESPN's line and the double-double bonus shown apart.
@@ -188,8 +139,11 @@ export default function ProjectionsPage() {
   const isCommish = identity?.isCommissioner === true;
 
   const { snapshot, original, edits } = useProjectionData();
-  const [editing, setEditing] = useState<string | null>(null);
   const [editedOnly, setEditedOnly] = useState(false);
+  // The cell being typed in, Excel style, and what has been typed so far.
+  const [cellAt, setCellAt] = useState<{ key: string; column: ProjectionColumnId; text: string } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const scenario = scenarioQuery.scenario;
 
   const [query, setQuery] = useState('');
@@ -198,7 +152,6 @@ export default function ProjectionsPage() {
   const [sort, setSort] = useState<ProjectionSort | null>({ column: 'fppg', dir: 'desc' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(50);
-  const [open, setOpen] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [hidden, setHidden] = useState<Set<ProjectionColumnId>>(readHidden);
   const [picking, setPicking] = useState(false);
@@ -232,6 +185,65 @@ export default function ProjectionsPage() {
     [rows, query, position, hideKept, editedOnly, sort],
   );
   const current = pageOf(shown, page, pageSize);
+
+  const espnRowOf = (row: PlayerProjection) =>
+    original?.players.find((player) => player.espnId === row.espnId)?.projection ?? null;
+  const espnValue = (row: PlayerProjection, statId: string): number | null => {
+    const espn = espnRowOf(row);
+    if (statId === '42') return espn?.stats['42'] ?? null;
+    return projectedPerGame(espn)?.[statId] ?? null;
+  };
+  const shownValue = (row: PlayerProjection, column: ProjectionColumnId): number | null => {
+    const value = projectionColumn(column).value(row);
+    return typeof value === 'number' ? value : null;
+  };
+  const startCell = (row: PlayerProjection, column: ProjectionColumnId) => {
+    if (!identity || row.espnId === null || !(column in EDITABLE_COLUMNS)) return;
+    setSaveError(null);
+    const value = shownValue(row, column);
+    setCellAt({ key: row.key, column, text: value === null ? '' : String(column === 'games' ? Math.round(value) : value) });
+  };
+  const commitCell = async () => {
+    const at = cellAt;
+    setCellAt(null);
+    if (!at || !identity) return;
+    const row = rows.find((entry) => entry.key === at.key);
+    if (!row || row.espnId === null) return;
+    const number = Number(at.text);
+    if (at.text.trim() === '' || !Number.isFinite(number) || number < 0) return;
+    const before = shownValue(row, at.column);
+    if (before !== null && Math.round(before * 10) === Math.round(number * 10)) return;
+    const next = withCellEdit(row.edit, espnRowOf(row), EDITABLE_COLUMNS[at.column], number);
+    try {
+      if (next) await saveProjectionEdit(identity, row.espnId, { name: row.name, ...next });
+      else await deleteProjectionEdit(identity, row.espnId);
+      await queryClient.invalidateQueries({ queryKey: PROJECTION_EDITS_KEY });
+    } catch (caught) {
+      setSaveError(apiErrorMessage(caught));
+    }
+  };
+  const resetRow = async (row: PlayerProjection) => {
+    if (!identity || row.espnId === null) return;
+    if (!window.confirm(`Put ${row.name} back to ESPN's projection?`)) return;
+    try {
+      await deleteProjectionEdit(identity, row.espnId);
+      await queryClient.invalidateQueries({ queryKey: PROJECTION_EDITS_KEY });
+    } catch (caught) {
+      setSaveError(apiErrorMessage(caught));
+    }
+  };
+  // Enter goes down a row, Tab goes right, like a spreadsheet.
+  const editableShown = columns.filter((column) => column.id in EDITABLE_COLUMNS).map((column) => column.id);
+  const moveFrom = (row: PlayerProjection, column: ProjectionColumnId, how: 'down' | 'right' | 'left') => {
+    const index = current.rows.findIndex((entry) => entry.key === row.key);
+    if (how === 'down') {
+      const next = current.rows[index + 1];
+      if (next) startCell(next, column);
+      return;
+    }
+    const at = editableShown.indexOf(column) + (how === 'right' ? 1 : -1);
+    if (at >= 0 && at < editableShown.length) startCell(row, editableShown[at]);
+  };
 
   if (!isCommish || !viewer) {
     return (
@@ -280,14 +292,11 @@ export default function ProjectionsPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Every player&apos;s projected points a game in our scoring: ESPN&apos;s line, plus the double- and
-        triple-double bonus ESPN leaves out. {projected} players have an ESPN projection
-        {fetchedOn ? `, fetched ${fetchedOn}` : ''}. <span className="proj-fallback">Grey</span> numbers have none
-        and come from ESPN&apos;s rank. Last season is shown for comparison only. Tap a player to see how his number is built.
+        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus. Click a stat to change it;
+        your edits show in yellow, and ✎ puts a player back to ESPN.
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet. <Link to="/admin">Fetch them in Commish Mode.</Link></>
         )}
-        {' '}<Link to="/mock">Open the mock draft →</Link>
       </div>
 
       {snapshot && snapshot.players.length > 0 && projected === 0 && (
@@ -373,6 +382,8 @@ export default function ProjectionsPage() {
         </section>
       )}
 
+      {saveError && <div className="identity-error" role="alert">{saveError}</div>}
+
       <div className="panel proj-table-wrap">
         <table className="proj-table">
           <thead>
@@ -399,52 +410,68 @@ export default function ProjectionsPage() {
             </tr>
           </thead>
           <tbody>
-            {current.rows.map((row, index) => {
-              const isOpen = open === row.key;
-              return (
-                <Fragment key={row.key}>
-                  <tr
-                    className={`proj-row${isOpen ? ' is-open' : ''}${row.tag !== 'open' ? ' is-kept' : ''}`}
-                    onClick={() => setOpen(isOpen ? null : row.key)}
-                  >
-                    <td className="proj-col-pos">{current.from + index}</td>
-                    {columns.map((column) => {
-                      const { text, className } = cell(row, column.id);
-                      return (
-                        <td key={column.id} className={`proj-col-${column.id}${className ? ` ${className}` : ''}`}>
-                          {column.id === 'name'
-                            ? <button type="button" className="proj-name" aria-expanded={isOpen}>{text}</button>
-                            : text}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  {isOpen && (
-                    <tr className="proj-detail-row">
-                      <td colSpan={columns.length + 1}>
-                        <Detail
-                          row={row}
-                          season={dataset.season}
-                          editing={editing === row.key}
-                          onEdit={() => setEditing(row.key)}
-                          editor={row.espnId !== null && (
-                            <ProjectionEditForm
-                              key={`${row.key}-${row.edit?.editedAt ?? 'espn'}`}
-                              espnId={row.espnId}
-                              name={row.name}
-                              espn={original?.players.find((player) => player.espnId === row.espnId)?.projection ?? null}
-                              edit={row.edit}
-                              scoringItems={original?.scoringItems ?? []}
-                              onDone={() => setEditing(null)}
-                            />
-                          )}
-                        />
+            {current.rows.map((row, index) => (
+              <tr key={row.key} className={`proj-row${row.tag !== 'open' ? ' is-kept' : ''}`}>
+                <td className="proj-col-pos">{current.from + index}</td>
+                {columns.map((column) => {
+                  const { text, className } = cell(row, column.id);
+                  const statId = EDITABLE_COLUMNS[column.id];
+                  const editable = statId !== undefined && row.espnId !== null && row.line !== null;
+                  const edited = statId !== undefined && cellEdited(row.edit, statId);
+                  const typing = cellAt?.key === row.key && cellAt.column === column.id;
+                  const classes = `proj-col-${column.id}${className ? ` ${className}` : ''}${editable ? ' proj-cell-edit' : ''}${edited ? ' proj-cell-edited' : ''}`;
+                  if (column.id === 'name') {
+                    return (
+                      <td key={column.id} className={classes}>
+                        <span className="proj-name">{text}</span>
+                        {row.edit && (
+                          <button
+                            type="button"
+                            className="proj-edited"
+                            title={`${editTitle(row) ?? 'Edited.'} Click to put him back to ESPN.`}
+                            aria-label={`Edited. Put ${row.name} back to ESPN`}
+                            onClick={() => void resetRow(row)}
+                          >
+                            ✎
+                          </button>
+                        )}
                       </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
+                    );
+                  }
+                  return (
+                    <td
+                      key={column.id}
+                      className={classes}
+                      title={edited ? `ESPN: ${espnValue(row, statId)?.toFixed(column.id === 'games' ? 0 : 1) ?? 'none'}` : undefined}
+                      onClick={editable && !typing ? () => startCell(row, column.id) : undefined}
+                    >
+                      {typing ? (
+                        <input
+                          className="proj-cell-input"
+                          type="number"
+                          inputMode="decimal"
+                          step={column.id === 'games' ? 1 : 0.1}
+                          min={0}
+                          autoFocus
+                          value={cellAt.text}
+                          onFocus={(event) => event.currentTarget.select()}
+                          onChange={(event) => setCellAt({ ...cellAt, text: event.target.value })}
+                          onBlur={() => void commitCell()}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') { event.preventDefault(); setCellAt(null); return; }
+                            if (event.key === 'Enter' || event.key === 'Tab') {
+                              event.preventDefault();
+                              const how = event.key === 'Enter' ? 'down' : event.shiftKey ? 'left' : 'right';
+                              void commitCell().then(() => moveFrom(row, column.id, how));
+                            }
+                          }}
+                        />
+                      ) : text}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
             {current.rows.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 1} className="proj-empty">No players match.</td>

@@ -83,3 +83,19 @@ test('a bad edit is refused in plain words', () => {
   assert.throws(() => parseProjectionEdit(0, { name: 'X', games: 3 }), /not a player/);
   assert.throws(() => parseProjectionEdit(7, { games: 3 }), /player name/);
 });
+
+test('one cell at a time: a change is kept, typing ESPN back drops it, and an empty edit goes', async () => {
+  const { withCellEdit, cellEdited } = await import('../src/lib/league/projectionEdits.ts');
+  const jokic = espnOf('Nikola Jokic');
+  const line = projectedPerGame(jokic.projection)!;
+  const first = withCellEdit(null, jokic.projection, '0', 30);
+  assert.deepEqual(first, { games: null, perGame: { '0': 30 }, note: '' });
+  assert.ok(cellEdited(first, '0'));
+  assert.ok(!cellEdited(first, '42'));
+  const second = withCellEdit(first, jokic.projection, '42', 60);
+  assert.deepEqual(second, { games: 60, perGame: { '0': 30 }, note: '' });
+  // Typing ESPN's own number back takes that field out.
+  const third = withCellEdit(second, jokic.projection, '0', line['0']);
+  assert.deepEqual(third, { games: 60, perGame: {}, note: '' });
+  assert.equal(withCellEdit(third, jokic.projection, '42', 72), null);
+});
