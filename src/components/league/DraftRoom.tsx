@@ -295,7 +295,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     ? untilTurn
     : null;
 
-  const focus = selected ?? (myTurn ? queuedPick(queue, availableNow)?.playerKey ?? null : null) ?? availableNow[0]?.playerKey ?? null;
+  // Paused at your keeper: the card shows him until you pick someone else.
+  const focus = selected ?? (atMyKeeper?.playerKey ?? null) ?? (myTurn ? queuedPick(queue, availableNow)?.playerKey ?? null : null) ?? availableNow[0]?.playerKey ?? null;
   const myPicks = live.run.result().rosters[person] ?? [];
   const myRoster = rosterBySlot(
     myPicks.filter((key) => shownPicks.some((pick) => pick.playerKey === key)).map((key) => ({ playerKey: key, positions: byKey.get(key)?.positions ?? [] })),
@@ -374,7 +375,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
-                  <span>Draft is paused to show you who is there at your keeper selection.</span>
+                  <span>Paused at your keeper: <strong>{atMyKeeper.playerName}</strong></span>
                   <button
                     type="button"
                     className="tap-btn mock-mini-btn is-primary"
@@ -417,7 +418,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 <span className="room-upcoming-row">
                   <span className="room-upcoming-num">{pick.overall}</span>
                   <span className="room-upcoming-owner">{pick.owner}</span>
-                  {pick.fixed && <span className="mock-tag mock-tag-known">keeper</span>}
+                  {pick.keeper && <KeeperChip projected={pick.keeper === 'assumed'} early={null} />}
                 </span>
               </li>
             ))}
@@ -810,6 +811,7 @@ interface CardProps {
 
 function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onClose, onDraft, onQueue }: CardProps) {
   const last = entry?.player.stats2026 ?? entry?.player.api2026 ?? null;
+  const lastLine = projection?.lastLine ?? null;
   const line = projection?.line ?? null;
   return (
     <section className={`panel room-card${picked ? ' is-picked' : ''}`}>
@@ -849,7 +851,8 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
               <td>{one(last && last.gp > 0 ? last.avg : null)}</td>
               <td>{last && last.gp > 0 ? Math.round(last.total).toLocaleString() : '–'}</td>
               <td>{last?.gp ?? '–'}</td>
-              <td colSpan={8} />
+              <td>{one(lastLine?.min)}</td><td>{one(lastLine?.pts)}</td><td>{one(lastLine?.reb)}</td><td>{one(lastLine?.ast)}</td>
+              <td>{one(lastLine?.stl)}</td><td>{one(lastLine?.blk)}</td><td>{one(lastLine?.threes)}</td><td>{one(lastLine?.to)}</td>
             </tr>
           </tbody>
         </table>

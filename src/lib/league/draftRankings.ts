@@ -64,6 +64,11 @@ export interface EspnDraftRankingPlayer {
   standard: DraftRankEntry | null;
   roto: DraftRankEntry | null;
   projection: ProjectionRow | null;
+  /**
+   * Last season's real line (`00{season - 1}`), in the same shape. Missing on
+   * snapshots fetched before it was asked for.
+   */
+  lastSeason?: ProjectionRow | null;
 }
 
 /** The stored form. Same fields; normalized. */
@@ -138,6 +143,16 @@ function normalizeProjection(row: ProjectionRow | null): ProjectionRow | null {
   return { id: String(row.id), stats, averageStats: hasAverages ? averages : null };
 }
 
+function lastSeasonOf(player: EspnDraftRankingPlayer): { lastSeason?: ProjectionRow } {
+  const lastSeason = normalizeProjection(player.lastSeason ?? null);
+  return lastSeason ? { lastSeason } : {};
+}
+
+/** ESPN's id for a season's actual stat row: `00{season}`. */
+export function seasonStatId(season: number): string {
+  return `00${season}`;
+}
+
 function normalizeText(value: string, field: string): string {
   const normalized = value.trim();
   if (!normalized) throw new Error(`${field} cannot be empty`);
@@ -158,6 +173,8 @@ export function normalizeDraftRankingPlayer(player: EspnDraftRankingPlayer): Dra
     standard: normalizeRankEntry(player.standard),
     roto: normalizeRankEntry(player.roto),
     projection: normalizeProjection(player.projection),
+    // Left off when absent, so older snapshots keep their fingerprints.
+    ...lastSeasonOf(player),
   };
 }
 

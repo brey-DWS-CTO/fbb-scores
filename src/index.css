@@ -3997,14 +3997,14 @@ th.schedule-col-active {
   letter-spacing: 0.06em;
   line-height: 1.5;
   vertical-align: 1px;
-  background: var(--neon-yellow);
+  background: var(--neon-teal);
   color: #111;
-  border: 1px solid var(--neon-yellow);
+  border: 1px solid var(--neon-teal);
 }
-.room-keeper-chip.is-projected { background: transparent; color: var(--neon-yellow); border-style: dashed; }
-.room-grid td.is-keeper { outline: 2px solid var(--neon-yellow); outline-offset: -2px; }
+.room-keeper-chip.is-projected { background: transparent; color: var(--neon-teal); border-style: dashed; }
+.room-grid td.is-keeper { outline: 2px solid var(--neon-teal); outline-offset: -2px; }
 .room-grid td.is-keeper.is-projected { outline-style: dashed; opacity: 1; }
-.room-update-list li.is-keeper { box-shadow: inset 3px 0 0 var(--neon-yellow); }
+.room-update-list li.is-keeper { box-shadow: inset 3px 0 0 var(--neon-teal); }
 .mock-setup.is-before { margin-bottom: 12px; }
 /* A keeper on a better pick than his round. */
 .keeper-early { color: var(--neon-orange); font-weight: 900; font-size: 0.8rem; line-height: 1; margin-left: 3px; cursor: help; }

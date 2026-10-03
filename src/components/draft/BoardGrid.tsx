@@ -4,7 +4,6 @@ import type { BoardCell } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
 import { earlyKeeperNote } from '../../lib/league/keeperEarly.js';
 import { leagueDataset, OWNERS } from '../../lib/league/data.js';
-import NavIcon from '../league/NavIcon.js';
 import { cellDisplay, positionTheme } from './boardUtils.js';
 
 interface Props {
@@ -258,9 +257,11 @@ function GridCell({
           {traded && <span style={{ color: 'var(--neon-yellow)' }}>▲</span>}
           {early && <span className="keeper-early" title={early} aria-label={early}>↑</span>}
           {d?.isKeeper && (
-            <span style={{ opacity: 0.9, display: 'inline-flex' }}>
-              <NavIcon name="lock" size={tv ? 12 : 11} label="Keeper" />
-            </span>
+            <span
+              className={`room-keeper-chip${projected ? ' is-projected' : ''}`}
+              title={projected ? 'Projected keeper' : 'Keeper'}
+              aria-label={projected ? 'Projected keeper' : 'Keeper'}
+            >K</span>
           )}
         </span>
       )}
