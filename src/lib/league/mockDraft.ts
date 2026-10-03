@@ -247,8 +247,11 @@ export interface OwnerTendency {
 export type MockMode = 'sharp' | 'realistic';
 
 export const MODE_PRESETS: Record<MockMode, OwnerTendency> = {
-  sharp: { adpWeight: 0, needWeight: 0.1, noise: 0.08, topK: 2, topBand: 0.05, positionBias: {} },
-  realistic: { adpWeight: 0.75, needWeight: 0.15, noise: 0.22, topK: 3, topBand: 0.25, positionBias: {} },
+  // Sharp teams agree on value but not to the pick: a player taken around
+  // 20th lands anywhere from about 10th to 27th. The commissioner found the
+  // old, tighter settings gave the same draft every time.
+  sharp: { adpWeight: 0, needWeight: 0.1, noise: 0.2, topK: 3, topBand: 0.12, positionBias: {} },
+  realistic: { adpWeight: 0.75, needWeight: 0.15, noise: 0.26, topK: 3, topBand: 0.28, positionBias: {} },
 };
 
 /** In the draw among close candidates, each next one has this share of the chance of the one before. */
@@ -336,6 +339,8 @@ export interface MockCandidate {
   positions: Position[];
   /** Place on the value board, best first. */
   valueRank: number;
+  /** Place once uncertain players are shaded down a little. Teams draft from this; screens show `valueRank`. */
+  riskRank?: number;
   roomRank: number | null;
   source: RankSource;
 }
@@ -417,6 +422,7 @@ export function prepareMock(input: MockDraftInput): PreparedMock {
       playerName: entry.player.name,
       positions: entry.positions,
       valueRank: entry.rank,
+      riskRank: entry.riskRank,
       roomRank: entry.roomRank,
       source: entry.source,
     }));
@@ -425,6 +431,7 @@ export function prepareMock(input: MockDraftInput): PreparedMock {
     playerName: entry.player.name,
     positions: entry.positions,
     valueRank: entry.rank,
+    riskRank: entry.riskRank,
     roomRank: entry.roomRank,
     source: entry.source,
   } satisfies MockCandidate]));
@@ -441,10 +448,16 @@ export function prepareMock(input: MockDraftInput): PreparedMock {
   return { input, roster, pool, byKey, orderByOwner, tendencies, owners };
 }
 
-/** Where a team puts a player before need and noise: our value, the room's ADP, or a blend. */
-export function baseScore(candidate: Pick<MockCandidate, 'valueRank' | 'roomRank'>, adpWeight: number): number {
-  const room = candidate.roomRank ?? candidate.valueRank;
-  return (1 - adpWeight) * candidate.valueRank + adpWeight * room;
+/**
+ * Where a team puts a player before need and noise: our value, the room's
+ * ADP, or a blend. Our value here is the risk-shaded order, so a sharp team
+ * knocks a player down a few places when our numbers for him disagree. ADP
+ * already prices risk the room's own way and is left alone.
+ */
+export function baseScore(candidate: Pick<MockCandidate, 'valueRank' | 'riskRank' | 'roomRank'>, adpWeight: number): number {
+  const value = candidate.riskRank ?? candidate.valueRank;
+  const room = candidate.roomRank ?? value;
+  return (1 - adpWeight) * value + adpWeight * room;
 }
 
 /** Add a player to a team and seat him if a starting slot can be found. */

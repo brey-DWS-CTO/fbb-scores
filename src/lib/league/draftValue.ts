@@ -338,9 +338,26 @@ export interface PlayerValue {
    * nothing valued him.
    */
   seasonValue: number | null;
+  /**
+   * The lowest number we hold for his points per game: the one in use, last
+   * season, or the season before. The tiers chart draws the same spread.
+   */
+  fppgLow: number | null;
+  /** `seasonValue` with his points per game shaded `RISK_SHADE` of the way down to `fppgLow`. */
+  riskValue: number | null;
   /** 1-based place on the board, best first. */
   rank: number;
+  /** 1-based place by `riskValue`: the order a sharp drafter works from. */
+  riskRank: number;
 }
+
+/**
+ * How far a sharp drafter shades a player's points per game toward the low
+ * end of what we hold for him. A quarter of the way moves the least certain
+ * players (Anthony Davis, Trae Young) about five places and leaves steady
+ * ones where they were. The commissioner asked for it to be light.
+ */
+export const RISK_SHADE = 0.25;
 
 export interface ValueBoard {
   /** Source order used, best first. */
@@ -464,6 +481,8 @@ export function valueBoard(
     if (last !== null && !options.projectionsOnly) candidates['last-season'] = last;
     const source = order.find((candidate) => candidates[candidate] !== undefined) ?? 'none';
     const fppg = source === 'none' ? null : candidates[source] ?? null;
+    const others = [last, player.prior?.avg ?? null].filter((value): value is number => value !== null && Number.isFinite(value));
+    const fppgLow = fppg === null ? null : round1(Math.min(fppg, ...others));
 
     const teamId = nbaTeamIdForProTeam(player.proTeam);
     const weightedGames = games
@@ -486,7 +505,10 @@ export function valueBoard(
       scheduleRatio,
       availability: availabilityOf(espn),
       seasonValue: null,
+      fppgLow,
+      riskValue: null,
       rank: 0,
+      riskRank: 0,
     };
   });
 
@@ -520,6 +542,8 @@ export function valueBoard(
     const own = games ? entry.weightedGames : 1;
     const average = games ? leagueAverageGames : 1;
     entry.seasonValue = round1(entry.fppg * own * entry.availability - level * average);
+    const shaded = entry.fppg - RISK_SHADE * (entry.fppg - (entry.fppgLow ?? entry.fppg));
+    entry.riskValue = round1(shaded * own * entry.availability - level * average);
   }
 
   valued.sort((a, b) => {
@@ -541,6 +565,10 @@ export function valueBoard(
     ? valued.filter((entry) => entry.source === 'projection' && entry.player.proTeam.toUpperCase() !== 'FA')
     : valued;
   const entries = kept.map((entry, index) => ({ ...entry, rank: index + 1 }));
+  // Ties and the unvalued keep board order, so a player nobody can shade stays put.
+  const byRisk = [...entries].sort((a, b) =>
+    (b.riskValue ?? -Infinity) - (a.riskValue ?? -Infinity) || a.rank - b.rank);
+  byRisk.forEach((entry, index) => { entry.riskRank = index + 1; });
   const primary = order.find((source) => counts[source] > 0) ?? 'none';
 
   return { order, primary, counts, replacement, leagueAverageGames, bridge, roster, entries };

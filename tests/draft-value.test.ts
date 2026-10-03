@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
 import fixture from './fixtures/espn-draft-rankings-2027.json' with { type: 'json' };
+import liveFixture from './fixtures/espn-draft-rankings-2027-2026-09-25.json' with { type: 'json' };
 import type { DatasetPlayer, LeagueDataset } from '../src/lib/keeper/types.ts';
 import type { EspnDraftRankingPlayer, ScoringItem } from '../src/lib/league/draftRankings.ts';
 import {
@@ -393,4 +394,20 @@ test('real ESPN data: last season and ESPN rank disagree, which is why the switc
   assert.ok(place(byLast, 'T. Maxey') < place(byEspn, 'T. Maxey') - 5, 'Maxey scored like a top-five player for us; ESPN ranks him 21st');
   assert.ok(place(byLast, 'K. Leonard') < place(byEspn, 'K. Leonard') - 20, 'Kawhi too');
   assert.equal(byEspn.counts['espn-rank'] + byEspn.counts['last-season'] + byEspn.counts.none, dataset.players.length);
+});
+
+test('risk shading moves the least certain players a few places and leaves steady ones', () => {
+  const values = valueBoard(dataset.players, liveFixture, { schedule: leagueSchedule2027, projectionsOnly: true });
+  const at = (name: string) => values.entries.find((entry) => entry.player.fullName === name)!;
+  const davis = at('Anthony Davis');
+  assert.equal(davis.fppgLow, 42.1);
+  assert.ok(davis.riskRank - davis.rank >= 3 && davis.riskRank - davis.rank <= 8, `Davis ${davis.rank} -> ${davis.riskRank}`);
+  const sabonis = at('Domantas Sabonis');
+  assert.ok(sabonis.riskRank > sabonis.rank, `Sabonis ${sabonis.rank} -> ${sabonis.riskRank}`);
+  for (const steady of ['Nikola Jokic', 'Jalen Johnson']) assert.ok(at(steady).riskRank <= at(steady).rank, steady);
+  // A light touch: nobody in the top 60 moves more than ten places.
+  for (const entry of values.entries.filter((e) => e.rank <= 60)) {
+    assert.ok(Math.abs(entry.riskRank - entry.rank) <= 10, `${entry.player.name} ${entry.rank} -> ${entry.riskRank}`);
+  }
+  assert.deepEqual(values.entries.map((e) => e.riskRank).sort((a, b) => a - b), values.entries.map((_, i) => i + 1));
 });

@@ -141,13 +141,18 @@ test('projections: Jalen Johnson goes early in a sharp room and Cade is the pick
   const sharpRuns = run('sharp');
   const sharp5 = availabilityAt(sharpRuns, 5);
   const realistic5 = availabilityAt(run('realistic'), 5);
-  assert.ok(share(sharp5, 'J. Johnson') < 0.1);
+  // Sharp teams no longer agree to the pick (the commissioner asked for more
+  // varied mocks), so Johnson sometimes lasts to 5. He still goes well before
+  // the room lets him.
+  assert.ok(share(sharp5, 'J. Johnson') < 0.5);
   assert.ok(share(realistic5, 'J. Johnson') > 0.6);
+  assert.ok(share(realistic5, 'J. Johnson') - share(sharp5, 'J. Johnson') > 0.25);
   const sharp9 = availabilityAt(sharpRuns, 9);
   assert.equal(takenMostOften(sharp9)[0], 'C. Cunningham');
-  assert.ok(sharp9.rows.find((row) => row.playerName === 'C. Cunningham')!.takenHereShare > 0.5);
-  // Sabonis is a double-double a night. With that paid, a sharp room takes him before 1.9 most of the time.
-  assert.ok(share(sharp9, 'D. Sabonis') < 0.35);
+  assert.ok(sharp9.rows.find((row) => row.playerName === 'C. Cunningham')!.takenHereShare > 0.2);
+  // Sabonis swings: 45.6 projected, 34.3 last season. A sharp room shades him
+  // down for it, so he is usually still there at 1.9.
+  assert.ok(share(sharp9, 'D. Sabonis') > 0.6);
   assert.ok(sharpRuns.every((result) => result.warnings.length === 0));
 });
 test('the no-deal world keeps Cade at 1.9 and takes him off the board', () => {

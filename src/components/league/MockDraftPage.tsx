@@ -587,6 +587,9 @@ function MockDraftScreen() {
                 role="radio"
                 aria-checked={mode === choice}
                 className={`tap-btn mock-seg-btn${mode === choice ? ' is-on' : ''}`}
+                title={choice === 'realistic'
+                  ? 'Teams draft mostly by ADP, the way real rooms do.'
+                  : 'Teams draft by our projections, and mark down a little the players whose numbers swing.'}
                 onClick={() => setMode(choice)}
               >
                 {choice === 'realistic' ? 'REALISTIC' : 'SHARP'}
