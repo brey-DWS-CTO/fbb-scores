@@ -170,7 +170,7 @@ test('the full stat line: minutes, shooting, and percents from makes over tries'
 test('on the forecast alone, last season ranks nobody', () => {
   const forecast = valueBoard(dataset.players, fixture, { schedule: leagueSchedule2027, projectionsOnly: true });
   assert.ok(forecast.entries.length > 250);
-  assert.ok(forecast.entries.every((entry) => entry.source === 'projection' || entry.source === 'espn-rank'));
+  assert.ok(forecast.entries.every((entry) => entry.source === 'projection' && entry.player.proTeam.toUpperCase() !== 'FA'));
   assert.ok(forecast.entries.every((entry) => entry.fppg !== null));
   assert.deepEqual(forecast.entries.map((entry) => entry.rank), forecast.entries.map((_, index) => index + 1));
   assert.ok(forecast.counts['last-season'] === 0);
