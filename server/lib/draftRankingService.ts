@@ -123,7 +123,12 @@ function parseRankEntry(value: unknown, field: string): DraftRankEntry | null {
   return { rank: entry.rank, auctionValue: optionalNumber(entry.auctionValue, `${field}.auctionValue`) };
 }
 
-function parseStatDict(value: unknown, field: string): Record<string, number> {
+/**
+ * A stat dictionary. `skipBlanks` drops entries that are not numbers instead
+ * of refusing the whole set: ESPN's actual-season rows carry a null here and
+ * there (a percentage with no attempts), and one blank must not sink an update.
+ */
+function parseStatDict(value: unknown, field: string, skipBlanks = false): Record<string, number> {
   const dict = record(value);
   if (!dict) throw new Error(`${field} must be an object`);
   const keys = Object.keys(dict);
@@ -132,6 +137,7 @@ function parseStatDict(value: unknown, field: string): Record<string, number> {
   for (const key of keys) {
     const number = dict[key];
     if (typeof number !== 'number' || !Number.isFinite(number)) {
+      if (skipBlanks) continue;
       throw new Error(`${field}.${key} must be a number`);
     }
     out[key] = number;
@@ -139,17 +145,17 @@ function parseStatDict(value: unknown, field: string): Record<string, number> {
   return out;
 }
 
-function parseProjection(value: unknown, field: string): ProjectionRow | null {
+function parseProjection(value: unknown, field: string, skipBlanks = false): ProjectionRow | null {
   if (value === undefined || value === null) return null;
   const row = record(value);
   if (!row) throw new Error(`${field} must be an object or null`);
   if (typeof row.id !== 'string' || row.id.trim() === '') throw new Error(`${field}.id is required`);
   return {
     id: row.id,
-    stats: parseStatDict(row.stats ?? {}, `${field}.stats`),
+    stats: parseStatDict(row.stats ?? {}, `${field}.stats`, skipBlanks),
     averageStats: row.averageStats === undefined || row.averageStats === null
       ? null
-      : parseStatDict(row.averageStats, `${field}.averageStats`),
+      : parseStatDict(row.averageStats, `${field}.averageStats`, skipBlanks),
   };
 }
 
@@ -227,7 +233,7 @@ export function parseDraftRankingCandidate(value: unknown): DraftRankingCandidat
       standard: parseRankEntry(player.standard, `${field}.standard`),
       roto: parseRankEntry(player.roto, `${field}.roto`),
       projection: parseProjection(player.projection, `${field}.projection`),
-      lastSeason: parseProjection(player.lastSeason, `${field}.lastSeason`),
+      lastSeason: parseProjection(player.lastSeason, `${field}.lastSeason`, true),
     };
   });
 
