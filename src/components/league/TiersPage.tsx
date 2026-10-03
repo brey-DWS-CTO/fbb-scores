@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { POSITIONS, valueBoard, type Position } from '../../lib/league/draftValue.js';
 import { keepersForMock } from '../../lib/league/mockDraft.js';
@@ -214,54 +215,80 @@ function Row({
   );
 }
 
-function Detail({ row }: { row: TierRow }) {
+/** A player's numbers, in a pop-up over the chart. Tap outside, ×, or Escape to close. */
+function TierPopup({ row, onClose }: { row: TierRow; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const atLast = row.lastGames !== null && row.lastGames !== row.games
     ? Math.round(row.fppg * row.lastGames)
     : null;
-  return (
-    <div className="tier-detail">
-      <div className="tier-detail-head">
-        <strong>{row.name}</strong>
-        <span>{row.proTeam} · {row.positions.join('/') || '—'} · Tier {row.tier} · #{row.rank}{row.adp !== null ? ` · ADP ${row.adp.toFixed(1)}` : ''}</span>
-      </div>
-      <div className="tier-detail-grid">
-        <div>
-          <div className="tier-detail-label">POINTS A GAME</div>
-          {row.estimates.map((estimate) => (
-            <div key={estimate.label} className="tier-detail-line">
-              <span className="tier-detail-num">{estimate.fppg.toFixed(1)}</span>
-              {estimate.label}
-            </div>
-          ))}
-        </div>
-        <div>
-          <div className="tier-detail-label">SEASON TOTAL</div>
-          <div className="tier-detail-line">
-            <span className="tier-detail-num">{row.total.toLocaleString()}</span>
-            over {Math.round(row.games)} projected games
+  const titleId = `tier-popup-${row.key}`;
+  return createPortal(
+    <div className="tier-popup-backdrop" onClick={onClose}>
+      <div
+        className="panel tier-popup"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="tier-popup-head">
+          <div>
+            <h2 id={titleId}>{row.name}</h2>
+            <p>{row.proTeam} · {row.positions.join('/') || '—'} · Tier {row.tier} · #{row.rank}{row.adp !== null ? ` · ADP ${row.adp.toFixed(1)}` : ''}</p>
           </div>
-          {atLast !== null && (
-            <div className="tier-detail-line">
-              <span className="tier-detail-num">{atLast.toLocaleString()}</span>
-              over last season&apos;s {row.lastGames} games
-            </div>
-          )}
-          {row.lastGames === null && <div className="tier-detail-line tier-detail-note">No games last season to compare.</div>}
+          <button ref={closeRef} type="button" className="tap-btn account-close" aria-label="Close" onClick={onClose}>×</button>
         </div>
-      </div>
-      {row.keptBy && (
+        <div className="tier-detail-label">POINTS A GAME</div>
+        {row.estimates.map((estimate) => (
+          <div key={estimate.label} className="tier-detail-line">
+            <span className="tier-detail-num">{estimate.fppg.toFixed(1)}</span>
+            {estimate.label}
+          </div>
+        ))}
         <div className="tier-detail-note">
-          {row.tag === 'keeper' ? `Kept by ${row.keptBy}.` : `Projected keeper for ${row.keptBy}.`}
+          {row.fppgLow === row.fppgHigh
+            ? 'Only one number, so no bar.'
+            : `Bar: ${row.fppgLow.toFixed(1)} to ${row.fppgHigh.toFixed(1)}.`}
         </div>
-      )}
-    </div>
+        <div className="tier-detail-label tier-popup-section">SEASON TOTAL</div>
+        <div className="tier-detail-line">
+          <span className="tier-detail-num">{row.total.toLocaleString()}</span>
+          over {Math.round(row.games)} projected games
+        </div>
+        {atLast !== null && (
+          <div className="tier-detail-line">
+            <span className="tier-detail-num">{atLast.toLocaleString()}</span>
+            over last season&apos;s {row.lastGames} games
+          </div>
+        )}
+        <div className="tier-detail-note">
+          {row.lastGames === null ? 'No games last season, so no bar.' : atLast === null ? 'Same games as last season, so no bar.' : `Bar: ${row.totalLow.toLocaleString()} to ${row.totalHigh.toLocaleString()}.`}
+        </div>
+        {row.keptBy && (
+          <div className="tier-detail-note tier-popup-section">
+            {row.tag === 'keeper' ? `Kept by ${row.keptBy}.` : `Projected keeper for ${row.keptBy}.`}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
 function TierChart({ rows }: { rows: readonly TierRow[] }) {
   const { ref, width } = useWidth();
   const measure = useMeasure();
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<TierRow | null>(null);
+  const close = useCallback(() => setOpen(null), []);
   const layout = layoutFor(width);
   const scales = rows.length > 0 && width > 0 ? scalesFor(rows, layout) : null;
 
@@ -284,23 +311,22 @@ function TierChart({ rows }: { rows: readonly TierRow[] }) {
                 TIER {group[0].tier}
               </div>
               {group.map((row) => (
-                <Fragment key={row.key}>
-                  <button
+                <button
+                    key={row.key}
                     type="button"
-                    className={`tier-row${open === row.key ? ' is-open' : ''}${row.tag !== 'open' ? ' is-kept' : ''}`}
-                    aria-expanded={open === row.key}
+                    className={`tier-row${open?.key === row.key ? ' is-open' : ''}${row.tag !== 'open' ? ' is-kept' : ''}`}
+                    aria-haspopup="dialog"
                     aria-label={`${row.rank}. ${row.name}, tier ${row.tier}. ${row.fppg.toFixed(1)} points a game, ${row.total.toLocaleString()} for the season.`}
-                    onClick={() => setOpen(open === row.key ? null : row.key)}
+                    onClick={() => setOpen(row)}
                   >
                     <Row row={row} scales={scales} layout={layout} width={width} measure={measure} />
                   </button>
-                  {open === row.key && <Detail row={row} />}
-                </Fragment>
               ))}
             </section>
           ))}
         </>
       )}
+      {open && <TierPopup row={open} onClose={close} />}
     </div>
   );
 }
