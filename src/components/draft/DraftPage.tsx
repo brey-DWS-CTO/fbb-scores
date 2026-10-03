@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
+import { earlyKeeperNote } from '../../lib/league/keeperEarly.js';
 import {
   useApplyStateResponse,
   useDraftData,
@@ -161,6 +162,9 @@ function PickRow({
             >
               {projected ? 'PROJECTED' : 'KEEPER'} · R{d.keeperRound ?? '?'}
             </span>
+            {cell.keeper.bumped && (
+              <span className="keeper-early-note">↑ {earlyKeeperNote(cell.keeper, pickLabel(cell.pick))}</span>
+            )}
           </div>
         ) : d ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

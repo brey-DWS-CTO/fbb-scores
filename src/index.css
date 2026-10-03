@@ -4004,6 +4004,9 @@ th.schedule-col-active {
 .room-grid td.is-keeper.is-projected { outline-style: dashed; opacity: 1; }
 .room-update-list li.is-keeper { box-shadow: inset 3px 0 0 var(--neon-yellow); }
 .mock-setup.is-before { margin-bottom: 12px; }
+/* A keeper on a better pick than his round. */
+.keeper-early { color: var(--neon-orange); font-weight: 900; font-size: 0.8rem; line-height: 1; margin-left: 3px; cursor: help; }
+.keeper-early-note { color: var(--neon-orange); font-size: 0.65rem; font-weight: 700; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

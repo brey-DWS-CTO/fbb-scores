@@ -618,7 +618,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                             >
                               <span className="room-grid-label">
                                 {cell.round}.{cell.slot}{cell.via ? ` ${cell.owner}` : ''}
-                                {kept && <KeeperChip projected={projected} />}
+                                {kept && <KeeperChip projected={projected} early={cell.pick?.keeperEarly ?? null} />}
                               </span>
                               {cell.pick?.playerName
                                 ? <>
@@ -706,7 +706,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 <span className="room-upcoming-num">{pick.label}</span>
                 <span>
                   {pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small>
-                  {pick.how === 'keeper' && <> <KeeperChip projected={pick.keeperStatus === 'assumed'} /></>}
+                  {pick.how === 'keeper' && <> <KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></>}
                 </span>
                 <span className="room-update-owner">{pick.owner}</span>
               </li>
@@ -729,8 +729,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
 }
 
 /** A keeper on the board or in the updates: solid when entered, dashed when projected. */
-function KeeperChip({ projected }: { projected: boolean }) {
-  return <span className={`room-keeper-chip${projected ? ' is-projected' : ''}`}>{projected ? 'PROJ KEEPER' : 'KEEPER'}</span>;
+function KeeperChip({ projected, early }: { projected: boolean; early: string | null }) {
+  return (
+    <>
+      <span className={`room-keeper-chip${projected ? ' is-projected' : ''}`}>{projected ? 'PROJ KEEPER' : 'KEEPER'}</span>
+      {early && <span className="keeper-early" title={early} aria-label={early}>↑</span>}
+    </>
+  );
 }
 
 interface CardProps {
