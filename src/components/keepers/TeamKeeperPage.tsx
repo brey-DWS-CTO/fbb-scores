@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import type { DatasetPlayer, KeeperSelection, ResolvedKeeper } from '../../lib/keeper/types.js';
 import { keeperCandidateError, pickLabel, resolveTeamKeepers } from '../../lib/keeper/engine.js';
 import { OWNERS, teamByOwner } from '../../lib/league/data.js';
@@ -378,6 +378,8 @@ function WhosIn({
 /** /keepers/:owner — one team's keeper worksheet (the old Excel sheet, but alive). */
 export default function TeamKeeperPage() {
   const headerRef = useRef<HTMLDivElement>(null);
+  // Came from the mock draft's PROJECT link: offer the way straight back.
+  const fromMock = (useLocation().state as { from?: string } | null)?.from === 'mock';
   useEffect(() => {
     const header = headerRef.current;
     if (!header) return;
@@ -606,7 +608,12 @@ export default function TeamKeeperPage() {
         }}
       >
         <div style={{ minWidth: 0 }}>
-          {isCommish && (
+          {fromMock && (
+            <Link className="tap-btn keeper-back-to-mock" to="/mock">
+              ← BACK TO MOCK DRAFT
+            </Link>
+          )}
+          {isCommish && !fromMock && (
             <Link
               className="keeper-page-back"
               to="/admin"

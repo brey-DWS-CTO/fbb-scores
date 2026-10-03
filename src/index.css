@@ -4006,6 +4006,11 @@ th.schedule-col-active {
 .mock-setup.is-before { margin-bottom: 12px; }
 /* A keeper on a better pick than his round. */
 .keeper-early { color: var(--neon-orange); font-weight: 900; font-size: 0.8rem; line-height: 1; margin-left: 3px; cursor: help; }
+.keeper-back-to-mock {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; margin-bottom: 6px;
+  border: 2px solid var(--neon-teal); border-radius: 8px; color: var(--neon-teal);
+  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-decoration: none;
+}
 .keeper-early-note { color: var(--neon-orange); font-size: 0.65rem; font-weight: 700; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */

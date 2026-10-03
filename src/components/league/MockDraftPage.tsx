@@ -414,7 +414,7 @@ function MockDraftScreen() {
               <div className="mock-guess-head">
                 <span className="mock-guess-owner">{row.owner}</span>
                 {!revealed && (
-                  <Link className="mock-edit" to={`/keepers/${encodeURIComponent(row.owner)}`}>
+                  <Link className="mock-edit" to={`/keepers/${encodeURIComponent(row.owner)}`} state={{ from: 'mock' }}>
                     {row.guess.length > 0 ? 'edit projection' : 'project'}
                   </Link>
                 )}
