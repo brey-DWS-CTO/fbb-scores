@@ -655,7 +655,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     <span className="room-player-name">{pick.playerName ?? 'nobody'}</span>
                     <small><Pos positions={pick.positions} /></small>
                     {pick.how === 'keeper'
-                      ? <span className={`mock-tag ${pick.keeperStatus === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>{pick.keeperStatus === 'known' ? 'keeper' : 'projected'}</span>
+                      ? <span><KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></span>
                       : <span />}
                     <span className="room-update-owner">{pick.owner}</span>
                   </li>
