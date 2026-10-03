@@ -3,18 +3,16 @@ import { Link } from 'react-router-dom';
 import {
   apiErrorMessage,
   closeDraft,
-  fetchPins,
   reopenDraft,
   resetDraft,
   setKeeperVisibility,
   setLocks,
-  setPin,
 } from '../../lib/league/api.js';
 import { draftYearLabel, tradeableSeason } from '../../lib/league/pickTrades.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import ActAsPanel from './ActAsPanel.js';
-import EmailAdmin from './EmailAdmin.js';
 import NavIcon from './NavIcon.js';
+import SignInAdmin from './SignInAdmin.js';
 
 const btnOutline = (color: string): CSSProperties => ({
   minHeight: 44,
@@ -27,17 +25,12 @@ const btnOutline = (color: string): CSSProperties => ({
   letterSpacing: '0.05em',
 });
 
-/** Lock keepers, PIN management, draft reset, TV link — commissioner only. */
+/** Lock keepers, PINs, draft reset, TV link — commissioner only. */
 export default function CommissionerPanel() {
   const { state, meta, dataset } = useLeagueData();
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
 
-  const [pins, setPins] = useState<Array<{ owner: string; pin: string; temp?: boolean }> | null>(
-    null,
-  );
-  const [pinsOpen, setPinsOpen] = useState(false);
-  const [pinArm, setPinArm] = useState<string | null>(null);
   const [resetArmed, setResetArmed] = useState(false);
   const [closeArmed, setCloseArmed] = useState(false);
   const [revealArmed, setRevealArmed] = useState(false);
@@ -66,25 +59,10 @@ export default function CommissionerPanel() {
       applyState(await setLocks(identity, !locked));
     });
 
-  const openPins = () =>
-    void run('pins', async () => {
-      setPins(await fetchPins(identity));
-      setPinsOpen(true);
-    });
-
   const setReveal = (next: boolean) => {
     setRevealArmed(false);
     void run('reveal', async () => {
       applyState(await setKeeperVisibility(identity, next));
-    });
-  };
-
-  const resetOwnerPin = (owner: string) => {
-    setPinArm(null);
-    void run(`pin-${owner}`, async () => {
-      // Clear to unclaimed — the owner sets a fresh PIN on their next sign-in
-      await setPin(identity, owner, '');
-      setPins(await fetchPins(identity));
     });
   };
 
@@ -207,102 +185,15 @@ export default function CommissionerPanel() {
         )}
       </div>
 
-      {/* Sign-in emails */}
+      {/* Sign-in: each owner's email and PIN */}
       <ActAsPanel />
       <details className="commish-fold commish-fold-inner">
         <summary className="hub-heading">
-          SIGN-IN EMAILS
-          <small>Where each owner&apos;s sign-in link goes</small>
+          SIGN-IN
+          <small>Each owner&apos;s email and PIN</small>
         </summary>
-        <EmailAdmin />
+        <SignInAdmin />
       </details>
-
-      {/* PINs — still here, and still needed until everyone has used a link */}
-      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
-        {!pinsOpen ? (
-          <button
-            className="tap-btn"
-            onClick={openPins}
-            disabled={busy !== null}
-            style={btnOutline('var(--neon-yellow)')}
-          >
-            {busy === 'pins' ? 'LOADING…' : 'VIEW PINS'}
-          </button>
-        ) : (
-          <>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ color: 'var(--neon-yellow)', fontSize: '0.72rem' }}>
-                <NavIcon name="warning" size={14} className="icon-in-heading" />
-                Don't screen-share with these on screen.
-              </span>
-              <button
-                className="tap-btn"
-                onClick={() => {
-                  setPinsOpen(false);
-                  setPinArm(null);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-mid)',
-                  fontSize: '0.75rem',
-                  textDecoration: 'underline',
-                  minHeight: 32,
-                }}
-              >
-                hide
-              </button>
-            </div>
-            <div style={{ display: 'grid', gap: 6 }}>
-              {(pins ?? []).map(({ owner: o, pin, temp }) => (
-                <div key={o} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ flex: 1, fontWeight: 600, color: 'var(--text-hi)' }}>{o}</span>
-                  {temp && (
-                    <span style={{ color: 'var(--neon-yellow)', fontSize: '0.62rem', fontWeight: 800 }}>
-                      TEMP
-                    </span>
-                  )}
-                  <span
-                    style={{
-                      fontFamily: 'monospace',
-                      letterSpacing: pin ? '0.2em' : undefined,
-                      color: pin ? 'var(--neon-teal)' : 'var(--neon-yellow)',
-                      fontSize: pin ? '0.95rem' : '0.72rem',
-                    }}
-                  >
-                    {pin || 'unclaimed'}
-                  </span>
-                  <button
-                    className="tap-btn"
-                    onClick={() => (pinArm === o ? resetOwnerPin(o) : setPinArm(o))}
-                    disabled={busy !== null || !pin}
-                    style={{
-                      minHeight: 40,
-                      padding: '0 12px',
-                      borderRadius: 8,
-                      border: `2px solid ${pinArm === o ? 'var(--neon-red)' : 'var(--panel-border)'}`,
-                      background: 'transparent',
-                      color: !pin ? 'var(--text-ghost)' : pinArm === o ? 'var(--neon-red)' : 'var(--text-mid)',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {busy === `pin-${o}` ? '…' : pinArm === o ? 'SURE?' : 'clear'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
 
       {/* Close the draft — this is what opens next season's pick trades */}
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>

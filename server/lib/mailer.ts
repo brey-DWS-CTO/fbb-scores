@@ -201,6 +201,45 @@ export async function sendMail(
   }
 }
 
+/**
+ * The PIN the commissioner just set, with a way in.
+ *
+ * `link` is a one-time sign-in link when one could be issued, and the app's
+ * home page when it could not, so the button always goes somewhere useful.
+ */
+export async function sendPinEmail(
+  to: string,
+  owner: string,
+  pin: string,
+  link: string,
+  signInLink: boolean,
+  minutes: number,
+): Promise<SendResult> {
+  const origin = new URL(link).origin;
+  if (!process.env.RESEND_API_KEY) {
+    // Local development. Say what would go out, but keep the PIN out of the log.
+    console.log(`[pin] no mail key, would send ${owner} their new PIN at ${to}: ${link}`);
+    return { ok: true, logged: true };
+  }
+  const notes = signInLink
+    ? [
+        `The button works once and runs out in ${minutes} minutes. The PIN keeps working.`,
+        'Sign in with your team name and this PIN when email is not handy.',
+      ]
+    : ['Sign in with your team name and this PIN.'];
+  const content: MailContent = {
+    subject: 'Your FBB Scores PIN',
+    preheader: `The commissioner set a PIN for ${owner}.`,
+    heading: `Your PIN is ${pin}`,
+    lines: [`The commissioner set a PIN for ${owner}.`],
+    textLines: [`The commissioner set a PIN for ${owner}.`, `Your PIN is ${pin}`],
+    action: { label: signInLink ? 'SIGN IN' : 'OPEN FBB SCORES', href: link },
+    notes,
+    paste: link,
+  };
+  return sendMail(to, content, origin, 'pin');
+}
+
 /** The sign-in email. */
 export async function sendLoginLink(
   to: string,
