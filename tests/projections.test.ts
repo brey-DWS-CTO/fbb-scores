@@ -170,7 +170,7 @@ test('the full stat line: minutes, shooting, and percents from makes over tries'
 test('on the forecast alone, last season ranks nobody', () => {
   const forecast = valueBoard(dataset.players, fixture, { schedule: leagueSchedule2027, projectionsOnly: true });
   assert.ok(forecast.entries.length > 250);
-  assert.ok(forecast.entries.every((entry) => entry.source === 'projection' || entry.source === 'espn-rank'));
+  assert.ok(forecast.entries.every((entry) => entry.source === 'projection' && entry.player.proTeam.toUpperCase() !== 'FA'));
   assert.ok(forecast.entries.every((entry) => entry.fppg !== null));
   assert.deepEqual(forecast.entries.map((entry) => entry.rank), forecast.entries.map((_, index) => index + 1));
   assert.ok(forecast.counts['last-season'] === 0);
@@ -203,21 +203,12 @@ test('columns: VS LAST sits beside ESPN; hidden ones drop out; the player always
   assert.ok(csv.startsWith('#,Player,Positions'));
 });
 
-test('commissioner games estimates cut total and value, not points per game', async () => {
-  const { GAMES_OVERRIDES } = await import('../src/lib/league/gamesOverrides.ts');
-  for (const override of GAMES_OVERRIDES) {
-    const row = rows.find((entry) => entry.name === override.name);
-    if (!row) continue;
-    assert.equal(row.games, override.games);
-    assert.ok(row.gamesNote);
-    assert.equal(row.total, Math.round(row.fppg! * override.games));
-    const espnGames = fixture.players.find((player) => player.espnId === override.espnId)!.projection!.stats['42'];
-    // Same per-game points as ESPN's line, fewer games.
-    assert.ok(override.games < espnGames);
-  }
-  const porzingis = rows.find((entry) => entry.name === 'Kristaps Porzingis');
-  const withoutOverride = valueBoard(dataset.players, fixture, { schedule: leagueSchedule2027 });
-  assert.ok(porzingis, 'Porzingis is on the board');
-  const before = withoutOverride.entries.find((entry) => entry.player.espnId === 3102531)!;
-  assert.ok(before.availability < 0.31, `availability ${before.availability}`);
+test('play-in and playoff games come from the schedule, and points scale with games missed', async () => {
+  const { teamScheduleSummaries2027 } = await import('../src/lib/league/scheduleData.ts');
+  const jokic = find(rows, 'Nikola Jokic');
+  const den = teamScheduleSummaries2027.find((team) => team.teamCode === 'DEN')!;
+  assert.equal(jokic.playInGames, den.playIn.total);
+  assert.equal(jokic.playoffGames, den.playoffs.total);
+  assert.equal(jokic.postPoints, Math.round(jokic.fppg! * den.postseasonTotal * Math.min(1, jokic.games! / 82)));
+  assert.ok(jokic.playInGames! > 0 && jokic.playoffGames! > 0);
 });

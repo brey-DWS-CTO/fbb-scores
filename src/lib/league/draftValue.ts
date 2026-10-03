@@ -37,7 +37,6 @@ import {
   type DraftRankingSnapshot,
   type RankSource,
 } from './draftRankings.js';
-import { gamesOverride } from './gamesOverrides.js';
 import { NBA_TEAMS, nbaTeamIdForProTeam, type LeagueSchedulePeriod, type SchedulePhase } from './schedule.js';
 
 // ─── Positions and roster slots ─────────────────────────────────────────────
@@ -366,9 +365,9 @@ export interface ValueOptions {
   /** ESPN's undrafted marker, when a season changes it. */
   undraftedAdp?: number;
   /**
-   * Value on this season's forecast only: a projection, else ESPN's rank read
-   * off a curve fitted to projections. Last season never ranks anyone, and a
-   * player neither source covers is left off. The commissioner asked for
+   * Value on this season's forecast only: ESPN's projection (with any
+   * commissioner edit). A player ESPN does not project, or a free agent, is
+   * left off; ranks and last season never value anyone. The commissioner asked for
    * this on the mock draft and the projections page; last season still
    * drives keeper tiers, which never come through here.
    */
@@ -403,13 +402,8 @@ export function roomRankOf(
   return espnRank !== null ? Math.max(espnRank, undraftedAdp) : null;
 }
 
-/**
- * Projected share of the season from a projection's games played, else all
- * of it. A commissioner games estimate wins over ESPN's.
- */
+/** Projected share of the season from a projection's games played, else all of it. */
 function availabilityOf(espn: DraftRankingPlayer | null): number {
-  const override = gamesOverride(espn?.espnId);
-  if (override) return Math.min(1, override.games / 82);
   const games = espn?.projection?.stats['42'];
   if (games === undefined || !Number.isFinite(games) || games < 0) return 1;
   return Math.min(1, games / 82);
@@ -466,7 +460,7 @@ export function valueBoard(
 
     const candidates: Partial<Record<RankSource, number>> = {};
     if (projected !== null) candidates.projection = projected;
-    if (espnRank !== null && bridge) candidates['espn-rank'] = round1(pointsForRank(bridge, espnRank));
+    if (espnRank !== null && bridge && !options.projectionsOnly) candidates['espn-rank'] = round1(pointsForRank(bridge, espnRank));
     if (last !== null && !options.projectionsOnly) candidates['last-season'] = last;
     const source = order.find((candidate) => candidates[candidate] !== undefined) ?? 'none';
     const fppg = source === 'none' ? null : candidates[source] ?? null;
@@ -542,7 +536,10 @@ export function valueBoard(
   const counts: Record<RankSource, number> = { projection: 0, 'espn-rank': 0, 'last-season': 0, none: 0 };
   for (const entry of valued) counts[entry.source] += 1;
   // On the forecast alone, a player nothing values is not on the board at all.
-  const kept = options.projectionsOnly ? valued.filter((entry) => entry.fppg !== null) : valued;
+  // On the forecast alone, only players ESPN projects and a team has signed.
+  const kept = options.projectionsOnly
+    ? valued.filter((entry) => entry.source === 'projection' && entry.player.proTeam.toUpperCase() !== 'FA')
+    : valued;
   const entries = kept.map((entry, index) => ({ ...entry, rank: index + 1 }));
   const primary = order.find((source) => counts[source] > 0) ?? 'none';
 

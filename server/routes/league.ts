@@ -97,9 +97,18 @@ import {
   insertPoll,
   updatePoll,
   OWNERS,
+  claimSentNotice,
+  deleteProjectionEdit,
+  listProjectionEdits,
+  saveProjectionEdit,
+  deleteMockResult,
+  listMockResults,
+  saveMockResult,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
+import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
+import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import { sendLoginLink } from '../lib/mailer.js';
 import {
@@ -691,6 +700,93 @@ router.post('/team-names/accept', requireAuth, requireCommissioner, async (req, 
 // ESPN's ADP, draft ranks and projections, frozen the same way as the player
 // pool. Any signed-in owner reads them, for the mock draft and projections.
 // Only the commissioner fetches or accepts new ones.
+
+// ─── Mock draft history ──────────────────────────────────────────────────────
+//
+// Each signed-in member keeps their own finished, graded mocks. The owner
+// comes from the sign-in, never the body. The commissioner keeps every one;
+// everyone else keeps their latest ten.
+
+/** GET /api/league/mock-results — your saved mocks, newest first. */
+router.get('/mock-results', requireAuth, async (_req, res) => {
+  const rows = await listMockResults(leagueDataset.season, res.locals.owner as string);
+  res.json({ results: rows.map((row) => row.result) });
+});
+
+/** POST /api/league/mock-results — save a finished mock. The same draft saves once. */
+router.post('/mock-results', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  let record;
+  try {
+    record = parseMockResult(owner, req.body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'That result is not valid' });
+    return;
+  }
+  const keep = res.locals.isCommissioner === true ? null : MEMBER_MOCK_LIMIT;
+  await saveMockResult({ season: leagueDataset.season, owner, id: record.id, result: record, createdAt: record.finishedAt }, keep);
+  res.json({ result: record });
+});
+
+/** DELETE /api/league/mock-results/:id — forget one of your mocks. */
+router.delete('/mock-results/:id', requireAuth, async (req, res) => {
+  await deleteMockResult(leagueDataset.season, res.locals.owner as string, String(req.params.id));
+  res.json({ ok: true });
+});
+
+// ─── Projection edits ────────────────────────────────────────────────────────
+//
+// The commissioner's changes to ESPN's projections, one row per player. The
+// client lays them over the accepted rankings snapshot; the snapshot itself is
+// never touched, so a fresh ESPN fetch keeps every edit on top.
+
+/** The two games estimates made before edits had a screen, written once. */
+async function seedProjectionEdits(season: number, by: string): Promise<void> {
+  if (!(await claimSentNotice(`projection-edits-seed-${season}`, season))) return;
+  const at = new Date().toISOString();
+  for (const seed of SEED_EDITS) {
+    const edit: ProjectionEdit = { ...seed, editedAt: at, editedBy: by };
+    await saveProjectionEdit({ season, espnId: seed.espnId, edit, updatedAt: at, updatedBy: by });
+  }
+}
+
+/** GET /api/league/projection-edits — every edit this season. Any owner reads; the projections are league-wide. */
+router.get('/projection-edits', requireAuth, async (_req, res) => {
+  const season = leagueDataset.season;
+  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, res.locals.owner as string);
+  const rows = await listProjectionEdits(season);
+  res.json({ season, edits: rows.map((row) => row.edit) });
+});
+
+/** PUT /api/league/projection-edits/:espnId — save one player's edit. */
+router.put('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+  const season = leagueDataset.season;
+  let parsed;
+  try {
+    parsed = parseProjectionEdit(Number(req.params.espnId), req.body);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'That edit is not valid' });
+    return;
+  }
+  const at = new Date().toISOString();
+  const by = res.locals.owner as string;
+  const edit: ProjectionEdit = { ...parsed, editedAt: at, editedBy: by };
+  await saveProjectionEdit({ season, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
+  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name, games: edit.games, perGame: edit.perGame });
+  res.json({ edit });
+});
+
+/** DELETE /api/league/projection-edits/:espnId — back to ESPN's projection. */
+router.delete('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+  const espnId = Number(req.params.espnId);
+  if (!Number.isInteger(espnId) || espnId <= 0) {
+    res.status(400).json({ error: 'That is not a player.' });
+    return;
+  }
+  await deleteProjectionEdit(leagueDataset.season, espnId);
+  await appendAudit(actor(res), 'projection_edit.removed', { espnId });
+  res.json({ ok: true });
+});
 
 /** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */
 router.get('/draft-rankings', requireAuth, async (_req, res) => {

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import { fetchDraftRankings, fetchPickTrades } from '../../lib/league/api.js';
+import { deleteMockResult, fetchMockResults, fetchPickTrades, saveMockResult } from '../../lib/league/api.js';
+import { gradeSummary, mockResultId } from '../../lib/league/mockGrade.js';
+import MockGradeCard from './MockGradeCard.js';
+import { useProjectionData } from '../../hooks/useProjectionData.js';
 import { rankSourceLabel } from '../../lib/league/draftRankings.js';
 import { valueBoard } from '../../lib/league/draftValue.js';
 import {
@@ -23,6 +26,7 @@ import { buildWorld, privateTrades, switchableTrades, tradeConflicts, type World
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
 import DraftRoom, { type RoomProgress } from './DraftRoom.js';
+import type { MockGrade } from '../../lib/league/mockGrade.js';
 import NavIcon from './NavIcon.js';
 
 const RUN_CHOICES = [100, 200, 500] as const;
@@ -208,12 +212,8 @@ function MockDraftScreen() {
   const isCommish = identity?.isCommissioner === true;
   const signedIn = viewer !== null;
 
-  const rankingsQuery = useQuery({
-    queryKey: ['mock-draft-rankings', viewer ?? 'anon', meta?.draftRankings?.activeSnapshotId ?? 'none'],
-    queryFn: () => fetchDraftRankings(identity as NonNullable<typeof identity>),
-    enabled: signedIn,
-    staleTime: 30_000,
-  });
+  // ESPN's numbers with the commissioner's projection edits laid over them.
+  const { snapshot, original, edits } = useProjectionData();
   const tradesQuery = useQuery({
     queryKey: ['pick-trades', viewer ?? 'anon'],
     queryFn: () => fetchPickTrades(identity as NonNullable<typeof identity>),
@@ -241,6 +241,27 @@ function MockDraftScreen() {
     ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft }
     : null));
   const onProgress = useCallback((next: RoomProgress) => setProgress(next), []);
+
+  // Finished mocks, graded and kept on the server for this person.
+  const queryClient = useQueryClient();
+  const historyQuery = useQuery({
+    queryKey: ['mock-results', viewer ?? 'anon'],
+    queryFn: () => fetchMockResults(identity as NonNullable<typeof identity>),
+    enabled: identity !== null,
+    staleTime: 30_000,
+  });
+  const onFinished = useCallback((finished: { choices: Record<number, string>; grade: MockGrade }) => {
+    if (!identity) return;
+    const id = mockResultId(identity.owner, seed, mode, finished.choices);
+    void saveMockResult(identity, { id, seed, mode, grade: finished.grade })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['mock-results'] }))
+      .catch(() => { /* the grade still shows; it just is not kept */ });
+  }, [identity, seed, mode, queryClient]);
+  const forget = (id: string) => {
+    if (!identity) return;
+    void deleteMockResult(identity, id).then(() => queryClient.invalidateQueries({ queryKey: ['mock-results'] }));
+  };
+  const [openResult, setOpenResult] = useState<string | null>(null);
   useEffect(() => {
     if (!viewer || acting) return;
     const save: MockSave = {
@@ -266,7 +287,6 @@ function MockDraftScreen() {
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
-  const snapshot = rankingsQuery.data?.snapshot ?? null;
   const fetchedProposals = tradesQuery.data?.proposals;
   const proposals = useMemo((): PickTradeProposal[] => fetchedProposals ?? [], [fetchedProposals]);
   const scenario = scenarioQuery.scenario;
@@ -279,8 +299,8 @@ function MockDraftScreen() {
   // Every player's projected line, for the room's player list and card.
   const projections = useMemo((): ReadonlyMap<string, PlayerProjection> => {
     const kept = keepersForMock(dataset, { viewer, state, scenario: scenarioQuery.scenario, useEntered: true });
-    return new Map(buildProjections(values, snapshot, kept).map((row) => [row.key, row]));
-  }, [dataset, viewer, state, scenarioQuery.scenario, values, snapshot]);
+    return new Map(buildProjections(values, snapshot, kept, edits, original).map((row) => [row.key, row]));
+  }, [dataset, viewer, state, scenarioQuery.scenario, values, snapshot, edits, original]);
 
   const ownCandidates = useMemo(
     () => viewer
@@ -623,6 +643,7 @@ function MockDraftScreen() {
               seed={seed}
               saved={progress}
               onProgress={onProgress}
+              onFinished={onFinished}
               onNewDraft={() => {
                 setProgress(null);
                 setSeed(Math.floor(Math.random() * 100_000));
@@ -648,6 +669,36 @@ function MockDraftScreen() {
       </div>
 
       {!setupFirst && setup}
+
+      <details className="commish-fold mock-history">
+        <summary className="hub-heading">
+          PAST MOCKS ({historyQuery.data?.length ?? 0})
+          <small>{isCommish ? 'Every mock you finish is kept.' : 'Your last ten finished mocks.'}</small>
+        </summary>
+        {(historyQuery.data ?? []).length === 0 ? (
+          <div className="mock-note">Finish a mock draft and its grade lands here.</div>
+        ) : (
+          <ol className="mock-history-list">
+            {(historyQuery.data ?? []).map((record) => (
+              <li key={record.id} className="panel">
+                <button type="button" className="mock-history-row" aria-expanded={openResult === record.id} onClick={() => setOpenResult(openResult === record.id ? null : record.id)}>
+                  <span className={`mock-grade-letter grade-${record.grade.grade[0].toLowerCase()}`}>{record.grade.grade}</span>
+                  <span className="mock-history-line">
+                    {gradeSummary(record.grade)}
+                    <small>{new Date(record.finishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {record.mode === 'sharp' ? 'sharp room' : 'realistic room'}</small>
+                  </span>
+                </button>
+                {openResult === record.id && (
+                  <>
+                    <MockGradeCard grade={record.grade} person={record.owner} />
+                    <button type="button" className="tap-btn mock-mini-btn" onClick={() => forget(record.id)}>FORGET THIS ONE</button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </details>
     </div>
   );
 }

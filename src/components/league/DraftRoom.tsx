@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, type LiveChoices } from '../../lib/league/liveMock.js';
 import type { MockCandidate, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
-import type { PlayerProjection } from '../../lib/league/projections.js';
+import { editTitle, type PlayerProjection } from '../../lib/league/projections.js';
 import {
   draftGrid,
   moveQueued,
@@ -14,6 +14,8 @@ import {
   upcomingPicks,
 } from '../../lib/league/draftRoom.js';
 import NavIcon from './NavIcon.js';
+import MockGradeCard from './MockGradeCard.js';
+import { gradeMock, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
 import { positionColor, positionTheme } from '../draft/boardUtils.js';
 
 /** A position code in the board's own colour for it. */
@@ -44,6 +46,8 @@ interface Props {
   saved: RoomProgress | null;
   onProgress: (progress: RoomProgress) => void;
   onNewDraft: () => void;
+  /** Called once when the last pick lands, with the draft's grade. */
+  onFinished: (finished: { choices: Record<number, string>; grade: MockGrade }) => void;
 }
 
 type CenterTab = 'players' | 'teams' | 'results';
@@ -72,7 +76,7 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 
  * before. What is new is that it is saved as it goes, so leaving the page and
  * coming back finds it where it was, with the clock paused.
  */
-export default function DraftRoom({ prepared, values, projections, person, seed, saved, onProgress, onNewDraft }: Props) {
+export default function DraftRoom({ prepared, values, projections, person, seed, saved, onProgress, onNewDraft, onFinished }: Props) {
   // Only the first render restores; after that the room owns its state.
   const [restored] = useState(() => replaySaved(prepared, seed, person, saved?.choices ?? {}));
   const [started, setStarted] = useState(saved?.started === true);
@@ -95,6 +99,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const [showDrafted, setShowDrafted] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'rank', dir: 1 });
   const [teamView, setTeamView] = useState(person);
+  // Tap a player anywhere (updates, a roster, the board) to see him in the card.
+  const look = (key: string | null | undefined) => {
+    if (!key) return;
+    setSelected(key);
+    setPhone('draft');
+  };
   const [resultsView, setResultsView] = useState<'board' | 'list'>('board');
 
   const live = useMemo(() => replaySaved(prepared, seed, person, choices).live, [prepared, seed, person, choices]);
@@ -291,6 +301,20 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     myPicks.filter((key) => shownPicks.some((pick) => pick.playerKey === key)).map((key) => ({ playerKey: key, positions: byKey.get(key)?.positions ?? [] })),
     prepared.roster,
   );
+  // The grade, once the last pick lands, and one report of it to be saved.
+  const grade = useMemo((): MockGrade | null => {
+    if (!over) return null;
+    const players = new Map<string, GradePlayer>();
+    for (const [key, row] of projections) players.set(key, { name: row.name, positions: row.positions, total: row.total, adp: row.adp });
+    return gradeMock(live.picks, person, players, prepared.roster);
+  }, [over, projections, live.picks, person, prepared.roster]);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!grade || reported.current) return;
+    reported.current = true;
+    onFinished({ choices: { ...choices }, grade });
+  }, [grade, choices, onFinished]);
+
   // When the last pick lands, show the board.
   const [sawEnd, setSawEnd] = useState(false);
   if (over && !sawEnd) {
@@ -330,8 +354,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             </>
           ) : over ? (
             <>
-              <div className="room-clock-big">DONE</div>
-              <div className="room-clock-meta">Draft complete. <button type="button" className="room-link" onClick={() => { setCenter('results'); setPhone('draft'); }}>See the board</button></div>
+              <div className="room-clock-row">
+                <div className={`room-clock-big mock-grade-letter grade-${(grade?.grade ?? 'c')[0].toLowerCase()}`}>{grade?.grade ?? 'DONE'}</div>
+                <div className="room-clock-meta">Draft complete.<br />Saved to Past mocks.</div>
+              </div>
+              <button type="button" className="room-link" onClick={() => { setCenter('results'); setPhone('draft'); }}>See the board</button>
             </>
           ) : (
             <>
@@ -400,10 +427,17 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
 
       {/* ── Center: the player card and the lists ── */}
       <main className="room-center">
+        {grade && (
+          <section className="panel room-grade">
+            <div className="hub-heading room-head">HOW YOU DID</div>
+            <MockGradeCard grade={grade} person={person} onPlayer={(key) => setSelected(key)} />
+          </section>
+        )}
+
         {started && shownPicks.length > 0 && (() => {
           const last = shownPicks[shownPicks.length - 1];
           return (
-            <div key={last.overall} className={`panel room-latest${last.owner === person ? ' is-mine' : ''}`} aria-live="polite">
+            <div key={last.overall} className={`panel room-latest is-tappable${last.owner === person ? ' is-mine' : ''}`} aria-live="polite" onClick={() => look(last.playerKey)}>
               <span className="room-upcoming-num">{last.label}</span>
               <span><strong>{last.owner}</strong> {last.how === 'keeper' ? 'keeps' : 'takes'} <strong>{last.playerName ?? 'nobody'}</strong> <small><Pos positions={last.positions} /></small></span>
             </div>
@@ -503,7 +537,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         </td>
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
-                        <td className="room-num" title={projection?.gamesNote ?? undefined}>{projection?.games ?? '–'}{projection?.gamesNote ? '*' : ''}</td>
+                        <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -556,7 +590,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     const pick = fill.playerKey ? takenBy.get(fill.playerKey) ?? null : null;
                     const line = projection?.line ?? null;
                     return (
-                      <tr key={`${fill.slot}-${index}`} className={fill.slot === 'BE' ? 'is-bench' : ''} onClick={() => fill.playerKey && setSelected(fill.playerKey)}>
+                      <tr key={`${fill.slot}-${index}`} className={fill.slot === 'BE' ? 'is-bench' : ''} onClick={() => look(fill.playerKey)}>
                         <td className="room-slot-col">{fill.slot === 'BE' ? 'Bench' : fill.slot}</td>
                         <td className="room-player-col">
                           {candidate ? (
@@ -614,7 +648,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                   <tbody>
                     {grid.rounds.map((row, index) => (
                       <tr key={index}>
-                        <th>R{index + 1}<small>{index % 2 === 0 ? '→' : '←'}</small></th>
+                        <th>R{index + 1}<span className="room-grid-arrow" aria-label={index % 2 === 0 ? 'left to right' : 'right to left'}>{index % 2 === 0 ? '→' : '←'}</span></th>
                         {row.map((cell) => {
                           const theme = cell.pick?.playerName ? positionTheme([...cell.pick.positions]) : null;
                           const kept = cell.pick?.how === 'keeper';
@@ -622,15 +656,17 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                           return (
                             <td
                               key={cell.overall}
-                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${kept ? ' is-keeper' : ''}${projected ? ' is-projected' : ''}`}
+                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${kept ? ' is-keeper' : ''}${projected ? ' is-projected' : ''}${cell.via ? ' is-traded' : ''}${cell.pick?.playerKey ? ' is-tappable' : ''}`}
+                              onClick={() => look(cell.pick?.playerKey)}
                               style={theme ? {
                                 background: `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`,
-                                borderColor: theme.border,
+                                borderColor: cell.via ? undefined : theme.border,
                                 boxShadow: `inset 3px 0 0 ${theme.color}`,
                               } : undefined}
                             >
                               <span className="room-grid-label">
-                                {cell.round}.{cell.slot}{cell.via ? ` ${cell.owner}` : ''}
+                                {cell.round}.{cell.slot}
+                                {cell.via && <span className="board-traded-tag" title={`${cell.owner} holds ${cell.via}'s pick`}>→ {cell.owner.toUpperCase()}</span>}
                                 {kept && <KeeperChip projected={projected} early={cell.pick?.keeperEarly ?? null} />}
                               </span>
                               {cell.pick?.playerName
@@ -650,7 +686,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             ) : (
               <ol className="room-team-list room-results-list">
                 {shownPicks.map((pick) => (
-                  <li key={pick.overall} className={pick.owner === person ? 'is-mine' : ''}>
+                  <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                     <span className="room-upcoming-num">{pick.label}</span>
                     <span className="room-player-name">{pick.playerName ?? 'nobody'}</span>
                     <small><Pos positions={pick.positions} /></small>
@@ -682,7 +718,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 return (
                   <li key={key} className={taken ? 'is-taken' : ''}>
                     <span className="room-upcoming-num">{index + 1}</span>
-                    <button type="button" className="room-queue-name" onClick={() => setSelected(key)}>
+                    <button type="button" className="room-queue-name" onClick={() => look(key)}>
                       {candidate?.playerName ?? key}<small>{candidate?.positions.join('/')}{taken ? ` · gone ${taken.label}` : ''}</small>
                     </button>
                     <button type="button" className="room-icon-btn" aria-label="Move up" disabled={index === 0} onClick={() => setQueue((current) => moveQueued(current, key, -1))}>↑</button>
@@ -701,7 +737,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             {myRoster.map((fill, index) => {
               const candidate = fill.playerKey ? prepared.byKey.get(fill.playerKey) : null;
               return (
-                <li key={`${fill.slot}-${index}`}>
+                <li key={`${fill.slot}-${index}`} className={fill.playerKey ? 'is-tappable' : ''} onClick={() => look(fill.playerKey)}>
                   <span className="room-slot-name">{fill.slot === 'BE' ? 'Bench' : fill.slot}</span>
                   <span>{candidate ? candidate.playerName : <span className="mock-live">empty</span>}</span>
                   <span className="room-num">{candidate ? one(projections.get(candidate.playerKey)?.fppg) : ''}</span>
@@ -715,7 +751,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           <div className="hub-heading room-head">UPDATES</div>
           <ol className="room-update-list">
             {[...shownPicks].reverse().slice(0, 12).map((pick) => (
-              <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''}${pick.how === 'keeper' ? ' is-keeper' : ''}`}>
+              <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''}${pick.how === 'keeper' ? ' is-keeper' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                 <span className="room-upcoming-num">{pick.label}</span>
                 <span>
                   {pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small>
@@ -797,14 +833,14 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
       <div className="room-card-table-wrap">
         <table className="room-card-table">
           <thead>
-            <tr><th>Season</th><th>FPPG</th><th>Total</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>3PM</th><th>TO</th></tr>
+            <tr><th aria-label="Season" /><th>FPPG</th><th>Total</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>3PM</th><th>TO</th></tr>
           </thead>
           <tbody>
             <tr>
               <th>Projected</th>
               <td>{one(projection?.fppg)}</td>
               <td>{projection?.total?.toLocaleString() ?? '–'}</td>
-              <td title={projection?.gamesNote ?? undefined}>{projection?.games ?? '–'}{projection?.gamesNote ? '*' : ''}</td>
+              <td title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
               <td>{one(line?.min)}</td><td>{one(line?.pts)}</td><td>{one(line?.reb)}</td><td>{one(line?.ast)}</td>
               <td>{one(line?.stl)}</td><td>{one(line?.blk)}</td><td>{one(line?.threes)}</td><td>{one(line?.to)}</td>
             </tr>

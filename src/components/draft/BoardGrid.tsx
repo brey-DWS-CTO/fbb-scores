@@ -146,7 +146,12 @@ export default function BoardGrid({ board, projectedKeeperKeys = NO_PROJECTED_KE
             }}
           >
             <span>R{r}</span>
-            <span style={{ color: 'var(--text-faint)' }}>{r % 2 === 1 ? '→' : '←'}</span>
+            <span
+              aria-label={r % 2 === 1 ? 'left to right' : 'right to left'}
+              style={{ color: 'var(--neon-teal)', fontSize: tv ? 'clamp(14px, 2vh, 24px)' : '1.15rem', fontWeight: 900, lineHeight: 1 }}
+            >
+              {r % 2 === 1 ? '→' : '←'}
+            </span>
           </div>
           {OWNERS.map((o) => (
             <GridCell
@@ -198,10 +203,16 @@ function GridCell({
     flexDirection: 'column',
     justifyContent: 'center',
     overflow: 'hidden',
-    border: `${projected ? '2px dashed' : '1px solid'} ${projected ? 'var(--neon-purple)' : d ? theme.border : 'var(--cell-border)'}`,
+    border: projected
+      ? '2px dashed var(--neon-purple)'
+      : traded
+        ? '2px solid var(--neon-yellow)'
+        : `1px solid ${d ? theme.border : 'var(--cell-border)'}`,
     background: d
       ? `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`
-      : 'var(--cell-bg)',
+      : traded
+        ? 'rgba(255,230,0,0.08)'
+        : 'var(--cell-bg)',
     // position accent as an inset bar (avoids border shorthand/longhand mixing)
     boxShadow: d ? `inset 3px 0 0 ${d.color}` : undefined,
     opacity: projected ? 0.72 : 1,
@@ -256,20 +267,8 @@ function GridCell({
       {d ? (
         <>
           {traded && (
-            <span
-              style={{
-                color: 'var(--neon-yellow)',
-                fontWeight: 800,
-                fontSize: tv ? 'clamp(7px, 0.7vw, 10px)' : '0.55rem',
-                letterSpacing: '0.05em',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                paddingRight: 12,
-              }}
-            >
-              {cell.pick.currentOwner.toUpperCase()}'S PICK
+            <span className="board-traded-tag" style={{ fontSize: tv ? 'clamp(7px, 0.7vw, 10px)' : '0.55rem' }}>
+              → {cell.pick.currentOwner.toUpperCase()}
             </span>
           )}
           <span
@@ -331,19 +330,8 @@ function GridCell({
             {pickLabel(cell.pick)}
           </span>
           {traded && (
-            <span
-              style={{
-                color: 'var(--neon-yellow)',
-                opacity: 0.8,
-                fontWeight: 700,
-                fontSize: tv ? 'clamp(8px, 0.8vw, 12px)' : '0.62rem',
-                lineHeight: 1.25,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              → {cell.pick.currentOwner}'s
+            <span className="board-traded-tag" style={{ fontSize: tv ? 'clamp(8px, 0.8vw, 12px)' : '0.6rem' }}>
+              → {cell.pick.currentOwner.toUpperCase()}
             </span>
           )}
         </>

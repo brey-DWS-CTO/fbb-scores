@@ -1,3 +1,5 @@
+import type { ProjectionEdit } from './projectionEdits.js';
+import type { MockResultRecord } from './mockGrade.js';
 import axios from 'axios';
 import type {
   KeeperSelection,
@@ -555,6 +557,47 @@ export async function acceptTeamNames(
     { headers: authHeaders(c) },
   );
   return data;
+}
+
+/** Your saved mock drafts, newest first. */
+export async function fetchMockResults(c: Credentials): Promise<MockResultRecord[]> {
+  const { data } = await axios.get('/api/league/mock-results', { headers: authHeaders(c) });
+  return data.results as MockResultRecord[];
+}
+
+/** Save a finished mock draft. Saving the same draft twice is a no-op. */
+export async function saveMockResult(
+  c: Credentials,
+  result: Pick<MockResultRecord, 'id' | 'seed' | 'mode' | 'grade'>,
+): Promise<MockResultRecord> {
+  const { data } = await axios.post('/api/league/mock-results', result, { headers: authHeaders(c) });
+  return data.result as MockResultRecord;
+}
+
+/** Forget one saved mock draft. */
+export async function deleteMockResult(c: Credentials, id: string): Promise<void> {
+  await axios.delete(`/api/league/mock-results/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
+}
+
+/** The commissioner's edits to ESPN's projections. */
+export async function fetchProjectionEdits(c: Credentials): Promise<ProjectionEdit[]> {
+  const { data } = await axios.get('/api/league/projection-edits', { headers: authHeaders(c) });
+  return data.edits as ProjectionEdit[];
+}
+
+/** Save one player's edit. */
+export async function saveProjectionEdit(
+  c: Credentials,
+  espnId: number,
+  edit: Pick<ProjectionEdit, 'name' | 'games' | 'perGame' | 'note'>,
+): Promise<ProjectionEdit> {
+  const { data } = await axios.put(`/api/league/projection-edits/${espnId}`, edit, { headers: authHeaders(c) });
+  return data.edit as ProjectionEdit;
+}
+
+/** Drop a player's edit, back to ESPN's projection. */
+export async function deleteProjectionEdit(c: Credentials, espnId: number): Promise<void> {
+  await axios.delete(`/api/league/projection-edits/${espnId}`, { headers: authHeaders(c) });
 }
 
 /** The accepted ESPN draft rankings, or the empty fallback. Commissioner-only for now. */
