@@ -52,7 +52,7 @@ import {
   setOwnerEmail,
   issueLoginToken,
   startImpersonation,
-  getPins,
+  getPinStates,
   setPin,
   getPinStatus,
   claimPin,
@@ -110,7 +110,7 @@ import {
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
-import { sendLoginLink } from '../lib/mailer.js';
+import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
   notifyTradeAccepted,
@@ -1401,16 +1401,21 @@ router.post('/emails/:owner/send-link', requireAuth, requireCommissioner, async 
 });
 
 /**
- * GET /api/league/pins — list every owner's PIN (commissioner only).
+ * GET /api/league/pins — whether each owner has a PIN (commissioner only).
+ * Never the value: the commissioner sets PINs but does not read them.
  */
 router.get('/pins', requireAuth, requireCommissioner, async (_req, res) => {
-  res.json(await getPins());
+  res.json(await getPinStates());
 });
 
 /**
  * POST /api/league/pins/:owner — set or clear an owner's PIN (commissioner
- * only). Body: { pin: string } — 4-8 characters, or "" to clear so the owner
+ * only). Body: { pin: string } — 4-8 digits, or "" to clear so the owner
  * sets a fresh one on their next sign-in.
+ *
+ * A new PIN goes straight to the owner's saved address, with a sign-in link,
+ * so the commissioner never has to pass it on by hand. The PIN still saves
+ * when there is no address or the mail fails; the answer says which.
  */
 router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) => {
   const target = routeParam(req.params.owner);
@@ -1420,8 +1425,8 @@ router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) =
   }
   const body = (req.body ?? {}) as { pin?: unknown; temp?: unknown };
   const pin = body.pin;
-  if (typeof pin !== 'string' || (pin !== '' && (pin.length < 4 || pin.length > 8))) {
-    res.status(400).json({ error: 'pin must be 4-8 characters, or "" to clear' });
+  if (typeof pin !== 'string' || (pin !== '' && !/^\d{4,8}$/.test(pin))) {
+    res.status(400).json({ error: 'PIN must be 4-8 digits, or "" to clear' });
     return;
   }
   // temp: true assigns a temporary PIN the owner must replace on first login
@@ -1431,7 +1436,31 @@ router.post('/pins/:owner', requireAuth, requireCommissioner, async (req, res) =
     target,
     temp: body.temp === true,
   });
-  res.json({ ok: true });
+  if (pin === '') {
+    res.json({ ok: true, emailed: false });
+    return;
+  }
+
+  const row = (await getOwnerEmails()).find((entry) => entry.owner === target);
+  if (!row || row.email === '') {
+    res.json({ ok: true, emailed: false, reason: `${target} has no email saved, so nothing went out. Add an email first.` });
+    return;
+  }
+  // A link on top of the PIN, so one email gets them in either way. If the
+  // address has had too many links lately, the PIN still goes, with a plain
+  // link to the app instead.
+  const issued = await issueLoginToken(row.email, new Date());
+  const signInLink = issued.ok && Boolean(issued.token);
+  const link = signInLink
+    ? `${appOrigin(req)}/sign-in/${encodeURIComponent(issued.token as string)}`
+    : `${appOrigin(req)}/`;
+  const sent = await sendPinEmail(row.email, target, pin, link, signInLink, LINK_TTL_MINUTES);
+  if (!sent.ok) {
+    res.json({ ok: true, emailed: false, reason: sent.error ?? 'Could not send the email' });
+    return;
+  }
+  await appendAudit(actor(res), 'pin.emailed', { target });
+  res.json({ ok: true, emailed: true, logged: sent.logged === true });
 });
 
 /**
