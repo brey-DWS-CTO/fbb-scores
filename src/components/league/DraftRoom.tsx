@@ -347,7 +347,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     <div className={`room room-phone-${phone}`}>
       {/* ── Left: the clock and who picks next ── */}
       <aside className="room-left">
-        <div className={`panel room-clock${myTurn ? ' is-mine' : ''}`}>
+        <div className={`panel room-clock${myTurn ? ' is-mine' : ''}${started ? '' : ' is-before'}`}>
           {!started ? (
             <>
               <div className="room-clock-meta">Nine teams, one seat for you. {PICK_CLOCK / 60} minutes a pick.</div>

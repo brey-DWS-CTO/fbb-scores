@@ -4279,6 +4279,9 @@ html.theme-light {
   .room .room-turn .mock-mini-btn { min-height: 28px; padding: 0 8px; font-size: 0.62rem; }
   .room-clock .room-actions .mock-mini-btn { min-height: 28px; font-size: 0.62rem; }
   .room-clock .live-start-btn { min-height: 38px; }
+  /* Before the draft, START sits on top, full width, with the note under it. */
+  .room .room-clock.is-before { grid-template-columns: minmax(0, 1fr); }
+  .room-clock.is-before .live-start-btn { order: -1; width: 100%; min-height: 44px; }
   .room .room-phone-tabs button { min-height: 36px; }
 
   .room-draft-lead { display: table-cell; }
