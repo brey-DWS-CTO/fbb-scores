@@ -141,7 +141,7 @@ function Detail({ row, season }: { row: PlayerProjection; season: number }) {
 }
 
 /**
- * Commissioner tool: every player's projected season in this league's
+ * Every player's projected season in this league's
  * scoring, with ESPN's line and the double-double bonus shown apart.
  */
 export default function ProjectionsPage() {
@@ -150,11 +150,12 @@ export default function ProjectionsPage() {
   const scenarioQuery = useKeeperScenario();
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
+  const signedIn = viewer !== null;
 
   const rankingsQuery = useQuery({
     queryKey: ['mock-draft-rankings', viewer ?? 'anon', meta?.draftRankings?.activeSnapshotId ?? 'none'],
     queryFn: () => fetchDraftRankings(identity as NonNullable<typeof identity>),
-    enabled: isCommish,
+    enabled: signedIn,
     staleTime: 30_000,
   });
   const snapshot = rankingsQuery.data?.snapshot ?? null;
@@ -198,13 +199,13 @@ export default function ProjectionsPage() {
   );
   const current = pageOf(shown, page, pageSize);
 
-  if (!isCommish || !viewer) {
+  if (!viewer) {
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
-          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>COMMISH ONLY</div>
+          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>SIGN IN</div>
           <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            Projections are the commish&apos;s for now.
+            Sign in to see projections.
           </div>
         </div>
       </div>
@@ -250,7 +251,8 @@ export default function ProjectionsPage() {
         {fetchedOn ? `, fetched ${fetchedOn}` : ''}. <span className="proj-fallback">Grey</span> numbers have none
         and come from ESPN&apos;s rank. Last season is shown for comparison only. Tap a player to see how his number is built.
         {!snapshot?.players.length && (
-          <> No ESPN numbers are accepted yet. <Link to="/admin">Fetch them in Commish Mode.</Link></>
+          <> No ESPN numbers are accepted yet.{' '}
+            {isCommish ? <Link to="/admin">Fetch them in Commish Mode.</Link> : 'The commish will load them soon.'}</>
         )}
         {' '}<Link to="/mock">Open the mock draft →</Link>
       </div>
@@ -258,9 +260,11 @@ export default function ProjectionsPage() {
       {snapshot && snapshot.players.length > 0 && projected === 0 && (
         <div className="panel proj-stale" role="status">
           <NavIcon name="warning" size={15} className="icon-in-heading" />
-          Your saved ESPN numbers are from {fetchedOn}, before ESPN posted its projections, so the
-          projection columns are empty. <Link to="/admin">Update from ESPN in Commish Mode</Link>, save, and
-          this page fills in.
+          The saved ESPN numbers are from {fetchedOn}, before ESPN posted its projections, so the
+          projection columns are empty.{' '}
+          {isCommish
+            ? <><Link to="/admin">Update from ESPN in Commish Mode</Link>, save, and this page fills in.</>
+            : 'The commish will update them soon.'}
         </div>
       )}
 

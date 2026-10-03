@@ -140,11 +140,11 @@ after(async () => {
   if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
 });
 
-test('draft rankings are commissioner-only, reads included', async () => {
+test('any owner reads draft rankings; only the commissioner changes them', async () => {
   const anonymous = await request('/api/league/draft-rankings');
   assert.equal(anonymous.status, 401);
   const member = await request('/api/league/draft-rankings', { headers: auth('Joel') });
-  assert.equal(member.status, 403);
+  assert.equal(member.status, 200);
 
   const fetchDenied = await request('/api/league/draft-rankings/fetch-preview', {
     method: 'POST',
