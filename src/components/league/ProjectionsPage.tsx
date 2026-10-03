@@ -140,6 +140,8 @@ export default function ProjectionsPage() {
 
   const { snapshot, original, edits } = useProjectionData();
   const [editedOnly, setEditedOnly] = useState(false);
+  // Stats are read-only until EDIT unlocks them.
+  const [editMode, setEditMode] = useState(false);
   // The cell being typed in, Excel style, and what has been typed so far.
   const [cellAt, setCellAt] = useState<{ key: string; column: ProjectionColumnId; text: string } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -198,7 +200,7 @@ export default function ProjectionsPage() {
     return typeof value === 'number' ? value : null;
   };
   const startCell = (row: PlayerProjection, column: ProjectionColumnId) => {
-    if (!identity || row.espnId === null || !(column in EDITABLE_COLUMNS)) return;
+    if (!editMode || !identity || row.espnId === null || !(column in EDITABLE_COLUMNS)) return;
     setSaveError(null);
     const value = shownValue(row, column);
     setCellAt({ key: row.key, column, text: value === null ? '' : String(column === 'games' ? Math.round(value) : value) });
@@ -292,8 +294,8 @@ export default function ProjectionsPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus. Click a stat to change it;
-        your edits show in yellow, and ✎ puts a player back to ESPN.
+        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus. Tap ✎ EDIT to change stats;
+        your edits show in yellow, and the ✎ by a name puts that player back to ESPN.
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet. <Link to="/admin">Fetch them in Commish Mode.</Link></>
         )}
@@ -347,6 +349,14 @@ export default function ProjectionsPage() {
           Edited only ({edits.size})
         </label>
         <div className="proj-export">
+          <button
+            type="button"
+            className={`tap-btn mock-mini-btn proj-edit-toggle${editMode ? ' is-on' : ''}`}
+            aria-pressed={editMode}
+            onClick={() => { setEditMode(!editMode); setCellAt(null); }}
+          >
+            {editMode ? '✓ DONE' : '✎ EDIT'}
+          </button>
           <button type="button" className={`tap-btn mock-mini-btn${picking ? ' is-on' : ''}`} aria-expanded={picking} onClick={() => setPicking(!picking)}>
             COLUMNS{hidden.size > 0 ? ` (${PROJECTION_COLUMNS.length - hidden.size} of ${PROJECTION_COLUMNS.length})` : ''}
           </button>
@@ -385,7 +395,7 @@ export default function ProjectionsPage() {
       {saveError && <div className="identity-error" role="alert">{saveError}</div>}
 
       <div className="panel proj-table-wrap">
-        <table className="proj-table">
+        <table className={`proj-table${editMode ? ' is-editing' : ''}`}>
           <thead>
             <tr>
               <th className="proj-col-pos" title="Place in this sort"><span>#</span></th>
@@ -416,7 +426,7 @@ export default function ProjectionsPage() {
                 {columns.map((column) => {
                   const { text, className } = cell(row, column.id);
                   const statId = EDITABLE_COLUMNS[column.id];
-                  const editable = statId !== undefined && row.espnId !== null && row.line !== null;
+                  const editable = editMode && statId !== undefined && row.espnId !== null && row.line !== null;
                   const edited = statId !== undefined && cellEdited(row.edit, statId);
                   const typing = cellAt?.key === row.key && cellAt.column === column.id;
                   const classes = `proj-col-${column.id}${className ? ` ${className}` : ''}${editable ? ' proj-cell-edit' : ''}${edited ? ' proj-cell-edited' : ''}`;
