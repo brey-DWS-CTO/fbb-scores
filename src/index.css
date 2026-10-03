@@ -4199,7 +4199,8 @@ html.theme-light {
 }
 .tier-page { max-width: 1080px; }
 .tier-pages { flex-wrap: wrap; }
-.tier-panel { padding: 6px 8px 10px; border-radius: 10px; }
+/* Visible, not the panel's hidden: a clipped parent stops the axis sticking. */
+.tier-panel { padding: 6px 8px 10px; border-radius: 10px; overflow: visible; }
 .tier-empty { color: var(--text-mid); font-size: 0.82rem; padding: 18px 8px; text-align: center; }
 .tier-empty a { color: var(--neon-teal); }
 .tier-chart { width: 100%; }
@@ -4236,7 +4237,7 @@ html.theme-light {
 }
 .tier-row:hover, .tier-row.is-open { background: rgba(0, 255, 204, 0.05); }
 .tier-row:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: -2px; }
-.tier-rank { fill: var(--text-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
+.tier-total { fill: var(--text-mid); font-size: 10px; font-variant-numeric: tabular-nums; }
 .tier-bar { stroke-width: 4; stroke-linecap: round; opacity: 0.55; }
 .tier-dot { stroke: var(--panel-bg); stroke-width: 2; }
 .tier-name {

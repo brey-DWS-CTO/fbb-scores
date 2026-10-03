@@ -25,22 +25,17 @@ const tierColor = (tier: number) => `var(--tier-${((tier - 1) % TIER_COLORS) + 1
 
 const ROW_HEIGHT = 22;
 const AXIS_HEIGHT = 36;
-const RANK_WIDTH = 24;
+// The y axis: each row's season total, right-aligned in this gutter.
+const TOTAL_WIDTH = 38;
 const NAME_FONT = 11;
 const NAME_GAP = 6;
 
-/** The pixel boxes the chart is drawn in, for a given width. */
+/** The pixel box the chart is drawn in, for a given width. */
 function layoutFor(width: number) {
-  const narrow = width < 560;
-  const totalWidth = narrow ? 76 : 200;
-  const mainLeft = RANK_WIDTH + 8;
-  const mainRight = width - totalWidth - 14;
   return {
-    narrow,
-    mainLeft,
-    mainRight,
-    totalLeft: mainRight + 14,
-    totalRight: width - 6,
+    narrow: width < 560,
+    plotLeft: TOTAL_WIDTH + 10,
+    plotRight: width - 6,
   };
 }
 
@@ -85,72 +80,47 @@ function useWidth() {
   return { ref, width };
 }
 
-const thousands = (value: number) => {
-  if (Math.abs(value) < 1000) return String(Math.round(value));
-  const k = value / 1000;
-  return `${Number.isInteger(k) ? k : k.toFixed(1)}k`;
-};
-
 interface Scales {
   fppg: ReturnType<typeof niceTicks>;
-  total: ReturnType<typeof niceTicks>;
   x: (value: number) => number;
-  t: (value: number) => number;
 }
 
+/**
+ * Points per game run high to low, left to right. The best players sit top
+ * left and the chart falls to the bottom right, as Boris draws it.
+ */
 function scalesFor(rows: readonly TierRow[], layout: Layout): Scales {
   const fppg = niceTicks(
     Math.min(...rows.map((row) => row.fppgLow)),
     Math.max(...rows.map((row) => row.fppgHigh)),
-    layout.mainRight - layout.mainLeft < 300 ? 4 : 7,
-  );
-  const total = niceTicks(
-    Math.min(...rows.map((row) => row.totalLow)),
-    Math.max(...rows.map((row) => row.totalHigh)),
-    layout.totalRight - layout.totalLeft < 120 ? 2 : 4,
+    layout.plotRight - layout.plotLeft < 300 ? 5 : 8,
   );
   // Inset by a dot's width, so a dot at either end of the range is drawn whole.
   const inset = 7;
-  return {
-    fppg,
-    total,
-    x: scale(fppg.min, fppg.max, layout.mainLeft + inset, layout.mainRight - inset),
-    t: scale(total.min, total.max, layout.totalLeft + inset, layout.totalRight - inset),
-  };
+  return { fppg, x: scale(fppg.max, fppg.min, layout.plotLeft + inset, layout.plotRight - inset) };
 }
 
 function Grid({ scales, height }: { scales: Scales; height: number }) {
   return (
     <g className="tier-grid">
       {scales.fppg.ticks.map((tick) => (
-        <line key={`f${tick}`} x1={scales.x(tick)} x2={scales.x(tick)} y1={0} y2={height} />
-      ))}
-      {scales.total.ticks.map((tick) => (
-        <line key={`t${tick}`} x1={scales.t(tick)} x2={scales.t(tick)} y1={0} y2={height} />
+        <line key={tick} x1={scales.x(tick)} x2={scales.x(tick)} y1={0} y2={height} />
       ))}
     </g>
   );
 }
 
-/** A tick label hard by a panel's edge leans inward, so the two panels' labels never meet. */
+/** A tick label hard by the plot's edge leans inward. */
 const edgeAnchor = (x: number, left: number, right: number) =>
   x - left < 10 ? 'start' : right - x < 10 ? 'end' : 'middle';
 
 function Axis({ scales, layout, width }: { scales: Scales; layout: Layout; width: number }) {
   return (
     <svg className="tier-axis" width={width} height={AXIS_HEIGHT} aria-hidden="true">
-      <text className="tier-axis-title" x={(layout.mainLeft + layout.mainRight) / 2} y={12} textAnchor="middle">
-        POINTS A GAME
-      </text>
-      <text className="tier-axis-title" x={(layout.totalLeft + layout.totalRight) / 2} y={12} textAnchor="middle">
-        SEASON TOTAL
-      </text>
-      <text className="tier-axis-title" x={RANK_WIDTH - 2} y={12} textAnchor="end">#</text>
+      <text className="tier-axis-title" x={0} y={12}>SEASON TOTAL</text>
+      <text className="tier-axis-title" x={layout.plotRight} y={12} textAnchor="end">POINTS PER GAME</text>
       {scales.fppg.ticks.map((tick) => (
-        <text key={`f${tick}`} className="tier-tick" x={scales.x(tick)} y={30} textAnchor={edgeAnchor(scales.x(tick), layout.mainLeft, layout.mainRight)}>{tick}</text>
-      ))}
-      {scales.total.ticks.map((tick) => (
-        <text key={`t${tick}`} className="tier-tick" x={scales.t(tick)} y={30} textAnchor={edgeAnchor(scales.t(tick), layout.totalLeft, layout.totalRight)}>{thousands(tick)}</text>
+        <text key={tick} className="tier-tick" x={scales.x(tick)} y={30} textAnchor={edgeAnchor(scales.x(tick), layout.plotLeft, layout.plotRight)}>{tick}</text>
       ))}
     </svg>
   );
@@ -177,24 +147,24 @@ function Row({
   const keeper = row.tag === 'open' ? '' : ' K';
   const name = layout.narrow ? row.shortName : row.name;
   const labelWidth = measure(name + keeper);
-  const barLeft = Math.min(low, dot);
-  const barRight = Math.max(high, dot);
-  const side = labelSide(barLeft, barRight, labelWidth, layout.mainLeft, layout.mainRight, NAME_GAP);
+  const barLeft = Math.min(low, high, dot);
+  const barRight = Math.max(low, high, dot);
+  const side = labelSide(barLeft, barRight, labelWidth, layout.plotLeft, layout.plotRight, NAME_GAP);
   // When the name fits neither side it stays inside the plot and crosses the
   // bar; the halo in the name's style keeps it readable.
   const nameX = side === 'left'
-    ? Math.max(layout.mainLeft + labelWidth, barLeft - NAME_GAP)
-    : Math.min(layout.mainRight - labelWidth, barRight + NAME_GAP);
-  const totalLow = scales.t(row.totalLow);
-  const totalHigh = scales.t(row.totalHigh);
+    ? Math.max(layout.plotLeft + labelWidth, barLeft - NAME_GAP)
+    : Math.min(layout.plotRight - labelWidth, barRight + NAME_GAP);
 
   return (
     <svg width={width} height={ROW_HEIGHT} aria-hidden="true">
       <Grid scales={scales} height={ROW_HEIGHT} />
-      <text className="tier-rank" x={RANK_WIDTH - 2} y={mid} dominantBaseline="central" textAnchor="end">{row.rank}</text>
-      <rect x={RANK_WIDTH + 2} y={0} width={4} height={ROW_HEIGHT} style={{ fill: color }} />
-      {high - low > 0.5 && (
-        <line className="tier-bar" x1={low} x2={high} y1={mid} y2={mid} style={{ stroke: color }} />
+      <text className="tier-total" x={TOTAL_WIDTH} y={mid} dominantBaseline="central" textAnchor="end">
+        {row.total.toLocaleString()}
+      </text>
+      <rect x={TOTAL_WIDTH + 4} y={0} width={4} height={ROW_HEIGHT} style={{ fill: color }} />
+      {barRight - barLeft > 0.5 && (
+        <line className="tier-bar" x1={barLeft} x2={barRight} y1={mid} y2={mid} style={{ stroke: color }} />
       )}
       <circle className="tier-dot" cx={dot} cy={mid} r={4} style={{ fill: color }} />
       <text
@@ -207,10 +177,6 @@ function Row({
         {name}
         {keeper && <tspan className={row.tag === 'keeper' ? 'tier-k-known' : 'tier-k-guess'}>{keeper}</tspan>}
       </text>
-      {totalHigh - totalLow > 0.5 && (
-        <line className="tier-bar" x1={totalLow} x2={totalHigh} y1={mid} y2={mid} style={{ stroke: color }} />
-      )}
-      <circle className="tier-dot" cx={scales.t(row.total)} cy={mid} r={4} style={{ fill: color }} />
     </svg>
   );
 }
@@ -247,7 +213,7 @@ function TierPopup({ row, onClose }: { row: TierRow; onClose: () => void }) {
           </div>
           <button ref={closeRef} type="button" className="tap-btn account-close" aria-label="Close" onClick={onClose}>×</button>
         </div>
-        <div className="tier-detail-label">POINTS A GAME</div>
+        <div className="tier-detail-label">POINTS PER GAME</div>
         {row.estimates.map((estimate) => (
           <div key={estimate.label} className="tier-detail-line">
             <span className="tier-detail-num">{estimate.fppg.toFixed(1)}</span>
@@ -270,9 +236,7 @@ function TierPopup({ row, onClose }: { row: TierRow; onClose: () => void }) {
             over last season&apos;s {row.lastGames} games
           </div>
         )}
-        <div className="tier-detail-note">
-          {row.lastGames === null ? 'No games last season, so no bar.' : atLast === null ? 'Same games as last season, so no bar.' : `Bar: ${row.totalLow.toLocaleString()} to ${row.totalHigh.toLocaleString()}.`}
-        </div>
+        {row.lastGames === null && <div className="tier-detail-note">No games last season.</div>}
         {row.keptBy && (
           <div className="tier-detail-note tier-popup-section">
             {row.tag === 'keeper' ? `Kept by ${row.keptBy}.` : `Projected keeper for ${row.keptBy}.`}
@@ -316,7 +280,7 @@ function TierChart({ rows }: { rows: readonly TierRow[] }) {
                     type="button"
                     className={`tier-row${open?.key === row.key ? ' is-open' : ''}${row.tag !== 'open' ? ' is-kept' : ''}`}
                     aria-haspopup="dialog"
-                    aria-label={`${row.rank}. ${row.name}, tier ${row.tier}. ${row.fppg.toFixed(1)} points a game, ${row.total.toLocaleString()} for the season.`}
+                    aria-label={`${row.rank}. ${row.name}, tier ${row.tier}. ${row.total.toLocaleString()} for the season, ${row.fppg.toFixed(1)} points per game.`}
                     onClick={() => setOpen(row)}
                   >
                     <Row row={row} scales={scales} layout={layout} width={width} measure={measure} />
@@ -333,7 +297,7 @@ function TierChart({ rows }: { rows: readonly TierRow[] }) {
 
 /**
  * Tiers in the style of Boris Chen's football charts: one row per player,
- * ranked by season total, with points a game beside it and a bar for how far
+ * season total down the side, points per game across with a bar for how far
  * our numbers disagree.
  */
 export default function TiersPage() {
@@ -391,10 +355,10 @@ export default function TiersPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Players ranked by the points they should score this season, cut into tiers where the numbers
-        leave a gap. The dot is the projection. The bar runs from the lowest to the highest number we
-        have for him: ESPN, last season and the season before for points a game; last season&apos;s
-        games for the total. Tap a player to see the numbers. <Link to="/projections">Same numbers as a table.</Link>
+        Players run down the page by the points they should score this season, cut into tiers where the
+        totals leave a gap. Across is points per game, best on the left. The dot is the projection; the
+        bar runs from the lowest to the highest number we have for him: ESPN, last season and the season
+        before. Tap a player to see his numbers. <Link to="/projections">Same numbers as a table.</Link>
       </div>
 
       <section className="panel mock-controls proj-controls">

@@ -69,7 +69,6 @@ test('every player on the chart has a projection and a season total', () => {
   for (const row of rows) {
     assert.ok(Number.isFinite(row.fppg) && Number.isFinite(row.total) && row.games > 0, row.name);
     assert.ok(row.fppgLow <= row.fppg && row.fppg <= row.fppgHigh, `${row.name}'s dot sits on his bar`);
-    assert.ok(row.totalLow <= row.total && row.total <= row.totalHigh, `${row.name}'s total sits on its bar`);
   }
 });
 
@@ -80,11 +79,10 @@ test('Jokic: a tight bar, ESPN and last season agree', () => {
   assert.equal(jokic.fppgHigh, 64.7);
 });
 
-test('Giannis: the total bar reaches down to last season\'s 36 games', () => {
+test('last season\'s games come from ESPN\'s full count', () => {
   const giannis = find(rows, 'Giannis Antetokounmpo');
   assert.equal(giannis.lastGames, 36);
-  assert.equal(giannis.totalLow, Math.round(giannis.fppg * 36));
-  assert.equal(giannis.totalHigh, giannis.total);
+  assert.equal(find(rows, 'Nikola Jokic').lastGames, 65);
 });
 
 test('Tatum: the season before widens a short season', () => {
@@ -94,13 +92,6 @@ test('Tatum: the season before widens a short season', () => {
   assert.equal(tatum.fppgHigh, 46.6);
 });
 
-test('a player who played more last season stretches the bar up, not down', () => {
-  const durant = find(rows, 'Kevin Durant');
-  assert.ok(durant.lastGames! > durant.games);
-  assert.equal(durant.totalLow, durant.total);
-  assert.ok(durant.totalHigh > durant.total);
-});
-
 test('no history: the bar is just the dot', () => {
   const jokic = projections.find((row) => row.name === 'Nikola Jokic')!;
   const rookie = { ...jokic, key: 'rookie', name: 'A. Rookie', lastSeason: null };
@@ -108,7 +99,6 @@ test('no history: the bar is just the dot', () => {
   assert.equal(row.estimates.length, 1);
   assert.equal(row.lastGames, null);
   assert.equal(row.fppgLow, row.fppgHigh);
-  assert.equal(row.totalLow, row.totalHigh);
 });
 
 test('a commish edit puts ESPN\'s own number on the bar', () => {

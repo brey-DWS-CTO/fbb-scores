@@ -1,7 +1,7 @@
 /**
  * The tier chart: every projected player in one row, ranked by the points he
- * should score this season, with his points per game drawn beside it and a
- * bar for how sure we are of each.
+ * should score this season, with his points per game drawn across and a bar
+ * for how far our numbers for it disagree.
  *
  * The look follows Boris Chen's tier charts for football: a dot, a bar either
  * side of it, and colour bands the numbers draw for themselves. His bar is how
@@ -50,11 +50,8 @@ export interface TierRow {
   /** Projected games and the season total they make. */
   games: number;
   total: number;
-  /** Games he played last season, if he played. */
+  /** Games he played last season, if he played, to set his total against. */
   lastGames: number | null;
-  /** The season total at his projected FPPG over the fewer and the more of the two game counts. */
-  totalLow: number;
-  totalHigh: number;
   adp: number | null;
 }
 
@@ -194,11 +191,6 @@ export function buildTierRows(
     const player = byKey.get(row.key);
     const estimates = estimatesFor(row, player);
     const values = estimates.map((estimate) => estimate.fppg);
-    const fppg = row.fppg!;
-    const games = row.games!;
-    const lastGames = lastSeasonGames(player);
-    const fewer = lastGames === null ? games : Math.min(games, lastGames);
-    const more = lastGames === null ? games : Math.max(games, lastGames);
     return {
       key: row.key,
       name: row.name,
@@ -209,15 +201,13 @@ export function buildTierRows(
       keptBy: row.keptBy,
       rank: index + 1,
       tier: groups[index] + 1,
-      fppg,
+      fppg: row.fppg!,
       fppgLow: round1(Math.min(...values)),
       fppgHigh: round1(Math.max(...values)),
       estimates,
-      games,
+      games: row.games!,
       total: row.total!,
-      lastGames,
-      totalLow: Math.round(fppg * fewer),
-      totalHigh: Math.round(fppg * more),
+      lastGames: lastSeasonGames(player),
       adp: row.adp,
     };
   });
