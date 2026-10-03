@@ -23,15 +23,17 @@ import fixture from './fixtures/espn-draft-rankings-2027.json' with { type: 'jso
 import type { LeagueDataset, LeagueDynamicState } from '../src/lib/keeper/types.ts';
 import { valueBoard } from '../src/lib/league/draftValue.ts';
 import {
-  availabilityAt,
   buildMockBoard,
   defaultMockSettings,
-  describeRound,
   simulateDraft,
-  simulateMany,
-  type AvailabilityReport,
   type MockMode,
 } from '../src/lib/league/mockDraft.ts';
+import {
+  availabilityAt,
+  describeRound,
+  simulateMany,
+  type AvailabilityReport,
+} from './support/mockOdds.ts';
 import { applyPlayerPoolToDataset, playerPoolFromDataset } from '../src/lib/league/playerPool.ts';
 import { leagueSchedule2027 } from '../src/lib/league/scheduleData.ts';
 
