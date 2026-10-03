@@ -77,11 +77,6 @@ export interface PlayerProjection {
   /** His NBA team's games in our play-in weeks, and in our playoff weeks. */
   playInGames: number | null;
   playoffGames: number | null;
-  /**
-   * Projected points across the play-in and playoff weeks: FPPG times those
-   * games, cut by the share of the season he is projected to miss.
-   */
-  postPoints: number | null;
   /** Games ESPN projects him to play, or the commissioner's estimate. */
   games: number | null;
   /** The commissioner's edit behind these numbers, if any. */
@@ -191,7 +186,7 @@ export function buildProjections(
       source: entry.source,
       fppg: entry.fppg,
       total: entry.fppg !== null && games !== null ? Math.round(entry.fppg * games) : null,
-      ...postseasonOf(player.proTeam, entry.fppg, games),
+      ...postseasonOf(player.proTeam),
       base,
       bonus,
       ddOdds: odds ? round2(odds.doubleDouble) : null,
@@ -222,24 +217,24 @@ export function buildProjections(
 
 const SUMMARY_BY_TEAM = new Map(teamScheduleSummaries2027.map((summary) => [summary.teamId, summary]));
 
-/** Play-in and playoff games for his NBA team, and the points they are worth to us. */
-function postseasonOf(proTeam: string, fppg: number | null, games: number | null) {
+/** Play-in and playoff games for his NBA team. */
+function postseasonOf(proTeam: string) {
   const teamId = nbaTeamIdForProTeam(proTeam);
   const summary = teamId !== null ? SUMMARY_BY_TEAM.get(teamId) : undefined;
-  if (!summary) return { playInGames: null, playoffGames: null, postPoints: null };
-  const share = games !== null ? Math.min(1, games / 82) : 1;
-  return {
-    playInGames: summary.playIn.total,
-    playoffGames: summary.playoffs.total,
-    postPoints: fppg !== null ? Math.round(fppg * summary.postseasonTotal * share) : null,
-  };
+  return summary
+    ? { playInGames: summary.playIn.total, playoffGames: summary.playoffs.total }
+    : { playInGames: null, playoffGames: null };
 }
+
+/** Every NBA team's play-in and playoff game counts, to colour a player's against. */
+export const PLAY_IN_COUNTS = teamScheduleSummaries2027.map((summary) => summary.playIn.total);
+export const PLAYOFF_COUNTS = teamScheduleSummaries2027.map((summary) => summary.playoffs.total);
 
 // ─── Columns ────────────────────────────────────────────────────────────────
 
 export type ProjectionColumnId =
   | 'valueRank' | 'name' | 'proTeam' | 'positions' | 'tag' | 'games' | 'fppg' | 'total' | 'base' | 'bonus'
-  | 'playInGames' | 'playoffGames' | 'postPoints'
+  | 'playInGames' | 'playoffGames'
   | 'ddOdds' | 'tdOdds' | 'min' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to'
   | 'fgm' | 'fga' | 'fgPct' | 'ftm' | 'fta' | 'ftPct'
   | 'lastSeason' | 'change' | 'espnRank' | 'adp';
@@ -264,7 +259,6 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'tag', label: 'STATUS', header: 'Status', firstDir: 'asc', value: (row) => (row.keptBy ? `${tagLabel[row.tag]} (${row.keptBy})` : tagLabel[row.tag]) },
   { id: 'fppg', label: 'FPPG', header: 'Projected FPPG', firstDir: 'desc', value: (row) => row.fppg },
   { id: 'total', label: 'TOTAL', header: 'Projected season points', firstDir: 'desc', value: (row) => row.total },
-  { id: 'postPoints', label: 'POST PTS', header: 'Projected play-in and playoff points', firstDir: 'desc', value: (row) => row.postPoints },
   { id: 'playInGames', label: 'PI', header: 'Team games in our play-in weeks', firstDir: 'desc', value: (row) => row.playInGames },
   { id: 'playoffGames', label: 'PO', header: 'Team games in our playoff weeks', firstDir: 'desc', value: (row) => row.playoffGames },
   { id: 'base', label: 'ESPN', header: 'ESPN line, our scoring', firstDir: 'desc', value: (row) => row.base },
