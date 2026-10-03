@@ -191,7 +191,16 @@ function WorldColumn({ title, color, world, results, viewer, watchIndex, childre
  * is still there at your pick across many seeded drafts. Two worlds side by
  * side, so "if I keep Cade" can sit next to "if I make this trade".
  */
+/**
+ * One mock per person: switching who you are (Act As, or back) starts the
+ * page over with that person's own draft.
+ */
 export default function MockDraftPage() {
+  const { identity } = useIdentity();
+  return <MockDraftScreen key={identity?.owner ?? 'anon'} />;
+}
+
+function MockDraftScreen() {
   const { identity } = useIdentity();
   const { state, dataset, meta } = useDraftData();
   const scenarioQuery = useKeeperScenario();
@@ -215,7 +224,9 @@ export default function MockDraftPage() {
 
   // Each person's mock draft is kept on their own device, so leaving the page
   // and coming back finds it where it was.
-  const [saved] = useState(() => readSave(viewer));
+  // A mock run while acting as someone is never saved: it ends when you switch back.
+  const acting = Boolean(identity?.impersonatedBy);
+  const [saved] = useState(() => (acting ? null : readSave(viewer)));
   const [view, setView] = useState<'odds' | 'live'>('live');
   const [mode, setMode] = useState<MockMode>(saved?.mode ?? 'realistic');
   const [runs, setRuns] = useState<number>(200);
@@ -231,7 +242,7 @@ export default function MockDraftPage() {
     : null));
   const onProgress = useCallback((next: RoomProgress) => setProgress(next), []);
   useEffect(() => {
-    if (!viewer) return;
+    if (!viewer || acting) return;
     const save: MockSave = {
       version: 1,
       seed,
@@ -251,7 +262,7 @@ export default function MockDraftPage() {
     } catch {
       /* no storage: the draft just does not survive leaving */
     }
-  }, [viewer, seed, mode, progress, tradesOn, tryKeepers, tryPicks, useEntered, guessInstead]);
+  }, [viewer, acting, seed, mode, progress, tradesOn, tryKeepers, tryPicks, useEntered, guessInstead]);
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 

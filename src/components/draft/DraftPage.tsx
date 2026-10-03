@@ -191,7 +191,7 @@ export default function DraftPage() {
   const teamName = useTeamName();
   const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
-  const [view, setView] = useState<'list' | 'grid'>('list');
+  const [view, setView] = useState<'list' | 'grid'>('grid');
   const [pickTarget, setPickTarget] = useState<BoardCell | null>(null);
   const [clearTarget, setClearTarget] = useState<BoardCell | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
@@ -558,7 +558,7 @@ export default function DraftPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        {(['list', 'grid'] as const).map((v) => (
+        {(['grid', 'list'] as const).map((v) => (
           <button
             key={v}
             className="tap-btn hub-heading"
@@ -574,7 +574,7 @@ export default function DraftPage() {
               cursor: 'pointer',
             }}
           >
-            {v.toUpperCase()}
+            {v === 'grid' ? 'BOARD' : 'LIST'}
           </button>
         ))}
       </div>
