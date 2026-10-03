@@ -45,3 +45,26 @@ test('saved mock trades read back; junk is dropped', () => {
   assert.deepEqual(parseMockTrades([good, { id: 'real-offer', teamA: 'A', teamB: 'B', aGives: [], bGives: [] }, null, 'x']), [good]);
   assert.deepEqual(parseMockTrades(undefined), []);
 });
+
+test('a mock trade switched on moves the picks on the mock board', async () => {
+  const { default: raw } = await import('../src/data/league-2027.json', { with: { type: 'json' } });
+  const { buildWorld } = await import('../src/lib/league/whatIf.ts');
+  const dataset = raw as unknown as import('../src/lib/keeper/types.ts').LeagueDataset;
+  const state: import('../src/lib/keeper/types.ts').LeagueDynamicState = {
+    season: 2027,
+    keepers: {},
+    keepersRevealed: false,
+    draft: { picks: {}, startedAt: null },
+    locks: { keepersLocked: false },
+  };
+  const [a, b] = dataset.teams.map((team) => team.owner);
+  const before = buildWorld(dataset, { viewer: a, state, scenario: {}, proposals: [], tradesOn: [] });
+  const aPick = tradablePicks(before.board.slots, a).find((pick) => pick.ref.round === 5)!;
+  const bPick = tradablePicks(before.board.slots, b).find((pick) => pick.ref.round === 4)!;
+  const proposal = mockTradeProposal({ id: 'mock:t', teamA: a, teamB: b, aGives: [aPick.ref], bGives: [bPick.ref] }, dataset.season);
+  const after = buildWorld(dataset, { viewer: a, state, scenario: {}, proposals: [proposal], tradesOn: ['mock:t'] });
+  assert.deepEqual(after.applied.map((entry) => entry.id), ['mock:t']);
+  const owner = (ref: typeof aPick.ref) => after.board.slots.find((slot) => slot.pick.round === ref.round && slot.pick.originalOwner === ref.originalOwner)!.pick.currentOwner;
+  assert.equal(owner(aPick.ref), b);
+  assert.equal(owner(bPick.ref), a);
+});
