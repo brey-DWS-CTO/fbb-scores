@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, type LiveChoices } from '../../lib/league/liveMock.js';
-import type { MockCandidate, PreparedMock } from '../../lib/league/mockDraft.js';
+import type { MockCandidate, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
 import type { PlayerProjection } from '../../lib/league/projections.js';
 import {
   draftGrid,
@@ -221,9 +221,17 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // ── What the screen shows ────────────────────────────────────────────────
   const shownPicks = useMemo(() => (started ? live.picks.slice(0, revealed) : []), [started, live.picks, revealed]);
   // Who has each player: keepers from the start, then every pick on screen.
-  const takenBy = new Map<string, { label: string; owner: string }>();
+  const takenBy = new Map<string, Taken>();
   for (const slot of slots) {
-    if (slot.keeper) takenBy.set(slot.keeper.playerKey, { label: `${slot.pick.round}.${slot.pick.slot}`, owner: slot.pick.currentOwner });
+    if (slot.keeper) {
+      takenBy.set(slot.keeper.playerKey, {
+        label: `${slot.pick.round}.${slot.pick.slot}`,
+        owner: slot.pick.currentOwner,
+        how: 'keeper',
+        keeperStatus: slot.keeper.status,
+        keeperEarly: slot.keeper.early,
+      });
+    }
   }
   for (const pick of shownPicks) if (pick.playerKey) takenBy.set(pick.playerKey, pick);
   const currentOverall = caughtUp
@@ -486,7 +494,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-player-col">
                           <span className="room-player-name">{projection?.name ?? candidate.playerName}</span>
                           <small>{projection?.proTeam ?? ''} – <Pos positions={candidate.positions} /></small>
-                          {taken && <small className="room-taken"> {taken.label} {taken.owner}</small>}
+                          {taken && (
+                            <small className="room-taken">
+                              {' '}{taken.label} {taken.owner}
+                              {taken.how === 'keeper' && <> <KeeperChip projected={taken.keeperStatus === 'assumed'} early={taken.keeperEarly ?? null} /></>}
+                            </small>
+                          )}
                         </td>
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
@@ -728,11 +741,18 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   );
 }
 
-/** A keeper on the board or in the updates: solid when entered, dashed when projected. */
+/** Who has a player, for the list, the card and the roster. */
+type Taken = Pick<MockPick, 'label' | 'owner'> & Partial<Pick<MockPick, 'how' | 'keeperStatus' | 'keeperEarly'>>;
+
+/** A keeper on the board, in the list and in the updates: K, solid when entered, dashed when projected. */
 function KeeperChip({ projected, early }: { projected: boolean; early: string | null }) {
   return (
     <>
-      <span className={`room-keeper-chip${projected ? ' is-projected' : ''}`}>{projected ? 'PROJ KEEPER' : 'KEEPER'}</span>
+      <span
+        className={`room-keeper-chip${projected ? ' is-projected' : ''}`}
+        title={projected ? 'Projected keeper' : 'Keeper'}
+        aria-label={projected ? 'Projected keeper' : 'Keeper'}
+      >K</span>
       {early && <span className="keeper-early" title={early} aria-label={early}>↑</span>}
     </>
   );
@@ -742,7 +762,7 @@ interface CardProps {
   playerKey: string;
   projection: PlayerProjection | null;
   entry: ValueBoard['entries'][number] | null;
-  takenBy: { label: string; owner: string } | null;
+  takenBy: Taken | null;
   queued: boolean;
   canDraft: boolean;
   /** Tapped on purpose, rather than the default player shown. */
@@ -768,7 +788,7 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
         </div>
         <div className="room-card-actions">
           {takenBy
-            ? <span className="room-card-taken">Drafted {takenBy.label} by {takenBy.owner}</span>
+            ? <span className="room-card-taken">{takenBy.how === 'keeper' ? (takenBy.keeperStatus === 'assumed' ? 'Projected keeper' : 'Kept') : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>
             : canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
           <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>
           {picked && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}

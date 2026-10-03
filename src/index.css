@@ -3988,9 +3988,11 @@ th.schedule-col-active {
 .room-keeper-chip {
   display: inline-block;
   margin-left: 4px;
-  padding: 0 5px;
-  border-radius: 999px;
-  font-size: 0.5rem;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.6rem;
   font-weight: 900;
   letter-spacing: 0.06em;
   line-height: 1.5;
