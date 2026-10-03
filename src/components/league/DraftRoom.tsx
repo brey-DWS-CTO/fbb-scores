@@ -604,11 +604,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <th>R{index + 1}<small>{index % 2 === 0 ? '→' : '←'}</small></th>
                         {row.map((cell) => {
                           const theme = cell.pick?.playerName ? positionTheme([...cell.pick.positions]) : null;
-                          const projected = cell.pick?.how === 'keeper' && cell.pick.keeperStatus === 'assumed';
+                          const kept = cell.pick?.how === 'keeper';
+                          const projected = kept && cell.pick?.keeperStatus === 'assumed';
                           return (
                             <td
                               key={cell.overall}
-                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${projected ? ' is-projected' : ''}`}
+                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${kept ? ' is-keeper' : ''}${projected ? ' is-projected' : ''}`}
                               style={theme ? {
                                 background: `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`,
                                 borderColor: theme.border,
@@ -617,7 +618,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                             >
                               <span className="room-grid-label">
                                 {cell.round}.{cell.slot}{cell.via ? ` ${cell.owner}` : ''}
-                                {cell.pick?.how === 'keeper' && <NavIcon name="lock" size={10} className="room-grid-lock" />}
+                                {kept && <KeeperChip projected={projected} />}
                               </span>
                               {cell.pick?.playerName
                                 ? <>
@@ -701,9 +702,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           <div className="hub-heading room-head">UPDATES</div>
           <ol className="room-update-list">
             {[...shownPicks].reverse().slice(0, 12).map((pick) => (
-              <li key={pick.overall} className={pick.owner === person ? 'is-mine' : ''}>
+              <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''}${pick.how === 'keeper' ? ' is-keeper' : ''}`}>
                 <span className="room-upcoming-num">{pick.label}</span>
-                <span>{pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small></span>
+                <span>
+                  {pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small>
+                  {pick.how === 'keeper' && <> <KeeperChip projected={pick.keeperStatus === 'assumed'} /></>}
+                </span>
                 <span className="room-update-owner">{pick.owner}</span>
               </li>
             ))}
@@ -722,6 +726,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       </nav>
     </div>
   );
+}
+
+/** A keeper on the board or in the updates: solid when entered, dashed when projected. */
+function KeeperChip({ projected }: { projected: boolean }) {
+  return <span className={`room-keeper-chip${projected ? ' is-projected' : ''}`}>{projected ? 'PROJ KEEPER' : 'KEEPER'}</span>;
 }
 
 interface CardProps {
