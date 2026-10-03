@@ -8,7 +8,7 @@
  */
 import { fillsSlot, type Position, type RosterSettings, type StarterSlot } from './draftValue.js';
 import { replayLive, type LiveChoices, type LiveState } from './liveMock.js';
-import type { MockCandidate, MockMode, MockPick, MockSlot, PreparedMock } from './mockDraft.js';
+import type { MockCandidate, MockKeeper, MockMode, MockPick, MockSlot, PreparedMock } from './mockDraft.js';
 
 // ─── Who is up ──────────────────────────────────────────────────────────────
 
@@ -19,6 +19,8 @@ export interface UpcomingPick {
   owner: string;
   /** A keeper or a pick already made fills this slot; nobody is on the clock for it. */
   fixed: boolean;
+  /** A keeper in this slot: entered (known) or projected (assumed). */
+  keeper: MockKeeper['status'] | null;
   /** True for the person's own slots. */
   mine: boolean;
 }
@@ -39,6 +41,7 @@ export function upcomingPicks(
       slot: slot.pick.slot,
       owner: slot.pick.currentOwner,
       fixed: slot.keeper !== null || slot.made !== null,
+      keeper: slot.keeper?.status ?? null,
       mine: slot.pick.currentOwner === person,
     }));
 }

@@ -390,7 +390,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 <span className="room-upcoming-row">
                   <span className="room-upcoming-num">{pick.overall}</span>
                   <span className="room-upcoming-owner">{pick.owner}</span>
-                  {pick.fixed && <span className="mock-tag mock-tag-known">keeper</span>}
+                  {pick.keeper && <KeeperChip projected={pick.keeper === 'assumed'} early={null} />}
                 </span>
               </li>
             ))}
