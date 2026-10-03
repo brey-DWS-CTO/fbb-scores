@@ -101,7 +101,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
   const caughtUp = revealed >= live.picks.length;
   // The draft halts at each of the person's own keeper slots, so they can see
-  // who would still be there, then SKIP on. The keeper itself never changes.
+  // who would still be there, then CONTINUE. The keeper itself never changes.
   const [skipped, setSkipped] = useState<ReadonlySet<number>>(() => new Set());
   const nextUp = live.picks[revealed];
   const atMyKeeper = started && !caughtUp && nextUp?.how === 'keeper' && nextUp.owner === person && !skipped.has(nextUp.overall)
@@ -339,13 +339,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
-                  <span>Your keeper, {atMyKeeper.label}: <strong>{atMyKeeper.playerName}</strong>. The list shows who else is still there.</span>
+                  <span>Draft is paused to show you who is there at your keeper selection.</span>
                   <button
                     type="button"
                     className="tap-btn mock-mini-btn is-primary"
                     onClick={() => setSkipped((current) => new Set(current).add(atMyKeeper.overall))}
                   >
-                    SKIP
+                    CONTINUE
                   </button>
                 </div>
               ) : myTurn ? (
