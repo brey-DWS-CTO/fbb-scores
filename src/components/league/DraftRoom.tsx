@@ -347,7 +347,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
-                  <span>Draft is paused to show you who is there at your keeper selection.</span>
+                  <span>Paused at your keeper: <strong>{atMyKeeper.playerName}</strong></span>
                   <button
                     type="button"
                     className="tap-btn mock-mini-btn is-primary"
