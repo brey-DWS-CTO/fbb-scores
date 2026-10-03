@@ -56,7 +56,8 @@ type Edit = { espnId: number; games: number | null; perGame: Record<string, numb
 
 test('projection edits are the commissioner\'s alone', async () => {
   assert.equal((await request('/api/league/projection-edits')).status, 401);
-  assert.equal((await request('/api/league/projection-edits', { headers: auth('Joel') })).status, 403);
+  // Members read the edits (projections are open to all) but cannot write them.
+  assert.equal((await request('/api/league/projection-edits', { headers: auth('Joel') })).status, 200);
   const put = await request('/api/league/projection-edits/7', { method: 'PUT', headers: auth('Joel'), body: JSON.stringify({ name: 'X', games: 3 }) });
   assert.equal(put.status, 403);
 });

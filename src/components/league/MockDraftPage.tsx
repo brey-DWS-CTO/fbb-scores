@@ -190,7 +190,7 @@ function WorldColumn({ title, color, world, results, viewer, watchIndex, childre
 }
 
 /**
- * Commissioner tool: the mock draft. Round one as it stands, your projections of
+ * The mock draft. Round one as it stands, your projections of
  * other teams' keepers, pending trades as switches, and how often each player
  * is still there at your pick across many seeded drafts. Two worlds side by
  * side, so "if I keep Cade" can sit next to "if I make this trade".
@@ -201,13 +201,14 @@ export default function MockDraftPage() {
   const scenarioQuery = useKeeperScenario();
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
+  const signedIn = viewer !== null;
 
   // ESPN's numbers with the commissioner's projection edits laid over them.
   const { snapshot, original, edits } = useProjectionData();
   const tradesQuery = useQuery({
     queryKey: ['pick-trades', viewer ?? 'anon'],
     queryFn: () => fetchPickTrades(identity as NonNullable<typeof identity>),
-    enabled: isCommish,
+    enabled: signedIn,
     staleTime: 5_000,
     refetchOnWindowFocus: true,
   });
@@ -339,13 +340,13 @@ export default function MockDraftPage() {
     [seed, mode, whatIf.board],
   );
 
-  if (!isCommish || !viewer) {
+  if (!viewer) {
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
-          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>COMMISH ONLY</div>
+          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>SIGN IN</div>
           <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            The mock draft is the commish&apos;s for now.
+            Sign in to run a mock draft.
           </div>
         </div>
       </div>
@@ -401,7 +402,8 @@ export default function MockDraftPage() {
       <div className="mock-intro">
         Draft against nine teams valued on ESPN&apos;s {rankSourceLabel('projection', dataset.season)}s in our scoring.
         {values.counts.projection === 0 && (
-          <> ESPN projections are not saved yet, so nobody can be valued. <Link to="/admin">Update from ESPN in Commish Mode.</Link></>
+          <> ESPN projections are not saved yet, so nobody can be valued.{' '}
+            {isCommish ? <Link to="/admin">Update from ESPN in Commish Mode.</Link> : 'The commish will load them soon.'}</>
         )}
       </div>
 
@@ -550,7 +552,8 @@ export default function MockDraftPage() {
         </summary>
         <section className="panel mock-assumptions">
         <div className="hub-heading mock-sub">THEIR KEEPERS</div>
-        {!revealed && (
+        {/* Members never see others' entered keepers before the reveal. */}
+        {!revealed && isCommish && (
           <>
             <label className="mock-use-entered">
               <input type="checkbox" checked={useEntered} onChange={(event) => setUseEntered(event.target.checked)} />

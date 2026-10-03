@@ -128,7 +128,7 @@ function download(blob: Blob, name: string) {
 }
 
 /**
- * Commissioner tool: every player's projected season in this league's
+ * Every player's projected season in this league's
  * scoring, with ESPN's line and the double-double bonus shown apart.
  */
 export default function ProjectionsPage() {
@@ -234,7 +234,7 @@ export default function ProjectionsPage() {
     }
   };
   const openRow = (row: PlayerProjection) => {
-    if (!identity || row.espnId === null || row.line === null) return;
+    if (!isCommish || !identity || row.espnId === null || row.line === null) return;
     // Opening another player saves the one that was open.
     if (rowEdit && rowEdit.key !== row.key) void commitRow();
     setSaveError(null);
@@ -260,13 +260,13 @@ export default function ProjectionsPage() {
     }
   };
 
-  if (!isCommish || !viewer) {
+  if (!viewer) {
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
-          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>COMMISH ONLY</div>
+          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>SIGN IN</div>
           <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            Projections are the commish&apos;s for now.
+            Sign in to see projections.
           </div>
         </div>
       </div>
@@ -307,19 +307,23 @@ export default function ProjectionsPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus. Hover a player and
-        tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow.
+        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus. {isCommish
+          ? ' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow.'
+          : ' Numbers in yellow are the commish’s changes to ESPN’s projection.'}
         {!snapshot?.players.length && (
-          <> No ESPN numbers are accepted yet. <Link to="/admin">Fetch them in Commish Mode.</Link></>
+          <> No ESPN numbers are accepted yet.{' '}
+            {isCommish ? <Link to="/admin">Fetch them in Commish Mode.</Link> : 'The commish will load them soon.'}</>
         )}
       </div>
 
       {snapshot && snapshot.players.length > 0 && projected === 0 && (
         <div className="panel proj-stale" role="status">
           <NavIcon name="warning" size={15} className="icon-in-heading" />
-          Your saved ESPN numbers are from {fetchedOn}, before ESPN posted its projections, so the
-          projection columns are empty. <Link to="/admin">Update from ESPN in Commish Mode</Link>, save, and
-          this page fills in.
+          The saved ESPN numbers are from {fetchedOn}, before ESPN posted its projections, so the
+          projection columns are empty.{' '}
+          {isCommish
+            ? <><Link to="/admin">Update from ESPN in Commish Mode</Link>, save, and this page fills in.</>
+            : 'The commish will update them soon.'}
         </div>
       )}
 
@@ -443,7 +447,7 @@ export default function ProjectionsPage() {
                       return (
                         <td key={column.id} className={classes}>
                           <span className="proj-name">{text}</span>
-                          {row.espnId !== null && row.line !== null && !open && (
+                          {isCommish && row.espnId !== null && row.line !== null && !open && (
                             <button
                               type="button"
                               className={`proj-pencil${row.edit ? ' is-edited' : ''}`}

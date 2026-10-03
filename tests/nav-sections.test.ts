@@ -10,9 +10,9 @@ test('members see five sections, the commish six', () => {
   assert.deepEqual(commish.map((section) => section.label), ['KEEPERS', 'DRAFT', 'TRADES', 'LEAGUE', 'RULES', 'COMMISH']);
 });
 
-test('commish-only tabs stay hidden from members', () => {
+test('everyone sees the mock draft and projections', () => {
   const draft = (sections: typeof member) => sections.find((section) => section.id === 'draft')!.tabs.map((tab) => tab.to);
-  assert.deepEqual(draft(member), ['/draft']);
+  assert.deepEqual(draft(member), ['/draft', '/mock', '/projections']);
   assert.deepEqual(draft(commish), ['/draft', '/mock', '/projections']);
 });
 
@@ -38,7 +38,8 @@ test('every old page address finds its section', () => {
   ];
   for (const [path, id] of cases) assert.equal(sectionFor(path, commish)?.id ?? null, id, path);
   // A member who follows a commish link lands nowhere, not on a tab they cannot see.
-  assert.equal(sectionFor('/mock', member), null);
+  assert.equal(sectionFor('/admin', member), null);
+  assert.equal(sectionFor('/mock', member)?.id, 'draft');
 });
 
 test('a path matches its own page and pages under it, not a neighbour', () => {

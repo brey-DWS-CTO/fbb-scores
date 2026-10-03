@@ -22,17 +22,18 @@ export function useProjectionData(): {
 } {
   const { identity } = useIdentity();
   const { meta } = useLeagueState();
-  const isCommish = identity?.isCommissioner === true;
+  // Every signed-in owner reads the numbers and the edits; only the commish writes.
+  const signedIn = identity !== null;
   const rankings = useQuery({
     queryKey: ['mock-draft-rankings', identity?.owner ?? 'anon', meta?.draftRankings?.activeSnapshotId ?? 'none'],
     queryFn: () => fetchDraftRankings(identity as NonNullable<typeof identity>),
-    enabled: isCommish,
+    enabled: signedIn,
     staleTime: 30_000,
   });
   const editsQuery = useQuery({
     queryKey: PROJECTION_EDITS_KEY,
     queryFn: () => fetchProjectionEdits(identity as NonNullable<typeof identity>),
-    enabled: isCommish,
+    enabled: signedIn,
     staleTime: 30_000,
   });
   const original = rankings.data?.snapshot ?? null;

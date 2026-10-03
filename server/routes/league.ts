@@ -698,8 +698,8 @@ router.post('/team-names/accept', requireAuth, requireCommissioner, async (req, 
 // ─── Draft rankings ──────────────────────────────────────────────────────────
 //
 // ESPN's ADP, draft ranks and projections, frozen the same way as the player
-// pool. Commissioner-only end to end until the mock draft is good enough to
-// show the league.
+// pool. Any signed-in owner reads them, for the mock draft and projections.
+// Only the commissioner fetches or accepts new ones.
 
 // ─── Mock draft history ──────────────────────────────────────────────────────
 //
@@ -750,10 +750,10 @@ async function seedProjectionEdits(season: number, by: string): Promise<void> {
   }
 }
 
-/** GET /api/league/projection-edits — every edit this season. */
-router.get('/projection-edits', requireAuth, requireCommissioner, async (_req, res) => {
+/** GET /api/league/projection-edits — every edit this season. Any owner reads; the projections are league-wide. */
+router.get('/projection-edits', requireAuth, async (_req, res) => {
   const season = leagueDataset.season;
-  await seedProjectionEdits(season, res.locals.owner as string);
+  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, res.locals.owner as string);
   const rows = await listProjectionEdits(season);
   res.json({ season, edits: rows.map((row) => row.edit) });
 });
@@ -789,7 +789,7 @@ router.delete('/projection-edits/:espnId', requireAuth, requireCommissioner, asy
 });
 
 /** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */
-router.get('/draft-rankings', requireAuth, requireCommissioner, async (_req, res) => {
+router.get('/draft-rankings', requireAuth, async (_req, res) => {
   const { state } = await getState();
   const snapshot = await resolveCurrentDraftRankings(state);
   res.json({
