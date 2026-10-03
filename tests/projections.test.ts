@@ -203,12 +203,11 @@ test('columns: VS LAST sits beside ESPN; hidden ones drop out; the player always
   assert.ok(csv.startsWith('#,Player,Positions'));
 });
 
-test('play-in and playoff games come from the schedule, and points scale with games missed', async () => {
+test('play-in and playoff games come from the schedule', async () => {
   const { teamScheduleSummaries2027 } = await import('../src/lib/league/scheduleData.ts');
   const jokic = find(rows, 'Nikola Jokic');
   const den = teamScheduleSummaries2027.find((team) => team.teamCode === 'DEN')!;
   assert.equal(jokic.playInGames, den.playIn.total);
   assert.equal(jokic.playoffGames, den.playoffs.total);
-  assert.equal(jokic.postPoints, Math.round(jokic.fppg! * den.postseasonTotal * Math.min(1, jokic.games! / 82)));
   assert.ok(jokic.playInGames! > 0 && jokic.playoffGames! > 0);
 });

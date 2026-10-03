@@ -5,6 +5,8 @@ import { POSITIONS, valueBoard, type Position } from '../../lib/league/draftValu
 import { keepersForMock } from '../../lib/league/mockDraft.js';
 import {
   FIXED_COLUMNS,
+  PLAY_IN_COUNTS,
+  PLAYOFF_COUNTS,
   PROJECTION_COLUMNS,
   buildProjections,
   changeTone,
@@ -31,6 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
 import { EDITABLE_COLUMNS, cellEdited, withCellEdit } from '../../lib/league/projectionEdits.js';
 import IdentityChip from './IdentityChip.js';
+import { relativeScheduleHeat } from './scheduleUi.js';
 import NavIcon from './NavIcon.js';
 
 const PAGE_SIZES = [20, 50, 100, 200, 500] as const;
@@ -92,9 +95,15 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
         className: row.source === 'projection' ? 'proj-fppg' : 'proj-fppg proj-fallback',
       };
     case 'total': return { text: row.total === null ? '—' : row.total.toLocaleString(), className: 'proj-fppg' };
-    case 'postPoints': return { text: row.postPoints === null ? '—' : row.postPoints.toLocaleString() };
-    case 'playInGames': return { text: whole(row.playInGames) };
-    case 'playoffGames': return { text: whole(row.playoffGames) };
+    // Coloured like the schedule grid: fewest games red, most dark green, against all 30 teams.
+    case 'playInGames': return {
+      text: whole(row.playInGames),
+      className: row.playInGames === null ? undefined : `schedule-heat-${relativeScheduleHeat(row.playInGames, PLAY_IN_COUNTS)}`,
+    };
+    case 'playoffGames': return {
+      text: whole(row.playoffGames),
+      className: row.playoffGames === null ? undefined : `schedule-heat-${relativeScheduleHeat(row.playoffGames, PLAYOFF_COUNTS)}`,
+    };
     case 'base': return { text: one(row.base) };
     case 'bonus': return { text: row.bonus === null ? '—' : `+${row.bonus.toFixed(1)}` };
     case 'ddOdds': return { text: pct(row.ddOdds), className: toneClass(oddsTone(row.ddOdds)).trim() };
