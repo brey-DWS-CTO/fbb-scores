@@ -462,8 +462,8 @@ export default function ProjectionsPage() {
                             </button>
                           )}
                           {open && row.edit && (
-                            <button type="button" className="proj-reset" onClick={() => void resetRow(row)} title="Put him back to ESPN's projection">
-                              ↺ ESPN
+                            <button type="button" className="proj-reset" onClick={() => void resetRow(row)} title="Undo every change to this player">
+                              ↺ UNDO
                             </button>
                           )}
                         </td>

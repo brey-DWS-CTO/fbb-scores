@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
+import { earlyKeeperNote } from '../../lib/league/keeperEarly.js';
 import { leagueDataset, OWNERS } from '../../lib/league/data.js';
 import NavIcon from '../league/NavIcon.js';
 import { cellDisplay, positionTheme } from './boardUtils.js';
@@ -190,6 +191,7 @@ function GridCell({
   const theme = positionTheme(d?.positions);
   const traded = cell.pick.viaTradeFrom;
   const projected = !!cell.keeper && projectedKeeperKeys.has(cell.keeper.selection.playerKey);
+  const early = cell.keeper ? earlyKeeperNote(cell.keeper, pickLabel(cell.pick)) : null;
 
   const style: CSSProperties = {
     position: 'relative',
@@ -254,6 +256,7 @@ function GridCell({
           }}
         >
           {traded && <span style={{ color: 'var(--neon-yellow)' }}>▲</span>}
+          {early && <span className="keeper-early" title={early} aria-label={early}>↑</span>}
           {d?.isKeeper && (
             <span style={{ opacity: 0.9, display: 'inline-flex' }}>
               <NavIcon name="lock" size={tv ? 12 : 11} label="Keeper" />

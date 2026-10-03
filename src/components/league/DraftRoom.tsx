@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, type LiveChoices } from '../../lib/league/liveMock.js';
-import type { MockCandidate, PreparedMock } from '../../lib/league/mockDraft.js';
+import type { MockCandidate, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
 import { editTitle, type PlayerProjection } from '../../lib/league/projections.js';
 import {
   draftGrid,
@@ -111,7 +111,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
   const caughtUp = revealed >= live.picks.length;
   // The draft halts at each of the person's own keeper slots, so they can see
-  // who would still be there, then SKIP on. The keeper itself never changes.
+  // who would still be there, then CONTINUE. The keeper itself never changes.
   const [skipped, setSkipped] = useState<ReadonlySet<number>>(() => new Set());
   const nextUp = live.picks[revealed];
   const atMyKeeper = started && !caughtUp && nextUp?.how === 'keeper' && nextUp.owner === person && !skipped.has(nextUp.overall)
@@ -231,9 +231,17 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // ── What the screen shows ────────────────────────────────────────────────
   const shownPicks = useMemo(() => (started ? live.picks.slice(0, revealed) : []), [started, live.picks, revealed]);
   // Who has each player: keepers from the start, then every pick on screen.
-  const takenBy = new Map<string, { label: string; owner: string }>();
+  const takenBy = new Map<string, Taken>();
   for (const slot of slots) {
-    if (slot.keeper) takenBy.set(slot.keeper.playerKey, { label: `${slot.pick.round}.${slot.pick.slot}`, owner: slot.pick.currentOwner });
+    if (slot.keeper) {
+      takenBy.set(slot.keeper.playerKey, {
+        label: `${slot.pick.round}.${slot.pick.slot}`,
+        owner: slot.pick.currentOwner,
+        how: 'keeper',
+        keeperStatus: slot.keeper.status,
+        keeperEarly: slot.keeper.early,
+      });
+    }
   }
   for (const pick of shownPicks) if (pick.playerKey) takenBy.set(pick.playerKey, pick);
   const currentOverall = caughtUp
@@ -366,13 +374,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
-                  <span>Your keeper, {atMyKeeper.label}: <strong>{atMyKeeper.playerName}</strong>. The list shows who else is still there.</span>
+                  <span>Draft is paused to show you who is there at your keeper selection.</span>
                   <button
                     type="button"
                     className="tap-btn mock-mini-btn is-primary"
                     onClick={() => setSkipped((current) => new Set(current).add(atMyKeeper.overall))}
                   >
-                    SKIP
+                    CONTINUE
                   </button>
                 </div>
               ) : myTurn ? (
@@ -520,7 +528,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-player-col">
                           <span className="room-player-name">{projection?.name ?? candidate.playerName}</span>
                           <small>{projection?.proTeam ?? ''} – <Pos positions={candidate.positions} /></small>
-                          {taken && <small className="room-taken"> {taken.label} {taken.owner}</small>}
+                          {taken && (
+                            <small className="room-taken">
+                              {' '}{taken.label} {taken.owner}
+                              {taken.how === 'keeper' && <> <KeeperChip projected={taken.keeperStatus === 'assumed'} early={taken.keeperEarly ?? null} /></>}
+                            </small>
+                          )}
                         </td>
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
@@ -638,11 +651,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <th>R{index + 1}<span className="room-grid-arrow" aria-label={index % 2 === 0 ? 'left to right' : 'right to left'}>{index % 2 === 0 ? '→' : '←'}</span></th>
                         {row.map((cell) => {
                           const theme = cell.pick?.playerName ? positionTheme([...cell.pick.positions]) : null;
-                          const projected = cell.pick?.how === 'keeper' && cell.pick.keeperStatus === 'assumed';
+                          const kept = cell.pick?.how === 'keeper';
+                          const projected = kept && cell.pick?.keeperStatus === 'assumed';
                           return (
                             <td
                               key={cell.overall}
-                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${projected ? ' is-projected' : ''}${cell.via ? ' is-traded' : ''}${cell.pick?.playerKey ? ' is-tappable' : ''}`}
+                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${kept ? ' is-keeper' : ''}${projected ? ' is-projected' : ''}${cell.via ? ' is-traded' : ''}${cell.pick?.playerKey ? ' is-tappable' : ''}`}
                               onClick={() => look(cell.pick?.playerKey)}
                               style={theme ? {
                                 background: `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`,
@@ -653,7 +667,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                               <span className="room-grid-label">
                                 {cell.round}.{cell.slot}
                                 {cell.via && <span className="board-traded-tag" title={`${cell.owner} holds ${cell.via}'s pick`}>→ {cell.owner.toUpperCase()}</span>}
-                                {cell.pick?.how === 'keeper' && <NavIcon name="lock" size={10} className="room-grid-lock" />}
+                                {kept && <KeeperChip projected={projected} early={cell.pick?.keeperEarly ?? null} />}
                               </span>
                               {cell.pick?.playerName
                                 ? <>
@@ -677,7 +691,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     <span className="room-player-name">{pick.playerName ?? 'nobody'}</span>
                     <small><Pos positions={pick.positions} /></small>
                     {pick.how === 'keeper'
-                      ? <span className={`mock-tag ${pick.keeperStatus === 'known' ? 'mock-tag-known' : 'mock-tag-assumed'}`}>{pick.keeperStatus === 'known' ? 'keeper' : 'projected'}</span>
+                      ? <span><KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></span>
                       : <span />}
                     <span className="room-update-owner">{pick.owner}</span>
                   </li>
@@ -737,9 +751,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           <div className="hub-heading room-head">UPDATES</div>
           <ol className="room-update-list">
             {[...shownPicks].reverse().slice(0, 12).map((pick) => (
-              <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
+              <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''}${pick.how === 'keeper' ? ' is-keeper' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                 <span className="room-upcoming-num">{pick.label}</span>
-                <span>{pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small></span>
+                <span>
+                  {pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small>
+                  {pick.how === 'keeper' && <> <KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></>}
+                </span>
                 <span className="room-update-owner">{pick.owner}</span>
               </li>
             ))}
@@ -760,11 +777,28 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   );
 }
 
+/** Who has a player, for the list, the card and the roster. */
+type Taken = Pick<MockPick, 'label' | 'owner'> & Partial<Pick<MockPick, 'how' | 'keeperStatus' | 'keeperEarly'>>;
+
+/** A keeper on the board, in the list and in the updates: K, solid when entered, dashed when projected. */
+function KeeperChip({ projected, early }: { projected: boolean; early: string | null }) {
+  return (
+    <>
+      <span
+        className={`room-keeper-chip${projected ? ' is-projected' : ''}`}
+        title={projected ? 'Projected keeper' : 'Keeper'}
+        aria-label={projected ? 'Projected keeper' : 'Keeper'}
+      >K</span>
+      {early && <span className="keeper-early" title={early} aria-label={early}>↑</span>}
+    </>
+  );
+}
+
 interface CardProps {
   playerKey: string;
   projection: PlayerProjection | null;
   entry: ValueBoard['entries'][number] | null;
-  takenBy: { label: string; owner: string } | null;
+  takenBy: Taken | null;
   queued: boolean;
   canDraft: boolean;
   /** Tapped on purpose, rather than the default player shown. */
@@ -790,7 +824,7 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
         </div>
         <div className="room-card-actions">
           {takenBy
-            ? <span className="room-card-taken">Drafted {takenBy.label} by {takenBy.owner}</span>
+            ? <span className="room-card-taken">{takenBy.how === 'keeper' ? (takenBy.keeperStatus === 'assumed' ? 'Projected keeper' : 'Kept') : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>
             : canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
           <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>
           {picked && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
