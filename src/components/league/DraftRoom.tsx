@@ -347,7 +347,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     <div className={`room room-phone-${phone}`}>
       {/* ── Left: the clock and who picks next ── */}
       <aside className="room-left">
-        <div className={`panel room-clock${myTurn ? ' is-mine' : ''}`}>
+        <div className={`panel room-clock${myTurn ? ' is-mine' : ''}${started ? '' : ' is-before'}`}>
           {!started ? (
             <>
               <div className="room-clock-meta">Nine teams, one seat for you. {PICK_CLOCK / 60} minutes a pick.</div>
@@ -369,7 +369,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 </div>
                 {currentSlot && (
                   <div className="room-clock-meta">
-                    Round {currentSlot.pick.round}<br />Pick {currentSlot.pick.slot}<br />{ordinal(currentSlot.pick.overall)} overall
+                    <span>Round {currentSlot.pick.round}</span><span>Pick {currentSlot.pick.slot}</span><span>{ordinal(currentSlot.pick.overall)} overall</span>
                   </div>
                 )}
               </div>
@@ -404,6 +404,14 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               <button type="button" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
             </div>
           )}
+          {/* Phone only. Inside the clock so the tabs stay pinned with it. */}
+          <nav className="room-phone-tabs" aria-label="Draft room">
+            {(['draft', 'queue', 'team', 'picks'] as const).map((tab) => (
+              <button key={tab} type="button" className={phone === tab ? 'is-on' : ''} onClick={() => setPhone(tab)}>
+                {tab === 'draft' ? 'PLAYERS' : tab === 'queue' ? `QUEUE${queue.length ? ` ${queue.length}` : ''}` : tab === 'team' ? 'MY TEAM' : 'PICKS'}
+              </button>
+            ))}
+          </nav>
         </div>
 
         <div className="panel room-now">
@@ -482,6 +490,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 <thead>
                   <tr>
                     <th className="room-star" aria-label="Queue" />
+                    {myTurn && <th className="room-draft-col room-draft-lead" />}
                     {sortHead('rank', 'RK', 'Our board rank')}
                     {sortHead('adp', 'ADP')}
                     <th className="room-player-col">Player</th>
@@ -496,7 +505,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('threes', '3PM')}
                     {sortHead('to', 'TO')}
                     {myTurn && sortHead('gone', 'GONE BY NEXT', 'How often he goes before your next pick, across 60 drafts from here')}
-                    {myTurn && <th className="room-draft-col" />}
+                    {myTurn && <th className="room-draft-col room-draft-trail" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -504,10 +513,16 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     const projection = projections.get(candidate.playerKey);
                     const taken = takenBy.get(candidate.playerKey) ?? null;
                     const gone = odds.get(candidate.playerKey) ?? 0;
+                    // One button, drawn first on a phone and last on a wide screen.
+                    const draftButton = taken ? null : (
+                      <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={(event) => { event.stopPropagation(); draft(candidate.playerKey); }}>
+                        DRAFT
+                      </button>
+                    );
                     return (
                       <Fragment key={candidate.playerKey}>
                       {pickLineAt === index && myNext && (
-                        <tr className="room-pickline"><td colSpan={16}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
+                        <tr className="room-pickline"><td colSpan={17}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
                       )}
                       <tr
                         className={`${taken ? 'is-taken' : ''}${focus === candidate.playerKey ? ' is-focus' : ''}`}
@@ -524,6 +539,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                             {queue.includes(candidate.playerKey) ? '★' : '☆'}
                           </button>
                         </td>
+                        {myTurn && <td className="room-draft-col room-draft-lead">{draftButton}</td>}
                         <td className="room-num">{candidate.valueRank}</td>
                         <td className="room-num">{one(projection?.adp)}</td>
                         <td className="room-player-col">
@@ -547,15 +563,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num">{one(projection?.line?.threes)}</td>
                         <td className="room-num">{one(projection?.line?.to)}</td>
                         {myTurn && <td className={`room-num${gone >= 0.5 ? ' is-hot' : ''}`}>{taken ? '–' : pct(gone)}</td>}
-                        {myTurn && (
-                          <td className="room-draft-col">
-                            {!taken && (
-                              <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={(event) => { event.stopPropagation(); draft(candidate.playerKey); }}>
-                                DRAFT
-                              </button>
-                            )}
-                          </td>
-                        )}
+                        {myTurn && <td className="room-draft-col room-draft-trail">{draftButton}</td>}
                       </tr>
                       </Fragment>
                     );
@@ -766,14 +774,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
         </div>
       </aside>
 
-      {/* ── Phone tabs ── */}
-      <nav className="room-phone-tabs" aria-label="Draft room">
-        {(['draft', 'queue', 'team', 'picks'] as const).map((tab) => (
-          <button key={tab} type="button" className={phone === tab ? 'is-on' : ''} onClick={() => setPhone(tab)}>
-            {tab === 'draft' ? 'PLAYERS' : tab === 'queue' ? `QUEUE${queue.length ? ` ${queue.length}` : ''}` : tab === 'team' ? 'MY TEAM' : 'PICKS'}
-          </button>
-        ))}
-      </nav>
     </div>
   );
 }
