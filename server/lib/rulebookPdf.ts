@@ -226,6 +226,17 @@ class Painter {
     if (this.doc.y + points > PAGE.height - MARGIN) this.doc.addPage();
   }
 
+  /**
+   * Start a new page if `text` would not fit on this one, so a run drawn in
+   * pieces (a bold title, then its body) never breaks across pages. pdfkit
+   * loses the join when a continued run meets a page break and prints the
+   * second piece over the first. A run longer than a page still flows.
+   */
+  private keepTogether(text: string, width: number): void {
+    const height = this.doc.font('body').fontSize(BODY).heightOfString(text, { width });
+    this.keepRoom(Math.min(height, PAGE.height - MARGIN * 2 - BODY * 4) + BODY);
+  }
+
   // ─── Front page ───────────────────────────────────────────────────────────
 
   private frontPage(): void {
@@ -321,6 +332,7 @@ class Painter {
   /** One line of mixed bold, italic, and plain text, wrapped to `width`. */
   private runs(runs: LetterRun[], x: number, width: number, allBold = false): void {
     const { doc } = this;
+    this.keepTogether(runs.map((r) => r.text).join(''), width);
     const y = doc.y;
     doc.fontSize(BODY).fillColor(RULE);
     runs.forEach((run, i) => {
@@ -396,11 +408,12 @@ class Painter {
     }
 
     const text = entry.text ? resolveRefs(entry.text, this.index) : '';
+    const bodyWidth = width - labelWidth;
+    this.keepTogether([entry.kind === 'example' ? 'Example: ' : '', entry.title ?? '', text].join(' '), bodyWidth);
     const y = doc.y;
     doc.text(label, x, y, { lineBreak: false });
     doc.x = x + labelWidth;
     doc.y = y;
-    const bodyWidth = width - labelWidth;
     if (entry.kind === 'example') {
       doc.font('italic').text('Example: ', x + labelWidth, y, { width: bodyWidth, continued: true });
       doc.font('body').text(text, { width: bodyWidth });
@@ -507,6 +520,7 @@ class Painter {
     }
     for (const v of [...input.versions].sort((a, b) => b.revision - a.revision)) {
       const x = MARGIN + INDENT;
+      this.keepTogether(`Revision ${v.revision} ${v.publishedBy} ${v.notes}`, CONTENT_WIDTH - INDENT);
       doc.text('•', x - 12, doc.y, { lineBreak: false });
       doc.font('bold').text(`Revision ${v.revision}`, x, doc.y, { width: CONTENT_WIDTH - INDENT, continued: true });
       doc.font('body').text(` · ${longDate(v.publishedAt)} · ${v.publishedBy}${v.notes ? `. ${v.notes}` : ''}`, {

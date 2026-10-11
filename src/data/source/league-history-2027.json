@@ -7,6 +7,17 @@
  "note": "Seeded from the constitution record tables plus the commissioner ruling of 2026-08-31. This is the committed fallback, the same pattern the player pool, schedule, and rule book use.",
  "franchises": [
   {
+   "id": "fr-shaikh",
+   "name": "Sam Shaikh",
+   "currentOwner": null,
+   "currentOwnerKey": null,
+   "active": false,
+   "formerMember": true,
+   "aliases": ["Sam"],
+   "note": "Left after the 2025-26 season. Bryan Russell took over the team; the ESPN slot carries on as fr-russell.",
+   "source": {"provenance": "commissioner", "reference": "Commissioner, 2026-10-11", "verified": true, "recordedAt": "2026-10-11"}
+  },
+  {
    "id": "fr-runnels",
    "name": "Eric Runnels",
    "currentOwner": null,
@@ -1317,7 +1328,7 @@
   {
    "id": "hs-s14-w15-fr-sam",
    "categoryId": "weekly-high-score",
-   "franchiseId": "fr-russell",
+   "franchiseId": "fr-shaikh",
    "ownerName": "Sam",
    "seasonNumber": 14,
    "period": 15,
