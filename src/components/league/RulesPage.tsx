@@ -15,6 +15,8 @@ import {
   fetchPublishedRulebook,
   fetchRulebookDraft,
   fetchRulebookSignatures,
+  fetchDraftRulebookPdf,
+  rulebookPdfUrl,
   fetchRulebookVersion,
   fetchRulebookVersions,
   isStaleDraftError,
@@ -465,6 +467,35 @@ export default function RulesPage() {
     }
   }, [identity]);
 
+  // The draft PDF needs a sign-in, so it cannot be a plain link. Open the tab
+  // inside the tap, since a tab opened after the fetch returns gets blocked as
+  // a pop-up, then point it at the bytes once they arrive.
+  const previewPdf = async () => {
+    if (!identity) return;
+    const tab = window.open('', '_blank');
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await fetchDraftRulebookPdf(identity);
+      const url = URL.createObjectURL(blob);
+      if (tab) {
+        tab.location.href = url;
+      } else {
+        // No tab allowed: save the file instead.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `The Nerds Constitution ${draft?.season ?? ''} draft.pdf`.replace('  ', ' ');
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      tab?.close();
+      setError(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const applyEdit = (next: Rulebook, note: string) => {
     if (draft) {
       undoStack.current = [...undoStack.current.slice(-(UNDO_DEPTH - 1)), draft];
@@ -678,10 +709,69 @@ export default function RulesPage() {
                 <button type="button" className="rules-tool tap-btn" disabled={busy} onClick={discard}>
                   RESET
                 </button>
+                <button
+                  type="button"
+                  className="rules-tool tap-btn"
+                  disabled={busy || dirty}
+                  title={dirty ? 'Save the draft first' : 'See the draft as the printed book'}
+                  onClick={previewPdf}
+                >
+                  PREVIEW PDF
+                </button>
                 <button type="button" className="rules-tool tap-btn" onClick={leaveDraft}>
                   DONE
                 </button>
               </div>
+              {draft && (
+                <div className="rules-front-editor">
+                  <span className="hub-heading">FRONT PAGE</span>
+                  <label className="rules-front-field">
+                    <span>Written by</span>
+                    <input
+                      className="hub-input"
+                      type="text"
+                      value={draft.frontMatter?.writtenBy ?? ''}
+                      onChange={(event) =>
+                        applyEdit(
+                          {
+                            ...draft,
+                            frontMatter: {
+                              writtenBy: event.target.value,
+                              letter: draft.frontMatter?.letter ?? '',
+                            },
+                          },
+                          'Edited the front page',
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="rules-front-field">
+                    <span>The letter that opens the printed book</span>
+                    <textarea
+                      className="hub-input rules-front-letter"
+                      rows={14}
+                      value={draft.frontMatter?.letter ?? ''}
+                      onChange={(event) =>
+                        applyEdit(
+                          {
+                            ...draft,
+                            frontMatter: {
+                              writtenBy: draft.frontMatter?.writtenBy ?? '',
+                              letter: event.target.value,
+                            },
+                          },
+                          'Edited the front page',
+                        )
+                      }
+                    />
+                  </label>
+                  <p className="rules-draft-note">
+                    A blank line ends a paragraph. Start a line with ## for a heading, with - for a
+                    bullet (two spaces deeper for a sub-bullet). **bold** and _italic_ work inside a
+                    line. The champion and the member table fill themselves in from league history.
+                  </p>
+                </div>
+              )}
               {problems.length > 0 && (
                 <ul className="rules-draft-problems">
                   {problems.slice(0, 6).map((p, i) => (
@@ -751,15 +841,15 @@ export default function RulesPage() {
         >
           {showHistory ? 'HIDE REVISIONS' : 'REVISIONS'}
         </button>
-        <button
-          type="button"
-          className="rules-tool rules-tool-icon tap-btn"
-          onClick={() => window.print()}
-          title="Save the rule book as a PDF"
-          aria-label="Save the rule book as a PDF"
+        <a
+          className="rules-tool tap-btn rules-pdf-link"
+          href={rulebookPdfUrl({ rev: pastVersion?.id ?? null, copyFor: identity?.owner ?? null })}
+          target="_blank"
+          rel="noopener"
+          title="Open the rule book as a PDF"
         >
-          <span aria-hidden="true">⤓</span>
-        </button>
+          <span aria-hidden="true">⤓</span> PDF
+        </a>
       </div>
 
       {!results && (

@@ -4255,6 +4255,20 @@ html.theme-light {
 .tier-detail-num { display: inline-block; min-width: 46px; color: var(--text-hi); font-weight: 700; font-variant-numeric: tabular-nums; }
 .tier-detail-note { color: var(--text-mid); font-size: 0.72rem; margin-top: 4px; }
 
+/* ─── Rule book, front page editor and PDF link ─────────────────────── */
+.rules-pdf-link { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.rules-front-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.rules-front-field { display: flex; flex-direction: column; gap: 4px; }
+.rules-front-field > span { color: var(--text-dim); font-size: 0.7rem; }
+.rules-front-letter { font-family: inherit; line-height: 1.45; resize: vertical; min-height: 160px; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

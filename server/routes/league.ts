@@ -90,6 +90,7 @@ import {
   saveHistoryDraft,
   PollWriteError,
   RulebookSignError,
+  CONFIG_TEAMS,
   listRulebookSignatures,
   insertRulebookSignature,
   listPolls,
@@ -143,6 +144,8 @@ import {
   makeSignature,
   signatureStatus,
 } from '../../src/lib/league/rulebookSignatures.js';
+import { pdfFileName } from '../../src/lib/league/rulebookFront.js';
+import { renderRulebookPdf } from '../lib/rulebookPdf.js';
 import { AmendmentError, canSeedAmendment, seedAmendment } from '../../src/lib/league/rulebookAmendment.js';
 import {
   FALLBACK_PLAYER_POOL,
@@ -1584,6 +1587,96 @@ router.get('/rulebook', async (_req, res, next) => {
       publishedBy: latest.publishedBy,
       notes: latest.notes,
       published: true,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * The constitution as a PDF, laid out like the Word file the league grew up
+ * on: the champion and the commissioner's letter up front, the numbered rules,
+ * the appendices, the amendment history, and a signature page at the back.
+ */
+async function sendRulebookPdf(
+  res: Response,
+  input: {
+    book: Rulebook;
+    versionId: string | null;
+    publishedAt: string | null;
+    superseded: boolean;
+    copyFor: string | null;
+  },
+): Promise<void> {
+  const [history, signatures, versions] = await Promise.all([
+    resolvePublishedHistory(),
+    listRulebookSignatures(RULEBOOK_SEASON),
+    listRulebookVersions(RULEBOOK_SEASON),
+  ]);
+  const pdf = await renderRulebookPdf({
+    book: input.book,
+    versionId: input.versionId,
+    publishedAt: input.publishedAt,
+    superseded: input.superseded,
+    history: history.history,
+    teams: CONFIG_TEAMS,
+    signatures,
+    versions: versions.map((v) => ({
+      revision: v.revision,
+      publishedAt: v.publishedAt,
+      publishedBy: v.publishedBy,
+      notes: v.notes,
+    })),
+    copyFor: input.copyFor,
+  });
+  const name = pdfFileName(input.book.season, input.book.revision, input.copyFor);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${name.replace(/"/g, '')}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(pdf);
+}
+
+/** The member a copy is for, by owner key. Anything else is just nobody. */
+function copyForOwner(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  return CONFIG_TEAMS.find((t) => t.owner === value)?.fullName ?? null;
+}
+
+/**
+ * GET /api/league/rulebook/pdf — public, like the book. `?rev=<id>` prints a
+ * frozen past revision; `?for=<owner>` stamps whose copy it is. With nothing
+ * published yet it prints the seed, marked as a working draft.
+ */
+router.get('/rulebook/pdf', async (req, res, next) => {
+  try {
+    const rev = typeof req.query.rev === 'string' ? req.query.rev : null;
+    const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
+    const version = rev ? await getRulebookVersion(rev) : latest;
+    if (rev && (!version || version.season !== RULEBOOK_SEASON)) {
+      throw new HttpError(404, 'No such revision');
+    }
+    await sendRulebookPdf(res, {
+      book: (version?.book as Rulebook | undefined) ?? SEED_RULEBOOK,
+      versionId: version?.id ?? null,
+      publishedAt: version?.publishedAt ?? null,
+      superseded: Boolean(version && latest && version.id !== latest.id),
+      copyFor: copyForOwner(req.query.for),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/league/rulebook/draft/pdf — the working draft, for the commissioner's eyes. */
+router.get('/rulebook/draft/pdf', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const row = await getRulebookDraft(RULEBOOK_SEASON);
+    await sendRulebookPdf(res, {
+      book: (row?.book as Rulebook | undefined) ?? SEED_RULEBOOK,
+      versionId: null,
+      publishedAt: null,
+      superseded: false,
+      copyFor: copyForOwner(req.query.for),
     });
   } catch (err) {
     next(err);

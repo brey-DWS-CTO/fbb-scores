@@ -80,12 +80,22 @@ export interface RulebookRecords {
   formerMembers: string[];
 }
 
+/**
+ * The front page: who wrote the book and the letter that opens it. The letter
+ * is plain text with light markup; see `parseLetter` in rulebookFront.ts.
+ */
+export interface RulebookFrontMatter {
+  writtenBy: string;
+  letter: string;
+}
+
 export interface Rulebook {
   schemaVersion: number;
   season: number;
   revision: number;
   status: string;
   title: string;
+  frontMatter?: RulebookFrontMatter;
   articles: RulebookArticle[];
   appendices: RulebookAppendix[];
   records: RulebookRecords;

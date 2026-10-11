@@ -14,7 +14,7 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 30,
-      "includeFiles": "src/data/**"
+      "includeFiles": "{src/data/**,server/assets/**}"
     }
   }
 }

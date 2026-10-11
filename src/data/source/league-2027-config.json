@@ -10,15 +10,15 @@
   "contractMaxYearsByRound": { "1": 1, "2": 2, "3": 2, "4": 2, "5": 3, "6": 3, "7": 3, "8": 4, "9": 4, "10": 4 },
   "teams": [
     { "owner": "Joel",    "fullName": "Joel Weigle",      "espnTeamId": 10, "espnTeamName": "Kyle's A Team",                "draftPosition": 1 },
-    { "owner": "Ryan",    "fullName": "Ryan Shaug",       "espnTeamId": 1,  "espnTeamName": "Trump is my Herro",            "draftPosition": 2 },
+    { "owner": "Ryan",    "fullName": "Ryan Shaug",       "espnTeamId": 1,  "espnTeamName": "Trump is my Herro",            "draftPosition": 2, "originalMember": true },
     { "owner": "Patrick", "fullName": "Patrick Akin",     "espnTeamId": 8,  "espnTeamName": "Im HIS daddy",                 "draftPosition": 3 },
     { "owner": "Bryan",   "fullName": "Bryan Russell",    "espnTeamId": 6,  "espnTeamName": "So many RULES",                "draftPosition": 4, "inheritedFrom": "Sam" },
     { "owner": "Kyle",    "fullName": "Kyle Commons",     "espnTeamId": 5,  "espnTeamName": "I Did Something to Some People", "draftPosition": 5 },
     { "owner": "Dustin",  "fullName": "Dustin Morgan",    "espnTeamId": 9,  "espnTeamName": "The King's Castle",            "draftPosition": 6 },
-    { "owner": "Aaron",   "fullName": "Aaron Jensen",     "espnTeamId": 4,  "espnTeamName": "The Hardened Knueppels",       "draftPosition": 7 },
+    { "owner": "Aaron",   "fullName": "Aaron Jensen",     "espnTeamId": 4,  "espnTeamName": "The Hardened Knueppels",       "draftPosition": 7, "originalMember": true },
     { "owner": "Derek",   "fullName": "Derek McCoy",      "espnTeamId": 3,  "espnTeamName": "Just Super Team",              "draftPosition": 8 },
-    { "owner": "Brey",    "fullName": "Brey Funkhouser",  "espnTeamId": 7,  "espnTeamName": "Mamu, There Goes That Amen",   "draftPosition": 9, "isCommissioner": true },
-    { "owner": "Amy",     "fullName": "Amy Shaug",        "espnTeamId": 2,  "espnTeamName": "Tu Mamacita",                  "draftPosition": 10 }
+    { "owner": "Brey",    "fullName": "Brey Funkhouser",  "espnTeamId": 7,  "espnTeamName": "Mamu, There Goes That Amen",   "draftPosition": 9, "originalMember": true, "isCommissioner": true },
+    { "owner": "Amy",     "fullName": "Amy Shaug",        "espnTeamId": 2,  "espnTeamName": "Tu Mamacita",                  "draftPosition": 10, "originalMember": true }
   ],
   "contracts2026": [
     { "player": "J. Harden",             "originalOwner": "Aaron",   "currentOwner": "Aaron",   "originalRound": 5,  "round2026": 3,  "firstKeptSeason": 2025, "lastKeepableSeason": 2027 },

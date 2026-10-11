@@ -4,6 +4,10 @@
   "revision": 14,
   "status": "draft",
   "title": "The Nerds Fantasy Basketball League Constitution & Rule Book",
+  "frontMatter": {
+    "writtenBy": "Brey Funkhouser, Co-commissioner, 3x Champion",
+    "letter": "Four titles. Nobody had ever won four. Amy did it, and she went through me to get there. I will be fine. Ryan is still out there chasing the 3-time club. Who wins in 2027? LET'S DO THIS. **WELCOME TO YEAR 17!**\n\n## LEAGUE CHANGES IN 2026-2027\n\n_Outgoing members:_ Sam Shaikh has left the league after two seasons. Thanks for playing, Sam.\n\n_Returning members:_ Bryan Russell is back and takes over Sam's team, keepers and all. Four runner-up finishes and no ring. This is the year, Bryan. Joel said last year was his contract year. He is still here, so the league office is treating that as a re-sign.\n\n_The draft:_ Sunday, October 18, 2026, at 2:00 PM Pacific. Keepers are due in the league app 24 hours before the draft starts.\n\n## What changed in the rules\n\n- **Picks 5 and 6:** the consolation matchup is gone. After Play-In Week 2, the two teams that fell out of the playoffs are ordered by their Play-In Week 2 score, same as picks 1 through 4. Passed by vote.\n- **The constitution lives in the league app now.** Read it there, sign it there, and propose changes there. Every member may start one vote a season, and every vote must finish before the draft.\n- **The keeper cap number** is set by the commissioners from the formula in the book and published in the app, so there is one number and it is never typed twice.\n\n## Keeper League Updates\n\n- Shai Gilgeous-Alexander (Dustin), Giannis Antetokounmpo (Patrick), and Devin Booker (Bryan) have **EXPIRED** keeper contracts. All three go back into this year's draft."
+  },
   "note": "Numbers are NOT stored. Every clause has a stable id; display numbers are computed from tree position, so adding or removing a clause renumbers the book automatically. Cross-references are stored as ref tokens naming a clause id, and re-resolve to the current number on every render.",
   "source": {
     "file": "The Nerds Constitution 2026 v13 with updates for 2027.docx",
@@ -2443,7 +2447,7 @@
     }
   ],
   "staleFrontMatter": {
-    "note": "All of this is 2026-season copy carried into a file named for 2027. Do not publish as 2027 without rewriting.",
+    "note": "The 2026 copy that came in with the import, kept for the record. The printed front page now comes from frontMatter, the champion block from league history, and the member table from counted titles. Replaced 2026-10-11.",
     "items": [
       {
         "id": "front.champion",

@@ -900,6 +900,27 @@ export async function fetchRulebookSignatures(
 }
 
 /** Sign the published revision. The server takes the signer from the PIN. */
+/**
+ * Where the printed constitution lives. Public, like the book: a member opens
+ * it in a new tab and the browser shows, saves, or prints it from there.
+ */
+export function rulebookPdfUrl(options: { rev?: string | null; copyFor?: string | null } = {}): string {
+  const params = new URLSearchParams();
+  if (options.rev) params.set('rev', options.rev);
+  if (options.copyFor) params.set('for', options.copyFor);
+  const query = params.toString();
+  return `/api/league/rulebook/pdf${query ? `?${query}` : ''}`;
+}
+
+/** The working draft as a PDF, for the commissioner to look at before publishing. */
+export async function fetchDraftRulebookPdf(c: Credentials): Promise<Blob> {
+  const { data } = await axios.get<Blob>('/api/league/rulebook/draft/pdf', {
+    headers: authHeaders(c),
+    responseType: 'blob',
+  });
+  return data;
+}
+
 export async function signRulebook(
   c: Credentials,
   versionId: string,
