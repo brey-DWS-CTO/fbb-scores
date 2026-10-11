@@ -319,6 +319,8 @@ class Painter {
       } else if (block.kind === 'bullet') {
         const x = MARGIN + INDENT * (block.depth + 1);
         const markers = ['•', 'o', '▪', '-'];
+        // Decide the page before the marker goes down, or it stays behind.
+        this.keepTogether(block.runs.map((r) => r.text).join(''), CONTENT_WIDTH - (x - MARGIN));
         this.body();
         doc.text(markers[block.depth] ?? '-', x - 12, doc.y, { lineBreak: false });
         this.runs(block.runs, x, CONTENT_WIDTH - (x - MARGIN));
