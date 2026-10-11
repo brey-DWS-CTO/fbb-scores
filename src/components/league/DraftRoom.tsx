@@ -414,7 +414,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const owners = grid.owners;
 
   const sortHead = (key: SortKey, label: string, title?: string, className = '') => (
-    <th className={`room-num${sort.key === key ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`} title={title ?? label}>
+    <th className={`room-num${sort.key === key ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`} title={title ?? label} data-sort={key}>
       <button type="button" onClick={() => sortBy(key)}>
         {label}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
       </button>
@@ -429,26 +429,25 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     const down = event.currentTarget.scrollTop > 80;
     if (down !== compact) setCompact(down);
   };
-  // A sort chosen from the chips slides the list so that column is on screen.
-  const slideToSort = useRef(false);
+  // A sort chosen from the chips slides the list so that column lands flush
+  // against the pinned name column. That column is narrower once the list is
+  // scrolled, so narrow it first, let it settle, then slide once.
   const quickSort = (key: SortKey) => {
-    slideToSort.current = true;
     sortBy(key);
-  };
-  useEffect(() => {
-    if (!slideToSort.current) return;
-    slideToSort.current = false;
     const wrap = wrapRef.current;
-    const sorted = wrap?.querySelector<HTMLElement>('th.is-sorted');
-    const pinned = wrap?.querySelector<HTMLElement>('th.room-player-col');
     if (!wrap) return;
-    if (!sorted || !pinned) {
-      wrap.scrollTo({ left: 0, behavior: 'smooth' });
+    const offset = () => {
+      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]:not(.room-gone-trail)`);
+      const pinned = wrap.querySelector<HTMLElement>('th.room-player-col');
+      return column && pinned ? column.offsetLeft - (pinned.offsetLeft + pinned.offsetWidth) : 0;
+    };
+    if (offset() <= SHORT_NAME_AT) {
+      wrap.scrollTo({ left: Math.max(0, offset()), behavior: 'smooth' });
       return;
     }
-    const pinnedRight = pinned.offsetLeft + pinned.offsetWidth;
-    wrap.scrollTo({ left: Math.max(0, sorted.offsetLeft - pinnedRight - 6), behavior: 'smooth' });
-  }, [sort]);
+    setScrolled(true);
+    window.setTimeout(() => wrap.scrollTo({ left: Math.max(0, offset()), behavior: 'smooth' }), 260);
+  };
 
   // On a phone a tapped card stands where the clock frame was, with the clock
   // small in its corner: the time on your pick, else the pick on the clock.

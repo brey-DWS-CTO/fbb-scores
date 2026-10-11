@@ -4362,7 +4362,8 @@ html.theme-light {
   html.in-mock-room .section-tabs,
   html.in-mock-room .mock-head,
   html.in-mock-room .mock-intro { display: none; }
-  html.in-mock-room .mock-page { padding-top: 8px; }
+  html.in-mock-room .mock-page { padding-top: 8px; padding-bottom: 0; }
+  html.in-mock-room .room-players { margin-bottom: 0; }
   html.in-mock-room .app-shell-nav { padding-bottom: 68px; }
   /* While the draft runs, nothing sits under the room: the page stops where the list meets the pinned stack. */
   html.in-mock-room .mock-setup, html.in-mock-room .mock-history { display: none; }
