@@ -79,15 +79,19 @@ const FONT_FILES = {
 } as const;
 
 /**
- * The font files live in server/assets, which vercel.json ships with the
- * function. On Vercel the bundle runs from the project root, so cwd finds
+ * Fonts and the trophy live in server/assets, which vercel.json ships with
+ * the function. On Vercel the bundle runs from the project root, so cwd finds
  * them; locally and in tests the module's own path does.
  */
-function fontDir(): string {
-  const fromCwd = path.join(process.cwd(), 'server', 'assets', 'fonts', 'carlito');
+function assetDir(...parts: string[]): string {
+  const fromCwd = path.join(process.cwd(), 'server', 'assets', ...parts);
   if (existsSync(fromCwd)) return fromCwd;
-  return path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'assets', 'fonts', 'carlito');
+  return path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'assets', ...parts);
 }
+
+const fontDir = () => assetDir('fonts', 'carlito');
+/** The league's trophy, the same picture the Word file carried. */
+const trophyFile = () => assetDir('images', 'trophy.png');
 
 // ─── Layout constants, in points ─────────────────────────────────────────────
 
@@ -97,7 +101,6 @@ const CONTENT_WIDTH = PAGE.width - MARGIN * 2;
 const BODY = 11;
 const GAP = 1.15;
 const INDENT = 22;
-const GOLD = '#d4a017';
 const RULE = '#000000';
 const MUTED = '#444444';
 
@@ -280,35 +283,17 @@ class Painter {
       doc.text(text, MARGIN, doc.y, { width: CONTENT_WIDTH, align: 'center' });
     }
     const bottom = doc.y;
-    const size = Math.max(40, bottom - top);
-    this.trophy(MARGIN + 30, top - 4, size);
-    this.trophy(PAGE.width - MARGIN - 30 - size * 0.8, top - 4, size);
+    // The trophy is 120 by 144 pixels; keep its shape and size it to the block.
+    const h = Math.max(54, bottom - top + 10);
+    const w = h * (120 / 144);
+    const y = top - 5;
+    const trophy = trophyFile();
+    if (existsSync(trophy)) {
+      doc.image(trophy, MARGIN + 36, y, { width: w, height: h });
+      doc.image(trophy, PAGE.width - MARGIN - 36 - w, y, { width: w, height: h });
+    }
     doc.y = bottom;
     this.gap(0.8);
-  }
-
-  /** A small gold cup. Drawn, not pasted, so there is nothing to license. */
-  private trophy(x: number, y: number, h: number): void {
-    const { doc } = this;
-    const w = h * 0.8;
-    const cupH = h * 0.5;
-    doc.save();
-    doc.fillColor(GOLD).strokeColor('#8a6508').lineWidth(0.8);
-    // Cup
-    doc
-      .moveTo(x + w * 0.15, y)
-      .lineTo(x + w * 0.85, y)
-      .lineTo(x + w * 0.72, y + cupH)
-      .lineTo(x + w * 0.28, y + cupH)
-      .closePath()
-      .fillAndStroke();
-    // Handles
-    doc.ellipse(x + w * 0.12, y + cupH * 0.35, w * 0.12, cupH * 0.3).stroke();
-    doc.ellipse(x + w * 0.88, y + cupH * 0.35, w * 0.12, cupH * 0.3).stroke();
-    // Stem and base
-    doc.rect(x + w * 0.44, y + cupH, w * 0.12, h * 0.22).fillAndStroke();
-    doc.rect(x + w * 0.25, y + cupH + h * 0.22, w * 0.5, h * 0.1).fillAndStroke();
-    doc.restore();
   }
 
   /** The commissioner's letter, with its headings and bullets. */
