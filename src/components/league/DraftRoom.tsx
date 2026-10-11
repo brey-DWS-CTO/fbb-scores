@@ -117,7 +117,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     if (!key) return;
     setSelected(key);
   };
-  const [resultsView, setResultsView] = useState<'board' | 'list'>('board');
+  // The list first: the latest pick on top. The board is a tap away.
+  const [resultsView, setResultsView] = useState<'list' | 'board'>('list');
 
   const live = useMemo(() => replaySaved(prepared, seed, person, choices).live, [prepared, seed, person, choices]);
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
@@ -262,16 +263,20 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     setChoices(next);
     setRevealed(Math.min(revealed, last - 1));
   };
-  const restart = (clearQueue = false) => {
-    setStarted(false);
+  // RESTART plays the same draft over from the first pick, same room, same
+  // seed, same queue. NEW DRAFT clears the room for a fresh seed.
+  const restart = (fresh = false) => {
+    setStarted(!fresh);
     setChoices({});
     setRevealed(0);
     setClock(null);
+    setSkipped(new Set());
+    setSelected(null);
     setMenuOpen(false);
-    if (clearQueue) setQueue([]);
+    if (fresh) setQueue([]);
     // Written now, not after the next render: NEW DRAFT unmounts this room
     // straight away, and the last thing it saves must be the empty draft.
-    progressRef.current = { started: false, choices: {}, queue: clearQueue ? [] : queue, clockLeft: null };
+    progressRef.current = { started: !fresh, choices: {}, queue: fresh ? [] : queue, clockLeft: null };
   };
   // Leave the room. The draft stays saved; DRAFT brings it back.
   const exit = () => navigate('/draft/start');
@@ -375,7 +380,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   if (over && !sawEnd) {
     setSawEnd(true);
     setCenter('results');
-    setResultsView('board');
   }
   if (!over && sawEnd) setSawEnd(false);
   const rosterOf = (owner: string) => rosterBySlot(
@@ -676,17 +680,20 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                           </button>
                         </td>
                         <td className="room-player-col">
-                          <span className="room-player-name">
-                            <span className="room-name-full">{fullName}</span>
-                            <span className="room-name-short">{shortName(fullName)}</span>
+                          <span className="room-player-line">
+                            <span className="room-player-name">
+                              <span className="room-name-full">{fullName}</span>
+                              <span className="room-name-short">{shortName(fullName)}</span>
+                            </span>
+                            {/* On a phone the team goes and the position stays whole. */}
+                            <small className="room-player-sub"><span className="room-player-team">{projection?.proTeam ?? ''} – </span><Pos positions={candidate.positions} /></small>
+                            {taken && (
+                              <small className="room-taken">
+                                {' '}{taken.label} {taken.owner}
+                                {taken.how === 'keeper' && <> <KeeperChip projected={taken.keeperStatus === 'assumed'} early={taken.keeperEarly ?? null} /></>}
+                              </small>
+                            )}
                           </span>
-                          <small className="room-player-sub">{projection?.proTeam ?? ''} – <Pos positions={candidate.positions} /></small>
-                          {taken && (
-                            <small className="room-taken">
-                              {' '}{taken.label} {taken.owner}
-                              {taken.how === 'keeper' && <> <KeeperChip projected={taken.keeperStatus === 'assumed'} early={taken.keeperEarly ?? null} /></>}
-                            </small>
-                          )}
                         </td>
                         <td className="room-num">{candidate.valueRank}</td>
                         <td className="room-num">{one(projection?.adp)}</td>
@@ -770,7 +777,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
         {center === 'results' && (
           <>
             <div className="mock-seg room-results-switch" role="radiogroup" aria-label="Board or list">
-              {(['board', 'list'] as const).map((choice) => (
+              {(['list', 'board'] as const).map((choice) => (
                 <button
                   key={choice}
                   type="button"
@@ -832,7 +839,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               </div>
             ) : (
               <ol className="room-team-list room-results-list">
-                {shownPicks.map((pick) => (
+                {/* Newest pick first, so the one that just landed is on top. */}
+                {[...shownPicks].reverse().map((pick) => (
                   <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                     <span className="room-upcoming-num">{pick.label}</span>
                     <span className="room-player-name">{pick.playerName ?? 'nobody'}</span>
@@ -945,6 +953,8 @@ interface CardProps {
 }
 
 function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked, onClose, onDraft, onQueue }: CardProps) {
+  // Last season stays folded until asked for; the projection is the point.
+  const [showLast, setShowLast] = useState(false);
   const last = entry?.player.stats2026 ?? entry?.player.api2026 ?? null;
   const lastLine = projection?.lastLine ?? null;
   const line = projection?.line ?? null;
@@ -959,6 +969,9 @@ function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked
             {entry?.positions.join('/') ?? ''} | {projection?.proTeam ?? entry?.player.proTeam ?? ''}
             {projection?.espnRank ? ` | ESPN #${projection.espnRank}` : ''}
             {projection?.adp ? ` | ADP ${projection.adp.toFixed(1)}` : ''}
+            <button type="button" className="room-card-last-toggle" aria-pressed={showLast} onClick={() => setShowLast((current) => !current)}>
+              {showLast ? 'hide last season' : 'last season'}
+            </button>
           </div>
         </div>
         <div className="room-card-actions">
@@ -983,14 +996,14 @@ function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked
               <td>{one(line?.min)}</td><td>{one(line?.pts)}</td><td>{one(line?.reb)}</td><td>{one(line?.ast)}</td>
               <td>{one(line?.stl)}</td><td>{one(line?.blk)}</td><td>{one(line?.threes)}</td><td>{one(line?.to)}</td>
             </tr>
-            <tr>
+            {showLast && <tr>
               <th>Last season</th>
               <td>{one(last && last.gp > 0 ? last.avg : null)}</td>
               <td>{last && last.gp > 0 ? Math.round(last.total).toLocaleString() : '–'}</td>
               <td>{last?.gp ?? '–'}</td>
               <td>{one(lastLine?.min)}</td><td>{one(lastLine?.pts)}</td><td>{one(lastLine?.reb)}</td><td>{one(lastLine?.ast)}</td>
               <td>{one(lastLine?.stl)}</td><td>{one(lastLine?.blk)}</td><td>{one(lastLine?.threes)}</td><td>{one(lastLine?.to)}</td>
-            </tr>
+            </tr>}
           </tbody>
         </table>
       </div>

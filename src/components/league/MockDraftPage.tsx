@@ -21,6 +21,7 @@ import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { buildWorld, privateTrades, switchableTrades, tradeConflicts } from '../../lib/league/whatIf.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
+import SignInPanel from './SignInPanel.js';
 import DraftRoom, { type RoomProgress } from './DraftRoom.js';
 import type { MockGrade } from '../../lib/league/mockGrade.js';
 import NavIcon from './NavIcon.js';
@@ -196,14 +197,7 @@ function MockDraftScreen() {
 
   if (!viewer) {
     return (
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
-        <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
-          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>SIGN IN</div>
-          <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            Sign in to run a mock draft.
-          </div>
-        </div>
-      </div>
+      <SignInPanel reason="Sign in to run a mock draft." />
     );
   }
 

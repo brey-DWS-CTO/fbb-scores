@@ -255,6 +255,11 @@ export const MODE_PRESETS: Record<MockMode, OwnerTendency> = {
   realistic: { adpWeight: 0.75, needWeight: 0.15, noise: 0.26, topK: 3, topBand: 0.28, positionBias: {} },
 };
 
+/** Places of spread a team has even at the top of the board, before rank adds to it. */
+const NOISE_FLOOR = 2;
+/** The random draw is cut at this many standard deviations. */
+const NOISE_TAIL = 2.5;
+
 /** In the draw among close candidates, each next one has this share of the chance of the one before. */
 const DRAW_DECAY = 0.6;
 
@@ -647,7 +652,13 @@ export function createMockRun(prepared: PreparedMock, seed: number): MockRun {
       if (entry.fills) score *= 1 - tendency.needWeight;
       const biases = entry.candidate.positions.map((position) => tendency.positionBias[position] ?? 0);
       if (biases.length > 0) score *= 1 + Math.min(...biases);
-      score *= 1 + tendency.noise * gaussian(random);
+      // Noise in places on the board, not as a share of the rank number: a
+      // share let a player ranked 30th swing twelve places while the 8th
+      // swung three, and once in a while put him in the first round. Here
+      // the spread grows slowly down the board (about 1.6 places at 8, 2.8
+      // at 20, 4 at 32 for a sharp team) and the tails are cut, so a reach
+      // is a few places, never a round.
+      score += tendency.noise * (NOISE_FLOOR + score / 2) * Math.max(-NOISE_TAIL, Math.min(NOISE_TAIL, gaussian(random)));
       entry.score = Math.max(0, score);
     }
     considered.sort((a, b) => a.score - b.score || a.candidate.valueRank - b.candidate.valueRank);
