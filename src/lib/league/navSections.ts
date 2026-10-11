@@ -22,7 +22,11 @@ export interface NavSection {
   /** On the phone's bottom bar; the rest sit behind MORE. */
   primary?: boolean;
   commishOnly?: boolean;
-  /** The first tab is where the section opens. */
+  /**
+   * Where the section opens. Without one, its first tab. A home that is not a
+   * tab is a landing page: the tabs stay hidden there.
+   */
+  home?: string;
   tabs: SectionTab[];
 }
 
@@ -33,6 +37,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: 'DRAFT',
     icon: 'target',
     primary: true,
+    home: '/draft/start',
     tabs: [
       { to: '/draft', label: 'BOARD' },
       { to: '/mock', label: 'MOCK DRAFT' },
@@ -90,7 +95,12 @@ export function sectionFor(pathname: string, sections: readonly NavSection[]): N
   return sections.find((section) => section.tabs.some((tab) => onPath(pathname, tab.to))) ?? null;
 }
 
-/** Where a section's link goes: its first tab. */
+/** Where a section's link goes: its home, else its first tab. */
 export function sectionHome(section: NavSection): string {
-  return section.tabs[0].to;
+  return section.home ?? section.tabs[0].to;
+}
+
+/** True on a section's landing page, where the tabs stay out of the way. */
+export function onLanding(pathname: string, section: NavSection): boolean {
+  return section.home !== undefined && pathname === section.home && !section.tabs.some((tab) => tab.to === section.home);
 }

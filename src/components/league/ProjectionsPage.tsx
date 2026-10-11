@@ -33,6 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
 import { EDITABLE_COLUMNS, cellEdited, withCellEdit } from '../../lib/league/projectionEdits.js';
 import IdentityChip from './IdentityChip.js';
+import SignInPanel from './SignInPanel.js';
 import { relativeScheduleHeat } from './scheduleUi.js';
 import NavIcon from './NavIcon.js';
 
@@ -274,14 +275,7 @@ export default function ProjectionsPage() {
 
   if (!viewer) {
     return (
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
-        <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
-          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>SIGN IN</div>
-          <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            Sign in to see projections.
-          </div>
-        </div>
-      </div>
+      <SignInPanel reason="Sign in to see projections." />
     );
   }
 

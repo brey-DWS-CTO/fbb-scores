@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
+import SignInPanel from './SignInPanel.js';
 import NavIcon from './NavIcon.js';
 import EarlierTrades from './EarlierTrades.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
@@ -581,10 +582,7 @@ export default function TradesPage() {
   if (!identity) {
     return (
       <main className="rules-page">
-        <div className="panel rules-status">
-          <span className="hub-heading">SIGN IN</span>
-          <p>Sign in from the home page to trade draft picks.</p>
-        </div>
+        <SignInPanel reason="Sign in to trade draft picks." />
       </main>
     );
   }

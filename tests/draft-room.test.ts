@@ -18,6 +18,7 @@ import {
   queuedPick,
   replaySaved,
   rosterBySlot,
+  shortName,
   toggleQueued,
   upcomingPicks,
   type MockSave,
@@ -137,4 +138,13 @@ test('saved picks replay; one that no longer fits is dropped, not the draft', ()
   assert.equal(bad.dropped, 1);
   assert.deepEqual(bad.choices, {});
   assert.equal(bad.live.waitingOn?.pick.overall, mine);
+});
+
+test('a short name is first initial and last name, suffix kept', () => {
+  assert.equal(shortName('Jayson Tatum'), 'J. Tatum');
+  assert.equal(shortName('Tyrese Maxey'), 'T. Maxey');
+  assert.equal(shortName('Gary Trent Jr.'), 'G. Trent Jr.');
+  assert.equal(shortName('Shai Gilgeous-Alexander'), 'S. Gilgeous-Alexander');
+  assert.equal(shortName('Nene'), 'Nene');
+  assert.equal(shortName('  Jalen   Brunson '), 'J. Brunson');
 });

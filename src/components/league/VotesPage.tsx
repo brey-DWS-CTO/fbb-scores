@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
+import SignInPanel from './SignInPanel.js';
 import NavIcon from './NavIcon.js';
 import RulePicker from './RulePicker.js';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -378,10 +379,7 @@ export default function VotesPage() {
   if (!identity) {
     return (
       <main className="rules-page">
-        <div className="panel rules-status">
-          <span className="hub-heading">SIGN IN</span>
-          <p>Sign in from the home page to see and cast league votes.</p>
-        </div>
+        <SignInPanel reason="Sign in to see and cast league votes." />
       </main>
     );
   }

@@ -9,7 +9,7 @@
  * dropping the last choice. Same seed and same choices, same draft.
  */
 import { fillsSlot } from './draftValue.js';
-import { createMockRun, runSeed, type MockCandidate, type MockPick, type MockRun, type MockSlot, type PreparedMock } from './mockDraft.js';
+import { createMockRun, prepareMock, runSeed, type MockCandidate, type MockPick, type MockRun, type MockSlot, type PreparedMock } from './mockDraft.js';
 
 /** The person's picks, by overall pick number. */
 export type LiveChoices = Readonly<Record<number, string>>;
@@ -105,4 +105,54 @@ export function autoPick(state: LiveState): MockCandidate | null {
     ? available.find((candidate) => open.some((slot) => fillsSlot(candidate.positions, slot)))
     : undefined;
   return fits ?? available[0] ?? null;
+}
+
+/**
+ * At one of the person's own keeper slots: how often that player would still
+ * have been on the board had he not been kept. The slot is made live and the
+ * player put back in the pool, then the draft is played to that slot `runs`
+ * times under fresh seeds. The person's earlier choices stand; their other
+ * live picks before the slot go to the team's best value. Null when the slot
+ * is not one of the person's keepers.
+ */
+export function oddsKeeperThere(
+  prepared: PreparedMock,
+  seed: number,
+  person: string,
+  overall: number,
+  choices: LiveChoices,
+  runs = 60,
+): number | null {
+  const slot = prepared.input.board.slots.find((entry) => entry.pick.overall === overall);
+  const keeper = slot?.keeper ?? null;
+  if (!slot || !keeper || slot.pick.currentOwner !== person || runs <= 0) return null;
+  const board = prepared.input.board;
+  const open = prepareMock({
+    ...prepared.input,
+    board: {
+      ...board,
+      slots: board.slots.map((entry) => (entry.pick.overall === overall ? { ...entry, keeper: null } : entry)),
+      taken: board.taken.filter((key) => key !== keeper.playerKey),
+    },
+  });
+  if (!open.pool.some((candidate) => candidate.playerKey === keeper.playerKey)) return null;
+
+  let there = 0;
+  for (let k = 0; k < runs; k += 1) {
+    const run = createMockRun(open, runSeed(seed, 5000 + k));
+    let gone = false;
+    for (let next = run.nextSlot(); next && next.pick.overall < overall; next = run.nextSlot()) {
+      const live = !next.keeper && !next.made;
+      const chosen = live && next.pick.currentOwner === person ? choices[next.pick.overall] : undefined;
+      const pick = chosen !== undefined && run.available().some((candidate) => candidate.playerKey === chosen)
+        ? run.next(chosen)
+        : run.next();
+      if (pick.playerKey === keeper.playerKey) {
+        gone = true;
+        break;
+      }
+    }
+    if (!gone) there += 1;
+  }
+  return there / runs;
 }
