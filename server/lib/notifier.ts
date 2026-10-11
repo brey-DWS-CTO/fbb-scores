@@ -266,6 +266,40 @@ export function notifyKeepersRevealed(origin: string): void {
   });
 }
 
+// ─── The rule book ───────────────────────────────────────────────────────────
+
+/**
+ * A new revision is out and the old signatures no longer count. Every member
+ * with an address gets one note: read it, sign it, here is the link.
+ */
+export function notifyRulebookPublished(
+  input: { revision: number; notes: string; publishedBy: string },
+  origin: string,
+): void {
+  queueMail('rule book published', async () => {
+    const book = await addressBook();
+    const why = input.notes.trim();
+    const content: MailContent = {
+      subject: `Sign the rule book: revision ${input.revision} is out`,
+      preheader: 'One tap in the app. A new revision means everyone signs again.',
+      heading: `Revision ${input.revision} of the constitution is out`,
+      lines: [
+        `${input.publishedBy} published revision ${input.revision} of The Nerds constitution.`,
+        ...(why ? [`The note on it: ${why}`] : []),
+        'Read it, then tap I AGREE, SIGN IT at the top of the Rules page. Your name and the date go on this revision.',
+      ],
+      action: { label: 'READ AND SIGN', href: `${origin}/rules` },
+      notes: [
+        `The printed copy, with the signature page, is at ${origin}/rules/paper`,
+        'Signatures never carry forward. If a newer revision comes out, the league signs again.',
+      ],
+    };
+    for (const address of book.values()) {
+      await sendMail(address, content, origin, 'notify');
+    }
+  });
+}
+
 // ─── Reminders ───────────────────────────────────────────────────────────────
 
 function reminderContent(reminder: DueReminder, origin: string): MailContent {

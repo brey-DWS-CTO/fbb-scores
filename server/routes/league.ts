@@ -114,6 +114,7 @@ import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
+  notifyRulebookPublished,
   notifyTradeAccepted,
   notifyTradeOffered,
   notifyTradeSettled,
@@ -1867,6 +1868,8 @@ router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, r
       previousVersionId: previous?.id ?? null,
       polls: carried,
     });
+    // Every signature just went stale, so everyone hears about it.
+    notifyRulebookPublished({ revision, notes, publishedBy: owner }, appOrigin(req));
     res.json({
       versionId: saved.id,
       revision,
