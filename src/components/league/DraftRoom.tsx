@@ -148,12 +148,17 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     const room = roomRef.current;
     const box = clockRef2.current;
     if (!room || !box || typeof ResizeObserver === 'undefined') return;
-    const measure = () => room.style.setProperty('--room-clock-h', `${Math.round(box.getBoundingClientRect().height)}px`);
+    const card = room.querySelector<HTMLElement>('.room-cards, .room-card.is-picked');
+    const measure = () => {
+      room.style.setProperty('--room-clock-h', `${Math.round(box.getBoundingClientRect().height)}px`);
+      room.style.setProperty('--room-card-h', `${card ? Math.round(card.getBoundingClientRect().height) : 0}px`);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(box);
+    if (card) observer.observe(card);
     return () => observer.disconnect();
-  }, []);
+  }, [selected, atMyKeeper, over]);
   useEffect(() => {
     if (!menuOpen) return;
     const close = () => setMenuOpen(false);
@@ -601,19 +606,29 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
 
         {center === 'players' && (
           <div className="room-players">
-            <div className="room-filters">
+            <div className="room-filters room-filters-main">
               <select className="hub-input mock-select" aria-label="Position" value={position} onChange={(event) => setPosition(event.target.value as Position | 'ALL')}>
                 <option value="ALL">All players</option>
                 {POSITIONS.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
               </select>
+              {/* Phone: sort chips, pinned with this row under the clock. Wide screens sort by the column heads. */}
+              <span className="room-sort-quick" role="group" aria-label="Sort by">
+                {([['rank', 'RK'], ['adp', 'ADP'], ['total', 'TOT'], ['fppg', 'FPPG']] as const).map(([key, label]) => (
+                  <button key={key} type="button" className={sort.key === key ? 'is-on' : ''} aria-pressed={sort.key === key} onClick={() => sortBy(key)}>
+                    {label}{sort.key === key ? (sort.dir === 1 ? '▲' : '▼') : ''}
+                  </button>
+                ))}
+              </span>
               <button
                 type="button"
                 className={`tap-btn mock-mini-btn room-queue-toggle${showQueue ? ' is-on' : ''}`}
                 aria-expanded={showQueue}
                 onClick={() => setShowQueue((current) => !current)}
               >
-                {showQueue ? '★' : '☆'} QUEUE{queue.length ? ` ${queue.length}` : ''}
+                {showQueue ? '★' : '☆'}<span className="room-queue-word"> QUEUE</span>{queue.length ? ` ${queue.length}` : ''}
               </button>
+            </div>
+            <div className="room-filters room-filters-search">
               <input className="hub-input room-search" type="search" placeholder="Search for a player" value={search} onChange={(event) => setSearch(event.target.value)} />
               <label className="proj-check"><input type="checkbox" checked={showDrafted} onChange={(event) => setShowDrafted(event.target.checked)} /> Show drafted</label>
             </div>

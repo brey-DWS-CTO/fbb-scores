@@ -4343,6 +4343,7 @@ html.theme-light {
 /* DRAFT and GONE BY NEXT lead the row on a phone and trail it on a wide screen. */
 .room-draft-lead, .room-gone-lead { display: none; }
 .room-name-short { display: none; }
+.room-sort-quick { display: none; }
 .mock-shared .room-grade { margin-top: 10px; }
 .mock-shared-missing { padding: 16px; border-radius: 10px; text-align: center; }
 
@@ -4448,6 +4449,15 @@ html.theme-light {
   .room .room-table-wrap.is-scrolled .room-table.is-my-turn .room-star { left: 56px; }
   .room .room-table-wrap.is-scrolled .room-table.is-my-turn .room-player-col { left: 86px; }
   .room .room-table th { z-index: 4; }
+  /* Sort chips sit in the filter row, which pins under the clock and the card. */
+  .room .room-filters.room-filters-main { position: sticky; top: calc(var(--room-clock-h, 92px) + var(--room-card-h, 0px) + 8px); z-index: 6; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; margin: 0 -4px 8px; padding: 4px 4px; background: var(--dark-bg); }
+  .room .room-filters-main .mock-select { min-height: 36px; padding: 4px 6px; font-size: 0.72rem; }
+  .room .room-filters-search { display: block; margin-bottom: 8px; }
+  .room .room-sort-quick { display: inline-flex; gap: 4px; justify-content: center; }
+  .room .room-sort-quick button { min-height: 30px; padding: 0 7px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.58rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1; }
+  .room .room-sort-quick button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+  .room .room-queue-word { display: none; }
+  .room .room-queue-toggle { min-width: 44px; padding: 0 8px; }
   .room .room-table th.room-draft-lead, .room .room-table th.room-gone-lead, .room .room-table th.room-player-col { z-index: 5; }
   .room .room-table td.room-player-col { max-width: 176px; overflow: hidden; white-space: nowrap; }
   .room .room-player-line { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
@@ -4460,10 +4470,10 @@ html.theme-light {
   .room .room-table-wrap.is-scrolled .room-player-sub,
   .room .room-table-wrap.is-scrolled .room-taken { display: none; }
   .room .room-table-wrap.is-scrolled .room-player-col { box-shadow: 2px 0 0 var(--panel-border); }
+  /* The list scrolls in its own box, so its header (with the sort chips) stays put under the clock. */
   .room .room-table-wrap { max-height: none; }
   .room .room-filters .proj-check { display: none; }
   .room .room-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-  .room .room-filters .room-search { grid-column: 1 / -1; flex: none; }
   .room .room-queue-toggle { margin-left: 0; }
   .room .room-grade .room-head { flex-wrap: wrap; }
   /* A shorter board: the position bar colours the cell, so the position line can go. */
