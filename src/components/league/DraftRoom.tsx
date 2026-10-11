@@ -31,8 +31,9 @@ const PICK_CLOCK = 120;
 /** Gap between one team's pick and the next on screen. */
 const REVEAL_MS = 450;
 const LIST_LIMIT = 150;
-/** How far the player list scrolls sideways before names shorten. */
-const SHORT_NAME_AT = 24;
+/** How far the player list scrolls sideways before names shorten, and how far back before they grow again. */
+const SHORT_NAME_AT = 40;
+const FULL_NAME_AT = 8;
 
 export interface RoomProgress {
   started: boolean;
@@ -112,6 +113,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const [showQueue, setShowQueue] = useState(false);
   // The player list scrolled sideways: names shorten so the stats fit.
   const [scrolled, setScrolled] = useState(false);
+  // Scrolled down into the list: the pinned clock and card slim down.
+  const [compact, setCompact] = useState(false);
   // Tap a player anywhere (updates, a roster, the board) to see him in the card.
   const look = (key: string | null | undefined) => {
     if (!key) return;
@@ -141,7 +144,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     document.documentElement.classList.toggle('in-mock-room', started);
     return () => document.documentElement.classList.remove('in-mock-room');
   }, [started]);
-  // The clock's height, so the pinned player card can sit right under it.
+  // The heights of the pinned stack (clock, card, filter row), so each piece
+  // can sit right under the one above and the list can fill what is left.
   const roomRef = useRef<HTMLDivElement>(null);
   const clockRef2 = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -149,16 +153,25 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     const box = clockRef2.current;
     if (!room || !box || typeof ResizeObserver === 'undefined') return;
     const card = room.querySelector<HTMLElement>('.room-cards, .room-card.is-picked');
+    const filters = room.querySelector<HTMLElement>('.room-filters-main');
+    const height = (element: HTMLElement | null) => (element ? Math.round(element.getBoundingClientRect().height) : 0);
     const measure = () => {
-      room.style.setProperty('--room-clock-h', `${Math.round(box.getBoundingClientRect().height)}px`);
-      room.style.setProperty('--room-card-h', `${card ? Math.round(card.getBoundingClientRect().height) : 0}px`);
+      room.style.setProperty('--room-clock-h', `${height(box)}px`);
+      room.style.setProperty('--room-card-h', `${height(card)}px`);
+      room.style.setProperty('--room-filters-h', `${height(filters)}px`);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(box);
     if (card) observer.observe(card);
+    if (filters) observer.observe(filters);
     return () => observer.disconnect();
-  }, [selected, atMyKeeper, over]);
+  }, [selected, atMyKeeper, over, center, compact]);
+  useEffect(() => {
+    const onScroll = () => setCompact((current) => (window.scrollY > 80 ? true : current && window.scrollY > 20));
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   useEffect(() => {
     if (!menuOpen) return;
     const close = () => setMenuOpen(false);
@@ -267,6 +280,9 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     delete next[last];
     setChoices(next);
     setRevealed(Math.min(revealed, last - 1));
+    // The replay runs forward again from here, so any keeper pause it had
+    // passed on the way is due again.
+    setSkipped((current) => new Set([...current].filter((overall) => overall < last)));
   };
   // RESTART plays the same draft over from the first pick, same room, same
   // seed, same queue. NEW DRAFT clears the room for a fresh seed.
@@ -398,21 +414,54 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const owners = grid.owners;
 
   const sortHead = (key: SortKey, label: string, title?: string, className = '') => (
-    <th className={`room-num${sort.key === key ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`} title={title ?? label}>
+    <th className={`room-num${sort.key === key ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`} title={title ?? label} data-sort={key}>
       <button type="button" onClick={() => sortBy(key)}>
         {label}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
       </button>
     </th>
   );
+  const wrapRef = useRef<HTMLDivElement>(null);
   const onListScroll = (event: React.UIEvent<HTMLDivElement>) => {
-    const next = event.currentTarget.scrollLeft > SHORT_NAME_AT;
+    const left = event.currentTarget.scrollLeft;
+    // A gap between the two marks, so a finger resting near one does not flicker.
+    const next = scrolled ? left > FULL_NAME_AT : left > SHORT_NAME_AT;
     if (next !== scrolled) setScrolled(next);
+    const down = event.currentTarget.scrollTop > 80;
+    if (down !== compact) setCompact(down);
+  };
+  // A sort chosen from the chips slides the list so that column lands flush
+  // against the pinned name column. That column is narrower once the list is
+  // scrolled, so narrow it first, let it settle, then slide once.
+  const quickSort = (key: SortKey) => {
+    sortBy(key);
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const offset = () => {
+      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]:not(.room-gone-trail)`);
+      const pinned = wrap.querySelector<HTMLElement>('th.room-player-col');
+      return column && pinned ? column.offsetLeft - (pinned.offsetLeft + pinned.offsetWidth) : 0;
+    };
+    if (offset() <= SHORT_NAME_AT) {
+      wrap.scrollTo({ left: Math.max(0, offset()), behavior: 'smooth' });
+      return;
+    }
+    setScrolled(true);
+    window.setTimeout(() => wrap.scrollTo({ left: Math.max(0, offset()), behavior: 'smooth' }), 260);
   };
 
+  // On a phone a tapped card stands where the clock frame was, with the clock
+  // small in its corner: the time on your pick, else the pick on the clock.
+  const hasPicked = started && !over && selected !== null;
+  const miniClock = (
+    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
+      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…'}
+    </span>
+  );
   const cardFor = (key: string, extra: { role: 'keeper' | 'compare' | 'card' }) => (
     <PlayerCard
       key={`${extra.role}-${key}`}
       role={extra.role}
+      corner={extra.role !== 'keeper' ? miniClock : null}
       playerKey={key}
       projection={projections.get(key) ?? null}
       entry={byKey.get(key) ?? null}
@@ -471,7 +520,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   );
 
   return (
-    <div ref={roomRef} className={`room room-center-${center}${atMyKeeper ? ' is-at-keeper' : ''}`}>
+    <div ref={roomRef} className={`room room-center-${center}${atMyKeeper ? ' is-at-keeper' : ''}${compact ? ' is-compact' : ''}${hasPicked ? ' has-picked' : ''}`}>
       {/* ── Left: the clock and who picks next ── */}
       <aside className="room-left">
         <div ref={clockRef2} className={`panel room-clock${myTurn ? ' is-mine' : ''}${started ? '' : ' is-before'}`}>
@@ -511,7 +560,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                   <NavIcon name="undo" size="1.5em" />
                   <span>UNDO</span>
                 </button>
-                {menu}
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
@@ -530,16 +578,19 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                   >
                     CONTINUE
                   </button>
+                  {menu}
                 </div>
               ) : myTurn ? (
                 <div className="room-turn is-mine">
                   YOUR PICK
                   <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>
+                  {menu}
                 </div>
               ) : (
                 <div className="room-turn">
                   {untilTurn === null ? 'No picks left for you' : `${untilTurn} pick${untilTurn === 1 ? '' : 's'} until your turn`}
                   {myNext && <small> ({myNext.pick.round}.{myNext.pick.slot})</small>}
+                  {menu}
                 </div>
               )}
             </>
@@ -614,7 +665,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               {/* Phone: sort chips, pinned with this row under the clock. Wide screens sort by the column heads. */}
               <span className="room-sort-quick" role="group" aria-label="Sort by">
                 {([['rank', 'RK'], ['adp', 'ADP'], ['total', 'TOT'], ['fppg', 'FPPG']] as const).map(([key, label]) => (
-                  <button key={key} type="button" className={sort.key === key ? 'is-on' : ''} aria-pressed={sort.key === key} onClick={() => sortBy(key)}>
+                  <button key={key} type="button" className={sort.key === key ? 'is-on' : ''} aria-pressed={sort.key === key} onClick={() => quickSort(key)}>
                     {label}{sort.key === key ? (sort.dir === 1 ? '▲' : '▼') : ''}
                   </button>
                 ))}
@@ -633,7 +684,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               <label className="proj-check"><input type="checkbox" checked={showDrafted} onChange={(event) => setShowDrafted(event.target.checked)} /> Show drafted</label>
             </div>
             {showQueue && <div className="panel room-queue-fold">{queueList}</div>}
-            <div className={`room-table-wrap${scrolled ? ' is-scrolled' : ''}`} onScroll={onListScroll}>
+            <div ref={wrapRef} className={`room-table-wrap${scrolled ? ' is-scrolled' : ''}`} onScroll={onListScroll}>
               <table className={`room-table${myTurn ? ' is-my-turn' : ''}`}>
                 <thead>
                   <tr>
@@ -962,40 +1013,55 @@ interface CardProps {
   canDraft: boolean;
   /** Tapped on purpose, rather than the default player shown. */
   picked: boolean;
+  /** A small clock for the card's corner, on a phone. */
+  corner?: React.ReactNode;
   onClose: () => void;
   onDraft: () => void;
   onQueue: () => void;
 }
 
-function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked, onClose, onDraft, onQueue }: CardProps) {
+function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked, corner, onClose, onDraft, onQueue }: CardProps) {
   // Last season stays folded until asked for; the projection is the point.
   const [showLast, setShowLast] = useState(false);
   const last = entry?.player.stats2026 ?? entry?.player.api2026 ?? null;
   const lastLine = projection?.lastLine ?? null;
   const line = projection?.line ?? null;
+  const lastToggle = (
+    <button type="button" className="room-card-last-toggle" aria-pressed={showLast} onClick={() => setShowLast((current) => !current)}>
+      {showLast ? 'hide last season' : 'last season'}
+    </button>
+  );
+  // A tagged or taken card has a top line already; the pill and the toggle
+  // ride on it, so the card is a row shorter.
+  const topLine = role !== 'card' || takenBy !== null;
   return (
     <section className={`panel room-card room-card-${role}${picked ? ' is-picked' : ''}`}>
       <div className="room-card-head">
-        <div>
-          {role === 'keeper' && <div className="room-card-tag">YOUR KEEPER</div>}
-          {role === 'compare' && <div className="room-card-tag is-compare">COMPARE</div>}
+        <div className="room-card-main">
+          {topLine && (
+            <div className="room-card-top">
+              {role === 'keeper' && <span className="room-card-tag">YOUR KEEPER</span>}
+              {role === 'compare' && <span className="room-card-tag is-compare">COMPARE</span>}
+              {takenBy && <span className="room-card-taken">{takenBy.how === 'keeper' ? (takenBy.keeperStatus === 'assumed' ? 'Projected keeper' : 'Kept') : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>}
+              {lastToggle}
+            </div>
+          )}
           <div className="room-card-name">{projection?.name ?? entry?.player.name ?? 'Player'}</div>
           <div className="room-card-meta">
             {entry?.positions.join('/') ?? ''} | {projection?.proTeam ?? entry?.player.proTeam ?? ''}
             {projection?.espnRank ? ` | ESPN #${projection.espnRank}` : ''}
             {projection?.adp ? ` | ADP ${projection.adp.toFixed(1)}` : ''}
-            <button type="button" className="room-card-last-toggle" aria-pressed={showLast} onClick={() => setShowLast((current) => !current)}>
-              {showLast ? 'hide last season' : 'last season'}
-            </button>
+            {!topLine && lastToggle}
           </div>
         </div>
-        <div className="room-card-actions">
-          {takenBy
-            ? <span className="room-card-taken">{takenBy.how === 'keeper' ? (takenBy.keeperStatus === 'assumed' ? 'Projected keeper' : 'Kept') : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>
-            : canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
-          {!takenBy && <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>}
-          {picked && role !== 'keeper' && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
-        </div>
+        {(!takenBy || (picked && role !== 'keeper') || corner) && (
+          <div className="room-card-actions">
+            {corner}
+            {!takenBy && canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
+            {!takenBy && <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>}
+            {picked && role !== 'keeper' && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
+          </div>
+        )}
       </div>
       <div className="room-card-table-wrap">
         <table className="room-card-table">

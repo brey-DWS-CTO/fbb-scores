@@ -4310,6 +4310,10 @@ html.theme-light {
 /* The clock box clips its children; the menu sheet must escape it. */
 .room-clock:has(.room-menu-sheet) { overflow: visible; }
 .room-menu { position: relative; display: flex; align-items: center; }
+/* The dots sit at the right end of the turn row, next to PAUSE. */
+.room-turn > .mock-mini-btn { margin-left: auto; }
+.room-turn .room-menu { margin-left: auto; flex: none; }
+.room-turn > .mock-mini-btn + .room-menu { margin-left: 0; }
 .room-menu-btn { width: 34px; height: 34px; }
 .room-menu-sheet {
   position: absolute;
@@ -4330,6 +4334,11 @@ html.theme-light {
 .room-keeper-odds { display: block; margin-top: 4px; color: var(--text-mid); font-weight: 600; font-size: 0.7rem; }
 .room-keeper-odds strong { color: var(--neon-yellow); }
 .room-card-last-toggle { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--neon-teal); font: inherit; font-size: 0.68rem; font-weight: 800; text-decoration: underline; cursor: pointer; }
+.room-mini-clock { display: none; }
+.room-card-main { min-width: 0; flex: 1 1 auto; }
+.room-card-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.room-card-top .room-card-last-toggle { margin-left: auto; }
+.room-card-top .room-card-taken { padding: 2px 8px; font-size: 0.66rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .room-card-tag { display: inline-block; margin-bottom: 2px; color: var(--neon-purple); font-size: 0.58rem; font-weight: 900; letter-spacing: 0.1em; }
 .room-card-tag.is-compare { color: var(--neon-teal); }
 .room-card-keeper { border-color: var(--neon-purple); }
@@ -4353,8 +4362,11 @@ html.theme-light {
   html.in-mock-room .section-tabs,
   html.in-mock-room .mock-head,
   html.in-mock-room .mock-intro { display: none; }
-  html.in-mock-room .mock-page { padding-top: 8px; }
+  html.in-mock-room .mock-page { padding-top: 8px; padding-bottom: 0; }
+  html.in-mock-room .room-players { margin-bottom: 0; }
   html.in-mock-room .app-shell-nav { padding-bottom: 68px; }
+  /* While the draft runs, nothing sits under the room: the page stops where the list meets the pinned stack. */
+  html.in-mock-room .mock-setup, html.in-mock-room .mock-history { display: none; }
   /* The bottom bar already says Players, Teams, Results; the row in the middle would say it twice. */
   html.in-mock-room .room .room-tabs { display: none; }
 
@@ -4406,6 +4418,24 @@ html.theme-light {
   .room .room-clock.is-before { flex-direction: column; }
   .room .room-clock.is-before .live-start-btn { width: 100%; min-height: 48px; }
 
+  /* A tapped card stands where the clock frame was; the clock shrinks to a badge in its corner. */
+  .room.has-picked .room-clock { display: none; }
+  .room.has-picked .room-mini-clock {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 8px;
+    border: 2px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text-max);
+    font-size: 0.9rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .room.has-picked .room-mini-clock.is-mine { border-color: var(--neon-teal); color: var(--neon-teal); }
+  .room.has-picked .room-mini-clock.is-low { color: var(--neon-red); border-color: var(--neon-red); }
+  .room.has-picked .room-mini-clock.is-paused { color: var(--neon-yellow); }
   /* Tapped player: the card pins under the clock, so it is there while the list scrolls. */
   /* Above the list's own pinned header cells, which sit at 5. */
   .room .room-clock { z-index: 8; }
@@ -4444,13 +4474,11 @@ html.theme-light {
   .room .room-table .room-player-col { position: sticky; left: 30px; z-index: 3; min-width: 0; }
   .room .room-table.is-my-turn .room-star { left: 100px; }
   .room .room-table.is-my-turn .room-player-col { left: 130px; }
-  /* Scrolled sideways: GONE goes too, so the stats get the room. */
-  .room .room-table-wrap.is-scrolled .room-gone-lead { display: none; }
-  .room .room-table-wrap.is-scrolled .room-table.is-my-turn .room-star { left: 56px; }
-  .room .room-table-wrap.is-scrolled .room-table.is-my-turn .room-player-col { left: 86px; }
+  /* Scrolled sideways, the name column eases narrower instead of snapping. */
+  .room .room-table td.room-player-col, .room .room-table th.room-player-col { transition: max-width 0.22s ease; }
   .room .room-table th { z-index: 4; }
   /* Sort chips sit in the filter row, which pins under the clock and the card. */
-  .room .room-filters.room-filters-main { position: sticky; top: calc(var(--room-clock-h, 92px) + var(--room-card-h, 0px) + 8px); z-index: 6; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; margin: 0 -4px 8px; padding: 4px 4px; background: var(--dark-bg); }
+  .room .room-filters.room-filters-main { position: sticky; top: calc(var(--room-clock-h, 92px) + var(--room-card-h, 0px)); z-index: 6; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; margin: 0 -4px 0; padding: 6px 4px; background: var(--dark-bg); }
   .room .room-filters-main .mock-select { min-height: 36px; padding: 4px 6px; font-size: 0.72rem; }
   .room .room-filters-search { display: block; margin-bottom: 8px; }
   .room .room-sort-quick { display: inline-flex; gap: 4px; justify-content: center; }
@@ -4459,19 +4487,46 @@ html.theme-light {
   .room .room-queue-word { display: none; }
   .room .room-queue-toggle { min-width: 44px; padding: 0 8px; }
   .room .room-table th.room-draft-lead, .room .room-table th.room-gone-lead, .room .room-table th.room-player-col { z-index: 5; }
-  .room .room-table td.room-player-col { max-width: 176px; overflow: hidden; white-space: nowrap; }
+  .room .room-table td.room-player-col, .room .room-table th.room-player-col { max-width: 176px; overflow: hidden; white-space: nowrap; }
   .room .room-player-line { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
   .room .room-player-line .room-player-name { flex: 1 1 auto; min-width: 0; margin-right: 0; overflow: hidden; text-overflow: ellipsis; }
   .room .room-player-line .room-player-sub, .room .room-player-line .room-taken { flex: none; }
   .room .room-player-team { display: none; }
   .room .room-table-wrap.is-scrolled .room-name-full { display: none; }
   .room .room-table-wrap.is-scrolled .room-name-short { display: inline; }
-  .room .room-table-wrap.is-scrolled td.room-player-col { max-width: 118px; }
+  .room .room-table-wrap.is-scrolled td.room-player-col, .room .room-table-wrap.is-scrolled th.room-player-col { max-width: 118px; }
   .room .room-table-wrap.is-scrolled .room-player-sub,
   .room .room-table-wrap.is-scrolled .room-taken { display: none; }
   .room .room-table-wrap.is-scrolled .room-player-col { box-shadow: 2px 0 0 var(--panel-border); }
   /* The list scrolls in its own box, so its header (with the sort chips) stays put under the clock. */
-  .room .room-table-wrap { max-height: none; }
+  /* The list scrolls in its own box that fills the screen under the pinned
+     stack, so the stat headers stay put. Scrolling the list never drags the page. */
+  .room .room-table-wrap {
+    max-height: calc(100dvh - var(--room-clock-h, 92px) - var(--room-card-h, 0px) - var(--room-filters-h, 44px) - 72px);
+    min-height: 40vh;
+    overscroll-behavior: contain;
+  }
+  .room .room-players > .mock-note { display: none; }
+  /* Scrolled into the list: the clock and the card slim down to give it room, eased so nothing jumps. */
+  .room .room-clock, .room .room-clock-big, .room .room-undo-btn, .room .room-turn, .room .room-card, .room .room-card-name, .room .room-card-table th, .room .room-card-table td { transition: padding 0.2s ease, font-size 0.2s ease, min-height 0.2s ease; }
+  .room.is-compact .room-clock { padding: 5px 10px; gap: 4px; }
+  .room.is-compact .room-clock-big { font-size: 1.25rem; }
+  .room.is-compact .room-clock-meta { font-size: 0.62rem; }
+  .room.is-compact .room-undo-btn { min-height: 36px; min-width: 46px; padding: 0 6px; font-size: 0.5rem; gap: 0; }
+  .room.is-compact .room-menu-btn { width: 30px; height: 30px; }
+  .room.is-compact .room-turn:not(.is-keeper) { padding: 2px 8px; font-size: 0.64rem; }
+  .room.is-compact .room-turn .mock-mini-btn { min-height: 24px; padding: 0 8px; font-size: 0.56rem; }
+  .room.is-compact .room-card { padding: 5px 10px; }
+  .room.is-compact .room-card-meta { display: none; }
+  .room.is-compact .room-card-name { font-size: 0.85rem; }
+  .room.is-compact .room-card-actions .live-start-btn { min-height: 28px; padding: 0 10px; font-size: 0.6rem; }
+  .room.is-compact .room-card-actions .mock-mini-btn { min-height: 26px; font-size: 0.56rem; }
+  .room.is-compact .room-card-actions .room-icon-btn { width: 24px; height: 24px; }
+  .room.is-compact .room-card-table-wrap { margin-top: 2px; }
+  .room.is-compact .room-card-table th, .room.is-compact .room-card-table td { padding: 2px 6px; }
+  .room.is-compact .room-filters-main .mock-select { min-height: 30px; }
+  .room.is-compact .room-sort-quick button { min-height: 26px; }
+  .room.is-compact .room-queue-toggle { min-height: 30px; }
   .room .room-filters .proj-check { display: none; }
   .room .room-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .room .room-queue-toggle { margin-left: 0; }
