@@ -348,12 +348,16 @@ export class DraftRankingAcceptError extends Error {
 
 // ─── League config (static import — bundled on Vercel) ───────────────────────
 
-interface ConfigTeam {
+export interface ConfigTeam {
   owner: string;
+  fullName: string;
+  espnTeamName?: string;
+  draftPosition: number;
+  originalMember?: boolean;
   isCommissioner?: boolean;
 }
 
-const CONFIG_TEAMS = leagueConfig.teams as ConfigTeam[];
+export const CONFIG_TEAMS = leagueConfig.teams as ConfigTeam[];
 export const OWNERS: string[] = CONFIG_TEAMS.map((t) => t.owner);
 const COMMISSIONERS = new Set(
   CONFIG_TEAMS.filter((t) => t.isCommissioner === true).map((t) => t.owner),

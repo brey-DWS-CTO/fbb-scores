@@ -4255,6 +4255,40 @@ html.theme-light {
 .tier-detail-num { display: inline-block; min-width: 46px; color: var(--text-hi); font-weight: 700; font-variant-numeric: tabular-nums; }
 .tier-detail-note { color: var(--text-mid); font-size: 0.72rem; margin-top: 4px; }
 
+/* ─── Rule book, front page editor and PDF link ─────────────────────── */
+.rules-pdf-link { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.rules-front-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.rules-front-field { display: flex; flex-direction: column; gap: 4px; }
+.rules-front-field > span { color: var(--text-dim); font-size: 0.7rem; }
+.rules-front-letter { font-family: inherit; line-height: 1.45; resize: vertical; min-height: 160px; }
+
+/* ─── The printed constitution, read in the app ──────────────────────── */
+.paper-page { width: min(100%, 820px); margin: 0 auto; padding: 12px 12px 24px; }
+.paper-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.paper-bar .rules-tool { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.paper-title { flex: 1 1 auto; color: var(--text-dim); font-size: 0.72rem; }
+.paper-note { color: var(--text-dim); font-size: 0.8rem; margin: 12px 0; }
+.paper-sheets { display: flex; flex-direction: column; gap: 10px; }
+.paper-sheet {
+  display: block;
+  max-width: 100%;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
 /* ─── Draft start page: two big doors, two small ones ─────────────────── */
 .start-page { max-width: 560px; margin: 0 auto; padding: 16px 12px 28px; display: flex; flex-direction: column; gap: 12px; }
 .start-page .mock-head { margin-bottom: 2px; }
