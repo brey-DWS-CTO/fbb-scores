@@ -280,6 +280,9 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     delete next[last];
     setChoices(next);
     setRevealed(Math.min(revealed, last - 1));
+    // The replay runs forward again from here, so any keeper pause it had
+    // passed on the way is due again.
+    setSkipped((current) => new Set([...current].filter((overall) => overall < last)));
   };
   // RESTART plays the same draft over from the first pick, same room, same
   // seed, same queue. NEW DRAFT clears the room for a fresh seed.
@@ -447,10 +450,19 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     wrap.scrollTo({ left: Math.max(0, sorted.offsetLeft - pinnedRight - 6), behavior: 'smooth' });
   }, [sort]);
 
+  // On a phone a tapped card stands where the clock frame was, with the clock
+  // small in its corner: the time on your pick, else the pick on the clock.
+  const hasPicked = started && !over && selected !== null;
+  const miniClock = (
+    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
+      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…'}
+    </span>
+  );
   const cardFor = (key: string, extra: { role: 'keeper' | 'compare' | 'card' }) => (
     <PlayerCard
       key={`${extra.role}-${key}`}
       role={extra.role}
+      corner={extra.role !== 'keeper' ? miniClock : null}
       playerKey={key}
       projection={projections.get(key) ?? null}
       entry={byKey.get(key) ?? null}
@@ -509,7 +521,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   );
 
   return (
-    <div ref={roomRef} className={`room room-center-${center}${atMyKeeper ? ' is-at-keeper' : ''}${compact ? ' is-compact' : ''}`}>
+    <div ref={roomRef} className={`room room-center-${center}${atMyKeeper ? ' is-at-keeper' : ''}${compact ? ' is-compact' : ''}${hasPicked ? ' has-picked' : ''}`}>
       {/* ── Left: the clock and who picks next ── */}
       <aside className="room-left">
         <div ref={clockRef2} className={`panel room-clock${myTurn ? ' is-mine' : ''}${started ? '' : ' is-before'}`}>
@@ -1002,40 +1014,55 @@ interface CardProps {
   canDraft: boolean;
   /** Tapped on purpose, rather than the default player shown. */
   picked: boolean;
+  /** A small clock for the card's corner, on a phone. */
+  corner?: React.ReactNode;
   onClose: () => void;
   onDraft: () => void;
   onQueue: () => void;
 }
 
-function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked, onClose, onDraft, onQueue }: CardProps) {
+function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked, corner, onClose, onDraft, onQueue }: CardProps) {
   // Last season stays folded until asked for; the projection is the point.
   const [showLast, setShowLast] = useState(false);
   const last = entry?.player.stats2026 ?? entry?.player.api2026 ?? null;
   const lastLine = projection?.lastLine ?? null;
   const line = projection?.line ?? null;
+  const lastToggle = (
+    <button type="button" className="room-card-last-toggle" aria-pressed={showLast} onClick={() => setShowLast((current) => !current)}>
+      {showLast ? 'hide last season' : 'last season'}
+    </button>
+  );
+  // A tagged or taken card has a top line already; the pill and the toggle
+  // ride on it, so the card is a row shorter.
+  const topLine = role !== 'card' || takenBy !== null;
   return (
     <section className={`panel room-card room-card-${role}${picked ? ' is-picked' : ''}`}>
       <div className="room-card-head">
-        <div>
-          {role === 'keeper' && <div className="room-card-tag">YOUR KEEPER</div>}
-          {role === 'compare' && <div className="room-card-tag is-compare">COMPARE</div>}
+        <div className="room-card-main">
+          {topLine && (
+            <div className="room-card-top">
+              {role === 'keeper' && <span className="room-card-tag">YOUR KEEPER</span>}
+              {role === 'compare' && <span className="room-card-tag is-compare">COMPARE</span>}
+              {takenBy && <span className="room-card-taken">{takenBy.how === 'keeper' ? (takenBy.keeperStatus === 'assumed' ? 'Projected keeper' : 'Kept') : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>}
+              {lastToggle}
+            </div>
+          )}
           <div className="room-card-name">{projection?.name ?? entry?.player.name ?? 'Player'}</div>
           <div className="room-card-meta">
             {entry?.positions.join('/') ?? ''} | {projection?.proTeam ?? entry?.player.proTeam ?? ''}
             {projection?.espnRank ? ` | ESPN #${projection.espnRank}` : ''}
             {projection?.adp ? ` | ADP ${projection.adp.toFixed(1)}` : ''}
-            <button type="button" className="room-card-last-toggle" aria-pressed={showLast} onClick={() => setShowLast((current) => !current)}>
-              {showLast ? 'hide last season' : 'last season'}
-            </button>
+            {!topLine && lastToggle}
           </div>
         </div>
-        <div className="room-card-actions">
-          {takenBy
-            ? <span className="room-card-taken">{takenBy.how === 'keeper' ? (takenBy.keeperStatus === 'assumed' ? 'Projected keeper' : 'Kept') : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>
-            : canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
-          {!takenBy && <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>}
-          {picked && role !== 'keeper' && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
-        </div>
+        {(!takenBy || (picked && role !== 'keeper') || corner) && (
+          <div className="room-card-actions">
+            {corner}
+            {!takenBy && canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
+            {!takenBy && <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>}
+            {picked && role !== 'keeper' && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
+          </div>
+        )}
       </div>
       <div className="room-card-table-wrap">
         <table className="room-card-table">

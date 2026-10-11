@@ -4334,6 +4334,11 @@ html.theme-light {
 .room-keeper-odds { display: block; margin-top: 4px; color: var(--text-mid); font-weight: 600; font-size: 0.7rem; }
 .room-keeper-odds strong { color: var(--neon-yellow); }
 .room-card-last-toggle { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--neon-teal); font: inherit; font-size: 0.68rem; font-weight: 800; text-decoration: underline; cursor: pointer; }
+.room-mini-clock { display: none; }
+.room-card-main { min-width: 0; flex: 1 1 auto; }
+.room-card-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.room-card-top .room-card-last-toggle { margin-left: auto; }
+.room-card-top .room-card-taken { padding: 2px 8px; font-size: 0.66rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .room-card-tag { display: inline-block; margin-bottom: 2px; color: var(--neon-purple); font-size: 0.58rem; font-weight: 900; letter-spacing: 0.1em; }
 .room-card-tag.is-compare { color: var(--neon-teal); }
 .room-card-keeper { border-color: var(--neon-purple); }
@@ -4412,6 +4417,24 @@ html.theme-light {
   .room .room-clock.is-before { flex-direction: column; }
   .room .room-clock.is-before .live-start-btn { width: 100%; min-height: 48px; }
 
+  /* A tapped card stands where the clock frame was; the clock shrinks to a badge in its corner. */
+  .room.has-picked .room-clock { display: none; }
+  .room.has-picked .room-mini-clock {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 8px;
+    border: 2px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text-max);
+    font-size: 0.9rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .room.has-picked .room-mini-clock.is-mine { border-color: var(--neon-teal); color: var(--neon-teal); }
+  .room.has-picked .room-mini-clock.is-low { color: var(--neon-red); border-color: var(--neon-red); }
+  .room.has-picked .room-mini-clock.is-paused { color: var(--neon-yellow); }
   /* Tapped player: the card pins under the clock, so it is there while the list scrolls. */
   /* Above the list's own pinned header cells, which sit at 5. */
   .room .room-clock { z-index: 8; }
