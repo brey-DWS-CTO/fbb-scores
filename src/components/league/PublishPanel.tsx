@@ -24,6 +24,7 @@ const LABEL: Record<ChangeKind, string> = {
  */
 export default function PublishPanel({
   published,
+  isPublished,
   draft,
   dirty,
   busy,
@@ -31,6 +32,8 @@ export default function PublishPanel({
   onPublish,
 }: {
   published: Rulebook;
+  /** False until a first revision is out; then any saved draft may publish. */
+  isPublished: boolean;
   draft: Rulebook;
   /** True when there are edits that have not been saved to the draft yet. */
   dirty: boolean;
@@ -46,7 +49,11 @@ export default function PublishPanel({
   const diff = useMemo(() => diffRulebooks(published, draft), [published, draft]);
   const fingerprint = useMemo(() => rulebookFingerprint(draft), [draft]);
 
-  if (diff.identical) {
+  // Before the first publish there is nothing to differ from: the "published"
+  // book on screen is the committed seed. The first revision always goes out.
+  const summary = isPublished ? summarizeDiff(diff) : 'First revision';
+
+  if (isPublished && diff.identical) {
     return (
       <p className="rules-draft-note">
         The draft matches the published rule book. Nothing to publish.
@@ -61,7 +68,7 @@ export default function PublishPanel({
         className="rules-tool rules-tool-publish tap-btn"
         onClick={() => setOpen(true)}
       >
-        REVIEW &amp; PUBLISH · {summarizeDiff(diff)}
+        REVIEW &amp; PUBLISH · {summary}
       </button>
     );
   }
@@ -70,7 +77,7 @@ export default function PublishPanel({
     <div className="publish-panel">
       <div className="publish-head">
         <span className="hub-heading publish-title">PUBLISH TO THE LEAGUE</span>
-        <span className="publish-summary">{summarizeDiff(diff)}</span>
+        <span className="publish-summary">{summary}</span>
       </div>
 
       {dirty && (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import RecordTables from './RecordTables.js';
@@ -15,8 +15,6 @@ import {
   fetchPublishedRulebook,
   fetchRulebookDraft,
   fetchRulebookSignatures,
-  fetchDraftRulebookPdf,
-  rulebookPdfUrl,
   fetchRulebookVersion,
   fetchRulebookVersions,
   isStaleDraftError,
@@ -467,35 +465,6 @@ export default function RulesPage() {
     }
   }, [identity]);
 
-  // The draft PDF needs a sign-in, so it cannot be a plain link. Open the tab
-  // inside the tap, since a tab opened after the fetch returns gets blocked as
-  // a pop-up, then point it at the bytes once they arrive.
-  const previewPdf = async () => {
-    if (!identity) return;
-    const tab = window.open('', '_blank');
-    setBusy(true);
-    setError(null);
-    try {
-      const blob = await fetchDraftRulebookPdf(identity);
-      const url = URL.createObjectURL(blob);
-      if (tab) {
-        tab.location.href = url;
-      } else {
-        // No tab allowed: save the file instead.
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `The Nerds Constitution ${draft?.season ?? ''} draft.pdf`.replace('  ', ' ');
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e) {
-      tab?.close();
-      setError(apiErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const applyEdit = (next: Rulebook, note: string) => {
     if (draft) {
       undoStack.current = [...undoStack.current.slice(-(UNDO_DEPTH - 1)), draft];
@@ -714,7 +683,7 @@ export default function RulesPage() {
                   className="rules-tool tap-btn"
                   disabled={busy || dirty}
                   title={dirty ? 'Save the draft first' : 'See the draft as the printed book'}
-                  onClick={previewPdf}
+                  onClick={() => navigate('/rules/paper?draft=1')}
                 >
                   PREVIEW PDF
                 </button>
@@ -793,6 +762,7 @@ export default function RulesPage() {
               {problems.length === 0 && draft && (
                 <PublishPanel
                   published={publishedBook}
+                  isPublished={publishedMeta.published}
                   draft={draft}
                   dirty={dirty}
                   busy={busy}
@@ -841,15 +811,13 @@ export default function RulesPage() {
         >
           {showHistory ? 'HIDE REVISIONS' : 'REVISIONS'}
         </button>
-        <a
+        <Link
           className="rules-tool tap-btn rules-pdf-link"
-          href={rulebookPdfUrl({ rev: pastVersion?.id ?? null, copyFor: identity?.owner ?? null })}
-          target="_blank"
-          rel="noopener"
-          title="Open the rule book as a PDF"
+          to={pastVersion ? `/rules/paper?rev=${encodeURIComponent(pastVersion.id)}` : '/rules/paper'}
+          title="Read the rule book as it prints"
         >
           <span aria-hidden="true">⤓</span> PDF
-        </a>
+        </Link>
       </div>
 
       {!results && (
