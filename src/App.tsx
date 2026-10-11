@@ -21,6 +21,8 @@ import TradesPage from './components/league/TradesPage.js'
 import MockDraftPage from './components/league/MockDraftPage.js'
 import ProjectionsPage from './components/league/ProjectionsPage.js'
 import TiersPage from './components/league/TiersPage.js'
+import DraftStartPage from './components/league/DraftStartPage.js'
+import MockResultPage from './components/league/MockResultPage.js'
 
 function App() {
   const location = useLocation()
@@ -66,6 +68,7 @@ function App() {
         <Route path="/keepers" element={<KeepersPage />} />
         <Route path="/keepers/:owner" element={<TeamKeeperPage />} />
         <Route path="/draft" element={<DraftPage />} />
+        <Route path="/draft/start" element={<DraftStartPage />} />
         <Route path="/draft/tv" element={<DraftTvPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />
@@ -75,6 +78,7 @@ function App() {
         <Route path="/trades" element={<TradesPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mock" element={<MockDraftPage />} />
+        <Route path="/mock/result/:id" element={<MockResultPage />} />
         <Route path="/projections" element={<ProjectionsPage />} />
         <Route path="/tiers" element={<TiersPage />} />
         <Route path="/schedule" element={<SchedulePage />} />

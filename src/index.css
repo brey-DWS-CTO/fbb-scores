@@ -4255,6 +4255,256 @@ html.theme-light {
 .tier-detail-num { display: inline-block; min-width: 46px; color: var(--text-hi); font-weight: 700; font-variant-numeric: tabular-nums; }
 .tier-detail-note { color: var(--text-mid); font-size: 0.72rem; margin-top: 4px; }
 
+/* ─── Draft start page: two big doors, two small ones ─────────────────── */
+.start-page { max-width: 560px; margin: 0 auto; padding: 16px 12px 28px; display: flex; flex-direction: column; gap: 12px; }
+.start-page .mock-head { margin-bottom: 2px; }
+.start-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 150px;
+  padding: 18px 16px;
+  border: 2px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel-bg);
+  color: var(--text-hi);
+  text-decoration: none;
+  text-align: center;
+}
+.start-btn-icon { color: inherit; display: flex; }
+.start-btn-title { font-size: 1.15rem; letter-spacing: 0.1em; }
+.start-btn-sub { color: var(--text-mid); font-size: 0.78rem; font-weight: 700; }
+.start-btn-count { margin-top: 4px; }
+.start-btn-mock { border-color: var(--neon-purple); color: var(--neon-purple); background: color-mix(in srgb, var(--neon-purple) 8%, var(--panel-bg)); }
+.start-btn-live { border-color: var(--neon-teal); color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 7%, var(--panel-bg)); }
+.start-btn-live.is-live { border-color: var(--neon-red); color: var(--neon-red); box-shadow: 0 0 0 1px rgba(255,0,0,0.25), 0 0 24px rgba(255,0,0,0.14); }
+.start-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.start-btn-small { min-height: 84px; gap: 8px; font-size: 0.74rem; color: var(--text-hi); }
+.start-btn-small .hub-heading { font-size: 0.7rem; }
+
+/* ─── Mock draft face lift: clock, undo, menu, keeper odds, share ──────── */
+.room-clock-meta span { display: block; }
+.room-clock-row { flex-wrap: wrap; }
+.room-undo-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 58px;
+  min-height: 52px;
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 2px solid var(--neon-yellow);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--neon-yellow) 10%, var(--panel-bg));
+  color: var(--neon-yellow);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+.room-undo-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+/* The clock box clips its children; the menu sheet must escape it. */
+.room-clock:has(.room-menu-sheet) { overflow: visible; }
+.room-menu { position: relative; display: flex; align-items: center; }
+.room-menu-btn { width: 34px; height: 34px; }
+.room-menu-sheet {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+}
+.room-menu-sheet .mock-mini-btn { width: 100%; }
+.room-keeper-odds { display: block; margin-top: 4px; color: var(--text-mid); font-weight: 600; font-size: 0.7rem; }
+.room-keeper-odds strong { color: var(--neon-yellow); }
+.room-card-last-toggle { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--neon-teal); font: inherit; font-size: 0.68rem; font-weight: 800; text-decoration: underline; cursor: pointer; }
+.room-card-tag { display: inline-block; margin-bottom: 2px; color: var(--neon-purple); font-size: 0.58rem; font-weight: 900; letter-spacing: 0.1em; }
+.room-card-tag.is-compare { color: var(--neon-teal); }
+.room-card-keeper { border-color: var(--neon-purple); }
+.room-cards { display: flex; flex-direction: column; gap: 8px; }
+.share-btn { display: inline-flex; align-items: center; gap: 6px; }
+.room-grade .room-head { justify-content: space-between; }
+.room-grade .room-head .share-btn { margin-left: auto; letter-spacing: 0.06em; }
+.room-clock .room-share { margin-left: auto; }
+.room-queue-toggle { margin-left: auto; }
+.room-queue-fold { display: none; }
+/* DRAFT and GONE BY NEXT lead the row on a phone and trail it on a wide screen. */
+.room-draft-lead, .room-gone-lead { display: none; }
+.room-name-short { display: none; }
+.room-sort-quick { display: none; }
+.mock-shared .room-grade { margin-top: 10px; }
+.mock-shared-missing { padding: 16px; border-radius: 10px; text-align: center; }
+
+@media (max-width: 839px) {
+  /* The app steps aside while the draft runs. */
+  html.in-mock-room .bottom-nav,
+  html.in-mock-room .section-tabs,
+  html.in-mock-room .mock-head,
+  html.in-mock-room .mock-intro { display: none; }
+  html.in-mock-room .mock-page { padding-top: 8px; }
+  html.in-mock-room .app-shell-nav { padding-bottom: 68px; }
+  /* The bottom bar already says Players, Teams, Results; the row in the middle would say it twice. */
+  html.in-mock-room .room .room-tabs { display: none; }
+
+  /* The room's own bar on the bottom: Players, Teams, Results, Exit. */
+  .room .room-phone-tabs {
+    order: 99;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 0;
+    border-top: 2px solid var(--panel-border);
+    border-radius: 0;
+    background: var(--nav-bg);
+    backdrop-filter: blur(8px);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .room .room-phone-tabs button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: 8px 0 10px;
+    border: 0;
+    border-top: 2px solid transparent;
+    margin-top: -2px;
+    background: transparent;
+    color: var(--text-mid);
+    font-size: 0.62rem;
+  }
+  .room .room-phone-tabs button .hub-heading { font-size: 0.62rem; }
+  .room .room-phone-tabs button.is-on { color: var(--neon-teal); border-top-color: var(--neon-teal); background: transparent; }
+  .room .room-phone-tabs button.is-exit { color: var(--text-dim); }
+
+  /* A short clock: time, round and pick on one line, UNDO and the menu beside them. */
+  .room .room-clock { padding: 8px 10px; gap: 6px; }
+  .room .room-clock-row { gap: 8px; flex-wrap: nowrap; }
+  .room .room-clock-big { font-size: 1.5rem; }
+  .room .room-clock-meta { flex: 1; min-width: 0; font-size: 0.66rem; line-height: 1.3; }
+  .room .room-clock-meta span { display: inline; }
+  .room .room-clock-meta span + span::before { content: ' · '; }
+  .room .room-turn { padding: 5px 8px; font-size: 0.72rem; }
+  .room .room-turn .mock-mini-btn { min-height: 30px; padding: 0 10px; font-size: 0.62rem; }
+  .room .room-undo-btn { min-height: 46px; min-width: 52px; padding: 2px 8px; }
+  .room .room-clock.is-before { flex-direction: column; }
+  .room .room-clock.is-before .live-start-btn { width: 100%; min-height: 48px; }
+
+  /* Tapped player: the card pins under the clock, so it is there while the list scrolls. */
+  /* Above the list's own pinned header cells, which sit at 5. */
+  .room .room-clock { z-index: 8; }
+  .room .room-card.is-picked,
+  .room .room-cards { position: sticky; top: var(--room-clock-h, 92px); z-index: 7; }
+  .room .room-cards .room-card { position: static; }
+  .room .room-card { padding: 8px 10px; }
+  .room .room-card-head { gap: 6px; }
+  .room .room-card-name { font-size: 0.95rem; }
+  .room .room-card-meta { font-size: 0.66rem; margin-top: 0; }
+  .room .room-card-actions { gap: 6px; }
+  .room .room-card-actions .live-start-btn { min-height: 34px; padding: 0 14px; }
+  .room .room-card-actions .mock-mini-btn { min-height: 30px; }
+  .room .room-card-actions .room-icon-btn { width: 28px; height: 28px; }
+  .room .room-card-table-wrap { margin-top: 6px; scrollbar-width: none; }
+  .room .room-card-table-wrap::-webkit-scrollbar { display: none; }
+  .room .room-card-table { font-size: 0.7rem; }
+  .room .room-card-table th, .room .room-card-table td { padding: 3px 6px; }
+  .room .room-cards .room-card-table thead { display: none; }
+  .room .room-cards .room-card-compare .room-card-table thead { display: table-header-group; }
+
+  /* The queue folds open above the list. The right column stays put away. */
+  .room .room-queue-fold { display: block; padding: 8px 10px; margin-bottom: 8px; }
+  /* The queue star stays, pinned between GONE and the name. */
+  .room .room-table .room-star { position: sticky; left: 0; z-index: 3; width: 30px; min-width: 30px; padding: 4px 0; }
+  .room .room-table .room-star button { padding: 2px 4px; }
+  .room .room-table th.room-star { z-index: 5; }
+
+  /* DRAFT, GONE and the name pin on the left; the stats slide under them. */
+  .room .room-draft-lead, .room .room-gone-lead { display: table-cell; position: sticky; z-index: 3; }
+  .room .room-gone-trail, .room .room-draft-trail { display: none; }
+  .room .room-table .room-draft-lead { left: 0; width: 56px; min-width: 56px; padding: 4px; }
+  .room .room-table .room-draft-lead .mock-mini-btn { min-height: 32px; padding: 0 6px; font-size: 0.6rem; width: 100%; }
+  .room .room-table .room-gone-lead { left: 56px; width: 44px; min-width: 44px; padding: 4px; font-size: 0.72rem; }
+  .room .room-table th.room-gone-lead button { padding: 8px 4px; }
+  .room .room-table .room-player-col { position: sticky; left: 30px; z-index: 3; min-width: 0; }
+  .room .room-table.is-my-turn .room-star { left: 100px; }
+  .room .room-table.is-my-turn .room-player-col { left: 130px; }
+  /* Scrolled sideways: GONE goes too, so the stats get the room. */
+  .room .room-table-wrap.is-scrolled .room-gone-lead { display: none; }
+  .room .room-table-wrap.is-scrolled .room-table.is-my-turn .room-star { left: 56px; }
+  .room .room-table-wrap.is-scrolled .room-table.is-my-turn .room-player-col { left: 86px; }
+  .room .room-table th { z-index: 4; }
+  /* Sort chips sit in the filter row, which pins under the clock and the card. */
+  .room .room-filters.room-filters-main { position: sticky; top: calc(var(--room-clock-h, 92px) + var(--room-card-h, 0px) + 8px); z-index: 6; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; margin: 0 -4px 8px; padding: 4px 4px; background: var(--dark-bg); }
+  .room .room-filters-main .mock-select { min-height: 36px; padding: 4px 6px; font-size: 0.72rem; }
+  .room .room-filters-search { display: block; margin-bottom: 8px; }
+  .room .room-sort-quick { display: inline-flex; gap: 4px; justify-content: center; }
+  .room .room-sort-quick button { min-height: 30px; padding: 0 7px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.58rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1; }
+  .room .room-sort-quick button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+  .room .room-queue-word { display: none; }
+  .room .room-queue-toggle { min-width: 44px; padding: 0 8px; }
+  .room .room-table th.room-draft-lead, .room .room-table th.room-gone-lead, .room .room-table th.room-player-col { z-index: 5; }
+  .room .room-table td.room-player-col { max-width: 176px; overflow: hidden; white-space: nowrap; }
+  .room .room-player-line { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+  .room .room-player-line .room-player-name { flex: 1 1 auto; min-width: 0; margin-right: 0; overflow: hidden; text-overflow: ellipsis; }
+  .room .room-player-line .room-player-sub, .room .room-player-line .room-taken { flex: none; }
+  .room .room-player-team { display: none; }
+  .room .room-table-wrap.is-scrolled .room-name-full { display: none; }
+  .room .room-table-wrap.is-scrolled .room-name-short { display: inline; }
+  .room .room-table-wrap.is-scrolled td.room-player-col { max-width: 118px; }
+  .room .room-table-wrap.is-scrolled .room-player-sub,
+  .room .room-table-wrap.is-scrolled .room-taken { display: none; }
+  .room .room-table-wrap.is-scrolled .room-player-col { box-shadow: 2px 0 0 var(--panel-border); }
+  /* The list scrolls in its own box, so its header (with the sort chips) stays put under the clock. */
+  .room .room-table-wrap { max-height: none; }
+  .room .room-filters .proj-check { display: none; }
+  .room .room-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .room .room-queue-toggle { margin-left: 0; }
+  .room .room-grade .room-head { flex-wrap: wrap; }
+  /* A shorter board: the position bar colours the cell, so the position line can go. */
+  .room .room-grid { font-size: 0.66rem; border-spacing: 2px; }
+  .room .room-grid td { height: 32px; padding: 3px 5px; }
+  .room .room-grid td small { display: none; }
+  .room .room-grid-label { font-size: 0.56rem; }
+  .room .room-grid tbody th { width: 30px; font-size: 0.6rem; }
+  .room .room-grid-arrow { display: inline; margin-left: 2px; }
+  .room .room-grid thead th { padding: 4px 2px; }
+}
+
+/* ─── The sign-in card is a button: tap it and the sign-in panel opens ─── */
+.sign-in-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 22px 20px;
+  border-radius: 12px;
+  border-color: var(--neon-yellow);
+  background: color-mix(in srgb, var(--neon-yellow) 6%, var(--panel-bg));
+  color: var(--text-mid);
+  font: inherit;
+  text-align: center;
+}
+.sign-in-panel-title { font-size: 0.8rem; color: var(--neon-yellow); }
+.sign-in-panel-reason { font-size: 0.85rem; }
+.sign-in-panel-hint { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

@@ -103,6 +103,7 @@ import {
   saveProjectionEdit,
   deleteMockResult,
   listMockResults,
+  findMockResult,
   saveMockResult,
   type KeeperSelection,
   type LeagueDynamicState,
@@ -726,6 +727,24 @@ router.post('/mock-results', requireAuth, async (req, res) => {
   const keep = res.locals.isCommissioner === true ? null : MEMBER_MOCK_LIMIT;
   await saveMockResult({ season: leagueDataset.season, owner, id: record.id, result: record, createdAt: record.finishedAt }, keep);
   res.json({ result: record });
+});
+
+/**
+ * GET /api/league/mock-results/:id — one finished mock, for a shared link.
+ * No sign-in: the link is the ticket. The id is a hash, so it cannot be guessed.
+ */
+router.get('/mock-results/:id', async (req, res) => {
+  const id = String(req.params.id);
+  if (!/^mock-[a-z0-9]+-\d+$/.test(id)) {
+    res.status(404).json({ error: 'No such mock.' });
+    return;
+  }
+  const row = await findMockResult(leagueDataset.season, id);
+  if (!row) {
+    res.status(404).json({ error: 'No such mock. It may have been forgotten.' });
+    return;
+  }
+  res.json({ result: row.result });
 });
 
 /** DELETE /api/league/mock-results/:id — forget one of your mocks. */

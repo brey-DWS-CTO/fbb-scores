@@ -16,6 +16,7 @@ import {
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
 import IdentityChip from './IdentityChip.js';
+import SignInPanel from './SignInPanel.js';
 import NavIcon from './NavIcon.js';
 
 // Eight tier colours, repeated past tier 8. Neighbours never match, and the
@@ -334,14 +335,7 @@ export default function TiersPage() {
 
   if (!viewer) {
     return (
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
-        <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
-          <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>SIGN IN</div>
-          <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            Sign in to see tiers.
-          </div>
-        </div>
-      </div>
+      <SignInPanel reason="Sign in to see tiers." />
     );
   }
 

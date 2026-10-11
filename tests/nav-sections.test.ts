@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { onPath, sectionFor, sectionHome, visibleSections } from '../src/lib/league/navSections.ts';
+import { onLanding, onPath, sectionFor, sectionHome, visibleSections } from '../src/lib/league/navSections.ts';
 
 const member = visibleSections(false);
 const commish = visibleSections(true);
@@ -47,4 +47,15 @@ test('a path matches its own page and pages under it, not a neighbour', () => {
   assert.ok(onPath('/keepers/Brey', '/keepers'));
   assert.ok(!onPath('/draftees', '/draft'));
   assert.equal(sectionHome(commish.find((section) => section.id === 'league')!), '/league');
+});
+
+test('DRAFT opens on its landing page, where the tabs stay hidden', () => {
+  const draft = member.find((section) => section.id === 'draft')!;
+  assert.equal(sectionHome(draft), '/draft/start');
+  assert.equal(sectionFor('/draft/start', member)?.id, 'draft');
+  assert.ok(onLanding('/draft/start', draft));
+  assert.ok(!onLanding('/draft', draft));
+  assert.ok(!onLanding('/mock', draft));
+  // Sections without a home are never a landing page.
+  assert.ok(!onLanding('/league', member.find((section) => section.id === 'league')!));
 });

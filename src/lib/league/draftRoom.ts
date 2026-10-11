@@ -101,6 +101,23 @@ export function rosterBySlot(
   return [...fills, ...bench];
 }
 
+// ─── Names ──────────────────────────────────────────────────────────────────
+
+/**
+ * A name short enough for a narrow column: first initial and last name, so
+ * Jayson Tatum reads J. Tatum. A suffix (Jr., III) stays with the last name.
+ * One word stays as it is.
+ */
+export function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return name.trim();
+  const suffix = /^(jr\.?|sr\.?|ii|iii|iv)$/i;
+  const last = parts.length > 2 && suffix.test(parts[parts.length - 1])
+    ? `${parts[parts.length - 2]} ${parts[parts.length - 1]}`
+    : parts[parts.length - 1];
+  return `${parts[0][0]}. ${last}`;
+}
+
 // ─── The queue ──────────────────────────────────────────────────────────────
 
 export function toggleQueued(queue: readonly string[], key: string): string[] {

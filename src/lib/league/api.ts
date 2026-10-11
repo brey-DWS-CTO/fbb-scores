@@ -574,6 +574,12 @@ export async function saveMockResult(
   return data.result as MockResultRecord;
 }
 
+/** One finished mock by its shared link's id. No sign-in needed. */
+export async function fetchSharedMockResult(id: string): Promise<MockResultRecord> {
+  const { data } = await axios.get(`/api/league/mock-results/${encodeURIComponent(id)}`);
+  return data.result as MockResultRecord;
+}
+
 /** Forget one saved mock draft. */
 export async function deleteMockResult(c: Credentials, id: string): Promise<void> {
   await axios.delete(`/api/league/mock-results/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
