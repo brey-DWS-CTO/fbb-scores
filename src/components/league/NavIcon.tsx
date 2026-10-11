@@ -29,6 +29,9 @@ const paths = {
   tiers: 'M3 5h7 M7 10h8 M11 15h8 M15 20h6',
   close: 'M6 6l12 12 M18 6L6 18',
   chevrons: 'M11 17l-5-5 5-5 M18 17l-5-5 5-5',
+  undo: 'M9 14L4 9l5-5 M4 9h10a6 6 0 0 1 0 12h-3',
+  dots: 'M5 12h.01 M12 12h.01 M19 12h.01',
+  share: 'M4 12v8h16v-8 M12 3v13 M8 7l4-4 4 4',
 };
 
 export type NavIconName = keyof typeof paths;

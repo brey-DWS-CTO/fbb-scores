@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
-import { autoPick, oddsGoneByNextPick, type LiveChoices } from '../../lib/league/liveMock.js';
-import type { MockCandidate, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
+import { autoPick, oddsGoneByNextPick, oddsKeeperThere, type LiveChoices } from '../../lib/league/liveMock.js';
+import type { MockCandidate, MockMode, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
 import { editTitle, type PlayerProjection } from '../../lib/league/projections.js';
 import {
   draftGrid,
@@ -10,12 +11,14 @@ import {
   queuedPick,
   replaySaved,
   rosterBySlot,
+  shortName,
   toggleQueued,
   upcomingPicks,
 } from '../../lib/league/draftRoom.js';
 import NavIcon from './NavIcon.js';
 import MockGradeCard from './MockGradeCard.js';
-import { gradeMock, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
+import ShareButton from './ShareButton.js';
+import { gradeMock, mockResultId, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
 import { positionColor, positionTheme } from '../draft/boardUtils.js';
 
 /** A position code in the board's own colour for it. */
@@ -28,6 +31,8 @@ const PICK_CLOCK = 120;
 /** Gap between one team's pick and the next on screen. */
 const REVEAL_MS = 450;
 const LIST_LIMIT = 150;
+/** How far the player list scrolls sideways before names shorten. */
+const SHORT_NAME_AT = 24;
 
 export interface RoomProgress {
   started: boolean;
@@ -42,6 +47,7 @@ interface Props {
   projections: ReadonlyMap<string, PlayerProjection>;
   person: string;
   seed: number;
+  mode: MockMode;
   /** Where the person left off, if they did. */
   saved: RoomProgress | null;
   onProgress: (progress: RoomProgress) => void;
@@ -51,7 +57,6 @@ interface Props {
 }
 
 type CenterTab = 'players' | 'teams' | 'results';
-type PhoneTab = 'draft' | 'queue' | 'team' | 'picks';
 type SortKey = 'rank' | 'adp' | 'fppg' | 'total' | 'games' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone';
 
 const pct = (share: number) => `${Math.round(share * 100)}%`;
@@ -70,13 +75,16 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 
  * The mock draft room, laid out the way Yahoo's is: the clock and who picks
  * next on the left, the player card and the player list in the middle, your
  * queue, your team and the latest picks on the right. On a phone the clock
- * stays on top and the rest sits behind four tabs.
+ * pins on top, the card pins under it, and three tabs on the bottom bar
+ * (Players, Teams, Draft Results) take the place of the app's own bar for as
+ * long as the draft runs.
  *
  * The draft is a replay of the seed and the person's choices, the same as
  * before. What is new is that it is saved as it goes, so leaving the page and
  * coming back finds it where it was, with the clock paused.
  */
-export default function DraftRoom({ prepared, values, projections, person, seed, saved, onProgress, onNewDraft, onFinished }: Props) {
+export default function DraftRoom({ prepared, values, projections, person, seed, mode, saved, onProgress, onNewDraft, onFinished }: Props) {
+  const navigate = useNavigate();
   // Only the first render restores; after that the room owns its state.
   const [restored] = useState(() => replaySaved(prepared, seed, person, saved?.choices ?? {}));
   const [started, setStarted] = useState(saved?.started === true);
@@ -92,18 +100,22 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   });
   const [now, setNow] = useState(() => Date.now());
   const [center, setCenter] = useState<CenterTab>('players');
-  const [phone, setPhone] = useState<PhoneTab>('draft');
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [position, setPosition] = useState<Position | 'ALL'>('ALL');
   const [showDrafted, setShowDrafted] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'rank', dir: 1 });
   const [teamView, setTeamView] = useState(person);
+  // Restart and new draft sit behind one small button.
+  const [menuOpen, setMenuOpen] = useState(false);
+  // On a phone the queue folds open above the player list.
+  const [showQueue, setShowQueue] = useState(false);
+  // The player list scrolled sideways: names shorten so the stats fit.
+  const [scrolled, setScrolled] = useState(false);
   // Tap a player anywhere (updates, a roster, the board) to see him in the card.
   const look = (key: string | null | undefined) => {
     if (!key) return;
     setSelected(key);
-    setPhone('draft');
   };
   const [resultsView, setResultsView] = useState<'board' | 'list'>('board');
 
@@ -120,6 +132,33 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const myTurn = started && caughtUp && live.waitingOn !== null;
   const over = started && caughtUp && live.over;
   const slots = prepared.input.board.slots;
+
+  // ── The app steps aside while the draft runs (phone) ─────────────────────
+  // The class on <html> hides the app's bottom bar, the section tabs and the
+  // page heading, and the room's own bar takes the bottom of the screen.
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('in-mock-room', started);
+    return () => document.documentElement.classList.remove('in-mock-room');
+  }, [started]);
+  // The clock's height, so the pinned player card can sit right under it.
+  const roomRef = useRef<HTMLDivElement>(null);
+  const clockRef2 = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const room = roomRef.current;
+    const box = clockRef2.current;
+    if (!room || !box || typeof ResizeObserver === 'undefined') return;
+    const measure = () => room.style.setProperty('--room-clock-h', `${Math.round(box.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [menuOpen]);
 
   // ── Saving as it goes ────────────────────────────────────────────────────
   const clockRef = useRef(clock);
@@ -200,6 +239,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     () => (myTurn ? oddsGoneByNextPick(prepared, seed, person, live, 60) : new Map<string, number>()),
     [myTurn, prepared, seed, person, live],
   );
+  // At your keeper: how often he would still have been there had you not kept him.
+  const keeperOverall = atMyKeeper?.overall ?? null;
+  const keeperOdds = useMemo(
+    () => (keeperOverall !== null ? oddsKeeperThere(prepared, seed, person, keeperOverall, choices, 60) : null),
+    [keeperOverall, prepared, seed, person, choices],
+  );
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const draft = (playerKey: string) => {
@@ -222,11 +267,14 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     setChoices({});
     setRevealed(0);
     setClock(null);
+    setMenuOpen(false);
     if (clearQueue) setQueue([]);
     // Written now, not after the next render: NEW DRAFT unmounts this room
     // straight away, and the last thing it saves must be the empty draft.
     progressRef.current = { started: false, choices: {}, queue: clearQueue ? [] : queue, clockLeft: null };
   };
+  // Leave the room. The draft stays saved; DRAFT brings it back.
+  const exit = () => navigate('/draft/start');
 
   // ── What the screen shows ────────────────────────────────────────────────
   const shownPicks = useMemo(() => (started ? live.picks.slice(0, revealed) : []), [started, live.picks, revealed]);
@@ -295,8 +343,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     ? untilTurn
     : null;
 
-  // Paused at your keeper: the card shows him until you pick someone else.
-  const focus = selected ?? (atMyKeeper?.playerKey ?? null) ?? (myTurn ? queuedPick(queue, availableNow)?.playerKey ?? null : null) ?? availableNow[0]?.playerKey ?? null;
+  // Paused at your keeper: his card stays up, and a tapped player sits beside
+  // it to compare. Otherwise the card shows the tapped player, else the top of
+  // the queue on your turn, else the best player left.
+  const keeperKey = atMyKeeper?.playerKey ?? null;
+  const focus = selected ?? keeperKey ?? (myTurn ? queuedPick(queue, availableNow)?.playerKey ?? null : null) ?? availableNow[0]?.playerKey ?? null;
+  const compareKey = keeperKey !== null && selected !== null && selected !== keeperKey ? selected : null;
   const myPicks = live.run.result().rosters[person] ?? [];
   const myRoster = rosterBySlot(
     myPicks.filter((key) => shownPicks.some((pick) => pick.playerKey === key)).map((key) => ({ playerKey: key, positions: byKey.get(key)?.positions ?? [] })),
@@ -315,6 +367,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     reported.current = true;
     onFinished({ choices: { ...choices }, grade });
   }, [grade, choices, onFinished]);
+  // The link to this finished draft, the same one Past mocks keeps.
+  const shareUrl = grade ? `${window.location.origin}/mock/result/${mockResultId(person, seed, mode, choices)}` : null;
 
   // When the last pick lands, show the board.
   const [sawEnd, setSawEnd] = useState(false);
@@ -322,7 +376,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     setSawEnd(true);
     setCenter('results');
     setResultsView('board');
-    setPhone('draft');
   }
   if (!over && sawEnd) setSawEnd(false);
   const rosterOf = (owner: string) => rosterBySlot(
@@ -335,31 +388,98 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const grid = draftGrid(slots, shownPicks, myTurn || !over ? currentOverall : null);
   const owners = grid.owners;
 
-  const sortHead = (key: SortKey, label: string, title?: string) => (
-    <th className={`room-num${sort.key === key ? ' is-sorted' : ''}`} title={title ?? label}>
+  const sortHead = (key: SortKey, label: string, title?: string, className = '') => (
+    <th className={`room-num${sort.key === key ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`} title={title ?? label}>
       <button type="button" onClick={() => sortBy(key)}>
         {label}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
       </button>
     </th>
   );
+  const onListScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const next = event.currentTarget.scrollLeft > SHORT_NAME_AT;
+    if (next !== scrolled) setScrolled(next);
+  };
+
+  const cardFor = (key: string, extra: { role: 'keeper' | 'compare' | 'card' }) => (
+    <PlayerCard
+      key={`${extra.role}-${key}`}
+      role={extra.role}
+      playerKey={key}
+      projection={projections.get(key) ?? null}
+      entry={byKey.get(key) ?? null}
+      takenBy={takenBy.get(key) ?? null}
+      queued={queue.includes(key)}
+      canDraft={myTurn && !takenBy.has(key)}
+      picked={extra.role !== 'card' || selected !== null}
+      onClose={() => setSelected(null)}
+      onDraft={() => { draft(key); setSelected(null); }}
+      onQueue={() => setQueue((current) => toggleQueued(current, key))}
+    />
+  );
+
+  const queueList = queue.length === 0 ? (
+    <div className="mock-note mock-note-dim">Tap ☆ next to a player to queue him. If your clock runs out, you take the top one still there.</div>
+  ) : (
+    <ol className="room-queue-list">
+      {queue.map((key, index) => {
+        const candidate = prepared.byKey.get(key);
+        const taken = takenBy.get(key);
+        return (
+          <li key={key} className={taken ? 'is-taken' : ''}>
+            <span className="room-upcoming-num">{index + 1}</span>
+            <button type="button" className="room-queue-name" onClick={() => look(key)}>
+              {candidate?.playerName ?? key}<small>{candidate?.positions.join('/')}{taken ? ` · gone ${taken.label}` : ''}</small>
+            </button>
+            <button type="button" className="room-icon-btn" aria-label="Move up" disabled={index === 0} onClick={() => setQueue((current) => moveQueued(current, key, -1))}>↑</button>
+            <button type="button" className="room-icon-btn" aria-label="Move down" disabled={index === queue.length - 1} onClick={() => setQueue((current) => moveQueued(current, key, 1))}>↓</button>
+            <button type="button" className="room-icon-btn" aria-label="Remove" onClick={() => setQueue((current) => toggleQueued(current, key))}>✕</button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+
+  const menu = (
+    <div className="room-menu" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        className="room-icon-btn room-menu-btn"
+        aria-label="More"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((current) => !current)}
+      >
+        <NavIcon name="dots" size="1.2em" />
+      </button>
+      {menuOpen && (
+        <div className="room-menu-sheet" role="menu">
+          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART THIS DRAFT</button>
+          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
+          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={exit}>LEAVE THE ROOM</button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <div className={`room room-phone-${phone}`}>
+    <div ref={roomRef} className={`room room-center-${center}${atMyKeeper ? ' is-at-keeper' : ''}`}>
       {/* ── Left: the clock and who picks next ── */}
       <aside className="room-left">
-        <div className={`panel room-clock${myTurn ? ' is-mine' : ''}`}>
+        <div ref={clockRef2} className={`panel room-clock${myTurn ? ' is-mine' : ''}${started ? '' : ' is-before'}`}>
           {!started ? (
             <>
-              <div className="room-clock-meta">Nine teams, one seat for you. {PICK_CLOCK / 60} minutes a pick.</div>
               <button type="button" className="tap-btn live-start-btn" onClick={() => setStarted(true)}>START DRAFT</button>
+              <div className="room-clock-meta">Nine teams, one seat for you. {PICK_CLOCK / 60} minutes a pick.</div>
             </>
           ) : over ? (
             <>
               <div className="room-clock-row">
                 <div className={`room-clock-big mock-grade-letter grade-${(grade?.grade ?? 'c')[0].toLowerCase()}`}>{grade?.grade ?? 'DONE'}</div>
-                <div className="room-clock-meta">Draft complete.<br />Saved to Past mocks.</div>
+                <div className="room-clock-meta"><span>Draft complete.</span><span>Saved to Past mocks.</span></div>
+                {shareUrl && grade && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} className="room-share" />}
+                {menu}
               </div>
-              <button type="button" className="room-link" onClick={() => { setCenter('results'); setPhone('draft'); }}>See the board</button>
+              <button type="button" className="room-link" onClick={() => setCenter('results')}>See the board</button>
             </>
           ) : (
             <>
@@ -369,17 +489,35 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 </div>
                 {currentSlot && (
                   <div className="room-clock-meta">
-                    Round {currentSlot.pick.round}<br />Pick {currentSlot.pick.slot}<br />{ordinal(currentSlot.pick.overall)} overall
+                    <span>Round {currentSlot.pick.round}</span><span>Pick {currentSlot.pick.slot}</span><span>{ordinal(currentSlot.pick.overall)} overall</span>
                   </div>
                 )}
+                <button
+                  type="button"
+                  className="tap-btn room-undo-btn"
+                  onClick={undo}
+                  disabled={Object.keys(choices).length === 0}
+                  title="Take back your last pick"
+                >
+                  <NavIcon name="undo" size="1.5em" />
+                  <span>UNDO</span>
+                </button>
+                {menu}
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
-                  <span>Paused at your keeper: <strong>{atMyKeeper.playerName}</strong></span>
+                  <span>
+                    Paused at your keeper: <strong>{atMyKeeper.playerName}</strong>
+                    {keeperOdds !== null && (
+                      <small className="room-keeper-odds">
+                        Without the keep, he is still here at this pick <strong>{pct(keeperOdds)}</strong> of the time.
+                      </small>
+                    )}
+                  </span>
                   <button
                     type="button"
                     className="tap-btn mock-mini-btn is-primary"
-                    onClick={() => setSkipped((current) => new Set(current).add(atMyKeeper.overall))}
+                    onClick={() => { setSkipped((current) => new Set(current).add(atMyKeeper.overall)); setSelected(null); }}
                   >
                     CONTINUE
                   </button>
@@ -396,13 +534,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 </div>
               )}
             </>
-          )}
-          {started && (
-            <div className="live-actions room-actions">
-              <button type="button" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART</button>
-              <button type="button" className="tap-btn mock-mini-btn" onClick={undo} disabled={Object.keys(choices).length === 0}>UNDO</button>
-              <button type="button" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
-            </div>
           )}
         </div>
 
@@ -430,7 +561,10 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       <main className="room-center">
         {grade && (
           <section className="panel room-grade">
-            <div className="hub-heading room-head">HOW YOU DID</div>
+            <div className="hub-heading room-head">
+              HOW YOU DID
+              {shareUrl && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} />}
+            </div>
             <MockGradeCard grade={grade} person={person} onPlayer={(key) => setSelected(key)} />
           </section>
         )}
@@ -445,19 +579,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           );
         })()}
 
-        {focus && <PlayerCard
-          playerKey={focus}
-          projection={projections.get(focus) ?? null}
-          entry={byKey.get(focus) ?? null}
-          takenBy={takenBy.get(focus) ?? null}
-          queued={queue.includes(focus)}
-          canDraft={myTurn && !takenBy.has(focus)}
-          picked={selected !== null}
-          onClose={() => setSelected(null)}
-          onDraft={() => { draft(focus); setSelected(null); }}
-          onQueue={() => setQueue((current) => toggleQueued(current, focus))}
-        />}
-
+        {/* At your keeper: his card, then whoever you tap to compare. */}
+        {keeperKey ? (
+          <div className="room-cards">
+            {cardFor(keeperKey, { role: 'keeper' })}
+            {compareKey && cardFor(compareKey, { role: 'compare' })}
+          </div>
+        ) : focus && cardFor(focus, { role: 'card' })}
 
         <div className="room-tabs" role="tablist">
           {(['players', 'teams', 'results'] as const).map((tab) => (
@@ -474,17 +602,29 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 <option value="ALL">All players</option>
                 {POSITIONS.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
               </select>
+              <button
+                type="button"
+                className={`tap-btn mock-mini-btn room-queue-toggle${showQueue ? ' is-on' : ''}`}
+                aria-expanded={showQueue}
+                onClick={() => setShowQueue((current) => !current)}
+              >
+                {showQueue ? '★' : '☆'} QUEUE{queue.length ? ` ${queue.length}` : ''}
+              </button>
               <input className="hub-input room-search" type="search" placeholder="Search for a player" value={search} onChange={(event) => setSearch(event.target.value)} />
               <label className="proj-check"><input type="checkbox" checked={showDrafted} onChange={(event) => setShowDrafted(event.target.checked)} /> Show drafted</label>
             </div>
-            <div className="room-table-wrap">
-              <table className="room-table">
+            {showQueue && <div className="panel room-queue-fold">{queueList}</div>}
+            <div className={`room-table-wrap${scrolled ? ' is-scrolled' : ''}`} onScroll={onListScroll}>
+              <table className={`room-table${myTurn ? ' is-my-turn' : ''}`}>
                 <thead>
                   <tr>
+                    {/* On a phone DRAFT and GONE BY NEXT lead the row, under a thumb. On a wide screen they trail. */}
+                    {myTurn && <th className="room-draft-col room-draft-lead" />}
+                    {myTurn && sortHead('gone', 'GONE', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-lead')}
                     <th className="room-star" aria-label="Queue" />
+                    <th className="room-player-col">Player</th>
                     {sortHead('rank', 'RK', 'Our board rank')}
                     {sortHead('adp', 'ADP')}
-                    <th className="room-player-col">Player</th>
                     {sortHead('fppg', 'FPPG')}
                     {sortHead('total', 'TOTAL', 'Projected season points')}
                     {sortHead('games', 'GP')}
@@ -495,8 +635,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('blk', 'BLK')}
                     {sortHead('threes', '3PM')}
                     {sortHead('to', 'TO')}
-                    {myTurn && sortHead('gone', 'GONE BY NEXT', 'How often he goes before your next pick, across 60 drafts from here')}
-                    {myTurn && <th className="room-draft-col" />}
+                    {myTurn && sortHead('gone', 'GONE BY NEXT', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-trail')}
+                    {myTurn && <th className="room-draft-col room-draft-trail" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -504,15 +644,26 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     const projection = projections.get(candidate.playerKey);
                     const taken = takenBy.get(candidate.playerKey) ?? null;
                     const gone = odds.get(candidate.playerKey) ?? 0;
+                    const fullName = projection?.name ?? candidate.playerName;
+                    const draftButton = taken ? null : (
+                      <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={(event) => { event.stopPropagation(); draft(candidate.playerKey); }}>
+                        DRAFT
+                      </button>
+                    );
+                    const goneCell = (className: string) => (
+                      <td className={`room-num ${className}${gone >= 0.5 ? ' is-hot' : ''}`}>{taken ? '–' : pct(gone)}</td>
+                    );
                     return (
                       <Fragment key={candidate.playerKey}>
                       {pickLineAt === index && myNext && (
-                        <tr className="room-pickline"><td colSpan={16}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
+                        <tr className="room-pickline"><td colSpan={18}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
                       )}
                       <tr
                         className={`${taken ? 'is-taken' : ''}${focus === candidate.playerKey ? ' is-focus' : ''}`}
                         onClick={() => setSelected(candidate.playerKey)}
                       >
+                        {myTurn && <td className="room-draft-col room-draft-lead">{draftButton}</td>}
+                        {myTurn && goneCell('room-gone-lead')}
                         <td className="room-star">
                           <button
                             type="button"
@@ -524,11 +675,12 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                             {queue.includes(candidate.playerKey) ? '★' : '☆'}
                           </button>
                         </td>
-                        <td className="room-num">{candidate.valueRank}</td>
-                        <td className="room-num">{one(projection?.adp)}</td>
                         <td className="room-player-col">
-                          <span className="room-player-name">{projection?.name ?? candidate.playerName}</span>
-                          <small>{projection?.proTeam ?? ''} – <Pos positions={candidate.positions} /></small>
+                          <span className="room-player-name">
+                            <span className="room-name-full">{fullName}</span>
+                            <span className="room-name-short">{shortName(fullName)}</span>
+                          </span>
+                          <small className="room-player-sub">{projection?.proTeam ?? ''} – <Pos positions={candidate.positions} /></small>
                           {taken && (
                             <small className="room-taken">
                               {' '}{taken.label} {taken.owner}
@@ -536,6 +688,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                             </small>
                           )}
                         </td>
+                        <td className="room-num">{candidate.valueRank}</td>
+                        <td className="room-num">{one(projection?.adp)}</td>
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
@@ -546,21 +700,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num">{one(projection?.line?.blk)}</td>
                         <td className="room-num">{one(projection?.line?.threes)}</td>
                         <td className="room-num">{one(projection?.line?.to)}</td>
-                        {myTurn && <td className={`room-num${gone >= 0.5 ? ' is-hot' : ''}`}>{taken ? '–' : pct(gone)}</td>}
-                        {myTurn && (
-                          <td className="room-draft-col">
-                            {!taken && (
-                              <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={(event) => { event.stopPropagation(); draft(candidate.playerKey); }}>
-                                DRAFT
-                              </button>
-                            )}
-                          </td>
-                        )}
+                        {myTurn && goneCell('room-gone-trail')}
+                        {myTurn && <td className="room-draft-col room-draft-trail">{draftButton}</td>}
                       </tr>
                       </Fragment>
                     );
                   })}
-                  {rows.length === 0 && <tr><td colSpan={16} className="proj-empty">No players match.</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={18} className="proj-empty">No players match.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -709,27 +855,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       <aside className="room-right">
         <div className="panel room-queue">
           <div className="hub-heading room-head">☆ MY QUEUE</div>
-          {queue.length === 0 ? (
-            <div className="mock-note mock-note-dim">Tap ☆ next to a player to queue him. If your clock runs out, you take the top one still there.</div>
-          ) : (
-            <ol className="room-queue-list">
-              {queue.map((key, index) => {
-                const candidate = prepared.byKey.get(key);
-                const taken = takenBy.get(key);
-                return (
-                  <li key={key} className={taken ? 'is-taken' : ''}>
-                    <span className="room-upcoming-num">{index + 1}</span>
-                    <button type="button" className="room-queue-name" onClick={() => look(key)}>
-                      {candidate?.playerName ?? key}<small>{candidate?.positions.join('/')}{taken ? ` · gone ${taken.label}` : ''}</small>
-                    </button>
-                    <button type="button" className="room-icon-btn" aria-label="Move up" disabled={index === 0} onClick={() => setQueue((current) => moveQueued(current, key, -1))}>↑</button>
-                    <button type="button" className="room-icon-btn" aria-label="Move down" disabled={index === queue.length - 1} onClick={() => setQueue((current) => moveQueued(current, key, 1))}>↓</button>
-                    <button type="button" className="room-icon-btn" aria-label="Remove" onClick={() => setQueue((current) => toggleQueued(current, key))}>✕</button>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
+          {queueList}
         </div>
 
         <div className="panel room-team">
@@ -766,14 +892,21 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
         </div>
       </aside>
 
-      {/* ── Phone tabs ── */}
-      <nav className="room-phone-tabs" aria-label="Draft room">
-        {(['draft', 'queue', 'team', 'picks'] as const).map((tab) => (
-          <button key={tab} type="button" className={phone === tab ? 'is-on' : ''} onClick={() => setPhone(tab)}>
-            {tab === 'draft' ? 'PLAYERS' : tab === 'queue' ? `QUEUE${queue.length ? ` ${queue.length}` : ''}` : tab === 'team' ? 'MY TEAM' : 'PICKS'}
+      {/* ── Phone: the room's own bottom bar, while the draft runs ── */}
+      {started && (
+        <nav className="room-phone-tabs" aria-label="Draft room">
+          {(['players', 'teams', 'results'] as const).map((tab) => (
+            <button key={tab} type="button" className={center === tab ? 'is-on' : ''} onClick={() => setCenter(tab)}>
+              <span aria-hidden="true"><NavIcon name={tab === 'players' ? 'people' : tab === 'teams' ? 'home' : 'trophy'} /></span>
+              <span className="hub-heading">{tab === 'players' ? 'PLAYERS' : tab === 'teams' ? 'TEAMS' : 'RESULTS'}</span>
+            </button>
+          ))}
+          <button type="button" className="is-exit" onClick={exit}>
+            <span aria-hidden="true"><NavIcon name="close" /></span>
+            <span className="hub-heading">EXIT</span>
           </button>
-        ))}
-      </nav>
+        </nav>
+      )}
     </div>
   );
 }
@@ -797,6 +930,8 @@ function KeeperChip({ projected, early }: { projected: boolean; early: string | 
 
 interface CardProps {
   playerKey: string;
+  /** The keeper you are paused at, a player tapped to compare with him, or the one card. */
+  role: 'keeper' | 'compare' | 'card';
   projection: PlayerProjection | null;
   entry: ValueBoard['entries'][number] | null;
   takenBy: Taken | null;
@@ -809,14 +944,16 @@ interface CardProps {
   onQueue: () => void;
 }
 
-function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onClose, onDraft, onQueue }: CardProps) {
+function PlayerCard({ role, projection, entry, takenBy, queued, canDraft, picked, onClose, onDraft, onQueue }: CardProps) {
   const last = entry?.player.stats2026 ?? entry?.player.api2026 ?? null;
   const lastLine = projection?.lastLine ?? null;
   const line = projection?.line ?? null;
   return (
-    <section className={`panel room-card${picked ? ' is-picked' : ''}`}>
+    <section className={`panel room-card room-card-${role}${picked ? ' is-picked' : ''}`}>
       <div className="room-card-head">
         <div>
+          {role === 'keeper' && <div className="room-card-tag">YOUR KEEPER</div>}
+          {role === 'compare' && <div className="room-card-tag is-compare">COMPARE</div>}
           <div className="room-card-name">{projection?.name ?? entry?.player.name ?? 'Player'}</div>
           <div className="room-card-meta">
             {entry?.positions.join('/') ?? ''} | {projection?.proTeam ?? entry?.player.proTeam ?? ''}
@@ -828,8 +965,8 @@ function PlayerCard({ projection, entry, takenBy, queued, canDraft, picked, onCl
           {takenBy
             ? <span className="room-card-taken">{takenBy.how === 'keeper' ? (takenBy.keeperStatus === 'assumed' ? 'Projected keeper' : 'Kept') : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>
             : canDraft && <button type="button" className="tap-btn live-start-btn" onClick={onDraft}>DRAFT</button>}
-          <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>
-          {picked && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
+          {!takenBy && <button type="button" className={`tap-btn mock-mini-btn${queued ? ' is-on' : ''}`} onClick={onQueue}>{queued ? '★ QUEUED' : '☆ QUEUE'}</button>}
+          {picked && role !== 'keeper' && <button type="button" className="room-icon-btn" aria-label="Close" onClick={onClose}>✕</button>}
         </div>
       </div>
       <div className="room-card-table-wrap">

@@ -447,6 +447,8 @@ interface StoreBackend {
     acceptedBy: string,
   ): Promise<MutateResult>;
   listMockResults(season: number, owner: string): Promise<MockResultRow[]>;
+  /** One finished mock by its id, whoever ran it, for a shared link. */
+  findMockResult(season: number, id: string): Promise<MockResultRow | null>;
   /** Insert unless the same id is already there. Then keep only the newest `keep`, or all when null. */
   saveMockResult(row: MockResultRow, keep: number | null): Promise<void>;
   deleteMockResult(season: number, owner: string, id: string): Promise<void>;
@@ -1189,6 +1191,18 @@ class NeonBackend implements StoreBackend {
       created_at: string | Date;
     }>;
     return rows.map((row) => ({ season, owner, id: row.id, result: row.data, createdAt: new Date(row.created_at).toISOString() }));
+  }
+
+  async findMockResult(season: number, id: string): Promise<MockResultRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, data, created_at FROM mock_results
+      WHERE season = ${season} AND id = ${id} ORDER BY created_at DESC LIMIT 1`) as Array<{
+      owner: string;
+      data: unknown;
+      created_at: string | Date;
+    }>;
+    const row = rows[0];
+    return row ? { season, owner: row.owner, id, result: row.data, createdAt: new Date(row.created_at).toISOString() } : null;
   }
 
   async saveMockResult(row: MockResultRow, keep: number | null): Promise<void> {
@@ -2024,6 +2038,11 @@ class FileBackend implements StoreBackend {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async findMockResult(season: number, id: string): Promise<MockResultRow | null> {
+    await this.ensureInit();
+    return this.readDoc().mockResults.find((row) => row.season === season && row.id === id) ?? null;
+  }
+
   async saveMockResult(row: MockResultRow, keep: number | null): Promise<void> {
     await this.enqueueWrite(() => {
       const doc = this.readDoc();
@@ -2738,6 +2757,10 @@ export async function acceptPlayerPoolSnapshot(
 
 export async function listMockResults(season: number, owner: string): Promise<MockResultRow[]> {
   return getBackend().listMockResults(season, owner);
+}
+
+export async function findMockResult(season: number, id: string): Promise<MockResultRow | null> {
+  return getBackend().findMockResult(season, id);
 }
 
 export async function saveMockResult(row: MockResultRow, keep: number | null): Promise<void> {

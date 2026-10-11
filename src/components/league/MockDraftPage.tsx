@@ -431,6 +431,7 @@ function MockDraftScreen() {
           projections={projections}
           person={viewer}
           seed={seed}
+          mode={mode}
           saved={progress}
           onProgress={onProgress}
           onFinished={onFinished}

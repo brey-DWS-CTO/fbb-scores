@@ -8,7 +8,7 @@ import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
 import fixture from './fixtures/espn-draft-rankings-2027-2026-09-25.json' with { type: 'json' };
 import type { LeagueDataset, LeagueDynamicState } from '../src/lib/keeper/types.ts';
 import { valueBoard } from '../src/lib/league/draftValue.ts';
-import { autoPick, nextLiveSlot, oddsGoneByNextPick, replayLive } from '../src/lib/league/liveMock.ts';
+import { autoPick, nextLiveSlot, oddsGoneByNextPick, oddsKeeperThere, replayLive } from '../src/lib/league/liveMock.ts';
 import { buildMockBoard, createMockRun, defaultMockSettings, prepareMock, runMock } from '../src/lib/league/mockDraft.ts';
 import { applyPlayerPoolToDataset, playerPoolFromDataset } from '../src/lib/league/playerPool.ts';
 
@@ -105,4 +105,19 @@ test('odds of a player being gone by the next pick are between 0 and 1 and never
   assert.ok(best.some((candidate) => (odds.get(candidate.playerKey) ?? 0) > 0.5));
   // Nobody picked before now shows up.
   for (const pick of live.picks) if (pick.playerKey) assert.equal(odds.has(pick.playerKey), false);
+});
+
+test('at your keeper slot, the odds he would still be there are a share, and nothing for other slots', () => {
+  // 1.9 is Cade, Brey's keeper. Cade is a top value: had Brey not kept him, the
+  // eight teams before 1.9 would nearly always take him.
+  const odds = oddsKeeperThere(prepared, 7, 'Brey', 9, {}, 40);
+  assert.ok(odds !== null && odds >= 0 && odds <= 1);
+  assert.ok(odds < 0.5, `expected Cade to be gone most of the time, got ${odds}`);
+  // The same seed gives the same answer.
+  assert.equal(oddsKeeperThere(prepared, 7, 'Brey', 9, {}, 40), odds);
+  // Joel's projected keeper is not Brey's slot; a live slot has no keeper.
+  assert.equal(oddsKeeperThere(prepared, 7, 'Brey', 1, {}, 10), null);
+  assert.equal(oddsKeeperThere(prepared, 7, 'Brey', 12, {}, 10), null);
+  // The real draft is untouched: Cade is still kept at 1.9.
+  assert.equal(replayLive(prepared, 7, 'Brey', {}).picks[8].how, 'keeper');
 });
