@@ -947,6 +947,13 @@ export async function requestRulebookSignatures(
   return data;
 }
 
+/** The commissioner withdraws one member's signature so they can sign again. */
+export async function withdrawRulebookSignature(c: Credentials, owner: string): Promise<void> {
+  await axios.delete(`/api/league/rulebook/signatures/${encodeURIComponent(owner)}`, {
+    headers: authHeaders(c),
+  });
+}
+
 export async function signRulebook(
   c: Credentials,
   versionId: string,

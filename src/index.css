@@ -4622,6 +4622,19 @@ html.theme-light {
 .sign-pad-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sign-pad-hint { color: var(--text-dim); font-size: 0.72rem; }
 
+.sign-withdraw {
+  margin-left: 8px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
