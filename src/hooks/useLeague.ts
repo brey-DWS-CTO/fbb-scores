@@ -217,7 +217,7 @@ function notify() {
 let checkingSignIn = false;
 
 /**
- * Sign-ins last 30 days, and the phone never knew when one ran out: it kept
+ * Sign-ins used to last 30 days, and the phone never knew when one ran out: it kept
  * the owner's name up while the server treated it as signed out. An owner saw
  * "no keepers saved" over keepers he had saved. Now a sign-in the server
  * rejects is dropped, so the page asks for a new sign-in instead of lying.
