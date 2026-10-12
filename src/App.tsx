@@ -18,6 +18,7 @@ import SchedulePage from './components/league/SchedulePage.js'
 import RulesPage from './components/league/RulesPage.js'
 import PaperPage from './components/league/PaperPage.js'
 import VotesPage from './components/league/VotesPage.js'
+import DuesPage from './components/league/DuesPage.js'
 import TradesPage from './components/league/TradesPage.js'
 import MockDraftPage from './components/league/MockDraftPage.js'
 import ProjectionsPage from './components/league/ProjectionsPage.js'
@@ -74,6 +75,7 @@ function App() {
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/dues" element={<DuesPage />} />
         <Route path="/rules" element={<RulesPage />} />
         <Route path="/rules/paper" element={<PaperPage />} />
         <Route path="/votes" element={<VotesPage />} />

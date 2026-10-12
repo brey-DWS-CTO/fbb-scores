@@ -30,6 +30,7 @@ import type {
 } from './history.js';
 import type { ImportProblem, TeamMapping } from './historyImport.js';
 import type { RulebookSignature } from './rulebookSignatures.js';
+import type { DuesAction, DuesBoard } from './dues.js';
 import type { Poll, PollKind } from './polls.js';
 import type {
   LeagueScheduleMapping,
@@ -879,6 +880,56 @@ export interface PublishRulebookResponse {
   publishedBy: string;
   /** Passed votes that were already in the draft and went out with it. */
   polls: string[];
+}
+
+// ─── Dues ────────────────────────────────────────────────────────────────────
+
+export interface DuesResponse extends DuesBoard {
+  season: number;
+  full: number;
+  half: number;
+  halfMaxTeams: number;
+  /** Venmo username that collects. Empty until a commissioner sets it. */
+  venmo: string;
+  /** The owner who collects. Empty until a commissioner sets it. */
+  payee: string;
+}
+
+/** Anyone may read who has paid. */
+export async function fetchDues(): Promise<DuesResponse> {
+  const { data } = await axios.get<DuesResponse>('/api/league/dues');
+  return data;
+}
+
+/** One change to one team's dues. The server checks who may make it. */
+export async function changeDues(c: Credentials, owner: string, action: DuesAction): Promise<DuesResponse> {
+  const { data } = await axios.post<DuesResponse>(
+    `/api/league/dues/${encodeURIComponent(owner)}`,
+    { action },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Mail every team that has not paid (commissioner only). */
+export async function sendDuesShame(c: Credentials): Promise<{ sent: string[]; noAddress: string[] }> {
+  const { data } = await axios.post<{ sent: string[]; noAddress: string[] }>(
+    '/api/league/dues/shame',
+    {},
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Who collects and their Venmo (commissioner only). */
+export async function saveDuesSettings(
+  c: Credentials,
+  settings: { venmo: string; payee: string },
+): Promise<DuesResponse> {
+  const { data } = await axios.put<DuesResponse>('/api/league/dues/settings', settings, {
+    headers: authHeaders(c),
+  });
+  return data;
 }
 
 // ─── Signatures ──────────────────────────────────────────────────────────────
