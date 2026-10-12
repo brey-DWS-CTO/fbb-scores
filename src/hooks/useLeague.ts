@@ -6,6 +6,7 @@ import {
   fetchPlayerPool,
   fetchPublishedHistory,
   sandboxActive,
+  sessionExpired,
   actAsOwner,
   apiErrorMessage,
   signOutServer,
@@ -56,6 +57,16 @@ export function useLeagueState(fast = false) {
     refetchOnWindowFocus: true,
     staleTime: 1000,
   });
+
+  // The server names who it thinks is asking. When that is not the owner this
+  // phone shows, the sign-in has likely run out, and the page would show an
+  // empty team under a real name. Check, and sign the phone out if so.
+  const serverViewer = query.isSuccess ? query.data.meta?.viewer : undefined;
+  useEffect(() => {
+    if (serverViewer === undefined || !identity?.session) return;
+    if (serverViewer === identity.owner || sandboxActive()) return;
+    void dropExpiredSignIn(identity);
+  }, [serverViewer, identity]);
   return {
     ...query,
     state: query.data?.state ?? EMPTY_STATE,
@@ -201,6 +212,39 @@ function storeIdentity(id: Identity): void {
 let listeners: Array<() => void> = [];
 function notify() {
   for (const l of listeners) l();
+}
+
+let checkingSignIn = false;
+
+/**
+ * Sign-ins last 30 days, and the phone never knew when one ran out: it kept
+ * the owner's name up while the server treated it as signed out. An owner saw
+ * "no keepers saved" over keepers he had saved. Now a sign-in the server
+ * rejects is dropped, so the page asks for a new sign-in instead of lying.
+ *
+ * A commissioner acting as someone gets their own seat back, not a sign-out.
+ */
+async function dropExpiredSignIn(identity: Identity): Promise<void> {
+  if (checkingSignIn) return;
+  checkingSignIn = true;
+  try {
+    if (!(await sessionExpired(identity))) return;
+    const current = loadIdentity();
+    if (current?.session !== identity.session) return;
+    let parked: Identity | null = null;
+    try {
+      const raw = localStorage.getItem(REAL_ID_KEY);
+      if (raw && identity.impersonatedBy) parked = JSON.parse(raw) as Identity;
+      localStorage.removeItem(REAL_ID_KEY);
+      if (parked) storeIdentity(parked);
+      else localStorage.removeItem(ID_KEY);
+    } catch {
+      /* ignore */
+    }
+    notify();
+  } finally {
+    checkingSignIn = false;
+  }
 }
 
 /**

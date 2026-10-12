@@ -881,7 +881,7 @@ export default function TeamKeeperPage() {
         </div>
       )}
       {locked && !isCommish && !projectionMode && <LockBanner />}
-      {identity?.owner === owner && !projectionMode && !locked && !isLoading && meta?.draftAt && (
+      {identity?.owner === owner && meta?.viewer === owner && !projectionMode && !locked && meta.draftAt && (
         <KeeperStatusBanner
           savedNames={serverSelections.map((selection) => selection.playerName)}
           dirty={dirty}
@@ -909,7 +909,7 @@ export default function TeamKeeperPage() {
           }}
         >
           <span style={{ color: 'var(--neon-yellow)', fontSize: '0.85rem' }}>
-            Read-only. Sign in to edit your team.
+            You are signed out. Sign in to see and save your keepers.
           </span>
           <IdentityChip />
         </div>
