@@ -17,6 +17,15 @@ export const SOFT_CLOCK_SECONDS = 90;
 export const CALLED_CLOCK_SECONDS = 30;
 /** A member may call CLOCK once this many picks. The commissioner has no limit. */
 export const CLOCK_COOLDOWN_PICKS = 5;
+/** Nobody may call CLOCK before the team has had this long: two minutes early, ninety seconds late. */
+export const EARLY_ROUNDS = 5;
+export const EARLY_CALL_SECONDS = 120;
+export const LATE_CALL_SECONDS = 90;
+
+/** How long the team picking gets before anyone may call CLOCK on them. */
+export function earliestCallSeconds(round: number): number {
+  return round <= EARLY_ROUNDS ? EARLY_CALL_SECONDS : LATE_CALL_SECONDS;
+}
 
 export const EMPTY_CLOCK: DraftClockState = { pickStartedAt: null, pausedAt: null, pausedMs: 0, call: null };
 
@@ -72,12 +81,19 @@ export function lastClockCallBy(picks: Readonly<Record<string, DraftPickState>>,
 
 export type ClockCallCheck =
   | { ok: true }
-  | { ok: false; reason: 'not-started' | 'complete' | 'own-pick' | 'already-called' | 'paused' | 'cooldown'; picksToWait?: number };
+  | {
+      ok: false;
+      reason: 'not-started' | 'complete' | 'own-pick' | 'already-called' | 'paused' | 'too-early' | 'cooldown';
+      picksToWait?: number;
+      /** Whole seconds until the call is allowed, for `too-early`. */
+      secondsToWait?: number;
+    };
 
 /**
- * Whether `caller` may call CLOCK right now. The commissioner skips the
- * cooldown but still cannot call it on himself, and nobody can while a call
- * is already running or the clock is paused.
+ * Whether `caller` may call CLOCK right now. Nobody may call it on
+ * themselves, while a call is running, while the clock is paused, or before
+ * the team has had its time (two minutes in rounds 1 to 5, ninety seconds
+ * after). The commissioner skips only the five-pick cooldown.
  */
 export function canCallClock(input: {
   clock: DraftClockState | null | undefined;
@@ -85,13 +101,16 @@ export function canCallClock(input: {
   onClock: Pick<BoardCell, 'pick'> | null;
   caller: string;
   isCommissioner: boolean;
+  now: string | number;
 }): ClockCallCheck {
-  const { clock, picks, onClock, caller, isCommissioner } = input;
+  const { clock, picks, onClock, caller, isCommissioner, now } = input;
   if (!clock?.pickStartedAt) return { ok: false, reason: 'not-started' };
   if (!onClock) return { ok: false, reason: 'complete' };
   if (onClock.pick.currentOwner === caller) return { ok: false, reason: 'own-pick' };
   if (clock.call) return { ok: false, reason: 'already-called' };
   if (clock.pausedAt) return { ok: false, reason: 'paused' };
+  const waitMs = earliestCallSeconds(onClock.pick.round) * 1000 - elapsedMs(clock, now);
+  if (waitMs > 0) return { ok: false, reason: 'too-early', secondsToWait: Math.ceil(waitMs / 1000) };
   if (isCommissioner) return { ok: true };
   const last = lastClockCallBy(picks, caller);
   if (last !== null) {

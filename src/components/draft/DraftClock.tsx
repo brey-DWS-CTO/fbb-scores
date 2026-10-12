@@ -121,9 +121,10 @@ export function ClockControls({
   const applyState = useApplyStateResponse();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const now = useNow(!!clock?.pickStartedAt, 1000);
   if (!identity || !clock?.pickStartedAt) return null;
 
-  const check = canCallClock({ clock, picks, onClock, caller: identity.owner, isCommissioner: identity.isCommissioner });
+  const check = canCallClock({ clock, picks, onClock, caller: identity.owner, isCommissioner: identity.isCommissioner, now });
   const paused = isPaused(clock);
 
   const run = async (action: () => Promise<Parameters<typeof applyState>[0]>) => {
@@ -143,7 +144,9 @@ export function ClockControls({
     ? 'CALL CLOCK'
     : check.reason === 'cooldown'
       ? `CLOCK IN ${check.picksToWait} PICK${check.picksToWait === 1 ? '' : 'S'}`
-      : null;
+      : check.reason === 'too-early'
+        ? `CLOCK OPENS IN ${formatClock((check.secondsToWait ?? 0) * 1000)}`
+        : null;
 
   return (
     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -153,7 +156,7 @@ export function ClockControls({
           type="button"
           disabled={!check.ok || busy}
           onClick={() => run(() => callDraftClock(identity))}
-          title={check.ok ? 'Rule 2.3.1: the team picking gets 30 seconds' : 'Once every five picks'}
+          title={check.ok ? 'Rule 2.3.1: the team picking gets 30 seconds' : check.reason === 'too-early' ? 'Two minutes a pick in rounds 1 to 5, ninety seconds after' : 'Once every five picks'}
           style={{
             flex: 1,
             minWidth: 150,

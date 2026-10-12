@@ -322,7 +322,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
               fontWeight: 700,
             }}
           >
-            <span>{busy && picking ? `ENTERING ${(picking.fullName ?? picking.name).toUpperCase()}…` : `${filtered.length} AVAILABLE · TAP TO PICK`}</span>
+            <span>{busy && picking ? `ENTERING ${(picking.fullName ?? picking.name).toUpperCase()}…` : `${filtered.length} AVAILABLE`}</span>
             <span>{showNumbers ? 'COMMISH VIEW · MEMBERS SEE NO NUMBERS' : `BY ${SORT_LABELS[sort]}`}</span>
           </div>
 
@@ -349,27 +349,18 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
               const stat = showNumbers ? numbers.get(player.key) ?? null : null;
               const gone = stat?.gone ?? null;
               return (
-                <button
+                <div
                   key={player.key}
-                  className="tap-btn"
-                  type="button"
-                  aria-label={`Select ${player.fullName ?? player.name}`}
-                  disabled={busy}
                   aria-busy={picking?.key === player.key}
-                  onClick={() => choose(player)}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '5px minmax(0, 1fr) auto',
+                    gridTemplateColumns: '5px minmax(0, 1fr) auto auto',
                     alignItems: 'stretch',
                     gap: 0,
                     width: '100%',
                     minHeight: 62,
-                    padding: 0,
-                    border: 0,
                     borderBottom: '1px solid var(--panel-border)',
-                    background: 'transparent',
                     color: 'var(--text-hi)',
-                    textAlign: 'left',
                     opacity: busy && picking?.key !== player.key ? 0.45 : 1,
                   }}
                 >
@@ -437,15 +428,31 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
                       <span style={{ display: 'block', fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.05em' }}>GONE</span>
                       <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800 }}>{pickPercent(gone)}</span>
                     </span>
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      style={{ alignSelf: 'center', paddingRight: 14, color: 'var(--text-faint)', fontSize: '1.1rem' }}
-                    >
-                      ›
-                    </span>
-                  )}
-                </button>
+                  ) : null}
+                  <button
+                    className="tap-btn"
+                    type="button"
+                    aria-label={`Draft ${player.fullName ?? player.name}`}
+                    disabled={busy}
+                    onClick={() => choose(player)}
+                    style={{
+                      alignSelf: 'center',
+                      minWidth: 68,
+                      minHeight: 40,
+                      marginRight: 10,
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: 'none',
+                      background: picking?.key === player.key ? 'var(--panel-border)' : 'var(--neon-teal)',
+                      color: picking?.key === player.key ? 'var(--text-dim)' : '#001a14',
+                      fontWeight: 800,
+                      fontSize: '0.72rem',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    {picking?.key === player.key ? '…' : 'DRAFT'}
+                  </button>
+                </div>
               );
             })}
           </div>

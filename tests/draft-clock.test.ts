@@ -19,7 +19,7 @@ import {
 
 const T0 = '2026-10-18T21:00:00.000Z';
 const at = (seconds: number) => new Date(Date.parse(T0) + seconds * 1000).toISOString();
-const onClock = (overall: number, owner: string) => ({ pick: { overall, currentOwner: owner } }) as unknown as Pick<BoardCell, 'pick'>;
+const onClock = (overall: number, owner: string, round = 2) => ({ pick: { overall, currentOwner: owner, round } }) as unknown as Pick<BoardCell, 'pick'>;
 
 test('the pick timer counts from the start and leaves paused time out', () => {
   const clock = startPickClock(T0);
@@ -51,10 +51,25 @@ test('CLOCK gives 30 seconds from the call, and a pause stops that too', () => {
   assert.equal(remainingMs(resumeClock(paused, at(70)), at(80)), 15_000);
 });
 
+test('nobody may call CLOCK before the team has had its time: two minutes early, ninety seconds late', () => {
+  const clock = startPickClock(T0);
+  const base = { clock, picks: {}, caller: 'Kyle', isCommissioner: true };
+  assert.deepEqual(canCallClock({ ...base, onClock: onClock(3, 'Joel', 1), now: at(1) }), { ok: false, reason: 'too-early', secondsToWait: 119 });
+  assert.deepEqual(canCallClock({ ...base, onClock: onClock(3, 'Joel', 1), now: at(119.5) }), { ok: false, reason: 'too-early', secondsToWait: 1 });
+  assert.deepEqual(canCallClock({ ...base, onClock: onClock(3, 'Joel', 1), now: at(120) }), { ok: true });
+  assert.deepEqual(canCallClock({ ...base, onClock: onClock(43, 'Joel', 5), now: at(100) }), { ok: false, reason: 'too-early', secondsToWait: 20 });
+  assert.deepEqual(canCallClock({ ...base, onClock: onClock(53, 'Joel', 6), now: at(90) }), { ok: true });
+  assert.deepEqual(canCallClock({ ...base, onClock: onClock(53, 'Joel', 6), now: at(89) }), { ok: false, reason: 'too-early', secondsToWait: 1 });
+  // A pause stops the wait too.
+  const resumed = resumeClock(pauseClock(clock, at(30)), at(90));
+  assert.deepEqual(canCallClock({ ...base, clock: resumed, onClock: onClock(53, 'Joel', 6), now: at(149) }), { ok: false, reason: 'too-early', secondsToWait: 1 });
+  assert.deepEqual(canCallClock({ ...base, clock: resumed, onClock: onClock(53, 'Joel', 6), now: at(150) }), { ok: true });
+});
+
 test('who may call CLOCK: not yourself, not twice, not while paused, and members wait five picks', () => {
   const clock = startPickClock(T0);
   const picks: Record<string, DraftPickState> = {};
-  const base = { clock, picks, onClock: onClock(12, 'Joel'), isCommissioner: false };
+  const base = { clock, picks, onClock: onClock(12, 'Joel'), isCommissioner: false, now: at(200) };
   assert.deepEqual(canCallClock({ ...base, caller: 'Kyle' }), { ok: true });
   assert.deepEqual(canCallClock({ ...base, caller: 'Joel' }), { ok: false, reason: 'own-pick' });
   assert.deepEqual(canCallClock({ ...base, caller: 'Brey', isCommissioner: true, onClock: onClock(12, 'Brey') }), { ok: false, reason: 'own-pick' });

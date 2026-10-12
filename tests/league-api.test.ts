@@ -953,6 +953,17 @@ test('CLOCK: anyone but the picker may call it once every five picks, the commis
   assert.ok(clockAfterStart?.pickStartedAt, 'the first team is on the pick from the start');
   assert.equal(clockAfterStart?.call, null);
 
+  // Nobody may call CLOCK in the first two minutes of a round-one pick, so back-date each pick's start.
+  const backdate = async () => {
+    await store.mutateState((draft) => {
+      if (draft.draft.clock) draft.draft.clock = { ...draft.draft.clock, pickStartedAt: new Date(Date.now() - 125_000).toISOString() };
+    });
+  };
+  const early = await request('/api/league/draft/clock/call', { method: 'POST', headers: auth('Ryan') });
+  assert.equal(early.status, 409);
+  assert.match(String(early.body.error), /CLOCK opens in/);
+  await backdate();
+
   const pick = (owner: string, overallPick: number, index: number) => request('/api/league/draft/pick', {
     method: 'POST',
     headers: auth(owner),
@@ -974,6 +985,7 @@ test('CLOCK: anyone but the picker may call it once every five picks, the commis
   // Joel picks: the pick keeps its seconds and who called CLOCK, and the next timer starts clean.
   const first = await pick('Joel', 1, 0);
   assert.equal(first.status, 200);
+  await backdate();
   const afterFirst = (first.body.state as LeagueDynamicState).draft;
   assert.equal(typeof afterFirst.picks['1']?.seconds, 'number');
   assert.equal(afterFirst.picks['1']?.clockCalledBy, 'Ryan');
@@ -985,6 +997,7 @@ test('CLOCK: anyone but the picker may call it once every five picks, the commis
   assert.equal((await call('Joel')).status, 200);
   const second = await pick('Ryan', 2, 1);
   assert.equal(second.status, 200);
+  await backdate();
   assert.equal((second.body.state as LeagueDynamicState).draft.picks['2']?.clockCalledBy, 'Joel');
 
   // Pick 3: Ryan called on pick 1, so he waits three more; Joel called on pick 2, four more. The commish never waits.
@@ -1008,6 +1021,7 @@ test('CLOCK: anyone but the picker may call it once every five picks, the commis
   const clock = (resumed.body.state as LeagueDynamicState).draft.clock;
   assert.equal(clock?.pausedAt, null);
   assert.ok((clock?.pausedMs ?? -1) >= 0);
+  await backdate();
   assert.equal((await call(commissioner)).status, 200);
 
   // Clearing a pick restarts that team's timer without a call.

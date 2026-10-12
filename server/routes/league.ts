@@ -1241,7 +1241,7 @@ router.post('/draft/clock/call', requireAuth, async (_req, res) => {
     if (draft.draft.startedAt === null) throw new HttpError(409, 'The draft has not started');
     const dataset = currentDataset(draft, draftPoolDataset);
     const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock) ?? null;
-    const check = canCallClock({ clock: draft.draft.clock, picks: draft.draft.picks, onClock, caller, isCommissioner });
+    const check = canCallClock({ clock: draft.draft.clock, picks: draft.draft.picks, onClock, caller, isCommissioner, now });
     if (!check.ok) {
       const why: Record<typeof check.reason, string> = {
         'not-started': 'The draft has not started',
@@ -1249,6 +1249,7 @@ router.post('/draft/clock/call', requireAuth, async (_req, res) => {
         'own-pick': 'You cannot call CLOCK on your own pick',
         'already-called': 'CLOCK is already running on this pick',
         paused: 'The clock is paused',
+        'too-early': `Give them their time first: CLOCK opens in ${check.secondsToWait} second${check.secondsToWait === 1 ? '' : 's'}`,
         cooldown: `You can call CLOCK again in ${check.picksToWait} pick${check.picksToWait === 1 ? '' : 's'}`,
       };
       throw new HttpError(check.reason === 'own-pick' ? 403 : 409, why[check.reason]);
