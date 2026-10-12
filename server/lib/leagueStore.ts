@@ -22,6 +22,7 @@ import {
   canRequestLink,
   emailTakenBy,
   isExpired,
+  sessionEndsAt,
   isValidEmail,
   linkExpiresAt,
   normalizeEmail,
@@ -221,6 +222,16 @@ export interface LoginTokenRow {
   owner: string;
   issuedAt: string;
   expiresAt: string;
+}
+
+/**
+ * The issue time before which an ordinary session has had its season. A
+ * session issued at the cutoff ends exactly at `now`.
+ */
+function seasonCutoff(nowIso: string): string {
+  const now = new Date(nowIso);
+  const lived = Date.parse(sessionExpiresAt(now)) - now.getTime();
+  return new Date(now.getTime() - lived).toISOString();
 }
 
 /** A signed-in device. Same rule: the hash is stored, never the token. */
@@ -994,7 +1005,12 @@ class NeonBackend implements StoreBackend {
   async purgeExpiredAuth(now: string): Promise<void> {
     await this.ensureInit();
     await this.sql`DELETE FROM login_tokens WHERE expires_at < ${now}`;
-    await this.sql`DELETE FROM sessions WHERE expires_at < ${now}`;
+    // Same rule as sessionEndsAt: an ordinary sign-in lives a season from
+    // issue, whatever end date the row was written with.
+    const issuedCutoff = seasonCutoff(now);
+    await this.sql`DELETE FROM sessions
+      WHERE expires_at < ${now}
+        AND (impersonated_by IS NOT NULL OR issued_at < ${issuedCutoff})`;
   }
 
   async appendAudit(owner: string | null, action: string, detail: unknown): Promise<void> {
@@ -2021,7 +2037,7 @@ class FileBackend implements StoreBackend {
     await this.enqueueWrite(() => {
       const doc = this.readDoc();
       doc.loginTokens = doc.loginTokens.filter((row) => row.expiresAt >= now);
-      doc.sessions = doc.sessions.filter((row) => row.expiresAt >= now);
+      doc.sessions = doc.sessions.filter((row) => sessionEndsAt(row) >= now);
       this.writeDoc(doc);
     });
   }
@@ -2770,7 +2786,7 @@ export async function verifySession(token: string, now: Date): Promise<SessionCh
 
   const cached = sessionCache.get(key);
   if (cached && now.getTime() - cached.readAt < SESSION_CACHE_MS) {
-    if (isExpired(cached.row.expiresAt, now)) {
+    if (isExpired(sessionEndsAt(cached.row), now)) {
       sessionCache.delete(key);
       return { ok: false };
     }
@@ -2785,7 +2801,7 @@ export async function verifySession(token: string, now: Date): Promise<SessionCh
 
   const row = await getBackend().getSession(key);
   if (row === null) return { ok: false };
-  if (isExpired(row.expiresAt, now)) {
+  if (isExpired(sessionEndsAt(row), now)) {
     await getBackend().deleteSession(key);
     sessionCache.delete(key);
     return { ok: false };
