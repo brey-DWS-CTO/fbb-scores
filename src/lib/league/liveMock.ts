@@ -54,10 +54,10 @@ export function nextLiveSlot(prepared: PreparedMock, person: string, overall: nu
 /**
  * For every player on the board at the person's current pick, how often he is
  * gone by their next one. Each run replays the picks already made exactly as
- * they stand, lets the person's current pick go to their best value (so it
- * is not counted against him), and plays the other teams forward under a
- * fresh seed until the person's next slot. Zero runs when there is no next
- * slot.
+ * they stand, gives the person's current pick to the last man on the board
+ * (the sim never assumes they take anyone), and plays the other teams
+ * forward under a fresh seed until the person's next slot. Zero runs when
+ * there is no next slot.
  */
 export function oddsGoneByNextPick(
   prepared: PreparedMock,
@@ -82,8 +82,10 @@ export function oddsGoneByNextPick(
       if (slot.keeper || slot.made || key === null) run.next();
       else run.next(key);
     }
-    // The person's own pick, as the team would make it, not counted as gone.
-    const own = run.next();
+    // The person's own pick never takes anyone good: the question is whether
+    // a player is still there NEXT time, so this slot takes the last man on
+    // the board and is not counted as gone.
+    const own = run.next(run.available().at(-1)?.playerKey);
     while (run.nextSlot() && run.nextSlot()!.pick.overall < until.pick.overall) {
       const pick = run.next();
       if (pick.playerKey && pick.playerKey !== own.playerKey) gone.set(pick.playerKey, (gone.get(pick.playerKey) ?? 0) + 1);

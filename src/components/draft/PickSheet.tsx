@@ -154,7 +154,9 @@ function SheetShell({
   // Keep it in a ref so this runs once: otherwise the cleanup pulled focus
   // out of whatever the person was typing in, every three seconds.
   const close = useRef(onClose);
-  close.current = onClose;
+  useEffect(() => {
+    close.current = onClose;
+  }, [onClose]);
   useEffect(() => {
     const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const priorOverflow = document.body.style.overflow;
