@@ -117,7 +117,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const postseasonGames = usePostseasonGames();
-  const [chosen, setChosen] = useState<DatasetPlayer | null>(null);
+  const [picking, setPicking] = useState<DatasetPlayer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -132,25 +132,26 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
   const sorted = useMemo(() => sortPool(pool, sort, numbers), [pool, sort, numbers]);
   const filtered = useMemo(() => filterPool(sorted, { query, position }), [sorted, position, query]);
 
-  const chosenTheme = positionTheme(chosen?.positions);
-
-  const confirm = async () => {
-    if (!identity || !chosen || busy) return;
+  // One tap and the pick lands. The commissioner has UNDO on the board for a slip.
+  const choose = async (player: DatasetPlayer) => {
+    if (!identity || busy) return;
     setBusy(true);
+    setPicking(player);
     setError(null);
     try {
       const res = await submitDraftPick(identity, {
         overallPick: cell.pick.overall,
-        playerKey: chosen.key,
-        playerName: chosen.name,
-        proTeam: chosen.proTeam,
-        positions: chosen.positions,
+        playerKey: player.key,
+        playerName: player.name,
+        proTeam: player.proTeam,
+        positions: player.positions,
       });
       applyState(res);
       onClose();
     } catch (e) {
       setError(apiErrorMessage(e));
       setBusy(false);
+      setPicking(null);
     }
   };
 
@@ -192,7 +193,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
         </button>
       </div>
 
-      {!chosen ? (
+      {(
         <div style={{ display: 'flex', minHeight: 0, flexDirection: 'column' }}>
           <label style={{ position: 'relative', display: 'block', marginBottom: 10 }}>
             <span className="sr-only">Search available players</span>
@@ -321,7 +322,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
               fontWeight: 700,
             }}
           >
-            <span>{filtered.length} AVAILABLE</span>
+            <span>{busy && picking ? `ENTERING ${(picking.fullName ?? picking.name).toUpperCase()}…` : `${filtered.length} AVAILABLE · TAP TO PICK`}</span>
             <span>{showNumbers ? 'COMMISH VIEW · MEMBERS SEE NO NUMBERS' : `BY ${SORT_LABELS[sort]}`}</span>
           </div>
 
@@ -352,10 +353,9 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
                   className="tap-btn"
                   type="button"
                   aria-label={`Select ${player.fullName ?? player.name}`}
-                  onClick={() => {
-                    setChosen(player);
-                    setError(null);
-                  }}
+                  disabled={busy}
+                  aria-busy={picking?.key === player.key}
+                  onClick={() => choose(player)}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '5px minmax(0, 1fr) auto',
@@ -369,9 +369,10 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
                     background: 'transparent',
                     color: 'var(--text-hi)',
                     textAlign: 'left',
+                    opacity: busy && picking?.key !== player.key ? 0.45 : 1,
                   }}
                 >
-                  <span aria-hidden="true" style={{ background: theme.color }} />
+                  <span aria-hidden="true" style={{ background: picking?.key === player.key ? 'var(--neon-teal)' : theme.color }} />
                   <span style={{ minWidth: 0, padding: '11px 12px' }}>
                     <span
                       style={{
@@ -447,60 +448,6 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
               );
             })}
           </div>
-        </div>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '18px 0 4px' }}>
-          <div
-            style={{
-              marginBottom: 16,
-              padding: '24px 16px',
-              border: `1px solid ${chosenTheme.border}`,
-              borderRadius: 12,
-              background: `linear-gradient(145deg, ${chosenTheme.background}, ${chosenTheme.deepBackground})`,
-            }}
-          >
-            <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#fff' }}>
-              {chosen.fullName ?? chosen.name}
-            </div>
-            <div style={{ color: '#d9d9e7', marginTop: 6 }}>
-              <strong style={{ color: chosenTheme.color }}>
-                {chosen.positions.join(' / ') || '—'}
-              </strong>
-              {' · '}{chosen.proTeam.toUpperCase()}
-            </div>
-          </div>
-          <button
-            className="tap-btn"
-            onClick={confirm}
-            disabled={busy}
-            style={{
-              width: '100%',
-              padding: 14,
-              background: busy ? 'var(--panel-border)' : 'var(--neon-teal)',
-              color: busy ? 'var(--text-dim)' : '#001a14',
-              fontWeight: 800,
-              fontSize: '1rem',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-            }}
-          >
-            {busy ? 'SUBMITTING…' : 'CONFIRM PICK'}
-          </button>
-          <button
-            className="tap-btn"
-            onClick={() => setChosen(null)}
-            style={{
-              marginTop: 10,
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-mid)',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-            }}
-          >
-            Back to players
-          </button>
         </div>
       )}
 

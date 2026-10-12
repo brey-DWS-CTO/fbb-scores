@@ -9,7 +9,14 @@ import {
   useIdentity,
   useKeeperScenario,
 } from '../../hooks/useLeague.js';
-import { apiErrorMessage, clearKeeperScenario, startDraft } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  clearKeeperScenario,
+  enterSandbox,
+  exitSandbox,
+  sandboxActive,
+  startDraft,
+} from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import {
   projectedPlayerKeys,
@@ -241,9 +248,37 @@ export default function DraftPage() {
     }
   };
 
+  // A dry run from right here: copy the league into test mode, start it,
+  // reload so every read comes from the copy. Nothing touches the server.
+  const [testBusy, setTestBusy] = useState(false);
+  const inSandbox = sandboxActive();
+  const doTestDraft = async () => {
+    if (!identity || testBusy) return;
+    setTestBusy(true);
+    setStartError(null);
+    try {
+      await enterSandbox(identity);
+      await startDraft(identity);
+      window.location.reload();
+    } catch (e) {
+      exitSandbox();
+      setStartError(apiErrorMessage(e));
+      setTestBusy(false);
+    }
+  };
+  const doExitTest = () => {
+    exitSandbox();
+    window.location.reload();
+  };
+
   const board = useMemo(() => buildDraftBoard(dataset, boardState), [boardState, dataset]);
   const pool = useMemo(() => availablePlayers(dataset, boardState), [boardState, dataset]);
   const recent = useMemo(() => recentPicks(board, 5), [board]);
+  // The newest live pick, for UNDO. Keepers are not picks.
+  const lastLive = useMemo(
+    () => (recent[0] ? board.find((cell) => cell.pick.overall === recent[0].overall) ?? null : null),
+    [board, recent],
+  );
 
   const onClockIdx = board.findIndex((c) => c.onClock);
   const onClock = onClockIdx >= 0 ? board[onClockIdx] : null;
@@ -309,6 +344,26 @@ export default function DraftPage() {
           2027 DRAFT
         </div>
         <IdentityChip />
+        {inSandbox && identity?.isCommissioner && (
+          <button
+            className="tap-btn"
+            type="button"
+            onClick={doExitTest}
+            title="Exit the test draft and discard it"
+            style={{
+              padding: '6px 10px',
+              border: '2px solid var(--neon-red)',
+              borderRadius: 999,
+              background: 'transparent',
+              color: 'var(--neon-red)',
+              fontSize: '0.68rem',
+              fontWeight: 800,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            EXIT TEST
+          </button>
+        )}
         <Link
           to="/draft/tv"
           className="tap-btn"
@@ -421,6 +476,32 @@ export default function DraftPage() {
                     FOR REAL? TAP TO GO LIVE
                   </button>
                 )}
+                {!inSandbox && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      className="tap-btn"
+                      type="button"
+                      disabled={testBusy}
+                      onClick={doTestDraft}
+                      style={{
+                        minHeight: 44,
+                        padding: '0 18px',
+                        borderRadius: 10,
+                        border: '2px solid var(--neon-yellow)',
+                        background: 'rgba(255,230,0,0.08)',
+                        color: 'var(--neon-yellow)',
+                        fontWeight: 800,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      <NavIcon name="flask" size={15} className="icon-in-heading" />
+                      {testBusy ? 'SETTING UP…' : 'RUN A TEST DRAFT'}
+                    </button>
+                    <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginTop: 6 }}>
+                      A copy on this device only. Nothing is saved to the league.
+                    </div>
+                  </div>
+                )}
                 {startError && (
                   <div style={{ color: 'var(--neon-red)', fontSize: '0.78rem', marginTop: 8 }}>{startError}</div>
                 )}
@@ -429,23 +510,28 @@ export default function DraftPage() {
           </div>
         ) : onClock ? (
           <>
-            <div className="hub-heading blink" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)' }}>
-              ON THE CLOCK
-            </div>
-            <div
-              className="hub-heading glow-teal"
-              style={{ fontSize: 'clamp(1rem, 6vw, 1.6rem)', color: 'var(--neon-teal)', margin: '8px 0 2px' }}
-            >
-              {onClock.pick.currentOwner.toUpperCase()}
-            </div>
-            <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
-              {teamName(onClock.pick.currentOwner)}
-            </div>
-            <div style={{ color: 'var(--text-soft)' }}>
-              Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall
-              {onClock.pick.viaTradeFrom && (
-                <span style={{ color: 'var(--neon-yellow)' }}> · via {onClock.pick.viaTradeFrom}</span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="hub-heading blink" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)' }}>
+                  ON THE CLOCK
+                </div>
+                <div
+                  className="hub-heading glow-teal"
+                  style={{ fontSize: 'clamp(1rem, 6vw, 1.6rem)', color: 'var(--neon-teal)', margin: '8px 0 2px' }}
+                >
+                  {onClock.pick.currentOwner.toUpperCase()}
+                </div>
+                <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
+                  {teamName(onClock.pick.currentOwner)}
+                </div>
+                <div style={{ color: 'var(--text-soft)' }}>
+                  Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall
+                  {onClock.pick.viaTradeFrom && (
+                    <span style={{ color: 'var(--neon-yellow)' }}> · via {onClock.pick.viaTradeFrom}</span>
+                  )}
+                </div>
+              </div>
+              <ClockReadout clock={boardState.draft.clock} corner />
             </div>
             {canEnterOnClock && (
               <button
@@ -469,8 +555,28 @@ export default function DraftPage() {
                 ENTER PICK {pickLabel(onClock.pick)}
               </button>
             )}
-            <ClockReadout clock={boardState.draft.clock} />
             <ClockControls clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
+            {identity?.isCommissioner && lastLive && (
+              <button
+                className="tap-btn"
+                type="button"
+                onClick={() => setClearTarget(lastLive)}
+                style={{
+                  width: '100%',
+                  minHeight: 40,
+                  marginTop: 8,
+                  borderRadius: 10,
+                  border: '1px solid var(--panel-border)',
+                  background: 'transparent',
+                  color: 'var(--text-mid)',
+                  fontWeight: 800,
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                ↶ UNDO LAST PICK · {recent[0]?.playerName} ({recent[0]?.label})
+              </button>
+            )}
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>

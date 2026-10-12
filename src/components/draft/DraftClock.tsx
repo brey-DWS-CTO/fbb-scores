@@ -28,9 +28,21 @@ function useNow(active: boolean, everyMs = 250): number {
  * The pick timer, or the CLOCK countdown once somebody called it. Shown on
  * the board and the TV. `tv` scales to the wall.
  */
-export function ClockReadout({ clock, tv = false }: { clock: DraftClockState | null | undefined; tv?: boolean }) {
+export function ClockReadout({
+  clock,
+  tv = false,
+  corner = false,
+}: {
+  clock: DraftClockState | null | undefined;
+  tv?: boolean;
+  /** Sits in the top right of the panel, beside the name, instead of under it. */
+  corner?: boolean;
+}) {
   const now = useNow(!!clock?.pickStartedAt);
   if (!clock?.pickStartedAt) return null;
+  const box = corner
+    ? ({ marginTop: 0, textAlign: 'right', flexShrink: 0 } as const)
+    : ({ marginTop: tv ? 2 : 10, textAlign: 'center' } as const);
   const paused = isPaused(clock);
   const left = remainingMs(clock, now);
   const elapsed = elapsedMs(clock, now);
@@ -41,7 +53,7 @@ export function ClockReadout({ clock, tv = false }: { clock: DraftClockState | n
   if (left !== null) {
     const out = left <= 0;
     return (
-      <div style={{ marginTop: tv ? 2 : 10, textAlign: 'center' }}>
+      <div style={box}>
         <div className={`hub-heading${out ? ' blink' : ''}`} style={{ fontSize: small, color: 'var(--neon-red)' }}>
           {paused ? 'CLOCK PAUSED' : out ? 'TIME' : 'CLOCK'} · CALLED BY {clock.call?.by.toUpperCase()}
         </div>
@@ -68,7 +80,7 @@ export function ClockReadout({ clock, tv = false }: { clock: DraftClockState | n
   }
 
   return (
-    <div style={{ marginTop: tv ? 2 : 10, textAlign: 'center' }}>
+    <div style={box}>
       <div className="hub-heading" style={{ fontSize: small, color: paused ? 'var(--neon-yellow)' : 'var(--text-dim)' }}>
         {paused ? 'PAUSED' : 'ON THE PICK'}
       </div>
