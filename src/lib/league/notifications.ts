@@ -89,8 +89,8 @@ export interface DueReminder {
   /** Whole hours left until the thing being warned about. Never negative. */
   hoursLeft: number;
   deadlineAt: string;
-  /** Whether this owner has at least one keeper saved. */
-  keepersSaved: boolean;
+  /** The keepers this owner has saved, by name. Empty when none. */
+  keeperNames: string[];
 }
 
 export function reminderKey(kind: ReminderKind, owner: string, season: number): string {
@@ -105,6 +105,8 @@ export interface ReminderInput {
   owners: string[];
   /** Owners with at least one keeper saved. */
   ownersWithKeepers: string[];
+  /** Saved keeper names by owner, so the mail can name them. */
+  keeperNames?: Record<string, string[]>;
   /** Keys already sent, from the store. */
   alreadySent: string[];
 }
@@ -141,7 +143,7 @@ export function dueReminders(input: ReminderInput): DueReminder[] {
         // say "1 day", not "23 hours".
         hoursLeft: Math.max(0, Math.round(msLeft / HOUR)),
         deadlineAt: target.toISOString(),
-        keepersSaved: withKeepers.has(owner),
+        keeperNames: withKeepers.has(owner) ? (input.keeperNames?.[owner] ?? []) : [],
       });
     }
   }
@@ -172,7 +174,14 @@ export function humanCountdown(hoursLeft: number): string {
 export interface ReminderCopy {
   subject: string;
   heading: string;
-  body: string;
+  /** One paragraph each. The first doubles as the inbox preview. */
+  lines: string[];
+}
+
+/** "Jokic", "Jokic and Curry", "A, B and C". */
+export function nameList(names: string[]): string {
+  if (names.length <= 1) return names.join('');
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 /** "Saturday, October 17 at 2:00 PM Pacific". The league says dates in Pacific. */
@@ -196,26 +205,41 @@ export function pacificLabel(iso: string): string {
 export function reminderCopy(reminder: DueReminder): ReminderCopy {
   const left = humanCountdown(reminder.hoursLeft);
   if (isKeeperKind(reminder.kind)) {
-    const lastCall = reminder.kind === 'keepers-last-call';
-    const when = `Keepers lock ${pacificLabel(reminder.deadlineAt)}.`;
+    // Owners asked "is mine locked in or do I lock it again?" So the subject
+    // alone says whether you are done, and nothing here says "lock" as if it
+    // were the owner's job. Saving is all an owner does; the commish locks.
+    const lastCall = reminder.kind === 'keepers-last-call' ? 'Last call: ' : '';
+    const due = pacificLabel(reminder.deadlineAt);
+    if (reminder.keeperNames.length > 0) {
+      return {
+        subject: `${lastCall}Your keepers are saved. You are done.`,
+        heading: 'Your keepers are saved',
+        lines: [
+          `You saved ${nameList(reminder.keeperNames)}. You are done. There is nothing else to lock or send.`,
+          `Want a change? You have until ${due}, ${left} from now. After that the commish locks every team.`,
+        ],
+      };
+    }
     return {
-      subject: lastCall ? `Last call: keepers are due in ${left}` : `Keepers are due in ${left}`,
-      heading: `Keepers due in ${left}`,
-      body: reminder.keepersSaved
-        ? `${when} Yours are saved. You can change them until then.`
-        : `${when} You have none saved. Pick two, one, or none, but save it so the commish knows.`,
+      subject: `${lastCall}You have no keepers saved. Due in ${left}.`,
+      heading: 'No keepers saved yet',
+      lines: [
+        `Keepers are due ${due}, ${left} from now.`,
+        'Pick up to two on your keeper page and tap SAVE KEEPERS. Saving is all you do. The commish locks them.',
+        'Keeping nobody? Then you are set.',
+      ],
     };
   }
   if (reminder.kind === 'draft-week') {
     return {
       subject: `The draft is in ${left}`,
       heading: `Draft in ${left}`,
-      body: 'Check your keepers and your picks before the room fills up.',
+      lines: ['Check your keepers and your picks before the room fills up.'],
     };
   }
   return {
     subject: `The draft is in ${left}`,
     heading: `Draft in ${left}`,
-    body: 'Last look at the board. Keepers are already closed.',
+    lines: ['Last look at the board. Keepers are already closed.'],
   };
 }

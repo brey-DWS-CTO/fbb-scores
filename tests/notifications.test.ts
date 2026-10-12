@@ -30,6 +30,7 @@ function run(options: {
     season: SEASON,
     owners: OWNERS,
     ownersWithKeepers: options.withKeepers ?? [],
+    keeperNames: { Brey: ['N. Jokic', 'S. Curry'] },
     alreadySent: options.alreadySent ?? [],
   });
 }
@@ -103,7 +104,7 @@ test('the day-before warning opens a day before the draft', () => {
 test('keeper warnings go to everyone, and know who has saved', () => {
   const list = run({ hoursBeforeDraft: 30, withKeepers: ['Brey'] });
   assert.deepEqual(owners(list, 'keepers-last-call'), ['Amy', 'Brey', 'Joel']);
-  const saved = list.filter((r) => r.kind === 'keepers-last-call' && r.keepersSaved).map((r) => r.owner);
+  const saved = list.filter((r) => r.kind === 'keepers-last-call' && r.keeperNames.length > 0).map((r) => r.owner);
   assert.deepEqual(saved, ['Brey']);
 });
 
@@ -112,10 +113,20 @@ test('the words change with whether you have saved', () => {
   const brey = list.find((r) => r.kind === 'keepers-last-call' && r.owner === 'Brey');
   const amy = list.find((r) => r.kind === 'keepers-last-call' && r.owner === 'Amy');
   assert.ok(brey && amy);
-  assert.match(reminderCopy(brey).body, /Yours are saved/);
-  assert.match(reminderCopy(amy).body, /You have none saved/);
-  assert.match(reminderCopy(amy).body, /Saturday, October 17 at 2:00 PM Pacific/);
-  assert.equal(reminderCopy(amy).subject, 'Last call: keepers are due in 6 hours');
+  const breyCopy = reminderCopy(brey);
+  const amyCopy = reminderCopy(amy);
+  assert.equal(breyCopy.subject, 'Last call: Your keepers are saved. You are done.');
+  assert.match(breyCopy.lines[0], /You saved N\. Jokic and S\. Curry\. You are done\./);
+  assert.equal(amyCopy.subject, 'Last call: You have no keepers saved. Due in 6 hours.');
+  assert.match(amyCopy.lines[0], /Saturday, October 17 at 2:00 PM Pacific/);
+});
+
+test('keeper mail never tells an owner to lock anything', () => {
+  for (const reminder of run({ hoursBeforeDraft: 30, withKeepers: ['Brey'] })) {
+    if (!reminder.kind.startsWith('keepers-')) continue;
+    const copy = reminderCopy(reminder);
+    assert.ok(!/lock (it|them|your)/i.test([copy.subject, ...copy.lines].join(' ')));
+  }
 });
 
 // ─── Sending once ────────────────────────────────────────────────────────────
@@ -175,7 +186,7 @@ test('a cron a minute late still says a whole day', () => {
   const list = run({ hoursBeforeDraft: 48 - 1 / 60 });
   const friday = list.find((r) => r.kind === 'keepers-1-day');
   assert.equal(friday?.hoursLeft, 24);
-  assert.equal(friday && reminderCopy(friday).subject, 'Keepers are due in 1 day');
+  assert.equal(friday && reminderCopy(friday).subject, 'You have no keepers saved. Due in 1 day.');
 });
 
 test('the countdown reads like a person wrote it', () => {
@@ -192,8 +203,8 @@ test('every reminder has a subject and no em dash', () => {
   assert.ok(list.length > 0);
   for (const reminder of list) {
     const copy = reminderCopy(reminder);
-    assert.ok(copy.subject.length > 0 && copy.heading.length > 0 && copy.body.length > 0);
-    for (const line of [copy.subject, copy.heading, copy.body]) {
+    assert.ok(copy.subject.length > 0 && copy.heading.length > 0 && copy.lines.length > 0);
+    for (const line of [copy.subject, copy.heading, ...copy.lines]) {
       assert.ok(!line.includes('—'), `em dash in: ${line}`);
     }
   }
