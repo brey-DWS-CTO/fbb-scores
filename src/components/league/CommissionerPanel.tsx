@@ -12,7 +12,6 @@ import { draftYearLabel, tradeableSeason } from '../../lib/league/pickTrades.js'
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import ActAsPanel from './ActAsPanel.js';
 import NavIcon from './NavIcon.js';
-import SignInAdmin from './SignInAdmin.js';
 
 const btnOutline = (color: string): CSSProperties => ({
   minHeight: 44,
@@ -185,15 +184,7 @@ export default function CommissionerPanel() {
         )}
       </div>
 
-      {/* Sign-in: each owner's email and PIN */}
       <ActAsPanel />
-      <details className="commish-fold commish-fold-inner">
-        <summary className="hub-heading">
-          SIGN-IN
-          <small>Each owner&apos;s email and PIN</small>
-        </summary>
-        <SignInAdmin />
-      </details>
 
       {/* Close the draft — this is what opens next season's pick trades */}
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>

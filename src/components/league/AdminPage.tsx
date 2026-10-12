@@ -10,6 +10,7 @@ import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import EspnSyncPanel from './EspnSyncPanel.js';
 import HistoryAdmin from './HistoryAdmin.js';
+import SignInAdmin from './SignInAdmin.js';
 import { RoundChip } from '../keepers/keeperUi.js';
 
 const baseRound = new Map(leagueDataset.players.map((p) => [p.key, p.keeper.round]));
@@ -116,6 +117,15 @@ export default function AdminPage() {
           {error}
         </div>
       )}
+
+      {/* ── Members: who can get in, and how ───────────────────── */}
+      <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
+        <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-teal)', marginBottom: 6 }}>
+          <NavIcon name="people" size={13} className="icon-in-heading" />
+          MEMBERS: EMAILS, SIGN-IN LINKS, PINS
+        </div>
+        <SignInAdmin />
+      </section>
 
       <EspnSyncPanel />
 
