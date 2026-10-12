@@ -11,6 +11,8 @@ import {
   saveKeepers,
 } from '../../lib/league/api.js';
 import { fmt1 } from '../../lib/league/format.js';
+import { keeperDeadline } from '../../lib/league/notifications.js';
+import { DraftCountdown } from '../../hooks/useCountdown.js';
 import {
   useApplyStateResponse,
   useIdentity,
@@ -638,8 +640,15 @@ export default function TeamKeeperPage() {
           </h1>
           <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem' }}>{teamName(owner)}</div>
         </div>
-        <div style={{ flexShrink: 0, paddingTop: 4 }}>
+        <div style={{ flexShrink: 0, paddingTop: 4, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <IdentityChip />
+          {!locked && meta?.draftAt && (
+            <DraftCountdown
+              targetIso={keeperDeadline(new Date(meta.draftAt)).toISOString()}
+              size="0.85rem"
+              label="KEEPERS LOCK IN"
+            />
+          )}
         </div>
       </div>
 
