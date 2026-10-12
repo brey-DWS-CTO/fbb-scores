@@ -4645,6 +4645,27 @@ html.theme-light {
   text-transform: uppercase;
 }
 
+/* ─── Keeper odds: commish only, how often he is gone by the pick the keep costs ─── */
+.keeper-odds {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-mid);
+  cursor: help;
+}
+.keeper-odds strong { font-weight: 900; }
+/* Green: keep him, he would be gone. Yellow: a coin flip. Red: you could draft him anyway. */
+.keeper-odds.is-keep { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.08); }
+.keeper-odds.is-maybe { border-color: var(--neon-yellow); color: var(--neon-yellow); background: rgba(255,230,0,0.08); }
+.keeper-odds.is-skip { border-color: var(--neon-red); color: var(--neon-red); background: rgba(255,34,34,0.08); }
+.keeper-odds.in-cost { margin-left: auto; font-size: 0.68rem; }
+
 /* ─── League dues ────────────────────────────────────────────────────── */
 .dues-mine, .dues-board, .dues-settings {
   display: flex;
@@ -4775,7 +4796,7 @@ html.theme-light {
     flex-wrap: nowrap !important;
   }
   .keeper-selected .keeper-card-cost > .hub-heading,
-  .keeper-selected .keeper-card-cost > span:nth-child(3) { display: none; }
+  .keeper-selected .keeper-card-cost > span:nth-child(3):not(.keeper-odds) { display: none; }
   .keeper-selected .keeper-card-cost > span:nth-child(2) {
     font-size: 0.85rem !important;
   }

@@ -11,6 +11,12 @@ import {
   saveKeepers,
 } from '../../lib/league/api.js';
 import { fmt1 } from '../../lib/league/format.js';
+import { valueBoard } from '../../lib/league/draftValue.js';
+import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
+import { buildWorld } from '../../lib/league/whatIf.js';
+import { defaultMockSettings, prepareMock, type MockSlot } from '../../lib/league/mockDraft.js';
+import { keeperCostSlot, oddsTone, openOwnerBoard, shareGoneBefore, simulateTakenAt, type TakenAt } from '../../lib/league/keeperOdds.js';
+import { useProjectionData } from '../../hooks/useProjectionData.js';
 import { keeperDeadline, nameList, pacificLabel } from '../../lib/league/notifications.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import {
@@ -39,6 +45,7 @@ function RosterRow({
   postseason,
   showApiSource,
   tapThrough,
+  odds,
   onTap,
 }: {
   p: DatasetPlayer;
@@ -52,6 +59,8 @@ function RosterRow({
   showApiSource: boolean;
   /** Blocked only by the cap: keep the greyed look but let the tap land. */
   tapThrough?: boolean;
+  /** Commissioner only: how often he is gone by the pick the keep costs. */
+  odds?: KeeperOdds | null;
   onTap: () => void;
 }) {
   const s = p.stats2026 ?? p.api2026;
@@ -130,6 +139,7 @@ function RosterRow({
       </div>
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
         {p.keeper.round !== null && <RoundChip round={p.keeper.round} />}
+        {odds && <OddsChip odds={odds} />}
       </div>
       {tappable && !looksBlocked && (
         <span
@@ -149,16 +159,39 @@ function RosterRow({
   );
 }
 
+/** How often a player is gone by the pick his keep costs, and that pick's label. */
+interface KeeperOdds {
+  share: number;
+  label: string;
+}
+
+/**
+ * Commissioner only. The keeper question as one number: across 60 drafts
+ * played with this team's keeper slots left live, how often he was taken
+ * before the pick the keep would cost. Green: keep him, he would be gone.
+ * Red: you could draft him anyway.
+ */
+function OddsChip({ odds, inCost = false }: { odds: KeeperOdds; inCost?: boolean }) {
+  return (
+    <span className={`keeper-odds is-${oddsTone(odds.share)}${inCost ? ' in-cost' : ''}`} title="How often he is gone by this pick, across 60 drafts. Only the commish sees this.">
+      <strong>{Math.round(odds.share * 100)}%</strong> gone by {odds.label}
+    </span>
+  );
+}
+
 /** One selected-keeper card with pick cost, contract projection and errors. */
 function KeeperCard({
   k,
   canEdit,
   projected = false,
+  odds = null,
   onRemove,
 }: {
   k: ResolvedKeeper;
   canEdit: boolean;
   projected?: boolean;
+  /** Commissioner only: how often he is gone by the pick the keep costs. */
+  odds?: KeeperOdds | null;
   onRemove: () => void;
 }) {
   const p = k.player;
@@ -258,6 +291,7 @@ function KeeperCard({
               (from {k.pick.viaTradeFrom})
             </span>
           )}
+          {odds && <OddsChip odds={odds} inCost />}
         </div>
       )}
 
@@ -470,6 +504,8 @@ export default function TeamKeeperPage() {
   const [flash, setFlash] = useState(false);
   const [leaguePool, setLeaguePool] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Commissioner only: the roster by keeper value, or by how often he is gone.
+  const [rosterByOdds, setRosterByOdds] = useState(false);
   const flashTimer = useRef<number | null>(null);
 
   // Reset local edits when navigating between teams
@@ -516,6 +552,35 @@ export default function TeamKeeperPage() {
 
   // Every derived number comes from the engine, recomputed each render
   const result = useMemo(() => resolveTeamKeepers(dataset, owner, selections), [owner, selections, dataset]);
+
+  // Commissioner only: the keeper question as a number. This team's keeper
+  // slots are opened, and the room drafts 60 times from the commish's full
+  // view of the league (entered keepers, projections for the rest). The
+  // answer per candidate: how often he is gone by the pick his keep costs.
+  const { snapshot } = useProjectionData();
+  const oddsWorld = useMemo((): { taken: TakenAt; slots: MockSlot[] } | null => {
+    if (!isCommish || !identity || !snapshot) return null;
+    const values = valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true });
+    if (values.entries.length === 0) return null;
+    const world = buildWorld(dataset, {
+      viewer: identity.owner, state, scenario: scenarioQuery.scenario, proposals: [], tradesOn: [], useEntered: true, guessInstead: [],
+    });
+    const board = openOwnerBoard(world.board, owner);
+    const prepared = prepareMock({ board, values, settings: defaultMockSettings('sharp', OWNERS, 7) });
+    return { taken: simulateTakenAt(prepared, 7, 60), slots: board.slots };
+  }, [isCommish, identity, snapshot, dataset, state, scenarioQuery.scenario, owner]);
+  const keeperOdds = (playerKey: string, round: number | null): KeeperOdds | null => {
+    if (!oddsWorld || round === null) return null;
+    // A chosen keeper is judged at the pick the engine charged him. Anyone
+    // else is judged at this team's pick in his round, skipping picks the
+    // chosen keepers already use.
+    const chosen = result.keepers.find((k) => k.selection.playerKey === playerKey);
+    const charged = new Set(result.keepers.flatMap((k) => (k.pick ? [k.pick.overall] : [])));
+    const overall = chosen?.pick?.overall ?? keeperCostSlot(oddsWorld.slots, owner, round, charged)?.pick.overall;
+    if (overall === undefined) return null;
+    const slot = oddsWorld.slots.find((entry) => entry.pick.overall === overall);
+    return { share: shareGoneBefore(oddsWorld.taken, playerKey, overall), label: slot ? `${slot.pick.round}.${slot.pick.slot}` : `#${overall}` };
+  };
 
   const rosterPlayers = useMemo(
     () =>
@@ -1036,6 +1101,7 @@ export default function TeamKeeperPage() {
               k={k}
               canEdit={canEdit}
               projected={projectionMode}
+              odds={keeperOdds(k.selection.playerKey, k.round)}
               onRemove={() => removeKeeper(k.selection.playerKey)}
             />
           ))}
@@ -1122,26 +1188,48 @@ export default function TeamKeeperPage() {
 
       {/* ── Full roster (tap a player to keep them) ────────────── */}
       <section className="panel" style={{ padding: '12px 0 4px', borderRadius: 10, marginBottom: 14 }}>
-        <div
-          className="hub-heading"
-          style={{ fontSize: '0.62rem', color: 'var(--neon-blue)', margin: '0 14px 4px' }}
-        >
-          FULL ROSTER ({rosterPlayers.length})
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, margin: '0 14px 4px' }}>
+          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-blue)' }}>
+            FULL ROSTER ({rosterPlayers.length})
+          </div>
+          {/* Commissioner only: the sort sits on the heading line, no row of its own. */}
+          {oddsWorld && (
+            <div className="mock-seg" role="radiogroup" aria-label="Sort the roster">
+              {([['value', 'VALUE'], ['odds', 'GONE %']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={rosterByOdds === (key === 'odds')}
+                  className={`tap-btn mock-seg-btn${rosterByOdds === (key === 'odds') ? ' is-on' : ''}`}
+                  style={{ minHeight: 30, padding: '0 10px', fontSize: '0.6rem' }}
+                  onClick={() => setRosterByOdds(key === 'odds')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {canEdit && (
           <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
             {projectionMode
-              ? `Tap players to project ${owner}'s keepers. Only you can see these picks.`
-              : 'Tap a player to keep them. Choices that break the cap or another rule are greyed out.'}
+              ? `Tap to project ${owner}'s keepers. Private to you.`
+              : 'Tap to keep. Greyed rows break a rule.'}
           </div>
         )}
         {!canEdit && (
           <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
-            Their final 2026 roster, with keeper value, price, and contract status. This does not show saved picks.
+            Their 2026 roster with keeper value, price and contract. Saved picks are not shown.
           </div>
         )}
         <div>
-          {rosterPlayers.map((p) => (
+          {(rosterByOdds && oddsWorld
+            ? [...rosterPlayers].sort((a, b) =>
+              (keeperOdds(b.key, b.keeper.round)?.share ?? -1) - (keeperOdds(a.key, a.keeper.round)?.share ?? -1)
+              || (b.keeper.effectiveAvg ?? -1) - (a.keeper.effectiveAvg ?? -1))
+            : rosterPlayers
+          ).map((p) => (
             <RosterRow
               key={p.key}
               p={p}
@@ -1152,6 +1240,7 @@ export default function TeamKeeperPage() {
               postseason={postseasonGames(p.proTeam)}
               showApiSource={identity?.isCommissioner === true}
               tapThrough={overCapTapThrough(p)}
+              odds={keeperOdds(p.key, p.keeper.round)}
               onTap={() => toggleKeeper(p)}
             />
           ))}
