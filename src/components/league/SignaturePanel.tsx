@@ -5,6 +5,7 @@ import {
   fetchOwnerEmails,
   requestRulebookSignatures,
   signRulebook,
+  withdrawRulebookSignature,
   type RulebookSignaturesResponse,
 } from '../../lib/league/api.js';
 import { describeSignatures, signatureStatus } from '../../lib/league/rulebookSignatures.js';
@@ -99,6 +100,21 @@ export default function SignaturePanel({
     }
   };
 
+  const withdraw = async (owner: string) => {
+    if (!identity) return;
+    if (!window.confirm(`Withdraw ${owner}'s signature on revision ${data.revision}? They can sign again.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await withdrawRulebookSignature(identity, owner);
+      onSigned();
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sign = async () => {
     if (!identity || !data.currentVersionId || !data.fingerprint) return;
     setBusy(true);
@@ -135,6 +151,17 @@ export default function SignaturePanel({
                     <li key={signature.owner}>
                       <span className="sign-name">{signature.owner}</span>
                       <span className="sign-when">{formatDay(signature.signedAt)}</span>
+                      {isCommish && isCurrent && !historical && (
+                        <button
+                          type="button"
+                          className="sign-withdraw tap-btn"
+                          disabled={busy}
+                          onClick={() => withdraw(signature.owner)}
+                          title="Withdraw this signature so they can sign again"
+                        >
+                          withdraw
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>

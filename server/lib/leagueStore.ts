@@ -474,6 +474,8 @@ interface StoreBackend {
   listRulebookVersions(season: number): Promise<Array<Omit<RulebookVersionRow, 'book'>>>;
   listRulebookSignatures(season: number): Promise<RulebookSignature[]>;
   insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature>;
+  /** Removes one signature. True when there was one to remove. */
+  deleteRulebookSignature(versionId: string, owner: string): Promise<boolean>;
   getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null>;
   saveHistoryDraft(
     season: number,
@@ -1410,6 +1412,14 @@ class NeonBackend implements StoreBackend {
     return row;
   }
 
+  async deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
+    await this.ensureInit();
+    const gone = (await this.sql`DELETE FROM rulebook_signatures
+      WHERE version_id = ${versionId} AND owner = ${owner}
+      RETURNING owner`) as Array<{ owner: string }>;
+    return gone.length > 0;
+  }
+
   async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -2205,6 +2215,20 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const before = doc.rulebookSignatures.length;
+      doc.rulebookSignatures = doc.rulebookSignatures.filter(
+        (s) => !(s.versionId === versionId && s.owner === owner),
+      );
+      if (doc.rulebookSignatures.length === before) return false;
+      this.writeDoc(doc);
+      return true;
+    });
+  }
+
   async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
     await this.ensureInit();
     return this.readDoc().historyDrafts.find((row) => row.season === season) ?? null;
@@ -2924,6 +2948,10 @@ export async function insertRulebookSignature(
   row: RulebookSignature,
 ): Promise<RulebookSignature> {
   return getBackend().insertRulebookSignature(row);
+}
+
+export async function deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
+  return getBackend().deleteRulebookSignature(versionId, owner);
 }
 
 export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {

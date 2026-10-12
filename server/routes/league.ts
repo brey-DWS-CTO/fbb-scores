@@ -91,6 +91,7 @@ import {
   PollWriteError,
   RulebookSignError,
   CONFIG_TEAMS,
+  deleteRulebookSignature,
   listRulebookSignatures,
   insertRulebookSignature,
   listPolls,
@@ -1722,9 +1723,17 @@ router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (r
 
     const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
     if (!latest) throw new HttpError(409, 'Nothing is published yet, so there is nothing to sign');
+    const versions = await listRulebookVersions(RULEBOOK_SEASON);
 
     const result = await sendRulebookSignRequest(
-      { revision: latest.revision, notes: latest.notes, publishedBy: latest.publishedBy, owners },
+      {
+        revision: latest.revision,
+        notes: latest.notes,
+        publishedBy: latest.publishedBy,
+        owners,
+        seasonLabel: `${RULEBOOK_SEASON - 1}-${String(RULEBOOK_SEASON).slice(-2)}`,
+        first: versions.length <= 1,
+      },
       appOrigin(req),
     );
     await appendAudit(actor(res), 'rulebook-sign-request', {
@@ -1734,6 +1743,26 @@ router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (r
       noAddress: result.noAddress,
     });
     res.json({ versionId: latest.id, revision: latest.revision, ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/league/rulebook/signatures/:owner — the commissioner withdraws
+ * one member's signature on the revision in force, so they can sign again.
+ * Audited, since a signature is otherwise never touched.
+ */
+router.delete('/rulebook/signatures/:owner', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const owner = String(req.params.owner);
+    if (!OWNERS.includes(owner)) throw new HttpError(404, 'No such member');
+    const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
+    if (!latest) throw new HttpError(409, 'Nothing is published yet');
+    const removed = await deleteRulebookSignature(latest.id, owner);
+    if (!removed) throw new HttpError(404, `${owner} has not signed this revision`);
+    await appendAudit(actor(res), 'rulebook-unsign', { versionId: latest.id, revision: latest.revision, owner });
+    res.json({ versionId: latest.id, owner, removed: true });
   } catch (err) {
     next(err);
   }

@@ -281,27 +281,34 @@ export interface SignRequestResult {
  * copy first, send it to one person as a test, and then to the rest.
  */
 export async function sendRulebookSignRequest(
-  input: { revision: number; notes: string; publishedBy: string; owners: string[] },
+  input: {
+    revision: number;
+    notes: string;
+    publishedBy: string;
+    owners: string[];
+    /** "2026-27", the season the book is for. */
+    seasonLabel: string;
+    /** True when this is the season's first published revision. */
+    first: boolean;
+  },
   origin: string,
 ): Promise<SignRequestResult> {
   const book = await addressBook();
   const sent = input.owners.filter((owner) => book.has(owner));
   const noAddress = input.owners.filter((owner) => !book.has(owner));
   const why = input.notes.trim();
+  const headline = input.first
+    ? `The first revision of the ${input.seasonLabel} constitution has released!`
+    : `A new revision of the ${input.seasonLabel} constitution has released!`;
   const content: MailContent = {
-    subject: `Sign the rule book: revision ${input.revision} is out`,
-    preheader: 'One tap in the app. A new revision means everyone signs again.',
-    heading: `Revision ${input.revision} of the constitution is out`,
+    subject: headline,
+    preheader: `Revision ${input.revision}. Read it and sign.`,
+    heading: headline,
     lines: [
-      `${input.publishedBy} published revision ${input.revision} of The Nerds constitution.`,
-      ...(why ? [`The note on it: ${why}`] : []),
-      'Read it, then sign at the bottom: tap to sign with your name, or draw your signature with a finger. It prints on the signature page.',
+      `Revision ${input.revision}, published by ${input.publishedBy}.${why ? ` ${why}` : ''}`,
+      'Read it, then sign at the bottom: tap to sign with your name, or draw it with a finger.',
     ],
     action: { label: 'READ AND SIGN', href: `${origin}/rules/paper` },
-    notes: [
-      `The same book, rule by rule, is at ${origin}/rules`,
-      'Signatures never carry forward. If a newer revision comes out, the league signs again.',
-    ],
   };
   queueMail('rule book sign request', async () => {
     for (const owner of sent) {

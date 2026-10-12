@@ -142,7 +142,7 @@ test('publishing is quiet; the sign request goes only to the members picked', as
     noAddress: [],
   });
   assert.deepEqual(mails().map((m) => m.to), ['joel@example.test'], 'a stranger is dropped, not mailed');
-  assert.match(mails()[0].subject, /Sign the rule book: revision 14 is out/);
+  assert.match(mails()[0].subject, /The first revision of the 2026-27 constitution has released!/);
 
   mailLog = [];
   const rest = await signRequest(['Amy', 'Ryan']);
@@ -152,4 +152,57 @@ test('publishing is quiet; the sign request goes only to the members picked', as
   assert.deepEqual(body.sent, ['Amy']);
   assert.deepEqual(body.noAddress, ['Ryan'], 'picked, but no address on file');
   assert.deepEqual(mails().map((m) => m.to), ['amy@example.test']);
+});
+
+test('the commissioner can withdraw a signature so a member signs again', async () => {
+  const versions = (await (await fetch(`${baseUrl}/api/league/rulebook/versions`)).json()) as Array<{
+    id: string;
+    fingerprint: string;
+  }>;
+  await store.setPin('Joel', '1000');
+  const joel = { 'content-type': 'application/json', 'x-owner': 'Joel', 'x-pin': '1000' };
+  const signed = await fetch(`${baseUrl}/api/league/rulebook/sign`, {
+    method: 'POST',
+    headers: joel,
+    body: JSON.stringify({ versionId: versions[0].id, fingerprint: versions[0].fingerprint }),
+  });
+  assert.equal(signed.status, 200);
+
+  const notCommish = await fetch(`${baseUrl}/api/league/rulebook/signatures/Joel`, { method: 'DELETE', headers: joel });
+  assert.equal(notCommish.status, 403);
+
+  const withdrawn = await request('/api/league/rulebook/signatures/Joel', { method: 'DELETE', headers: auth(commissioner) });
+  assert.equal(withdrawn.status, 200);
+  const again = await request('/api/league/rulebook/signatures/Joel', { method: 'DELETE', headers: auth(commissioner) });
+  assert.equal(again.status, 404, 'nothing left to withdraw');
+
+  const list = (await (await fetch(`${baseUrl}/api/league/rulebook/signatures`)).json()) as { missing: string[] };
+  assert.ok(list.missing.includes('Joel'));
+
+  const resigned = await fetch(`${baseUrl}/api/league/rulebook/sign`, {
+    method: 'POST',
+    headers: joel,
+    body: JSON.stringify({ versionId: versions[0].id, fingerprint: versions[0].fingerprint }),
+  });
+  assert.equal(resigned.status, 200, 'and Joel may sign again');
+
+  // A second revision makes the next note "a new revision", not "the first".
+  mailLog = [];
+  const book = structuredClone(seed);
+  book.articles[0].title = 'League Format (second)';
+  const current = await store.getRulebookDraft(SEASON);
+  await request('/api/league/rulebook/draft', {
+    method: 'PUT',
+    headers: auth(commissioner),
+    body: JSON.stringify({ book, expectedVersion: current?.version ?? 0 }),
+  });
+  const second = await request('/api/league/rulebook/publish', {
+    method: 'POST',
+    headers: auth(commissioner),
+    body: JSON.stringify({ fingerprint: rulebookFingerprint(book), notes: '' }),
+  });
+  assert.equal(second.status, 200);
+  await signRequest(['Joel']);
+  await notifier.mailSettled();
+  assert.match(mails()[0].subject, /A new revision of the 2026-27 constitution has released!/);
 });
