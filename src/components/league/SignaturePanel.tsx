@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Identity } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
+  fetchOwnerEmails,
+  requestRulebookSignatures,
   signRulebook,
   type RulebookSignaturesResponse,
 } from '../../lib/league/api.js';
@@ -32,6 +34,28 @@ export default function SignaturePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Sending the note (commissioner) ──
+  const isCommish = identity?.isCommissioner === true;
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [addressed, setAddressed] = useState<Set<string> | null>(null);
+  const [sentNote, setSentNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!picking || !identity || !isCommish) return;
+    let cancelled = false;
+    fetchOwnerEmails(identity)
+      .then((rows) => {
+        if (!cancelled) setAddressed(new Set(rows.filter((r) => r.email !== '').map((r) => r.owner)));
+      })
+      .catch(() => {
+        if (!cancelled) setAddressed(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [picking, identity, isCommish]);
+
   // Nothing published means nothing to sign. The page already says so.
   if (!data || !data.versionId) return null;
 
@@ -40,6 +64,40 @@ export default function SignaturePanel({
   const isCurrent = data.versionId !== null && data.versionId === data.currentVersionId;
   const canSignNow =
     identity !== null && isCurrent && !historical && !mine && data.fingerprint !== null;
+
+  const openPicker = () => {
+    // Start with everyone who has not signed. The commissioner trims from there.
+    const unsigned = data.members.filter((o) => !data.signed.some((s) => s.owner === o));
+    setPicked(new Set(unsigned));
+    setSentNote(null);
+    setPicking(true);
+  };
+
+  const togglePick = (owner: string) => {
+    const next = new Set(picked);
+    if (next.has(owner)) next.delete(owner);
+    else next.add(owner);
+    setPicked(next);
+  };
+
+  const sendRequest = async () => {
+    if (!identity || picked.size === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await requestRulebookSignatures(identity, [...picked]);
+      const sent = result.sent.length ? `Sent to ${result.sent.join(', ')}.` : 'Nothing sent.';
+      const missing = result.noAddress.length
+        ? ` No address on file for ${result.noAddress.join(', ')}; add one on the Admin page.`
+        : '';
+      setSentNote(sent + missing);
+      setPicking(false);
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const sign = async () => {
     if (!identity || !data.currentVersionId || !data.fingerprint) return;
@@ -125,6 +183,59 @@ export default function SignaturePanel({
             </div>
           )}
 
+          {isCommish && isCurrent && !historical && !picking && (
+            <div className="sign-actions sign-send">
+              <button type="button" className="rules-tool tap-btn" disabled={busy} onClick={openPicker}>
+                EMAIL A SIGN REQUEST
+              </button>
+              <span className="rule-edit-hint">
+                Pick who gets the "read it, sign it" email. Try it on yourself first.
+              </span>
+            </div>
+          )}
+
+          {isCommish && picking && (
+            <div className="sign-picker">
+              <span className="sign-column-head">WHO GETS THE EMAIL</span>
+              <ul className="sign-pick-list">
+                {data.members.map((owner) => {
+                  const signedAlready = data.signed.some((s) => s.owner === owner);
+                  const hasAddress = addressed === null ? null : addressed.has(owner);
+                  return (
+                    <li key={owner}>
+                      <label className="sign-pick">
+                        <input
+                          type="checkbox"
+                          checked={picked.has(owner)}
+                          onChange={() => togglePick(owner)}
+                        />
+                        <span className="sign-name">{owner}</span>
+                        <span className="sign-when">
+                          {signedAlready ? 'signed' : 'not signed'}
+                          {hasAddress === false ? ' · no address' : ''}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="sign-actions">
+                <button
+                  type="button"
+                  className="rule-edit-save tap-btn"
+                  disabled={busy || picked.size === 0}
+                  onClick={sendRequest}
+                >
+                  {busy ? 'SENDING...' : `SEND TO ${picked.size}`}
+                </button>
+                <button type="button" className="rule-edit-cancel tap-btn" onClick={() => setPicking(false)}>
+                  CANCEL
+                </button>
+              </div>
+            </div>
+          )}
+
+          {sentNote && <p className="rules-draft-note">{sentNote}</p>}
           {error && <p className="rules-draft-error">{error}</p>}
         </>
       )}

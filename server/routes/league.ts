@@ -115,7 +115,7 @@ import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
-  notifyRulebookPublished,
+  sendRulebookSignRequest,
   notifyTradeAccepted,
   notifyTradeOffered,
   notifyTradeSettled,
@@ -1703,6 +1703,40 @@ router.get('/rulebook/draft/pdf', requireAuth, requireCommissioner, async (req, 
   }
 });
 
+/**
+ * POST /api/league/rulebook/sign-request — mail the picked members a "read it,
+ * sign it" note for the revision in force (commissioner only). Body:
+ * { owners: string[] }. Publishing never mails on its own, so the commissioner
+ * can try it on one person first.
+ */
+router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const body = (req.body ?? {}) as { owners?: unknown };
+    const picked = Array.isArray(body.owners)
+      ? body.owners.filter((o): o is string => typeof o === 'string')
+      : [];
+    const owners = OWNERS.filter((owner) => picked.includes(owner));
+    if (!owners.length) throw new HttpError(400, 'Pick at least one member');
+
+    const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
+    if (!latest) throw new HttpError(409, 'Nothing is published yet, so there is nothing to sign');
+
+    const result = await sendRulebookSignRequest(
+      { revision: latest.revision, notes: latest.notes, publishedBy: latest.publishedBy, owners },
+      appOrigin(req),
+    );
+    await appendAudit(actor(res), 'rulebook-sign-request', {
+      versionId: latest.id,
+      revision: latest.revision,
+      sent: result.sent,
+      noAddress: result.noAddress,
+    });
+    res.json({ versionId: latest.id, revision: latest.revision, ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/rulebook/versions', async (_req, res, next) => {
   try {
     res.json(await listRulebookVersions(RULEBOOK_SEASON));
@@ -1819,11 +1853,11 @@ router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, r
     }
     const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : '';
 
+    // No stored draft means the editor is showing the committed seed at
+    // version 0. The first publish goes straight from that; it is what the
+    // commissioner previewed.
     const draftRow = await getRulebookDraft(RULEBOOK_SEASON);
-    if (!draftRow) {
-      throw new HttpError(409, 'There is no draft to publish');
-    }
-    const book = draftRow.book as Rulebook;
+    const book = (draftRow?.book as Rulebook | undefined) ?? SEED_RULEBOOK;
 
     // The draft must be exactly what the commissioner previewed. Anything else
     // means it moved underneath them, so refuse instead of publishing a
@@ -1887,8 +1921,6 @@ router.post('/rulebook/publish', requireAuth, requireCommissioner, async (req, r
       previousVersionId: previous?.id ?? null,
       polls: carried,
     });
-    // Every signature just went stale, so everyone hears about it.
-    notifyRulebookPublished({ revision, notes, publishedBy: owner }, appOrigin(req));
     res.json({
       versionId: saved.id,
       revision,

@@ -11,9 +11,10 @@ import type { Rulebook } from '../src/lib/league/rulebook.ts';
 import { rulebookFingerprint } from '../src/lib/league/rulebookDiff.ts';
 
 /**
- * Publishing a revision mails every member with an address: read it, sign it.
- * With no mail key the mailer prints who it would have written to, and the
- * test reads that, the same way tests/notify-api.test.ts does.
+ * Publishing is quiet. The commissioner then picks who gets the "read it,
+ * sign it" note, which is what lets them try it on themselves first. With no
+ * mail key the mailer prints who it would have written to, and the test reads
+ * that, the same way tests/notify-api.test.ts does.
  */
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
@@ -102,31 +103,53 @@ after(async () => {
   if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
 });
 
-test('publishing a revision mails every member who has an address', async () => {
-  mailLog = [];
-  const book = structuredClone(seed);
-  book.articles[0].title = 'League Format (mailed)';
-  const current = await store.getRulebookDraft(SEASON);
-  const saved = await request('/api/league/rulebook/draft', {
-    method: 'PUT',
+const signRequest = (owners: unknown) =>
+  request('/api/league/rulebook/sign-request', {
+    method: 'POST',
     headers: auth(commissioner),
-    body: JSON.stringify({ book, expectedVersion: current?.version ?? 0 }),
+    body: JSON.stringify({ owners }),
   });
-  assert.equal(saved.status, 200);
 
+test('before a publish there is nothing to ask anyone to sign', async () => {
+  const { status } = await signRequest(['Joel']);
+  assert.equal(status, 409);
+});
+
+test('publishing is quiet; the sign request goes only to the members picked', async () => {
+  mailLog = [];
+  // Nothing has been saved as a draft yet: the editor shows the seed at v0,
+  // and the first publish goes straight from it.
+  assert.equal(await store.getRulebookDraft(SEASON), null);
   const published = await request('/api/league/rulebook/publish', {
     method: 'POST',
     headers: auth(commissioner),
-    body: JSON.stringify({ fingerprint: rulebookFingerprint(book), notes: 'Season 17 book.' }),
+    body: JSON.stringify({ fingerprint: rulebookFingerprint(seed), notes: 'Season 17 book.' }),
   });
-  assert.equal(published.status, 200);
+  assert.equal(published.status, 200, JSON.stringify(published.body));
   await notifier.mailSettled();
+  assert.deepEqual(mails(), [], 'publishing on its own mails nobody');
 
-  const sent = mails();
-  assert.deepEqual(
-    sent.map((m) => m.to).sort(),
-    ['amy@example.test', 'joel@example.test'],
-    'the two members with addresses, nobody else',
-  );
-  assert.match(sent[0].subject, /Sign the rule book: revision 14 is out/);
+  const empty = await signRequest([]);
+  assert.equal(empty.status, 400);
+
+  const one = await signRequest(['Joel', 'Mallory']);
+  assert.equal(one.status, 200);
+  await notifier.mailSettled();
+  assert.deepEqual(one.body, {
+    versionId: (one.body as { versionId: string }).versionId,
+    revision: 14,
+    sent: ['Joel'],
+    noAddress: [],
+  });
+  assert.deepEqual(mails().map((m) => m.to), ['joel@example.test'], 'a stranger is dropped, not mailed');
+  assert.match(mails()[0].subject, /Sign the rule book: revision 14 is out/);
+
+  mailLog = [];
+  const rest = await signRequest(['Amy', 'Ryan']);
+  assert.equal(rest.status, 200);
+  await notifier.mailSettled();
+  const body = rest.body as { sent: string[]; noAddress: string[] };
+  assert.deepEqual(body.sent, ['Amy']);
+  assert.deepEqual(body.noAddress, ['Ryan'], 'picked, but no address on file');
+  assert.deepEqual(mails().map((m) => m.to), ['amy@example.test']);
 });

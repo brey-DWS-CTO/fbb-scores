@@ -268,36 +268,47 @@ export function notifyKeepersRevealed(origin: string): void {
 
 // ─── The rule book ───────────────────────────────────────────────────────────
 
+export interface SignRequestResult {
+  /** Owners a note went out to. */
+  sent: string[];
+  /** Owners who were picked but have no address on file. */
+  noAddress: string[];
+}
+
 /**
- * A new revision is out and the old signatures no longer count. Every member
- * with an address gets one note: read it, sign it, here is the link.
+ * "Read it, sign it": one note to each member the commissioner picked.
+ * Publishing is quiet on its own, so the commissioner can read the printed
+ * copy first, send it to one person as a test, and then to the rest.
  */
-export function notifyRulebookPublished(
-  input: { revision: number; notes: string; publishedBy: string },
+export async function sendRulebookSignRequest(
+  input: { revision: number; notes: string; publishedBy: string; owners: string[] },
   origin: string,
-): void {
-  queueMail('rule book published', async () => {
-    const book = await addressBook();
-    const why = input.notes.trim();
-    const content: MailContent = {
-      subject: `Sign the rule book: revision ${input.revision} is out`,
-      preheader: 'One tap in the app. A new revision means everyone signs again.',
-      heading: `Revision ${input.revision} of the constitution is out`,
-      lines: [
-        `${input.publishedBy} published revision ${input.revision} of The Nerds constitution.`,
-        ...(why ? [`The note on it: ${why}`] : []),
-        'Read it, then tap I AGREE, SIGN IT at the top of the Rules page. Your name and the date go on this revision.',
-      ],
-      action: { label: 'READ AND SIGN', href: `${origin}/rules` },
-      notes: [
-        `The printed copy, with the signature page, is at ${origin}/rules/paper`,
-        'Signatures never carry forward. If a newer revision comes out, the league signs again.',
-      ],
-    };
-    for (const address of book.values()) {
-      await sendMail(address, content, origin, 'notify');
+): Promise<SignRequestResult> {
+  const book = await addressBook();
+  const sent = input.owners.filter((owner) => book.has(owner));
+  const noAddress = input.owners.filter((owner) => !book.has(owner));
+  const why = input.notes.trim();
+  const content: MailContent = {
+    subject: `Sign the rule book: revision ${input.revision} is out`,
+    preheader: 'One tap in the app. A new revision means everyone signs again.',
+    heading: `Revision ${input.revision} of the constitution is out`,
+    lines: [
+      `${input.publishedBy} published revision ${input.revision} of The Nerds constitution.`,
+      ...(why ? [`The note on it: ${why}`] : []),
+      'Read it, then tap I AGREE, SIGN IT at the top of the Rules page. Your name and the date go on this revision.',
+    ],
+    action: { label: 'READ AND SIGN', href: `${origin}/rules` },
+    notes: [
+      `The printed copy, with the signature page, is at ${origin}/rules/paper`,
+      'Signatures never carry forward. If a newer revision comes out, the league signs again.',
+    ],
+  };
+  queueMail('rule book sign request', async () => {
+    for (const owner of sent) {
+      await sendMail(book.get(owner) as string, content, origin, 'notify');
     }
   });
+  return { sent, noAddress };
 }
 
 // ─── Reminders ───────────────────────────────────────────────────────────────

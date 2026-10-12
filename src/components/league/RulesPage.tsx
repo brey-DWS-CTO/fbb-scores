@@ -533,7 +533,9 @@ export default function RulesPage() {
     try {
       const result = await publishRulebook(identity, fingerprint, notes);
       await loadPublished();
-      setNotice(`Published revision ${result.revision}. Everyone reads it now.`);
+      setNotice(
+        `Published revision ${result.revision}. Everyone reads it now. Nothing was emailed: use EMAIL A SIGN REQUEST in the Signatures block when you are ready.`,
+      );
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {

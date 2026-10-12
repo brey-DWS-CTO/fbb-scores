@@ -495,9 +495,21 @@ test('an unmapped ESPN team blocks the import and names itself', () => {
 test('the wrong season, or a season still running, is refused', () => {
   const wrong = parseEspnSeason({ ...espnFixture, seasonId: 2014 }, importOptions);
   assert.ok(wrong.problems.some((problem) => problem.kind === 'wrong-season'));
-  const running = parseEspnSeason(
+  // ESPN flags every season of a living league active, so a past season has
+  // to read as finished anyway: its year is gone, or its periods are played.
+  const flaggedButOver = parseEspnSeason(
     { ...espnFixture, status: { isActive: true } },
     importOptions,
+  );
+  assert.ok(!flaggedButOver.problems.some((problem) => problem.kind === 'season-in-progress'));
+  const played = parseEspnSeason(
+    { ...espnFixture, status: { isActive: true, finalScoringPeriod: 170, latestScoringPeriod: 170 } },
+    { ...importOptions, espnSeasonId: new Date(importOptions.fetchedAt).getUTCFullYear() + 1 },
+  );
+  assert.ok(!played.problems.some((problem) => problem.kind === 'season-in-progress'), 'all periods played');
+  const running = parseEspnSeason(
+    { ...espnFixture, status: { isActive: true, finalScoringPeriod: 170, latestScoringPeriod: 90 } },
+    { ...importOptions, espnSeasonId: new Date(importOptions.fetchedAt).getUTCFullYear() + 1 },
   );
   assert.ok(running.problems.some((problem) => problem.kind === 'season-in-progress'));
   assert.equal(running.seasonImport, null);
