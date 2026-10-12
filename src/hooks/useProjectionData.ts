@@ -12,7 +12,7 @@ export const PROJECTION_EDITS_KEY = ['projection-edits'] as const;
  * top. Every page that values players reads this, so an edit shows up in
  * projections, the mock draft and the draft room alike.
  */
-export function useProjectionData(): {
+export function useProjectionData(enabled = true): {
   /** The snapshot with edits applied. */
   snapshot: DraftRankingSnapshot | null;
   /** ESPN's numbers before any edit. */
@@ -23,7 +23,7 @@ export function useProjectionData(): {
   const { identity } = useIdentity();
   const { meta } = useLeagueState();
   // Every signed-in owner reads the numbers and the edits; only the commish writes.
-  const signedIn = identity !== null;
+  const signedIn = enabled && identity !== null;
   const rankings = useQuery({
     queryKey: ['mock-draft-rankings', identity?.owner ?? 'anon', meta?.draftRankings?.activeSnapshotId ?? 'none'],
     queryFn: () => fetchDraftRankings(identity as NonNullable<typeof identity>),

@@ -6,6 +6,18 @@ import { apiErrorMessage, clearDraftPick, submitDraftPick } from '../../lib/leag
 import { useApplyStateResponse, useIdentity } from '../../hooks/useLeague.js';
 import { usePostseasonGames } from '../../hooks/usePostseasonGames.js';
 import PostseasonTag from '../league/PostseasonTag.js';
+import {
+  allowedSort,
+  filterPool,
+  pickNumber,
+  pickPercent,
+  SORT_LABELS,
+  sortPool,
+  sortsFor,
+  type PickNumbersByKey,
+  type PickSort,
+  type PositionFilter,
+} from '../../lib/league/pickSheet.js';
 import { POSITION_ORDER, positionTheme } from './boardUtils.js';
 
 function SheetShell({
@@ -93,12 +105,15 @@ interface PickSheetProps {
   cell: BoardCell;
   pool: DatasetPlayer[];
   onClose: () => void;
+  /**
+   * The commissioner's numbers beside each name. Members get nothing here,
+   * and the sheet shows nothing without it.
+   */
+  numbers?: PickNumbersByKey | null;
 }
 
-type PositionFilter = 'ALL' | (typeof POSITION_ORDER)[number];
-
 /** Bottom sheet for entering a live draft pick into an empty cell. */
-export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
+export default function PickSheet({ cell, pool, onClose, numbers = null }: PickSheetProps) {
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const postseasonGames = usePostseasonGames();
@@ -107,27 +122,15 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PositionFilter>('ALL');
+  const [sortChoice, setSortChoice] = useState<PickSort>('name');
 
-  const alphabetical = useMemo(
-    () =>
-      [...pool].sort((a, b) => {
-        const nameA = a.fullName ?? a.name;
-        const nameB = b.fullName ?? b.name;
-        return nameA.localeCompare(nameB, 'en', { sensitivity: 'base' }) || a.key.localeCompare(b.key);
-      }),
-    [pool],
-  );
+  const isCommissioner = identity?.isCommissioner === true;
+  const showNumbers = isCommissioner && numbers !== null;
+  const sort = allowedSort(sortChoice, showNumbers);
+  const sorts = sortsFor(showNumbers);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase();
-    return alphabetical
-      .filter((player) => position === 'ALL' || player.positions.includes(position))
-      .filter((player) => {
-        if (!q) return true;
-        return [player.name, player.fullName ?? '', player.proTeam, ...player.positions]
-          .some((value) => value.toLocaleLowerCase().includes(q));
-      });
-  }, [alphabetical, position, query]);
+  const sorted = useMemo(() => sortPool(pool, sort, numbers), [pool, sort, numbers]);
+  const filtered = useMemo(() => filterPool(sorted, { query, position }), [sorted, position, query]);
 
   const chosenTheme = positionTheme(chosen?.positions);
 
@@ -274,6 +277,40 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
           </div>
 
           <div
+            aria-label="Sort players"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}
+          >
+            <span className="hub-heading" style={{ color: 'var(--text-dim)', fontSize: '0.55rem', marginRight: 2, flexShrink: 0 }}>
+              SORT
+            </span>
+            {sorts.map((option) => {
+              const active = sort === option;
+              return (
+                <button
+                  key={option}
+                  className="tap-btn"
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setSortChoice(option)}
+                  style={{
+                    minHeight: 32,
+                    padding: '4px 11px',
+                    border: `1px solid ${active ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
+                    borderRadius: 999,
+                    background: active ? 'rgba(0,255,204,0.1)' : 'var(--chip-bg)',
+                    color: active ? 'var(--neon-teal)' : 'var(--text-mid)',
+                    fontSize: '0.66rem',
+                    fontWeight: 800,
+                    flexShrink: 0,
+                  }}
+                >
+                  {SORT_LABELS[option]}
+                </button>
+              );
+            })}
+          </div>
+
+          <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -285,7 +322,7 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
             }}
           >
             <span>{filtered.length} AVAILABLE</span>
-            <span>NAME A–Z</span>
+            <span>{showNumbers ? 'COMMISH VIEW · MEMBERS SEE NO NUMBERS' : `BY ${SORT_LABELS[sort]}`}</span>
           </div>
 
           <div
@@ -307,6 +344,8 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
             {filtered.map((player) => {
               const theme = positionTheme(player.positions);
               const postseason = postseasonGames(player.proTeam);
+              const stat = showNumbers ? numbers.get(player.key) ?? null : null;
+              const gone = stat?.gone ?? null;
               return (
                 <button
                   key={player.key}
@@ -356,13 +395,54 @@ export default function PickSheet({ cell, pool, onClose }: PickSheetProps) {
                         </>
                       )}
                     </span>
+                    {showNumbers && (
+                      <span
+                        className="room-num"
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '2px 10px',
+                          marginTop: 4,
+                          color: 'var(--text-soft)',
+                          fontSize: '0.72rem',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span><b style={{ color: 'var(--text-dim)' }}>FPPG</b> <span className="room-strong">{pickNumber(stat?.fppg)}</span></span>
+                        <span><b style={{ color: 'var(--text-dim)' }}>ADP</b> {pickNumber(stat?.adp)}</span>
+                        <span><b style={{ color: 'var(--text-dim)' }}>RK</b> {pickNumber(stat?.rank, 0)}</span>
+                        <span><b style={{ color: 'var(--text-dim)' }}>PLAY-IN</b> {pickNumber(stat?.playIn, 0)}</span>
+                        <span><b style={{ color: 'var(--text-dim)' }}>PLAYOFF</b> {pickNumber(stat?.playoff, 0)}</span>
+                      </span>
+                    )}
                   </span>
-                  <span
-                    aria-hidden="true"
-                    style={{ alignSelf: 'center', paddingRight: 14, color: 'var(--text-faint)', fontSize: '1.1rem' }}
-                  >
-                    ›
-                  </span>
+                  {showNumbers ? (
+                    <span
+                      title="How often he is gone before your next pick, across 60 drafts from here"
+                      style={{
+                        alignSelf: 'center',
+                        minWidth: 52,
+                        marginRight: 10,
+                        padding: '4px 6px',
+                        borderRadius: 8,
+                        border: `1px solid ${gone !== null && gone >= 0.5 ? 'var(--neon-red)' : 'var(--panel-border)'}`,
+                        background: gone !== null && gone >= 0.5 ? 'rgba(255,34,34,0.12)' : 'var(--chip-bg)',
+                        color: gone !== null && gone >= 0.5 ? 'var(--neon-red)' : 'var(--text-mid)',
+                        textAlign: 'center',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      <span style={{ display: 'block', fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.05em' }}>GONE</span>
+                      <span style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800 }}>{pickPercent(gone)}</span>
+                    </span>
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      style={{ alignSelf: 'center', paddingRight: 14, color: 'var(--text-faint)', fontSize: '1.1rem' }}
+                    >
+                      ›
+                    </span>
+                  )}
                 </button>
               );
             })}

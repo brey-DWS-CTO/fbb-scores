@@ -16,6 +16,7 @@ import {
   stateWithKeeperScenario,
 } from '../../lib/league/keeperScenario.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
+import { useDraftNumbers } from '../../hooks/useDraftNumbers.js';
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
 import NavIcon from '../league/NavIcon.js';
@@ -249,6 +250,20 @@ export default function DraftPage() {
     ? board.slice(onClockIdx + 1).filter((c) => !c.selection && !c.keeper).slice(0, 3)
     : [];
 
+  // Only the commissioner's screen carries numbers. Members and the TV get none.
+  const { numbers } = useDraftNumbers({
+    enabled: started && identity?.isCommissioner === true,
+    dataset,
+    state: boardState,
+    onClock,
+    person: identity?.owner ?? null,
+  });
+
+  // The pick on the clock is yours to enter when it is your team's, or you are the commish.
+  const canEnterOnClock =
+    started && poolReady && onClock !== null && identity !== null
+    && (identity.isCommissioner || identity.owner === onClock.pick.currentOwner);
+
   const rounds = useMemo(
     () => Array.from({ length: dataset.draftRounds }, (_, i) => i + 1),
     [dataset.draftRounds],
@@ -431,6 +446,28 @@ export default function DraftPage() {
                 <span style={{ color: 'var(--neon-yellow)' }}> · via {onClock.pick.viaTradeFrom}</span>
               )}
             </div>
+            {canEnterOnClock && (
+              <button
+                className="tap-btn"
+                type="button"
+                onClick={() => setPickTarget(onClock)}
+                style={{
+                  width: '100%',
+                  minHeight: 52,
+                  marginTop: 12,
+                  padding: '0 20px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'var(--neon-teal)',
+                  color: '#001a14',
+                  fontWeight: 800,
+                  fontSize: '1rem',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                ENTER PICK {pickLabel(onClock.pick)}
+              </button>
+            )}
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>
@@ -614,13 +651,18 @@ export default function DraftPage() {
         ))
       ) : (
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 8 }}>
-          <BoardGrid board={board} projectedKeeperKeys={projectedKeys} />
+          <BoardGrid
+            board={board}
+            projectedKeeperKeys={projectedKeys}
+            tappable={isTappable}
+            onCellTap={onCellTap}
+          />
         </div>
       )}
 
       {showSignIn && <TeamPickerModal onClose={() => setShowSignIn(false)} />}
       {pickTarget && (
-        <PickSheet cell={pickTarget} pool={pool} onClose={() => setPickTarget(null)} />
+        <PickSheet cell={pickTarget} pool={pool} numbers={numbers} onClose={() => setPickTarget(null)} />
       )}
       {clearTarget && <ClearPickSheet cell={clearTarget} onClose={() => setClearTarget(null)} />}
     </div>

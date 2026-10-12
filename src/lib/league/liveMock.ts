@@ -156,3 +156,36 @@ export function oddsKeeperThere(
   }
   return there / runs;
 }
+
+/**
+ * The real board, from the pick on the clock: for every player still on it,
+ * how often he is gone before `person`'s next open pick, across `runs`
+ * drafts played from here. Picks already made stand as made. When the pick
+ * on the clock is the person's own, it goes to their best value and is not
+ * counted against them. Empty when the person has no open pick left.
+ */
+export function oddsGoneFromClock(
+  prepared: PreparedMock,
+  seed: number,
+  person: string,
+  onClock: number,
+  runs = 60,
+): Map<string, number> {
+  const gone = new Map<string, number>();
+  if (runs <= 0) return gone;
+  const until = nextLiveSlot(prepared, person, onClock);
+  if (!until) return gone;
+
+  for (let k = 0; k < runs; k += 1) {
+    const run = createMockRun(prepared, runSeed(seed, 1000 + k));
+    for (let slot = run.nextSlot(); slot && slot.pick.overall < until.pick.overall; slot = run.nextSlot()) {
+      const fixed = slot.keeper !== null || slot.made !== null;
+      const own = slot.pick.overall === onClock && slot.pick.currentOwner === person;
+      const pick = run.next();
+      if (fixed || own || slot.pick.overall < onClock || !pick.playerKey) continue;
+      gone.set(pick.playerKey, (gone.get(pick.playerKey) ?? 0) + 1);
+    }
+  }
+  for (const [key, count] of gone) gone.set(key, count / runs);
+  return gone;
+}
