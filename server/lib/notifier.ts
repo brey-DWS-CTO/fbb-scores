@@ -288,26 +288,22 @@ export async function sendRulebookSignRequest(
     owners: string[];
     /** "2026-27", the season the book is for. */
     seasonLabel: string;
-    /** True when this is the season's first published revision. */
-    first: boolean;
+    /** When the revision went out, ISO. */
+    publishedAt: string;
   },
   origin: string,
 ): Promise<SignRequestResult> {
   const book = await addressBook();
   const sent = input.owners.filter((owner) => book.has(owner));
   const noAddress = input.owners.filter((owner) => !book.has(owner));
-  const why = input.notes.trim();
-  const headline = input.first
-    ? `The first revision of the ${input.seasonLabel} constitution has released!`
-    : `A new revision of the ${input.seasonLabel} constitution has released!`;
+  const when = new Date(input.publishedAt);
+  const stamp = `${String(when.getUTCMonth() + 1).padStart(2, '0')}-${String(when.getUTCDate()).padStart(2, '0')}-${when.getUTCFullYear()}`;
+  const title = `The ${input.seasonLabel} Nerds Fantasy Basketball League Constitution`;
   const content: MailContent = {
-    subject: headline,
-    preheader: `Revision ${input.revision}. Read it and sign.`,
-    heading: headline,
-    lines: [
-      `Revision ${input.revision}, published by ${input.publishedBy}.${why ? ` ${why}` : ''}`,
-      'Read it, then sign at the bottom: tap to sign with your name, or draw it with a finger.',
-    ],
+    subject: title,
+    preheader: `Revision ${input.revision} released on ${stamp}`,
+    heading: title,
+    lines: [`Revision ${input.revision} released on ${stamp}`],
     action: { label: 'READ AND SIGN', href: `${origin}/rules/paper` },
   };
   queueMail('rule book sign request', async () => {

@@ -50,6 +50,13 @@ export default function PaperPage() {
   const [signing, setSigning] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
 
+  // The neon theme lays scanlines over the whole screen. Over white pages
+  // they read as a printer fault, so they go while this page is open.
+  useEffect(() => {
+    document.body.classList.add('paper-open');
+    return () => document.body.classList.remove('paper-open');
+  }, []);
+
   const loadSignatures = useCallback(async () => {
     try {
       setSignatures(await fetchRulebookSignatures());
@@ -130,8 +137,10 @@ export default function PaperPage() {
         canvas.className = 'paper-sheet';
         canvas.width = viewport.width;
         canvas.height = viewport.height;
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${base.height * scale}px`;
+        // Width follows the column and height follows the page's own shape,
+        // so a narrower screen than the one measured never stretches a page.
+        canvas.style.width = '100%';
+        canvas.style.height = 'auto';
         canvas.setAttribute('aria-label', `Page ${n} of ${doc.numPages}`);
         host.appendChild(canvas);
         const context = canvas.getContext('2d');
@@ -166,6 +175,15 @@ export default function PaperPage() {
           {draft ? 'Draft, as it would print' : 'The printed constitution'}
           {pages ? ` · ${pages} pages` : ''}
         </span>
+        {canSignHere && (
+          <button
+            type="button"
+            className="rule-edit-save tap-btn paper-jump-sign"
+            onClick={() => document.getElementById('sign')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            SIGN
+          </button>
+        )}
         {!draft && (
           <a className="rules-tool tap-btn rules-pdf-link" href={fileUrl} target="_blank" rel="noopener">
             <span aria-hidden="true">⤓</span> SAVE OR PRINT
@@ -177,7 +195,7 @@ export default function PaperPage() {
       <div ref={holder} className="paper-sheets" />
 
       {!draft && !rev && signatures && signatures.versionId && (
-        <section className="panel sign-block paper-sign">
+        <section id="sign" className="panel sign-block paper-sign">
           <div className="sign-head">
             <span className="hub-heading sign-title">SIGN REVISION {signatures.revision}</span>
             <span className="sign-count">

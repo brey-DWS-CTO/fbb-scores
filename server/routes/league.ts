@@ -1723,8 +1723,6 @@ router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (r
 
     const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
     if (!latest) throw new HttpError(409, 'Nothing is published yet, so there is nothing to sign');
-    const versions = await listRulebookVersions(RULEBOOK_SEASON);
-
     const result = await sendRulebookSignRequest(
       {
         revision: latest.revision,
@@ -1732,7 +1730,7 @@ router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (r
         publishedBy: latest.publishedBy,
         owners,
         seasonLabel: `${RULEBOOK_SEASON - 1}-${String(RULEBOOK_SEASON).slice(-2)}`,
-        first: versions.length <= 1,
+        publishedAt: latest.publishedAt,
       },
       appOrigin(req),
     );
