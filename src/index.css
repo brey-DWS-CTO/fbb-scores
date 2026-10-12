@@ -4601,6 +4601,26 @@ html.theme-light {
 .sign-pick { display: flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; }
 .sign-pick input { width: 18px; height: 18px; accent-color: var(--neon-teal); }
 
+/* ─── Signing on the printed copy, by name or by hand ──────────────── */
+.paper-sign { margin-top: 14px; }
+.paper-sign-actions { flex-wrap: wrap; }
+.paper-sign-draw { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.sign-pad { display: flex; flex-direction: column; gap: 6px; }
+.sign-pad-canvas {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 3 / 1;
+  height: auto;
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.sign-pad-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sign-pad-hint { color: var(--text-dim); font-size: 0.72rem; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

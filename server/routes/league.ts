@@ -143,7 +143,9 @@ import type { Rulebook } from '../../src/lib/league/rulebook.js';
 import {
   ACKNOWLEDGEMENT,
   canSign,
+  checkDrawing,
   makeSignature,
+  publicSignature,
   signatureStatus,
 } from '../../src/lib/league/rulebookSignatures.js';
 import { pdfFileName } from '../../src/lib/league/rulebookFront.js';
@@ -1780,7 +1782,7 @@ router.get('/rulebook/signatures', async (req, res, next) => {
       fingerprint: latest?.fingerprint ?? null,
       acknowledgement: ACKNOWLEDGEMENT,
       members: OWNERS,
-      signed: status.signed,
+      signed: status.signed.map(publicSignature),
       missing: status.missing,
       complete: status.complete,
     });
@@ -1793,12 +1795,16 @@ router.post('/rulebook/sign', requireAuth, async (req, res, next) => {
   try {
     // The owner comes from the PIN, never the body: nobody signs for anyone else.
     const owner = res.locals.owner as string;
-    const body = req.body as { versionId?: unknown; fingerprint?: unknown };
+    const body = req.body as { versionId?: unknown; fingerprint?: unknown; drawing?: unknown };
     const versionId = typeof body.versionId === 'string' ? body.versionId : '';
     const fingerprint = typeof body.fingerprint === 'string' ? body.fingerprint : '';
     if (!versionId || !fingerprint) {
       throw new HttpError(400, 'versionId and fingerprint are required');
     }
+    // A drawn signature is optional. A bad one is refused outright rather than
+    // quietly dropped, so nobody thinks they signed by hand when they did not.
+    const drawing = checkDrawing(body.drawing);
+    if (!drawing.ok) throw new HttpError(400, drawing.message);
 
     const latest = await getLatestRulebookVersion(RULEBOOK_SEASON);
     const signatures = await listRulebookSignatures(RULEBOOK_SEASON);
@@ -1825,14 +1831,19 @@ router.post('/rulebook/sign', requireAuth, async (req, res, next) => {
       // Stored as it reads today, so later wording cannot rewrite what was agreed.
       acknowledgement: ACKNOWLEDGEMENT,
       signedAt: new Date().toISOString(),
+      drawing: drawing.drawing,
     });
     await insertRulebookSignature(signature);
-    await appendAudit(actor(res), 'rulebook-sign', { versionId, revision: signature.revision });
+    await appendAudit(actor(res), 'rulebook-sign', {
+      versionId,
+      revision: signature.revision,
+      drawn: Boolean(drawing.drawing),
+    });
 
     const after = signatureStatus(OWNERS, [...signatures, signature], versionId);
     res.json({
-      signature,
-      signed: after.signed,
+      signature: publicSignature(signature),
+      signed: after.signed.map(publicSignature),
       missing: after.missing,
       complete: after.complete,
     });

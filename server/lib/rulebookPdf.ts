@@ -559,29 +559,36 @@ class Painter {
     doc.text(`${signed} of ${rows.length} members have signed.`, MARGIN, doc.y);
     this.gap(1);
 
-    const nameWidth = CONTENT_WIDTH * 0.4;
+    const nameWidth = CONTENT_WIDTH * 0.36;
+    const drawH = 30;
+    const rowH = drawH + BODY * GAP * 1.6;
     for (const row of rows) {
-      this.keepRoom(BODY * GAP * 3);
-      const y = doc.y;
-      this.body();
-      doc.text(row.name, MARGIN, y + 2, { width: nameWidth, lineBreak: false });
+      this.keepRoom(rowH + BODY);
+      const top = doc.y;
+      const lineY = top + drawH + 2;
       const lineX = MARGIN + nameWidth;
       const lineRight = PAGE.width - MARGIN;
-      if (row.signedAt) {
-        doc.font('italic').fillColor(MUTED);
-        doc.text(`Signed in the app, ${longDate(row.signedAt)}`, lineX, y + 2, {
-          width: lineRight - lineX,
-          lineBreak: false,
-        });
-        doc.fillColor(RULE);
+      this.body();
+      doc.text(row.name, MARGIN, lineY - BODY - 2, { width: nameWidth, lineBreak: false });
+      if (row.drawing) {
+        try {
+          doc.image(row.drawing, lineX + 4, top, { fit: [lineRight - lineX - 8, drawH] });
+        } catch {
+          // A picture that will not decode still leaves the name and the date.
+        }
       }
-      doc
-        .moveTo(lineX, y + BODY + 6)
-        .lineTo(lineRight, y + BODY + 6)
-        .lineWidth(0.6)
-        .strokeColor(RULE)
-        .stroke();
-      doc.y = y + BODY * GAP * 2.2;
+      if (row.signedAt) {
+        doc.font('italic').fontSize(8).fillColor(MUTED);
+        doc.text(
+          `${row.drawing ? 'Signed by hand in the app' : 'Signed in the app'}, ${longDate(row.signedAt)}`,
+          lineX,
+          lineY + 3,
+          { width: lineRight - lineX, lineBreak: false },
+        );
+        doc.fontSize(BODY).fillColor(RULE);
+      }
+      doc.moveTo(lineX, lineY).lineTo(lineRight, lineY).lineWidth(0.6).strokeColor(RULE).stroke();
+      doc.y = top + rowH;
     }
   }
 

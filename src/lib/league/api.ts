@@ -890,7 +890,7 @@ export interface RulebookSignaturesResponse {
   fingerprint: string | null;
   acknowledgement: string;
   members: string[];
-  signed: RulebookSignature[];
+  signed: Array<Omit<RulebookSignature, 'drawing'> & { drawn: boolean }>;
   missing: string[];
   complete: boolean;
 }
@@ -951,6 +951,8 @@ export async function signRulebook(
   c: Credentials,
   versionId: string,
   fingerprint: string,
+  /** A hand-drawn signature as a PNG data URL, or nothing to sign with the name. */
+  drawing: string | null = null,
 ): Promise<{
   signature: RulebookSignature;
   signed: RulebookSignature[];
@@ -959,7 +961,7 @@ export async function signRulebook(
 }> {
   const { data } = await axios.post(
     '/api/league/rulebook/sign',
-    { versionId, fingerprint },
+    { versionId, fingerprint, drawing },
     { headers: authHeaders(c) },
   );
   return data;

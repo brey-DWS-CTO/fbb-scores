@@ -1,8 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import NavIcon from './NavIcon.js';
+import SignaturePad from './SignaturePad.js';
 import { useIdentity } from '../../hooks/useLeague.js';
-import { apiErrorMessage, fetchDraftRulebookPdf, rulebookPdfUrl } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  fetchDraftRulebookPdf,
+  fetchRulebookSignatures,
+  rulebookPdfUrl,
+  signRulebook,
+  type RulebookSignaturesResponse,
+} from '../../lib/league/api.js';
+import { describeSignatures, signatureStatus } from '../../lib/league/rulebookSignatures.js';
+
+const formatDay = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 /**
  * The printed constitution, read inside the app.
@@ -28,6 +40,54 @@ export default function PaperPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [pages, setPages] = useState(0);
+  // Bumped after a signature lands, so the pages redraw with it on the back.
+  const [generation, setGeneration] = useState(0);
+
+  // ── Signing, at the bottom of the printed copy ──
+  const [signatures, setSignatures] = useState<RulebookSignaturesResponse | null>(null);
+  const [mode, setMode] = useState<'idle' | 'draw'>('idle');
+  const [drawing, setDrawing] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
+
+  const loadSignatures = useCallback(async () => {
+    try {
+      setSignatures(await fetchRulebookSignatures());
+    } catch {
+      setSignatures(null);
+    }
+  }, []);
+  useEffect(() => {
+    if (!draft && !rev) void loadSignatures();
+  }, [draft, rev, loadSignatures]);
+
+  const mine = identity && signatures ? signatures.signed.find((s) => s.owner === identity.owner) : undefined;
+  const canSignHere =
+    !draft &&
+    !rev &&
+    identity !== null &&
+    signatures !== null &&
+    signatures.versionId !== null &&
+    signatures.versionId === signatures.currentVersionId &&
+    signatures.fingerprint !== null &&
+    !mine;
+
+  const sign = async (withDrawing: string | null) => {
+    if (!identity || !signatures?.currentVersionId || !signatures.fingerprint) return;
+    setSigning(true);
+    setSignError(null);
+    try {
+      await signRulebook(identity, signatures.currentVersionId, signatures.fingerprint, withDrawing);
+      await loadSignatures();
+      setMode('idle');
+      setDrawing(null);
+      setGeneration((n) => n + 1);
+    } catch (e) {
+      setSignError(apiErrorMessage(e));
+    } finally {
+      setSigning(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +136,9 @@ export default function PaperPage() {
         host.appendChild(canvas);
         const context = canvas.getContext('2d');
         if (!context) continue;
-        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        // 'print' draws straight through instead of waiting on animation
+        // frames, which a background tab never gets. Same picture either way.
+        await page.render({ canvas, canvasContext: context, viewport, intent: 'print' }).promise;
       }
       if (!cancelled) setStatus('ready');
     };
@@ -91,7 +153,7 @@ export default function PaperPage() {
     };
     // identity.owner is what the draft fetch and the copy stamp depend on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, rev, identity?.owner]);
+  }, [draft, rev, identity?.owner, generation]);
 
   return (
     <main className="paper-page">
@@ -113,6 +175,75 @@ export default function PaperPage() {
       {status === 'loading' && <p className="paper-note">Laying out the pages...</p>}
       {status === 'error' && <p className="rules-draft-error">{error}</p>}
       <div ref={holder} className="paper-sheets" />
+
+      {!draft && !rev && signatures && signatures.versionId && (
+        <section className="panel sign-block paper-sign">
+          <div className="sign-head">
+            <span className="hub-heading sign-title">SIGN REVISION {signatures.revision}</span>
+            <span className="sign-count">
+              {describeSignatures(signatureStatus(signatures.members, signatures.signed, signatures.versionId))}
+            </span>
+          </div>
+          <p className="sign-ack">&ldquo;{signatures.acknowledgement}&rdquo;</p>
+
+          {mine && (
+            <p className="sign-line sign-mine">
+              You signed revision {mine.revision} on {formatDay(mine.signedAt)}
+              {mine.drawn ? ', by hand' : ''}. It is on the last page above.
+            </p>
+          )}
+          {!identity && !mine && <p className="sign-line">Sign in from the home page to sign.</p>}
+
+          {canSignHere && mode === 'idle' && (
+            <div className="sign-actions paper-sign-actions">
+              <button
+                type="button"
+                className="rule-edit-save tap-btn"
+                disabled={signing}
+                onClick={() => sign(null)}
+              >
+                {signing ? 'SIGNING...' : 'SIGN WITH MY NAME'}
+              </button>
+              <button type="button" className="rules-tool tap-btn" disabled={signing} onClick={() => setMode('draw')}>
+                DRAW MY SIGNATURE
+              </button>
+              <span className="rule-edit-hint">
+                Either one records your name and the time on this revision. A drawn signature prints on the
+                signature page.
+              </span>
+            </div>
+          )}
+
+          {canSignHere && mode === 'draw' && (
+            <div className="paper-sign-draw">
+              <SignaturePad onChange={setDrawing} />
+              <div className="sign-actions">
+                <button
+                  type="button"
+                  className="rule-edit-save tap-btn"
+                  disabled={signing || !drawing}
+                  onClick={() => sign(drawing)}
+                >
+                  {signing ? 'SIGNING...' : 'I AGREE, SIGN IT'}
+                </button>
+                <button
+                  type="button"
+                  className="rule-edit-cancel tap-btn"
+                  disabled={signing}
+                  onClick={() => {
+                    setMode('idle');
+                    setDrawing(null);
+                  }}
+                >
+                  CANCEL
+                </button>
+              </div>
+            </div>
+          )}
+
+          {signError && <p className="rules-draft-error">{signError}</p>}
+        </section>
+      )}
     </main>
   );
 }
