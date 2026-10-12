@@ -62,12 +62,19 @@ test('a top player is almost always gone by 1.9; nobody is gone before 1.1', () 
   assert.equal(shareGoneBefore(simulateTakenAt(prepared, 7, 40), cade.playerKey, 9), byNine);
 });
 
-test('the cost slot is the owner\'s pick in that round, skipping picks already charged', () => {
+test('the cost slot is the owner's pick in that round; a charged pick bumps the keep a round earlier', () => {
   const slot = keeperCostSlot(board.slots, 'Brey', 1);
   assert.equal(slot?.pick.overall, 9);
+  // Round one already charged to Cade: a second round-one keeper has nowhere to go.
   assert.equal(keeperCostSlot(board.slots, 'Brey', 1, new Set([9])), null);
-  assert.equal(keeperCostSlot(board.slots, 'Brey', 2)?.pick.round, 2);
-  assert.equal(keeperCostSlot(board.slots, 'Brey', 99), null);
+  const second = keeperCostSlot(board.slots, 'Brey', 2);
+  assert.equal(second?.pick.round, 2);
+  // Round two charged: a round-two keeper bumps to the round-one pick.
+  assert.equal(keeperCostSlot(board.slots, 'Brey', 2, new Set([second!.pick.overall]))?.pick.overall, 9);
+  // Both charged: nothing left from round two up.
+  assert.equal(keeperCostSlot(board.slots, 'Brey', 2, new Set([second!.pick.overall, 9])), null);
+  // A round past the end of the draft falls back to the latest pick there is.
+  assert.equal(keeperCostSlot(board.slots, 'Brey', 99)?.pick.currentOwner, 'Brey');
 });
 
 test('tone: keep him at 70 and up, maybe from 40, skip under 40', () => {

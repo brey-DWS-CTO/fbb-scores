@@ -456,6 +456,8 @@ export default function TeamKeeperPage() {
   const [flash, setFlash] = useState(false);
   const [leaguePool, setLeaguePool] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Commissioner only: the roster by keeper value, or by how often he is gone.
+  const [rosterByOdds, setRosterByOdds] = useState(false);
   const flashTimer = useRef<number | null>(null);
 
   // Reset local edits when navigating between teams
@@ -1142,8 +1144,31 @@ export default function TeamKeeperPage() {
             Their final 2026 roster, with keeper value, price, and contract status. This does not show saved picks.
           </div>
         )}
+        {oddsWorld && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 14px 8px' }}>
+            <div className="mock-seg" role="radiogroup" aria-label="Sort the roster">
+              {([['value', 'BY VALUE'], ['odds', 'BY GONE %']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={rosterByOdds === (key === 'odds')}
+                  className={`tap-btn mock-seg-btn${rosterByOdds === (key === 'odds') ? ' is-on' : ''}`}
+                  onClick={() => setRosterByOdds(key === 'odds')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div>
-          {rosterPlayers.map((p) => (
+          {(rosterByOdds && oddsWorld
+            ? [...rosterPlayers].sort((a, b) =>
+              (keeperOdds(b.key, b.keeper.round)?.share ?? -1) - (keeperOdds(a.key, a.keeper.round)?.share ?? -1)
+              || (b.keeper.effectiveAvg ?? -1) - (a.keeper.effectiveAvg ?? -1))
+            : rosterPlayers
+          ).map((p) => (
             <RosterRow
               key={p.key}
               p={p}

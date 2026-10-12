@@ -52,12 +52,18 @@ export function shareGoneBefore(taken: TakenAt, playerKey: string, overall: numb
 
 /**
  * The pick a keep in `round` would cost `owner` on this board: their own
- * slot in that round, skipping any already charged to another keeper. Null
- * when they hold no such pick (traded away, or every one is spoken for).
+ * slot in that round, skipping any already charged to another keeper. When
+ * that pick is gone (charged, or traded away) the keep bumps to the next
+ * earlier round, the way the engine charges a duplicate tier. Null when no
+ * pick from that round up is left.
  */
 export function keeperCostSlot(slots: readonly MockSlot[], owner: string, round: number, charged: ReadonlySet<number> = new Set()): MockSlot | null {
-  return slots.find((slot) =>
-    slot.pick.currentOwner === owner && slot.pick.round === round && !slot.made && !charged.has(slot.pick.overall)) ?? null;
+  for (let at = round; at >= 1; at -= 1) {
+    const slot = slots.find((entry) =>
+      entry.pick.currentOwner === owner && entry.pick.round === at && !entry.made && !charged.has(entry.pick.overall));
+    if (slot) return slot;
+  }
+  return null;
 }
 
 /**
