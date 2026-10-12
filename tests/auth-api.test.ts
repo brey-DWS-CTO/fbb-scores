@@ -335,11 +335,11 @@ test('a member seat cannot be used to take another seat', async () => {
 
 // ─── Rate limiting ───────────────────────────────────────────────────────────
 
-test('a fourth link in the window is refused with a wait', async () => {
+test('a sixth link in the window is refused with a wait', async () => {
   await setEmail('Amy', 'amy@example.com');
-  for (let i = 0; i < 3; i += 1) {
+  for (let i = 0; i < 5; i += 1) {
     const asked = await linkFor('amy@example.com');
-    assert.equal(asked.status, 200, `link ${i + 1} of 3 should send`);
+    assert.equal(asked.status, 200, `link ${i + 1} of 5 should send`);
   }
   const refused = await linkFor('amy@example.com');
   assert.equal(refused.status, 429);

@@ -1358,6 +1358,19 @@ export async function sessionExpired(c: Credentials): Promise<boolean> {
   }
 }
 
+/**
+ * True only when the server refuses this owner-and-PIN pair (a 401): the PIN
+ * was reset, or cleared. Anything else answers false and keeps them signed in.
+ */
+export async function pinDead(c: Credentials): Promise<boolean> {
+  try {
+    await axios.post('/api/league/verify', {}, { headers: authHeaders(c) });
+    return false;
+  } catch (e) {
+    return axios.isAxiosError(e) && e.response?.status === 401;
+  }
+}
+
 export function apiErrorMessage(e: unknown): string {
   if (axios.isAxiosError(e)) {
     // A phone can hold a sign-in the server no longer accepts: a PIN that was

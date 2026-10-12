@@ -87,7 +87,8 @@ export default function SignInAdmin() {
       const text = await fn();
       if (text) setNotes((all) => ({ ...all, [owner]: { text, ok: !text.startsWith('Saved.') } }));
     } catch (caught) {
-      setError(apiErrorMessage(caught));
+      // On the row, where the tap was, not at the foot of the list.
+      setNotes((all) => ({ ...all, [owner]: { text: `Did not work: ${apiErrorMessage(caught)}`, ok: false } }));
     } finally {
       setBusy(null);
     }

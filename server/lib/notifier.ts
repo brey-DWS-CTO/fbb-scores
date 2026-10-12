@@ -28,6 +28,7 @@ import {
   claimSentNotice,
   getOwnerEmails,
   getState,
+  issueLoginToken,
   listSentNotices,
 } from './leagueStore.js';
 import { sendMail, type MailContent } from './mailer.js';
@@ -300,7 +301,28 @@ export async function sendRulebookSignRequest(
   const when = new Date(input.publishedAt);
   const stamp = `${String(when.getUTCMonth() + 1).padStart(2, '0')}-${String(when.getUTCDate()).padStart(2, '0')}-${when.getUTCFullYear()}`;
   const title = `The ${input.seasonLabel} Nerds Fantasy Basketball League Constitution`;
-  const content: MailContent = {
+  const landing = `${origin}/rules/paper`;
+
+  /**
+   * The button is a personal sign-in link that lands on the printed copy, so
+   * tapping it signs the member in and puts SIGN in front of them. A phone
+   * holding a dead PIN was the way a signature failed to stick. If this
+   * address cannot have another link right now, the button still opens the
+   * copy and the page asks them to sign in.
+   */
+  const buttonFor = async (owner: string): Promise<string> => {
+    try {
+      const issued = await issueLoginToken(book.get(owner) as string, new Date());
+      if (issued.ok && issued.token) {
+        return `${origin}/sign-in/${encodeURIComponent(issued.token)}?next=${encodeURIComponent('/rules/paper')}`;
+      }
+    } catch (err) {
+      console.error('[notify] could not issue a sign-in link for the sign request:', err instanceof Error ? err.message : err);
+    }
+    return landing;
+  };
+
+  const contentFor = (href: string): MailContent => ({
     subject: title,
     preheader: `Revision ${input.revision} has been released on ${stamp}.`,
     heading: 'The Nerds',
@@ -308,11 +330,13 @@ export async function sendRulebookSignRequest(
       `${title}, revision ${input.revision}, has been released on ${stamp}.`,
       'Get in here and pretend to read and sign it!',
     ],
-    action: { label: 'READ AND SIGN', href: `${origin}/rules/paper` },
-  };
+    action: { label: 'READ AND SIGN', href },
+    notes: ['This button signs you in on this device. It works once, for two days.'],
+  });
+
   queueMail('rule book sign request', async () => {
     for (const owner of sent) {
-      await sendMail(book.get(owner) as string, content, origin, 'notify');
+      await sendMail(book.get(owner) as string, contentFor(await buttonFor(owner)), origin, 'notify');
     }
   });
   return { sent, noAddress };
