@@ -1345,6 +1345,19 @@ export async function cancelPickTrade(
   return data;
 }
 
+/**
+ * True only when the server says this sign-in is gone (a 401). A network
+ * blip or a database hiccup answers false, so it never signs anyone out.
+ */
+export async function sessionExpired(c: Credentials): Promise<boolean> {
+  try {
+    await fetchMe(c);
+    return false;
+  } catch (e) {
+    return axios.isAxiosError(e) && e.response?.status === 401;
+  }
+}
+
 export function apiErrorMessage(e: unknown): string {
   if (axios.isAxiosError(e)) {
     // A phone can hold a sign-in the server no longer accepts: a PIN that was
