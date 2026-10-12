@@ -112,9 +112,10 @@ before(async () => {
   cpSync(path.join(repoRoot, 'server'), path.join(tempRoot, 'server'), { recursive: true });
   cpSync(path.join(repoRoot, 'src'), path.join(tempRoot, 'src'), { recursive: true });
 
-  // A draft 30 hours out puts three of the four reminder windows open: the
-  // week warning, and both keeper warnings, since keepers close 24 hours
-  // before the draft. The draft-day warning is still an hour short.
+  // A draft 30 hours out puts two reminder windows open: the week warning,
+  // and the keeper last call, since keepers close 24 hours before the draft
+  // and last call opens 6 hours before that. The earlier keeper warnings have
+  // shut, and the draft-day warning is still six hours short.
   const configPath = path.join(tempRoot, 'src', 'data', 'source', 'league-2027-config.json');
   const config = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
   config.draftAt = new Date(Date.now() + 30 * 3600_000).toISOString();
@@ -311,12 +312,12 @@ test('the right secret runs the clock, and each reminder goes out once', async (
   const first = await tick({ authorization: 'Bearer open-sesame' });
   assert.equal(first.status, 200);
   const run = asRecord(first.body) as { due: number; sent: number };
-  // Three owners have addresses, none has saved a keeper: the week warning
-  // for all three, plus both keeper warnings for all three.
-  assert.equal(run.due, 9);
-  assert.equal(run.sent, 9);
+  // Three owners have addresses: the week warning and the keeper last call
+  // for each of them.
+  assert.equal(run.due, 6);
+  assert.equal(run.sent, 6);
   const firstBatch = mails();
-  assert.equal(firstBatch.length, 9);
+  assert.equal(firstBatch.length, 6);
   assert.equal(
     new Set(firstBatch.map((row) => row.to)).size,
     3,

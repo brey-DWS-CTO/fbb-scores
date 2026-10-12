@@ -56,7 +56,10 @@ export default function SignInAdmin() {
   const [pinDraft, setPinDraft] = useState('');
   const [clearArm, setClearArm] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<{ owner: string; text: string; ok: boolean } | null>(null);
+  /** What last happened on each row, kept until that row does something else. */
+  const [notes, setNotes] = useState<Record<string, { text: string; ok: boolean }>>({});
+  /** Whose action menu is open. */
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,14 +76,16 @@ export default function SignInAdmin() {
 
   if (!identity) return null;
 
+  const emailBy = new Map((emails ?? []).map((row) => [row.owner, row]));
+  const pinBy = new Map((pins ?? []).map((row) => [row.owner, row.state]));
+
   /** One write at a time, with its result shown under that owner's row. */
   const run = async (key: string, owner: string, fn: () => Promise<string | null>) => {
     setBusy(key);
     setError(null);
-    setNote(null);
     try {
       const text = await fn();
-      if (text) setNote({ owner, text, ok: !text.startsWith('Saved.') });
+      if (text) setNotes((all) => ({ ...all, [owner]: { text, ok: !text.startsWith('Saved.') } }));
     } catch (caught) {
       setError(apiErrorMessage(caught));
     } finally {
@@ -88,12 +93,15 @@ export default function SignInAdmin() {
     }
   };
 
+  const clock = () =>
+    new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
   const saveEmail = (owner: string) =>
     void run(`email-${owner}`, owner, async () => {
       const list = await saveOwnerEmail(identity, owner, (drafts[owner] ?? '').trim());
       setEmails(list);
       setDrafts(Object.fromEntries(list.map((row) => [row.owner, row.email])));
-      return 'EMAIL SAVED';
+      return `Email saved at ${clock()}.`;
     });
 
   /**
@@ -101,11 +109,14 @@ export default function SignInAdmin() {
    * check an address reaches somebody without asking them to try, and it is
    * safe because the link lands in their mail, not the commissioner's.
    */
-  const sendLink = (owner: string) =>
+  const sendLink = (owner: string) => {
+    setMenuFor(null);
+    const address = emailBy.get(owner)?.email ?? 'their address';
     void run(`link-${owner}`, owner, async () => {
       await sendOwnerLink(identity, owner);
-      return 'LINK SENT';
+      return `Sign-in link sent to ${address} at ${clock()}.`;
     });
+  };
 
   const savePin = (owner: string, pin: string) => {
     setClearArm(null);
@@ -114,8 +125,12 @@ export default function SignInAdmin() {
       setPins(await fetchPins(identity));
       setPinFor(null);
       setPinDraft('');
-      if (pin === '') return 'PIN CLEARED';
-      if (result.emailed) return result.logged ? 'PIN SET, MAIL LOGGED' : 'PIN SET AND EMAILED';
+      if (pin === '') return `PIN cleared at ${clock()}.`;
+      if (result.emailed) {
+        return result.logged
+          ? `PIN set at ${clock()}; the mail was logged, not sent.`
+          : `PIN set and emailed to ${emailBy.get(owner)?.email ?? 'their address'} at ${clock()}.`;
+      }
       return `Saved. ${result.reason ?? 'No email went out.'}`;
     });
   };
@@ -125,8 +140,6 @@ export default function SignInAdmin() {
     if (/^\d{4,8}$/.test(pinDraft)) savePin(owner, pinDraft);
   };
 
-  const emailBy = new Map((emails ?? []).map((row) => [row.owner, row]));
-  const pinBy = new Map((pins ?? []).map((row) => [row.owner, row.state]));
 
   return (
     <div>
@@ -189,19 +202,64 @@ export default function SignInAdmin() {
                   <button
                     className="tap-btn"
                     type="button"
-                    onClick={() => sendLink(owner)}
-                    disabled={busy !== null || dirty || !row?.email}
-                    title={dirty ? 'Save the address first' : `Send ${owner} a sign-in link`}
-                    style={smallBtn(
-                      'var(--panel-border)',
-                      !dirty && row?.email ? 'var(--text-mid)' : 'var(--text-ghost)',
-                    )}
+                    onClick={() => {
+                      setMenuFor(menuFor === owner ? null : owner);
+                      setClearArm(null);
+                    }}
+                    disabled={busy !== null || editingPin}
+                    aria-expanded={menuFor === owner}
+                    style={smallBtn(menuFor === owner ? 'var(--neon-teal)' : 'var(--panel-border)', menuFor === owner ? 'var(--neon-teal)' : 'var(--text-mid)')}
                   >
-                    {busy === `link-${owner}` ? '…' : 'LINK'}
+                    {menuFor === owner ? 'CLOSE' : 'ACTIONS'}
                   </button>
                 </div>
 
-                {editingPin ? (
+                {menuFor === owner && !editingPin && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      className="tap-btn"
+                      type="button"
+                      onClick={() => sendLink(owner)}
+                      disabled={busy !== null || dirty || !row?.email}
+                      title={dirty ? 'Save the address first' : `Send ${owner} a sign-in link`}
+                      style={smallBtn('var(--neon-teal)', !dirty && row?.email ? 'var(--neon-teal)' : 'var(--text-ghost)')}
+                    >
+                      {busy === `link-${owner}` ? '…' : 'SEND SIGN-IN LINK'}
+                    </button>
+                    <button
+                      className="tap-btn"
+                      type="button"
+                      onClick={() => {
+                        setPinFor(owner);
+                        setPinDraft('');
+                        setClearArm(null);
+                        setMenuFor(null);
+                      }}
+                      disabled={busy !== null}
+                      style={smallBtn('var(--panel-border)', 'var(--text-mid)')}
+                    >
+                      SET A NEW PIN
+                    </button>
+                    <button
+                      className="tap-btn"
+                      type="button"
+                      onClick={() => (clearArm === owner ? savePin(owner, '') : setClearArm(owner))}
+                      disabled={busy !== null || pinState === 'none'}
+                      style={smallBtn(
+                        clearArm === owner ? 'var(--neon-red)' : 'var(--panel-border)',
+                        pinState === 'none'
+                          ? 'var(--text-ghost)'
+                          : clearArm === owner
+                            ? 'var(--neon-red)'
+                            : 'var(--text-mid)',
+                      )}
+                    >
+                      {busy === `pin-${owner}` ? '…' : clearArm === owner ? 'SURE? CLEAR IT' : 'CLEAR PIN'}
+                    </button>
+                  </div>
+                )}
+
+                {editingPin && (
                   <form style={{ display: 'flex', gap: 8 }} onSubmit={(event) => submitPin(event, owner)}>
                     <input
                       className="identity-email-input"
@@ -236,49 +294,18 @@ export default function SignInAdmin() {
                       CANCEL
                     </button>
                   </form>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <button
-                      className="tap-btn"
-                      type="button"
-                      onClick={() => {
-                        setPinFor(owner);
-                        setPinDraft('');
-                        setClearArm(null);
-                        setNote(null);
-                      }}
-                      disabled={busy !== null}
-                      style={smallBtn('var(--neon-teal)')}
-                    >
-                      SET PIN
-                    </button>
-                    <button
-                      className="tap-btn"
-                      type="button"
-                      onClick={() => (clearArm === owner ? savePin(owner, '') : setClearArm(owner))}
-                      disabled={busy !== null || pinState === 'none'}
-                      style={smallBtn(
-                        clearArm === owner ? 'var(--neon-red)' : 'var(--panel-border)',
-                        pinState === 'none'
-                          ? 'var(--text-ghost)'
-                          : clearArm === owner
-                            ? 'var(--neon-red)'
-                            : 'var(--text-mid)',
-                      )}
-                    >
-                      {busy === `pin-${owner}` ? '…' : clearArm === owner ? 'SURE?' : 'CLEAR PIN'}
-                    </button>
-                  </div>
                 )}
 
-                {note?.owner === owner && (
+                {notes[owner] && (
                   <div
+                    role="status"
                     style={{
-                      ...badge(note.ok ? 'var(--neon-teal)' : 'var(--neon-yellow)'),
-                      fontSize: '0.68rem',
+                      color: notes[owner].ok ? 'var(--neon-teal)' : 'var(--neon-yellow)',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
                     }}
                   >
-                    {note.text}
+                    {notes[owner].text}
                   </div>
                 )}
               </div>

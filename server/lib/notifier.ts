@@ -31,6 +31,7 @@ import {
   listSentNotices,
 } from './leagueStore.js';
 import { sendMail, type MailContent } from './mailer.js';
+import { shameEmailCopy, type DuesBoard } from '../../src/lib/league/dues.js';
 
 const leagueDataset = rawDataset as unknown as LeagueDataset;
 
@@ -317,17 +318,46 @@ export async function sendRulebookSignRequest(
   return { sent, noAddress };
 }
 
+// ─── Dues ────────────────────────────────────────────────────────────────────
+
+/**
+ * "Pay up": one note to each team the commissioner is shaming, each with its
+ * own amount and the names still on the wall.
+ */
+export async function sendDuesShame(
+  input: { owners: string[]; season: number; board: DuesBoard; payee: string },
+  origin: string,
+): Promise<SignRequestResult> {
+  const book = await addressBook();
+  const sent = input.owners.filter((owner) => book.has(owner));
+  const noAddress = input.owners.filter((owner) => !book.has(owner));
+  queueMail('dues shame', async () => {
+    for (const owner of sent) {
+      const copy = shameEmailCopy({ owner, season: input.season, board: input.board, payee: input.payee });
+      const content: MailContent = {
+        subject: copy.subject,
+        preheader: copy.preheader,
+        heading: copy.heading,
+        lines: copy.lines,
+        action: { label: copy.actionLabel, href: `${origin}/dues` },
+        notes: copy.notes,
+      };
+      await sendMail(book.get(owner) as string, content, origin, 'notify');
+    }
+  });
+  return { sent, noAddress };
+}
+
 // ─── Reminders ───────────────────────────────────────────────────────────────
 
 function reminderContent(reminder: DueReminder, origin: string): MailContent {
   const copy = reminderCopy(reminder);
-  const keeperKind =
-    reminder.kind === 'keepers-soon' || reminder.kind === 'keepers-last-call';
+  const keeperKind = reminder.kind.startsWith('keepers-');
   return {
     subject: copy.subject,
-    preheader: copy.body,
+    preheader: copy.lines[0],
     heading: copy.heading,
-    lines: [copy.body],
+    lines: copy.lines,
     action: keeperKind
       ? { label: 'PICK YOUR KEEPERS', href: `${origin}/keepers` }
       : { label: 'OPEN THE DRAFT ROOM', href: `${origin}/draft` },
@@ -357,6 +387,12 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
   const withKeepers = Object.entries(state.keepers)
     .filter(([, selections]) => selections.length > 0)
     .map(([owner]) => owner);
+  const keeperNames = Object.fromEntries(
+    Object.entries(state.keepers).map(([owner, selections]) => [
+      owner,
+      selections.map((selection) => selection.playerName),
+    ]),
+  );
 
   const due = dueReminders({
     now,
@@ -364,6 +400,7 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
     season: state.season,
     owners: [...book.keys()],
     ownersWithKeepers: withKeepers,
+    keeperNames,
     alreadySent: await listSentNotices(state.season),
   });
 

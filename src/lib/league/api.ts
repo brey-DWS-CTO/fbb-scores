@@ -30,6 +30,7 @@ import type {
 } from './history.js';
 import type { ImportProblem, TeamMapping } from './historyImport.js';
 import type { RulebookSignature } from './rulebookSignatures.js';
+import type { DuesAction, DuesBoard } from './dues.js';
 import type { Poll, PollKind } from './polls.js';
 import type {
   LeagueScheduleMapping,
@@ -881,6 +882,56 @@ export interface PublishRulebookResponse {
   polls: string[];
 }
 
+// ─── Dues ────────────────────────────────────────────────────────────────────
+
+export interface DuesResponse extends DuesBoard {
+  season: number;
+  full: number;
+  half: number;
+  halfMaxTeams: number;
+  /** Venmo username that collects. Empty until a commissioner sets it. */
+  venmo: string;
+  /** The owner who collects. Empty until a commissioner sets it. */
+  payee: string;
+}
+
+/** Anyone may read who has paid. */
+export async function fetchDues(): Promise<DuesResponse> {
+  const { data } = await axios.get<DuesResponse>('/api/league/dues');
+  return data;
+}
+
+/** One change to one team's dues. The server checks who may make it. */
+export async function changeDues(c: Credentials, owner: string, action: DuesAction): Promise<DuesResponse> {
+  const { data } = await axios.post<DuesResponse>(
+    `/api/league/dues/${encodeURIComponent(owner)}`,
+    { action },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Mail every team that has not paid (commissioner only). */
+export async function sendDuesShame(c: Credentials): Promise<{ sent: string[]; noAddress: string[] }> {
+  const { data } = await axios.post<{ sent: string[]; noAddress: string[] }>(
+    '/api/league/dues/shame',
+    {},
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+/** Who collects and their Venmo (commissioner only). */
+export async function saveDuesSettings(
+  c: Credentials,
+  settings: { venmo: string; payee: string },
+): Promise<DuesResponse> {
+  const { data } = await axios.put<DuesResponse>('/api/league/dues/settings', settings, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
 // ─── Signatures ──────────────────────────────────────────────────────────────
 
 export interface RulebookSignaturesResponse {
@@ -1294,8 +1345,27 @@ export async function cancelPickTrade(
   return data;
 }
 
+/**
+ * True only when the server says this sign-in is gone (a 401). A network
+ * blip or a database hiccup answers false, so it never signs anyone out.
+ */
+export async function sessionExpired(c: Credentials): Promise<boolean> {
+  try {
+    await fetchMe(c);
+    return false;
+  } catch (e) {
+    return axios.isAxiosError(e) && e.response?.status === 401;
+  }
+}
+
 export function apiErrorMessage(e: unknown): string {
   if (axios.isAxiosError(e)) {
+    // A phone can hold a sign-in the server no longer accepts: a PIN that was
+    // reset, or a link that ran out. "Invalid owner" reads like an insult;
+    // say what to do instead.
+    if (e.response?.status === 401) {
+      return 'Your sign-in is out of date. Sign in again from the home page, then try that once more.';
+    }
     const data = e.response?.data as { error?: string } | undefined;
     return data?.error ?? e.message;
   }

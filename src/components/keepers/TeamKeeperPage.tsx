@@ -17,6 +17,8 @@ import { buildWorld } from '../../lib/league/whatIf.js';
 import { defaultMockSettings, prepareMock, type MockSlot } from '../../lib/league/mockDraft.js';
 import { keeperCostSlot, oddsTone, openOwnerBoard, shareGoneBefore, simulateTakenAt, type TakenAt } from '../../lib/league/keeperOdds.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
+import { keeperDeadline, nameList, pacificLabel } from '../../lib/league/notifications.js';
+import { DraftCountdown } from '../../hooks/useCountdown.js';
 import {
   useApplyStateResponse,
   useIdentity,
@@ -410,6 +412,52 @@ function WhosIn({
 }
 
 /** /keepers/:owner — one team's keeper worksheet (the old Excel sheet, but alive). */
+/**
+ * Whether the owner is done, in words nobody can misread. An owner asked "is
+ * mine locked in or do I lock it again?", so this says saving is the whole job
+ * and never asks the owner to lock anything. The commish locks.
+ */
+function KeeperStatusBanner({
+  savedNames,
+  dirty,
+  dueLabel,
+}: {
+  savedNames: string[];
+  dirty: boolean;
+  dueLabel: string;
+}) {
+  const done = savedNames.length > 0 && !dirty;
+  const color = done ? 'var(--neon-teal)' : 'var(--neon-yellow)';
+  const heading = dirty
+    ? 'CHANGES NOT SAVED'
+    : done
+      ? '✓ YOUR KEEPERS ARE SAVED'
+      : 'NO KEEPERS SAVED YET';
+  const body = dirty
+    ? `Tap SAVE KEEPERS at the bottom or these changes do not count. Due ${dueLabel}.`
+    : done
+      ? `You saved ${nameList(savedNames)}. You are done. There is nothing else to lock or send. You can change them until ${dueLabel}.`
+      : `Pick up to two below and tap SAVE KEEPERS by ${dueLabel}. Saving is all you do. Keeping nobody? Then you are set.`;
+  return (
+    <div
+      className="panel"
+      role="status"
+      style={{
+        borderColor: color,
+        background: `color-mix(in srgb, ${color} 8%, var(--panel-bg))`,
+        padding: '10px 12px',
+        borderRadius: 8,
+        marginBottom: 12,
+      }}
+    >
+      <div className="hub-heading" style={{ fontSize: '0.62rem', color, marginBottom: 4 }}>
+        {heading}
+      </div>
+      <div style={{ color: 'var(--text-hi)', fontSize: '0.82rem', lineHeight: 1.4 }}>{body}</div>
+    </div>
+  );
+}
+
 export default function TeamKeeperPage() {
   const headerRef = useRef<HTMLDivElement>(null);
   // Came from the mock draft's PROJECT link: offer the way straight back.
@@ -703,8 +751,15 @@ export default function TeamKeeperPage() {
           </h1>
           <div style={{ color: 'var(--text-mid)', fontSize: '0.85rem' }}>{teamName(owner)}</div>
         </div>
-        <div style={{ flexShrink: 0, paddingTop: 4 }}>
+        <div style={{ flexShrink: 0, paddingTop: 4, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <IdentityChip />
+          {!locked && meta?.draftAt && (
+            <DraftCountdown
+              targetIso={keeperDeadline(new Date(meta.draftAt)).toISOString()}
+              size="0.85rem"
+              label="KEEPERS DUE IN"
+            />
+          )}
         </div>
       </div>
 
@@ -891,6 +946,13 @@ export default function TeamKeeperPage() {
         </div>
       )}
       {locked && !isCommish && !projectionMode && <LockBanner />}
+      {identity?.owner === owner && meta?.viewer === owner && !projectionMode && !locked && meta.draftAt && (
+        <KeeperStatusBanner
+          savedNames={serverSelections.map((selection) => selection.playerName)}
+          dirty={dirty}
+          dueLabel={pacificLabel(keeperDeadline(new Date(meta.draftAt)).toISOString())}
+        />
+      )}
       {locked && isCommish && (
         <div style={{ color: 'var(--neon-yellow)', fontSize: '0.75rem', marginBottom: 12 }}>
           <NavIcon name="lock" size={14} className="icon-in-heading" />
@@ -912,7 +974,7 @@ export default function TeamKeeperPage() {
           }}
         >
           <span style={{ color: 'var(--neon-yellow)', fontSize: '0.85rem' }}>
-            Read-only. Sign in to edit your team.
+            You are signed out. Sign in to see and save your keepers.
           </span>
           <IdentityChip />
         </div>
@@ -1234,7 +1296,13 @@ export default function TeamKeeperPage() {
                       : 'Fix the blocked keeper choice'}
                 </span>
               ) : (
-                <span style={{ color: 'var(--text-dim)' }}>{projectionMode ? 'Private projection saved' : 'In sync with the league'}</span>
+                <span style={{ color: projectionMode || serverSelections.length === 0 ? 'var(--text-dim)' : 'var(--neon-teal)' }}>
+                  {projectionMode
+                    ? 'Private projection saved'
+                    : serverSelections.length > 0
+                      ? '✓ Saved. You are done.'
+                      : 'No keepers saved'}
+                </span>
               )}
             </div>
             <button

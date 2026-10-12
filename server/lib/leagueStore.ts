@@ -22,6 +22,7 @@ import {
   canRequestLink,
   emailTakenBy,
   isExpired,
+  sessionEndsAt,
   isValidEmail,
   linkExpiresAt,
   normalizeEmail,
@@ -33,6 +34,7 @@ import leagueConfig from '../../src/data/source/league-2027-config.json' with { 
 import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
+import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
 
@@ -220,6 +222,16 @@ export interface LoginTokenRow {
   owner: string;
   issuedAt: string;
   expiresAt: string;
+}
+
+/**
+ * The issue time before which an ordinary session has had its season. A
+ * session issued at the cutoff ends exactly at `now`.
+ */
+function seasonCutoff(nowIso: string): string {
+  const now = new Date(nowIso);
+  const lived = Date.parse(sessionExpiresAt(now)) - now.getTime();
+  return new Date(now.getTime() - lived).toISOString();
 }
 
 /** A signed-in device. Same rule: the hash is stored, never the token. */
@@ -476,6 +488,14 @@ interface StoreBackend {
   insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature>;
   /** Removes one signature. True when there was one to remove. */
   deleteRulebookSignature(versionId: string, owner: string): Promise<boolean>;
+  listDues(season: number): Promise<DuesRow[]>;
+  /**
+   * Writes one team's dues row only if nobody changed it since `expected` was
+   * read ('' for a team with no row yet). False when someone beat us to it.
+   */
+  saveDues(row: DuesRow, expected: string): Promise<boolean>;
+  getDuesSettings(season: number): Promise<DuesSettings | null>;
+  saveDuesSettings(row: DuesSettings): Promise<void>;
   getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null>;
   saveHistoryDraft(
     season: number,
@@ -710,6 +730,25 @@ class NeonBackend implements StoreBackend {
       primary key (version_id, owner)
     )`;
     await this.sql`ALTER TABLE rulebook_signatures ADD COLUMN IF NOT EXISTS drawing text`;
+    // League dues: one row per team per season. The app cannot see Venmo, so a
+    // row records what the member said and what a commissioner confirmed.
+    await this.sql`CREATE TABLE IF NOT EXISTS league_dues (
+      season int not null,
+      owner text not null,
+      half boolean not null default false,
+      paid_at timestamptz,
+      verified_at timestamptz,
+      verified_by text,
+      updated_at timestamptz not null,
+      primary key (season, owner)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS league_dues_settings (
+      season int primary key,
+      venmo text not null default '',
+      payee text not null default '',
+      updated_at timestamptz,
+      updated_by text
+    )`;
     await this.sql`CREATE TABLE IF NOT EXISTS league_history_draft (
       season int primary key,
       data jsonb not null,
@@ -966,7 +1005,12 @@ class NeonBackend implements StoreBackend {
   async purgeExpiredAuth(now: string): Promise<void> {
     await this.ensureInit();
     await this.sql`DELETE FROM login_tokens WHERE expires_at < ${now}`;
-    await this.sql`DELETE FROM sessions WHERE expires_at < ${now}`;
+    // Same rule as sessionEndsAt: an ordinary sign-in lives a season from
+    // issue, whatever end date the row was written with.
+    const issuedCutoff = seasonCutoff(now);
+    await this.sql`DELETE FROM sessions
+      WHERE expires_at < ${now}
+        AND (impersonated_by IS NOT NULL OR issued_at < ${issuedCutoff})`;
   }
 
   async appendAudit(owner: string | null, action: string, detail: unknown): Promise<void> {
@@ -1420,6 +1464,79 @@ class NeonBackend implements StoreBackend {
     return gone.length > 0;
   }
 
+  async listDues(season: number): Promise<DuesRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT season, owner, half, paid_at, verified_at, verified_by, updated_at
+      FROM league_dues WHERE season = ${season}`) as Array<{
+      season: number;
+      owner: string;
+      half: boolean;
+      paid_at: string | Date | null;
+      verified_at: string | Date | null;
+      verified_by: string | null;
+      updated_at: string | Date;
+    }>;
+    const iso = (value: string | Date | null) => (value === null ? null : new Date(value).toISOString());
+    return rows.map((row) => ({
+      season: row.season,
+      owner: row.owner,
+      half: row.half,
+      paidAt: iso(row.paid_at),
+      verifiedAt: iso(row.verified_at),
+      verifiedBy: row.verified_by,
+      updatedAt: new Date(row.updated_at).toISOString(),
+    }));
+  }
+
+  async saveDues(row: DuesRow, expected: string): Promise<boolean> {
+    await this.ensureInit();
+    if (expected === '') {
+      const written = (await this.sql`INSERT INTO league_dues
+        (season, owner, half, paid_at, verified_at, verified_by, updated_at)
+        VALUES (${row.season}, ${row.owner}, ${row.half}, ${row.paidAt}, ${row.verifiedAt},
+          ${row.verifiedBy}, ${row.updatedAt})
+        ON CONFLICT (season, owner) DO NOTHING
+        RETURNING owner`) as Array<{ owner: string }>;
+      return written.length > 0;
+    }
+    const written = (await this.sql`UPDATE league_dues SET
+        half = ${row.half}, paid_at = ${row.paidAt}, verified_at = ${row.verifiedAt},
+        verified_by = ${row.verifiedBy}, updated_at = ${row.updatedAt}
+      WHERE season = ${row.season} AND owner = ${row.owner}
+        AND updated_at = ${expected}::timestamptz
+      RETURNING owner`) as Array<{ owner: string }>;
+    return written.length > 0;
+  }
+
+  async getDuesSettings(season: number): Promise<DuesSettings | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT season, venmo, payee, updated_at, updated_by
+      FROM league_dues_settings WHERE season = ${season}`) as Array<{
+      season: number;
+      venmo: string;
+      payee: string;
+      updated_at: string | Date | null;
+      updated_by: string | null;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      season: row.season,
+      venmo: row.venmo,
+      payee: row.payee,
+      updatedAt: row.updated_at === null ? null : new Date(row.updated_at).toISOString(),
+      updatedBy: row.updated_by,
+    };
+  }
+
+  async saveDuesSettings(row: DuesSettings): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO league_dues_settings (season, venmo, payee, updated_at, updated_by)
+      VALUES (${row.season}, ${row.venmo}, ${row.payee}, ${row.updatedAt}, ${row.updatedBy})
+      ON CONFLICT (season) DO UPDATE SET venmo = EXCLUDED.venmo, payee = EXCLUDED.payee,
+        updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
+  }
+
   async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -1623,6 +1740,8 @@ interface FileDoc {
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
+  dues: DuesRow[];
+  duesSettings: DuesSettings[];
   historyDrafts: LeagueHistoryDraftRow[];
   historyVersions: LeagueHistoryVersionRow[];
   polls: PollRow[];
@@ -1649,6 +1768,8 @@ function emptyDoc(): FileDoc {
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
+    dues: [],
+    duesSettings: [],
     historyDrafts: [],
     historyVersions: [],
     polls: [],
@@ -1706,6 +1827,8 @@ class FileBackend implements StoreBackend {
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
+        dues: Array.isArray(doc.dues) ? doc.dues : [],
+        duesSettings: Array.isArray(doc.duesSettings) ? doc.duesSettings : [],
         historyDrafts: Array.isArray(doc.historyDrafts) ? doc.historyDrafts : [],
         historyVersions: Array.isArray(doc.historyVersions) ? doc.historyVersions : [],
         polls: Array.isArray(doc.polls) ? doc.polls : [],
@@ -1914,7 +2037,7 @@ class FileBackend implements StoreBackend {
     await this.enqueueWrite(() => {
       const doc = this.readDoc();
       doc.loginTokens = doc.loginTokens.filter((row) => row.expiresAt >= now);
-      doc.sessions = doc.sessions.filter((row) => row.expiresAt >= now);
+      doc.sessions = doc.sessions.filter((row) => sessionEndsAt(row) >= now);
       this.writeDoc(doc);
     });
   }
@@ -2226,6 +2349,41 @@ class FileBackend implements StoreBackend {
       if (doc.rulebookSignatures.length === before) return false;
       this.writeDoc(doc);
       return true;
+    });
+  }
+
+  async listDues(season: number): Promise<DuesRow[]> {
+    await this.ensureInit();
+    return this.readDoc().dues.filter((row) => row.season === season);
+  }
+
+  async saveDues(row: DuesRow, expected: string): Promise<boolean> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const at = doc.dues.findIndex((r) => r.season === row.season && r.owner === row.owner);
+      const current = at === -1 ? '' : doc.dues[at].updatedAt;
+      // Same rule as Neon: only write over the row the caller read.
+      if (current !== expected) return false;
+      if (at === -1) doc.dues.push(structuredClone(row));
+      else doc.dues[at] = structuredClone(row);
+      this.writeDoc(doc);
+      return true;
+    });
+  }
+
+  async getDuesSettings(season: number): Promise<DuesSettings | null> {
+    await this.ensureInit();
+    return this.readDoc().duesSettings.find((row) => row.season === season) ?? null;
+  }
+
+  async saveDuesSettings(row: DuesSettings): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.duesSettings = doc.duesSettings.filter((r) => r.season !== row.season);
+      doc.duesSettings.push(structuredClone(row));
+      this.writeDoc(doc);
     });
   }
 
@@ -2628,7 +2786,7 @@ export async function verifySession(token: string, now: Date): Promise<SessionCh
 
   const cached = sessionCache.get(key);
   if (cached && now.getTime() - cached.readAt < SESSION_CACHE_MS) {
-    if (isExpired(cached.row.expiresAt, now)) {
+    if (isExpired(sessionEndsAt(cached.row), now)) {
       sessionCache.delete(key);
       return { ok: false };
     }
@@ -2643,7 +2801,7 @@ export async function verifySession(token: string, now: Date): Promise<SessionCh
 
   const row = await getBackend().getSession(key);
   if (row === null) return { ok: false };
-  if (isExpired(row.expiresAt, now)) {
+  if (isExpired(sessionEndsAt(row), now)) {
     await getBackend().deleteSession(key);
     sessionCache.delete(key);
     return { ok: false };
@@ -2952,6 +3110,22 @@ export async function insertRulebookSignature(
 
 export async function deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
   return getBackend().deleteRulebookSignature(versionId, owner);
+}
+
+export async function listDues(season: number): Promise<DuesRow[]> {
+  return getBackend().listDues(season);
+}
+
+export async function saveDues(row: DuesRow, expected: string): Promise<boolean> {
+  return getBackend().saveDues(row, expected);
+}
+
+export async function getDuesSettings(season: number): Promise<DuesSettings | null> {
+  return getBackend().getDuesSettings(season);
+}
+
+export async function saveDuesSettings(row: DuesSettings): Promise<void> {
+  return getBackend().saveDuesSettings(row);
 }
 
 export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {
