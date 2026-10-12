@@ -195,10 +195,17 @@ test('a fingerprint is required, so nobody publishes without seeing the diff', a
   assert.equal(missing.status, 400);
 });
 
-test('publishing with no draft at all is refused', async () => {
-  const noDraft = await publish(commissioner, fingerprint(rulebookSeed()));
-  assert.equal(noDraft.status, 409);
-  assert.match(String(asRecord(noDraft.body).error), /no draft/i);
+test('with no draft stored, the committed seed is what publishes', async () => {
+  // The editor shows the seed at v0 when nothing is saved, so the first
+  // publish of a season must work from it. The fingerprint still has to be
+  // the seed's: a stale one is refused like any other.
+  const stale = await publish(commissioner, 'rb_00000000_0');
+  assert.equal(stale.status, 409);
+  assert.equal(asRecord(stale.body).code, 'stale-fingerprint');
+
+  const fromSeed = await publish(commissioner, fingerprint(rulebookSeed()));
+  assert.equal(fromSeed.status, 200, JSON.stringify(fromSeed.body));
+  assert.equal(typeof asRecord(fromSeed.body).revision, 'number');
 });
 
 test('republishing an unchanged book is refused', async () => {

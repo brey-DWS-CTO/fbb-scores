@@ -927,6 +927,26 @@ export async function fetchDraftRulebookPdf(c: Credentials): Promise<Blob> {
   return data;
 }
 
+export interface SignRequestResponse {
+  versionId: string;
+  revision: number;
+  sent: string[];
+  noAddress: string[];
+}
+
+/** Mail the picked members a "read it, sign it" note (commissioner only). */
+export async function requestRulebookSignatures(
+  c: Credentials,
+  owners: string[],
+): Promise<SignRequestResponse> {
+  const { data } = await axios.post<SignRequestResponse>(
+    '/api/league/rulebook/sign-request',
+    { owners },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
 export async function signRulebook(
   c: Credentials,
   versionId: string,

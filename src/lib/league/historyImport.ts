@@ -150,7 +150,17 @@ export function parseEspnSeason(
       message: 'ESPN returned no teams for that season',
     });
   }
-  if (payload.status?.isActive === true) {
+  // ESPN keeps `isActive` true on every season of a league that is still
+  // going, so on its own it says nothing about THIS season. A season is over
+  // when its last scoring period has been played, or when the year it ends is
+  // already behind us.
+  const status = payload.status;
+  const periodsDone =
+    status?.finalScoringPeriod !== undefined &&
+    status?.latestScoringPeriod !== undefined &&
+    status.latestScoringPeriod >= status.finalScoringPeriod;
+  const yearGone = options.espnSeasonId < new Date(options.fetchedAt).getUTCFullYear();
+  if (status?.isActive === true && !periodsDone && !yearGone) {
     problems.push({
       kind: 'season-in-progress',
       severity: 'error',
