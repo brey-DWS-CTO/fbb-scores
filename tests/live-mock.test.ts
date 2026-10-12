@@ -8,7 +8,7 @@ import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
 import fixture from './fixtures/espn-draft-rankings-2027-2026-09-25.json' with { type: 'json' };
 import type { LeagueDataset, LeagueDynamicState } from '../src/lib/keeper/types.ts';
 import { valueBoard } from '../src/lib/league/draftValue.ts';
-import { autoPick, nextLiveSlot, oddsGoneByNextPick, oddsKeeperThere, replayLive } from '../src/lib/league/liveMock.ts';
+import { autoPick, nextLiveSlot, oddsGoneByNextPick, oddsGoneFromClock, oddsKeeperThere, replayLive } from '../src/lib/league/liveMock.ts';
 import { buildMockBoard, createMockRun, defaultMockSettings, prepareMock, runMock } from '../src/lib/league/mockDraft.ts';
 import { applyPlayerPoolToDataset, playerPoolFromDataset } from '../src/lib/league/playerPool.ts';
 
@@ -120,4 +120,40 @@ test('at your keeper slot, the odds he would still be there are a share, and not
   assert.equal(oddsKeeperThere(prepared, 7, 'Brey', 12, {}, 10), null);
   // The real draft is untouched: Cade is still kept at 1.9.
   assert.equal(replayLive(prepared, 7, 'Brey', {}).picks[8].how, 'keeper');
+});
+
+test('on the real board, the odds count from the pick on the clock to the person\'s next open pick', () => {
+  // Keepers revealed, draft started, the first three picks made.
+  const made = [select('Nikola Jokic'), select('Victor Wembanyama'), select('Luka Doncic')];
+  const live: LeagueDynamicState = {
+    ...state,
+    keepersRevealed: true,
+    draft: {
+      picks: Object.fromEntries(made.map((pick, index) => [String(index + 1), pick])),
+      startedAt: '2026-10-18T21:00:00.000Z',
+    },
+  };
+  const realBoard = buildMockBoard(dataset, { viewer: 'Brey', state: live, scenario: {}, useEntered: true });
+  const real = prepareMock({ board: realBoard, values, settings: defaultMockSettings('realistic', OWNERS, 1) });
+  // Pick 4 is on the clock; Brey's first open pick is 2.2 (overall 12).
+  const odds = oddsGoneFromClock(real, 1, 'Brey', 4, 30);
+  assert.ok(odds.size > 5);
+  for (const share of odds.values()) assert.ok(share > 0 && share <= 1);
+  for (const pick of made) assert.equal(odds.has(pick.playerKey), false, 'a made pick is not on the board');
+  assert.equal(odds.has(select('Cade Cunningham').playerKey), false, 'a keeper is not on the board');
+  // Eight picks pass before 2.2, so the best values left are mostly gone.
+  const best = real.pool.slice(0, 3);
+  assert.ok(best.some((candidate) => (odds.get(candidate.playerKey) ?? 0) > 0.5));
+  // The same seed gives the same answer.
+  assert.deepEqual([...oddsGoneFromClock(real, 1, 'Brey', 4, 30)], [...odds]);
+  // From Brey's own pick the question is "if I pass, is he there at 3.9?", so the
+  // best value left is mostly gone, not quietly taken by Brey himself.
+  const fromOwn = oddsGoneFromClock(real, 1, 'Brey', 12, 30);
+  assert.ok(fromOwn.size > 5);
+  const run = createMockRun(real, 1);
+  while (run.nextSlot() && run.nextSlot()!.pick.overall < 12) run.next();
+  const bestLeft = run.available()[0]!;
+  assert.ok((fromOwn.get(bestLeft.playerKey) ?? 0) > 0.5, `${bestLeft.playerName} should be mostly gone, got ${fromOwn.get(bestLeft.playerKey)}`);
+  // No open pick left: nothing.
+  assert.equal(oddsGoneFromClock(real, 1, 'Brey', 140, 30).size, 0);
 });

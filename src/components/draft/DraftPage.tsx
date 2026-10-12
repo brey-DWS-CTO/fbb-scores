@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
@@ -9,26 +9,41 @@ import {
   useIdentity,
   useKeeperScenario,
 } from '../../hooks/useLeague.js';
-import { apiErrorMessage, clearKeeperScenario, startDraft } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  clearKeeperScenario,
+  enterSandbox,
+  exitSandbox,
+  expireDraftClock,
+  sandboxActive,
+  startDraft,
+} from '../../lib/league/api.js';
+import { clockExpired } from '../../lib/league/draftClock.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import {
   projectedPlayerKeys,
   stateWithKeeperScenario,
 } from '../../lib/league/keeperScenario.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
+import { useDraftNumbers } from '../../hooks/useDraftNumbers.js';
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
 import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
+import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
+  ACTION_BUTTON,
   cellDisplay,
   POSITION_ORDER,
   positionColor,
   positionTheme,
   recentPicks,
 } from './boardUtils.js';
+
+/** Picks shown under the clock before SHOW ALL. */
+const RECENT_LIMIT = 10;
 
 function PosChip({ positions }: { positions: string[] }) {
   if (positions.length === 0) return null;
@@ -175,11 +190,11 @@ function PickRow({
         ) : (
           <div
             style={{
-              color: cell.onClock ? 'var(--neon-teal)' : 'var(--text-ghost)',
-              fontWeight: cell.onClock ? 700 : 400,
+              color: cell.onClock ? 'var(--neon-teal)' : cell.skipped ? 'var(--neon-red)' : 'var(--text-ghost)',
+              fontWeight: cell.onClock || cell.skipped ? 700 : 400,
             }}
           >
-            {cell.onClock ? 'ON THE CLOCK' : '—'}
+            {cell.onClock ? 'ON THE CLOCK' : cell.skipped ? `SKIPPED · ${tappable ? 'tap to enter' : 'open any time'}` : '—'}
           </div>
         )}
       </div>
@@ -239,9 +254,40 @@ export default function DraftPage() {
     }
   };
 
+  // A dry run from right here: copy the league into test mode, start it,
+  // reload so every read comes from the copy. Nothing touches the server.
+  const [testBusy, setTestBusy] = useState(false);
+  const inSandbox = sandboxActive();
+  const doTestDraft = async () => {
+    if (!identity || testBusy) return;
+    setTestBusy(true);
+    setStartError(null);
+    try {
+      await enterSandbox(identity);
+      await startDraft(identity);
+      window.location.reload();
+    } catch (e) {
+      exitSandbox();
+      setStartError(apiErrorMessage(e));
+      setTestBusy(false);
+    }
+  };
+  const doExitTest = () => {
+    exitSandbox();
+    window.location.reload();
+  };
+
   const board = useMemo(() => buildDraftBoard(dataset, boardState), [boardState, dataset]);
   const pool = useMemo(() => availablePlayers(dataset, boardState), [boardState, dataset]);
-  const recent = useMemo(() => recentPicks(board, 5), [board]);
+  // Every live pick, newest first. Keepers are not picks.
+  const allPicks = useMemo(() => recentPicks(board, Number.POSITIVE_INFINITY), [board]);
+  const [showAllPicks, setShowAllPicks] = useState(false);
+  const recent = showAllPicks ? allPicks : allPicks.slice(0, RECENT_LIMIT);
+  // The newest live pick, for UNDO.
+  const lastLive = useMemo(
+    () => (allPicks[0] ? board.find((cell) => cell.pick.overall === allPicks[0].overall) ?? null : null),
+    [board, allPicks],
+  );
 
   const onClockIdx = board.findIndex((c) => c.onClock);
   const onClock = onClockIdx >= 0 ? board[onClockIdx] : null;
@@ -249,11 +295,26 @@ export default function DraftPage() {
     ? board.slice(onClockIdx + 1).filter((c) => !c.selection && !c.keeper).slice(0, 3)
     : [];
 
+  // Only the commissioner's screen carries numbers. Members and the TV get none.
+  const { numbers } = useDraftNumbers({
+    enabled: started && identity?.isCommissioner === true,
+    dataset,
+    state: boardState,
+    onClock,
+    person: identity?.owner ?? null,
+  });
+
+  // The pick on the clock is yours to enter when it is your team's, or you are the commish.
+  const canEnterOnClock =
+    started && poolReady && onClock !== null && identity !== null
+    && (identity.isCommissioner || identity.owner === onClock.pick.currentOwner);
+
   const rounds = useMemo(
     () => Array.from({ length: dataset.draftRounds }, (_, i) => i + 1),
     [dataset.draftRounds],
   );
 
+  // An open cell takes a pick when it is on the clock, or was yielded (rule 2.3.2.2).
   const onCellTap = (cell: BoardCell) => {
     if (!started) return;
     if (cell.keeper) return;
@@ -266,7 +327,7 @@ export default function DraftPage() {
       setShowSignIn(true);
       return;
     }
-    if (!cell.onClock || (!identity.isCommissioner && identity.owner !== cell.pick.currentOwner)) return;
+    if (!(cell.onClock || cell.skipped) || (!identity.isCommissioner && identity.owner !== cell.pick.currentOwner)) return;
     setPickTarget(cell);
   };
 
@@ -275,9 +336,34 @@ export default function DraftPage() {
     if (cell.keeper) return false;
     if (cell.selection) return identity?.isCommissioner === true;
     if (!poolReady) return false;
-    if (!cell.onClock) return false;
+    if (!(cell.onClock || cell.skipped)) return false;
     return !identity || identity.isCommissioner || identity.owner === cell.pick.currentOwner;
   };
+
+  // When the called clock hits zero, whoever sees it first tells the server.
+  // The server checks its own clock, so a second report changes nothing.
+  const clock = boardState.draft.clock;
+  const reportedCall = useRef<string | null>(null);
+  useEffect(() => {
+    if (!identity || !clock?.call || !onClock || inSandbox === undefined) return;
+    const callAt = clock.call.at;
+    const report = () => {
+      if (reportedCall.current === callAt) return;
+      reportedCall.current = callAt;
+      expireDraftClock(identity, onClock.pick.overall).then(applyState).catch(() => {
+        reportedCall.current = null;
+      });
+    };
+    if (clockExpired(clock, Date.now())) {
+      report();
+      return;
+    }
+    const tick = window.setInterval(() => {
+      if (clockExpired(clock, Date.now())) report();
+    }, 500);
+    return () => window.clearInterval(tick);
+  }, [identity, clock, onClock, applyState, inSandbox]);
+  const skippedCells = board.filter((cell) => cell.skipped);
 
   return (
     <div
@@ -293,6 +379,26 @@ export default function DraftPage() {
           2027 DRAFT
         </div>
         <IdentityChip />
+        {inSandbox && identity?.isCommissioner && (
+          <button
+            className="tap-btn"
+            type="button"
+            onClick={doExitTest}
+            title="Exit the test draft and discard it"
+            style={{
+              padding: '6px 10px',
+              border: '2px solid var(--neon-red)',
+              borderRadius: 999,
+              background: 'transparent',
+              color: 'var(--neon-red)',
+              fontSize: '0.68rem',
+              fontWeight: 800,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            EXIT TEST
+          </button>
+        )}
         <Link
           to="/draft/tv"
           className="tap-btn"
@@ -405,6 +511,32 @@ export default function DraftPage() {
                     FOR REAL? TAP TO GO LIVE
                   </button>
                 )}
+                {!inSandbox && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      className="tap-btn"
+                      type="button"
+                      disabled={testBusy}
+                      onClick={doTestDraft}
+                      style={{
+                        minHeight: 44,
+                        padding: '0 18px',
+                        borderRadius: 10,
+                        border: '2px solid var(--neon-yellow)',
+                        background: 'rgba(255,230,0,0.08)',
+                        color: 'var(--neon-yellow)',
+                        fontWeight: 800,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      <NavIcon name="flask" size={15} className="icon-in-heading" />
+                      {testBusy ? 'SETTING UP…' : 'RUN A TEST DRAFT'}
+                    </button>
+                    <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginTop: 6 }}>
+                      A copy on this device only. Nothing is saved to the league.
+                    </div>
+                  </div>
+                )}
                 {startError && (
                   <div style={{ color: 'var(--neon-red)', fontSize: '0.78rem', marginTop: 8 }}>{startError}</div>
                 )}
@@ -413,24 +545,92 @@ export default function DraftPage() {
           </div>
         ) : onClock ? (
           <>
-            <div className="hub-heading blink" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)' }}>
-              ON THE CLOCK
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="hub-heading blink" style={{ fontSize: '0.62rem', color: 'var(--neon-yellow)' }}>
+                  ON THE CLOCK
+                </div>
+                <div
+                  className="hub-heading glow-teal"
+                  style={{ fontSize: 'clamp(1rem, 6vw, 1.6rem)', color: 'var(--neon-teal)', margin: '8px 0 2px' }}
+                >
+                  {onClock.pick.currentOwner.toUpperCase()}
+                </div>
+                <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
+                  {teamName(onClock.pick.currentOwner)}
+                </div>
+                <div style={{ color: 'var(--text-soft)' }}>
+                  Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall
+                  {onClock.pick.viaTradeFrom && (
+                    <span style={{ color: 'var(--neon-yellow)' }}> · via {onClock.pick.viaTradeFrom}</span>
+                  )}
+                </div>
+              </div>
+              <ClockReadout clock={boardState.draft.clock} corner />
             </div>
             <div
-              className="hub-heading glow-teal"
-              style={{ fontSize: 'clamp(1rem, 6vw, 1.6rem)', color: 'var(--neon-teal)', margin: '8px 0 2px' }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 8,
+                marginTop: 12,
+              }}
             >
-              {onClock.pick.currentOwner.toUpperCase()}
-            </div>
-            <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
-              {teamName(onClock.pick.currentOwner)}
-            </div>
-            <div style={{ color: 'var(--text-soft)' }}>
-              Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall
-              {onClock.pick.viaTradeFrom && (
-                <span style={{ color: 'var(--neon-yellow)' }}> · via {onClock.pick.viaTradeFrom}</span>
+              {canEnterOnClock && (
+                <button
+                  className="tap-btn"
+                  type="button"
+                  onClick={() => setPickTarget(onClock)}
+                  style={{ ...ACTION_BUTTON, border: 'none', background: 'var(--neon-teal)', color: '#001a14' }}
+                >
+                  ENTER PICK {pickLabel(onClock.pick)}
+                </button>
               )}
+              {identity?.isCommissioner && (
+                <button
+                  className="tap-btn"
+                  type="button"
+                  disabled={!lastLive}
+                  onClick={() => lastLive && setClearTarget(lastLive)}
+                  title={allPicks[0] ? `Clear ${allPicks[0].playerName} off ${allPicks[0].label}` : 'No pick to undo yet'}
+                  style={{
+                    ...ACTION_BUTTON,
+                    border: '2px solid var(--panel-border)',
+                    background: 'transparent',
+                    color: lastLive ? 'var(--text-soft)' : 'var(--text-dim)',
+                  }}
+                >
+                  ↶ UNDO LAST PICK
+                </button>
+              )}
+              <ClockControls clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
             </div>
+            {skippedCells.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--neon-red)', fontWeight: 700 }}>SKIPPED:</span>
+                {skippedCells.map((c) => (
+                  <button
+                    key={c.pick.overall}
+                    className="tap-btn"
+                    type="button"
+                    disabled={!isTappable(c)}
+                    onClick={() => onCellTap(c)}
+                    title="Rule 2.3.2.2: the skipped team may pick any time"
+                    style={{
+                      border: '1px dashed var(--neon-red)',
+                      background: 'rgba(255,34,34,0.08)',
+                      borderRadius: 999,
+                      padding: '3px 10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: 'var(--text-soft)',
+                    }}
+                  >
+                    {c.pick.currentOwner} · {pickLabel(c.pick)}{isTappable(c) ? ' · ENTER' : ''}
+                  </button>
+                ))}
+              </div>
+            )}
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>
@@ -462,6 +662,10 @@ export default function DraftPage() {
           </div>
         )}
       </div>
+
+      {started && !onClock && (
+        <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
+      )}
 
       {meta && !meta.revealed && started && (
         <div
@@ -502,22 +706,47 @@ export default function DraftPage() {
         </div>
       )}
 
-      {/* recent picks ticker */}
-      {recent.length > 0 && (
+      {/* picks made, newest first, like the mock room's pick list */}
+      {allPicks.length > 0 && (
         <div className="panel" style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
-          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)', marginBottom: 6 }}>
-            RECENT PICKS
-          </div>
-          {recent.map((rp) => (
-            <div key={rp.overall} style={{ display: 'flex', gap: 8, padding: '3px 0', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--text-dim)', minWidth: 40 }}>#{rp.overall}</span>
-              <span style={{ color: 'var(--text-soft)' }}>{rp.owner}</span>
-              <span style={{ color: 'var(--text-dim)' }}>→</span>
-              <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {rp.playerName}
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
+              PICKS · {allPicks.length} MADE
             </div>
-          ))}
+            {allPicks.length > RECENT_LIMIT && (
+              <button
+                className="tap-btn"
+                type="button"
+                onClick={() => setShowAllPicks((value) => !value)}
+                style={{
+                  padding: '4px 10px',
+                  border: '1px solid var(--panel-border)',
+                  borderRadius: 999,
+                  background: 'transparent',
+                  color: 'var(--text-mid)',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                }}
+              >
+                {showAllPicks ? `LAST ${RECENT_LIMIT}` : 'SHOW ALL'}
+              </button>
+            )}
+          </div>
+          <ol className="room-team-list room-results-list">
+            {recent.map((rp) => (
+              <li key={rp.overall} className={rp.owner === identity?.owner ? 'is-mine' : undefined}>
+                <span className="room-upcoming-num">{rp.label}</span>
+                <span className="room-player-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {rp.playerName}
+                </span>
+                <small>
+                  <span style={{ color: positionColor(rp.positions), fontWeight: 800 }}>{rp.positions.join('/')}</span>
+                </small>
+                <span />
+                <span className="room-update-owner">{rp.owner}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
@@ -614,13 +843,18 @@ export default function DraftPage() {
         ))
       ) : (
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 8 }}>
-          <BoardGrid board={board} projectedKeeperKeys={projectedKeys} />
+          <BoardGrid
+            board={board}
+            projectedKeeperKeys={projectedKeys}
+            tappable={isTappable}
+            onCellTap={onCellTap}
+          />
         </div>
       )}
 
       {showSignIn && <TeamPickerModal onClose={() => setShowSignIn(false)} />}
       {pickTarget && (
-        <PickSheet cell={pickTarget} pool={pool} onClose={() => setPickTarget(null)} />
+        <PickSheet cell={pickTarget} pool={pool} numbers={numbers} onClose={() => setPickTarget(null)} />
       )}
       {clearTarget && <ClearPickSheet cell={clearTarget} onClose={() => setClearTarget(null)} />}
     </div>

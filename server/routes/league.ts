@@ -14,6 +14,18 @@ import {
   buildDraftBoard,
   resolveTeamKeepers,
 } from '../../src/lib/keeper/engine.js';
+import {
+  callClock,
+  canCallClock,
+  clockExpired,
+  isPaused,
+  pauseClock,
+  pickTiming,
+  resumeClock,
+  startPickClock,
+  yieldPick,
+} from '../../src/lib/league/draftClock.js';
+import { nameTaken, parseWriteIn } from '../../src/lib/league/writeIn.js';
 import type {
   LeagueDataset,
   PickRef,
@@ -1099,6 +1111,40 @@ router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, 
 });
 
 /**
+ * A called clock that has run out yields the pick on the clock (rule
+ * 2.3.2.1) and moves the clock to the next team. Runs before every draft
+ * change and when a screen reports the countdown hit zero. Returns the
+ * yielded pick, or null when nothing changed.
+ */
+function settleClock(draft: LeagueDynamicState, dataset: LeagueDataset, now: string): number | null {
+  const clock = draft.draft.clock;
+  if (!clock || draft.draft.startedAt === null || !clockExpired(clock, now)) return null;
+  const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
+  if (!onClock) return null;
+  const next = yieldPick({ clock, skipped: draft.draft.skipped }, onClock.pick.overall, now);
+  draft.draft.clock = next.clock;
+  draft.draft.skipped = next.skipped;
+  return onClock.pick.overall;
+}
+
+/**
+ * POST /api/league/draft/clock/expire — a screen saw the countdown hit zero.
+ * Any signed-in member may report it; the server checks its own clock and
+ * does nothing when time is still left or the pick already moved on.
+ */
+router.post('/draft/clock/expire', requireAuth, async (_req, res) => {
+  const current = await getState();
+  const draftPoolDataset = await resolveDraftDataset(current.state);
+  const now = new Date().toISOString();
+  let yielded: number | null = null;
+  const result = await mutateState((draft) => {
+    yielded = settleClock(draft, currentDataset(draft, draftPoolDataset), now);
+  });
+  if (yielded !== null) await appendAudit(actor(res), 'draft.pick_yielded', { overallPick: yielded, at: now });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
+});
+
+/**
  * POST /api/league/draft/pick — record a draft pick.
  * Body: { overallPick: number, playerKey: string, playerName: string, isKeeper?: boolean }
  */
@@ -1122,10 +1168,23 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
   const isCommissioner = res.locals.isCommissioner as boolean;
   const current = await getState();
   const draftPoolDataset = await resolveDraftDataset(current.state);
-  const player = draftPoolDataset.players.find((candidate) => candidate.key === playerKey);
-  if (!player) {
-    res.status(400).json({ error: `Unknown player: ${playerKey}` });
-    return;
+  // A write-in is a player the locked pool does not have: name, team and position typed in.
+  const writeIn = body.writeIn === true;
+  let player: { key: string; name: string; proTeam: string; positions: string[] };
+  if (writeIn) {
+    const parsed = parseWriteIn({ name: body.playerName, proTeam: body.proTeam, positions: body.positions });
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+    player = parsed.player;
+  } else {
+    const found = draftPoolDataset.players.find((candidate) => candidate.key === playerKey);
+    if (!found) {
+      res.status(400).json({ error: `Unknown player: ${playerKey}` });
+      return;
+    }
+    player = found;
   }
   const timestamp = new Date().toISOString();
   const result = await mutateState((draft) => {
@@ -1133,17 +1192,30 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
     const dataset = currentDataset(draft, draftPoolDataset);
-    const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
-    if (!onClock) throw new HttpError(409, 'The draft is complete');
-    if (onClock.pick.overall !== overallPick) {
-      throw new HttpError(409, `Pick #${onClock.pick.overall} is on the clock`);
+    settleClock(draft, dataset, timestamp);
+    const board = buildDraftBoard(dataset, draft);
+    const onClock = board.find((cell) => cell.onClock);
+    // A yielded pick is its owner's to fill any time, rule 2.3.2.2.
+    const target = board.find((cell) => cell.pick.overall === overallPick && cell.skipped) ?? null;
+    if (!target) {
+      if (!onClock) throw new HttpError(409, 'The draft is complete');
+      if (onClock.pick.overall !== overallPick) {
+        throw new HttpError(409, `Pick #${onClock.pick.overall} is on the clock`);
+      }
     }
-    if (!isCommissioner && onClock.pick.currentOwner !== authedOwner) {
-      throw new HttpError(403, `Only ${onClock.pick.currentOwner} can enter this pick`);
+    const cell = target ?? onClock!;
+    if (!isCommissioner && cell.pick.currentOwner !== authedOwner) {
+      throw new HttpError(403, `Only ${cell.pick.currentOwner} can enter this pick`);
     }
-    if (!availablePlayers(dataset, draft).some((candidate) => candidate.key === player.key)) {
+    if (writeIn) {
+      const wanted = player.name.toLowerCase();
+      const inPool = dataset.players.find((entry) => entry.name.toLowerCase() === wanted || entry.fullName?.toLowerCase() === wanted);
+      if (inPool) throw new HttpError(409, `${inPool.fullName ?? inPool.name} is in the player pool. Pick him from the list.`);
+      if (nameTaken(player.name, draft.draft.picks, [], new Set())) throw new HttpError(409, `${player.name} is already on the board`);
+    } else if (!availablePlayers(dataset, draft).some((candidate) => candidate.key === player.key)) {
       throw new HttpError(409, `${player.name} is already off the board`);
     }
+    const yielded = draft.draft.skipped?.[String(overallPick)];
     draft.draft.picks[String(overallPick)] = {
       playerKey: player.key,
       playerName: player.name,
@@ -1152,7 +1224,17 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       isKeeper: false,
       enteredBy: authedOwner,
       timestamp,
+      ...(target && yielded
+        ? { skipped: true, clockCalledBy: yielded.calledBy || null }
+        : pickTiming(draft.draft.clock, timestamp)),
     };
+    if (target) {
+      // Filling a yielded pick does not touch the team on the clock.
+      if (draft.draft.skipped) delete draft.draft.skipped[String(overallPick)];
+    } else {
+      // The next team's time starts now. A pause the commish set stays set.
+      draft.draft.clock = startPickClock(timestamp, isPaused(draft.draft.clock));
+    }
   });
   await appendAudit(actor(res), 'draft.pick', {
     overallPick,
@@ -1161,6 +1243,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     proTeam: player.proTeam,
     positions: player.positions,
     isKeeper: false,
+    writeIn,
   });
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
 });
@@ -1175,7 +1258,15 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
     return;
   }
   const result = await mutateState((draft) => {
+    const was = draft.draft.picks[String(overallPick)];
     delete draft.draft.picks[String(overallPick)];
+    if (was?.skipped) {
+      // A late-filled pick goes back to being yielded; the clock stays where it is.
+      draft.draft.skipped = { ...(draft.draft.skipped ?? {}), [String(overallPick)]: { at: new Date().toISOString(), calledBy: was.clockCalledBy ?? '' } };
+    } else if (draft.draft.startedAt !== null) {
+      // Clearing a pick puts that team back on the clock with a fresh timer.
+      draft.draft.clock = startPickClock(new Date().toISOString(), isPaused(draft.draft.clock));
+    }
   });
   await appendAudit(actor(res), 'draft.pick_cleared', { overallPick });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
@@ -1201,9 +1292,70 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
       draft.draft.playerPoolSnapshotId =
         draft.playerPool?.activeSnapshotId ?? FALLBACK_PLAYER_POOL.id;
       draft.draft.startedAt = new Date().toISOString();
+      draft.draft.clock = startPickClock(draft.draft.startedAt);
     }
   });
   await appendAudit(actor(res), 'draft.started', null);
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/draft/clock/call — call CLOCK on the team picking (rule 2.3.1).
+ * Any signed-in member, not on their own pick, once every five picks. The
+ * commissioner has no cooldown. Nothing is skipped when time runs out; the
+ * yield in 2.3.2.1 stays a call at the table.
+ */
+router.post('/draft/clock/call', requireAuth, async (_req, res) => {
+  const caller = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner as boolean;
+  const current = await getState();
+  const draftPoolDataset = await resolveDraftDataset(current.state);
+  const now = new Date().toISOString();
+  let calledOn = '';
+  const result = await mutateState((draft) => {
+    if (draft.draft.startedAt === null) throw new HttpError(409, 'The draft has not started');
+    const dataset = currentDataset(draft, draftPoolDataset);
+    settleClock(draft, dataset, now);
+    const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock) ?? null;
+    const check = canCallClock({ clock: draft.draft.clock, picks: draft.draft.picks, onClock, caller, isCommissioner, now });
+    if (!check.ok) {
+      const why: Record<typeof check.reason, string> = {
+        'not-started': 'The draft has not started',
+        complete: 'The draft is complete',
+        'own-pick': 'You cannot call CLOCK on your own pick',
+        'already-called': 'CLOCK is already running on this pick',
+        paused: 'The clock is paused',
+        'too-early': `Give them their time first: CLOCK opens in ${check.secondsToWait} second${check.secondsToWait === 1 ? '' : 's'}`,
+        cooldown: `You can call CLOCK again in ${check.picksToWait} pick${check.picksToWait === 1 ? '' : 's'}`,
+      };
+      throw new HttpError(check.reason === 'own-pick' ? 403 : 409, why[check.reason]);
+    }
+    calledOn = onClock!.pick.currentOwner;
+    draft.draft.clock = callClock(draft.draft.clock!, caller, now);
+  });
+  await appendAudit(actor(res), 'draft.clock_called', { on: calledOn, at: now });
+  res.json(redactState(result, { owner: caller, isCommissioner }));
+});
+
+/** POST /api/league/draft/clock/pause — freeze the pick timer and any CLOCK (commissioner only). */
+router.post('/draft/clock/pause', requireAuth, requireCommissioner, async (_req, res) => {
+  const now = new Date().toISOString();
+  const result = await mutateState((draft) => {
+    if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
+    draft.draft.clock = pauseClock(draft.draft.clock, now);
+  });
+  await appendAudit(actor(res), 'draft.clock_paused', { at: now });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/** POST /api/league/draft/clock/resume — let the clock run again (commissioner only). */
+router.post('/draft/clock/resume', requireAuth, requireCommissioner, async (_req, res) => {
+  const now = new Date().toISOString();
+  const result = await mutateState((draft) => {
+    if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
+    draft.draft.clock = resumeClock(draft.draft.clock, now);
+  });
+  await appendAudit(actor(res), 'draft.clock_resumed', { at: now });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 

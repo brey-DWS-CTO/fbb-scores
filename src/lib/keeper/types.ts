@@ -125,6 +125,37 @@ export interface DraftPickState {
   isKeeper?: boolean;
   enteredBy?: string;
   timestamp?: string;
+  /** How long the team had the pick, pauses taken out. Set by the server as the pick lands. */
+  seconds?: number;
+  /** Who called CLOCK on this pick, if anyone. */
+  clockCalledBy?: string | null;
+  /** The called clock ran out and this pick was entered late, rule 2.3.2.2. */
+  skipped?: boolean;
+}
+
+export interface SkippedPick {
+  /** When the clock ran out. */
+  at: string;
+  calledBy: string;
+}
+
+export interface ClockCall {
+  by: string;
+  /** When the call landed. */
+  at: string;
+  /** The pick timer's reading at that moment, so pauses after it count right. */
+  atElapsedMs: number;
+}
+
+/** The draft clock, rule 2.3. The server stamps every moment; screens only do arithmetic. */
+export interface DraftClockState {
+  /** When the team on the clock got the pick. Null before the draft starts. */
+  pickStartedAt: string | null;
+  /** Set while the commissioner has the clock paused. */
+  pausedAt: string | null;
+  /** Paused time already taken off this pick. */
+  pausedMs: number;
+  call: ClockCall | null;
 }
 
 export interface LeagueOverrides {
@@ -148,6 +179,13 @@ export interface LeagueDynamicState {
     closedAt?: string | null;
     /** Pool frozen when the commissioner starts the draft. */
     playerPoolSnapshotId?: string | null;
+    /** The pick timer and any CLOCK call, rule 2.3. See src/lib/league/draftClock.ts. */
+    clock?: DraftClockState | null;
+    /**
+     * Picks whose called clock ran out, by overall pick, rule 2.3.2.1. They
+     * stay open for their owner to fill any time; the clock moves on.
+     */
+    skipped?: Record<string, SkippedPick>;
   };
   /** Commissioner-accepted pool used before the draft is frozen. */
   playerPool?: {
@@ -293,4 +331,6 @@ export interface BoardCell {
   selection: DraftPickState | null;
   keeper: ResolvedKeeper | null; // pre-filled keeper occupying this pick
   onClock: boolean;
+  /** Open, yielded by an expired CLOCK, and still the owner's to fill any time. */
+  skipped: boolean;
 }

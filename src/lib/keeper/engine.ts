@@ -498,15 +498,18 @@ export function buildDraftBoard(
   }
 
   let onClockAssigned = false;
+  const yielded = dynamic.draft.skipped ?? {};
   const cells: BoardCell[] = picks.map((pick) => {
     const selection = dynamic.draft.picks[String(pick.overall)] ?? null;
     const keeper = keeperByOverall.get(pick.overall) ?? null;
-    return { pick, selection, keeper, onClock: false };
+    // A yielded pick stays open for its owner, rule 2.3.2.2, but the clock has moved on.
+    const skipped = !selection && !keeper && yielded[String(pick.overall)] !== undefined;
+    return { pick, selection, keeper, onClock: false, skipped };
   });
   // Nobody is on the clock until the commissioner starts the draft
   if (dynamic.draft.startedAt !== null) {
     for (const cell of cells) {
-      if (!cell.selection && !cell.keeper && !onClockAssigned) {
+      if (!cell.selection && !cell.keeper && !cell.skipped && !onClockAssigned) {
         cell.onClock = true;
         onClockAssigned = true;
       }

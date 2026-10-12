@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
 import { useDraftData } from '../../hooks/useLeague.js';
@@ -7,6 +8,7 @@ import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import NavIcon from '../league/NavIcon.js';
 import BoardGrid from './BoardGrid.js';
+import { ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import { recentPicks } from './boardUtils.js';
 
 /** Full-screen wall board for the draft-night TV. Read-only, 3s poll. */
@@ -131,6 +133,7 @@ export default function DraftTvPage() {
                   <span style={{ color: 'var(--neon-yellow)' }}> · VIA {onClock.pick.viaTradeFrom.toUpperCase()}</span>
                 )}
               </div>
+              <ClockReadout clock={state.draft.clock} tv />
             </>
           ) : (
             <div
@@ -148,6 +151,23 @@ export default function DraftTvPage() {
         </div>
 
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <Link
+            to="/draft"
+            style={{
+              display: 'inline-block',
+              marginBottom: 4,
+              padding: '3px 10px',
+              border: '1px solid var(--panel-border)',
+              borderRadius: 999,
+              color: 'var(--text-mid)',
+              textDecoration: 'none',
+              fontSize: 'clamp(0.6rem, 1.4vh, 0.85rem)',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+            }}
+          >
+            EXIT TV
+          </Link>
           {sandboxActive() && (
             <div
               style={{
@@ -196,6 +216,12 @@ export default function DraftTvPage() {
           </div>
         </div>
       </div>
+
+      {started && !onClock && (
+        <div style={{ flexShrink: 0, padding: '8px 10px 0' }}>
+          <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} tv />
+        </div>
+      )}
 
       {/* board fills the rest; horizontal scroll fallback on small screens */}
       <div

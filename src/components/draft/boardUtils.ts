@@ -1,8 +1,22 @@
+import type { CSSProperties } from 'react';
 import type { BoardCell, DatasetPlayer } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
 import { leagueDataset } from '../../lib/league/data.js';
 
 export const POSITION_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+
+/** The draft actions under the clock share one look and sit in one grid. */
+export const ACTION_BUTTON: CSSProperties = {
+  minHeight: 48,
+  padding: '0 10px',
+  borderRadius: 10,
+  fontWeight: 800,
+  fontSize: '0.8rem',
+  letterSpacing: '0.05em',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
 
 export interface PositionTheme {
   color: string;
@@ -90,6 +104,7 @@ export interface RecentPick {
   overall: number;
   owner: string; // team on the clock for that pick (trade-adjusted)
   playerName: string;
+  positions: string[];
   label: string; // "4.7"
   timestamp: string;
 }
@@ -104,6 +119,7 @@ export function recentPicks(board: BoardCell[], limit = 5): RecentPick[] {
       overall: c.pick.overall,
       owner: c.pick.currentOwner,
       playerName: s.playerName ?? playerForKey(s.playerKey)?.name ?? 'Unknown',
+      positions: s.positions ?? playerForKey(s.playerKey)?.positions ?? [],
       label: pickLabel(c.pick),
       timestamp: s.timestamp ?? '',
     });

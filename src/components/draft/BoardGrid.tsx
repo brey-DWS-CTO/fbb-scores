@@ -11,6 +11,9 @@ interface Props {
   projectedKeeperKeys?: ReadonlySet<string>;
   /** TV mode: fill the parent's height exactly (rows 1fr), viewport-scaled fonts. */
   tv?: boolean;
+  /** Which cells a tap acts on, and what the tap does. Neither on the TV. */
+  tappable?: (cell: BoardCell) => boolean;
+  onCellTap?: (cell: BoardCell) => void;
 }
 
 const NO_PROJECTED_KEEPERS: ReadonlySet<string> = new Set();
@@ -83,7 +86,13 @@ function TradeTooltip({ tip }: { tip: TradeTip }) {
  * The classic wall board: 10 team columns (draft order) x 14 round rows,
  * with an owner header row and a round-number rail.
  */
-export default function BoardGrid({ board, projectedKeeperKeys = NO_PROJECTED_KEEPERS, tv = false }: Props) {
+export default function BoardGrid({
+  board,
+  projectedKeeperKeys = NO_PROJECTED_KEEPERS,
+  tv = false,
+  tappable,
+  onCellTap,
+}: Props) {
   const [tip, setTip] = useState<TradeTip | null>(null);
 
   const cellMap = useMemo(() => {
@@ -102,7 +111,8 @@ export default function BoardGrid({ board, projectedKeeperKeys = NO_PROJECTED_KE
       style={{
         display: 'grid',
         gridTemplateColumns: `${tv ? 'minmax(26px, 3vw)' : '30px'} repeat(${OWNERS.length}, minmax(0, 1fr))`,
-        gridTemplateRows: tv ? `auto repeat(${rounds.length}, minmax(0, 1fr))` : undefined,
+        // Every round the same height: the tallest cell on the board sets it.
+        gridTemplateRows: tv ? `auto repeat(${rounds.length}, minmax(0, 1fr))` : `auto repeat(${rounds.length}, 1fr)`,
         gap: 3,
         height: tv ? '100%' : undefined,
         minWidth: 900,
@@ -161,6 +171,8 @@ export default function BoardGrid({ board, projectedKeeperKeys = NO_PROJECTED_KE
               onTradeShow={(cell, x, y) => setTip({ cell, x, y })}
               onTradeHide={() => setTip(null)}
               tipShownFor={tip?.cell.pick.overall ?? null}
+              onTap={onCellTap}
+              canTap={tappable}
             />
           ))}
         </Fragment>
@@ -177,6 +189,8 @@ function GridCell({
   onTradeShow,
   onTradeHide,
   tipShownFor,
+  onTap,
+  canTap,
 }: {
   cell?: BoardCell;
   projectedKeeperKeys: ReadonlySet<string>;
@@ -184,8 +198,11 @@ function GridCell({
   onTradeShow: (cell: BoardCell, x: number, y: number) => void;
   onTradeHide: () => void;
   tipShownFor: number | null;
+  onTap?: (cell: BoardCell) => void;
+  canTap?: (cell: BoardCell) => boolean;
 }) {
   if (!cell) return <div />;
+  const tappable = !tv && onTap !== undefined && canTap?.(cell) === true;
   const d = cellDisplay(cell);
   const theme = positionTheme(d?.positions);
   const traded = cell.pick.viaTradeFrom;
@@ -221,15 +238,37 @@ function GridCell({
     style.outlineOffset = -2;
     style.background = 'rgba(0,255,204,0.06)';
   }
+  if (cell.skipped) {
+    style.outline = '2px dashed var(--neon-red)';
+    style.outlineOffset = -2;
+    style.background = 'rgba(255,34,34,0.06)';
+  }
 
+  // A tap that enters or clears a pick wins over the trade tooltip's tap toggle.
   const tradeHandlers = traded
     ? {
         onMouseEnter: (e: React.MouseEvent) => onTradeShow(cell, e.clientX, e.clientY),
         onMouseLeave: () => onTradeHide(),
-        onClick: (e: React.MouseEvent) => {
-          // tap toggle for touch screens
-          if (tipShownFor === cell.pick.overall) onTradeHide();
-          else onTradeShow(cell, e.clientX, e.clientY);
+        onClick: tappable
+          ? undefined
+          : (e: React.MouseEvent) => {
+              // tap toggle for touch screens
+              if (tipShownFor === cell.pick.overall) onTradeHide();
+              else onTradeShow(cell, e.clientX, e.clientY);
+            },
+      }
+    : {};
+  const tapHandlers = tappable
+    ? {
+        role: 'button' as const,
+        tabIndex: 0,
+        'aria-label': `${cell.selection ? 'Clear' : 'Enter'} pick ${pickLabel(cell.pick)}`,
+        onClick: () => onTap(cell),
+        onKeyDown: (event: React.KeyboardEvent) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onTap(cell);
+          }
         },
       }
     : {};
@@ -237,8 +276,9 @@ function GridCell({
   return (
     <div
       className={cell.onClock ? 'pulse-glow' : undefined}
-      style={{ ...style, cursor: traded ? 'help' : undefined }}
+      style={{ ...style, cursor: tappable ? 'pointer' : traded ? 'help' : undefined }}
       {...tradeHandlers}
+      {...tapHandlers}
     >
       {/* corner markers: keeper lock + trade flag, small, upper right */}
       {(d?.isKeeper || traded) && (
@@ -319,6 +359,22 @@ function GridCell({
         >
           {pickLabel(cell.pick)} ⏱
         </span>
+      ) : cell.skipped ? (
+        <>
+          <span style={{ color: 'var(--text-dim)', fontSize: tv ? 'clamp(9px, 0.9vw, 14px)' : '0.68rem', lineHeight: 1.2 }}>
+            {pickLabel(cell.pick)}
+          </span>
+          <span
+            style={{
+              color: 'var(--neon-red)',
+              fontWeight: 800,
+              fontSize: tv ? 'clamp(7px, 0.75vw, 11px)' : '0.55rem',
+              letterSpacing: '0.05em',
+            }}
+          >
+            SKIPPED{tappable ? ' · TAP' : ''}
+          </span>
+        </>
       ) : (
         <>
           <span

@@ -942,3 +942,173 @@ test('refuses names nobody previewed and a fetch that changed nothing', async ()
   assert.equal(quiet.status, 409);
   assert.match(String(quiet.body.error), /Nothing changed/);
 });
+
+test('CLOCK: anyone but the picker may call it once every five picks, the commish can pause, and picks keep their time', async () => {
+  const next = cleanState();
+  next.keepersRevealed = true;
+  await replaceState(next);
+  const started = await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(started.status, 200);
+  const clockAfterStart = (started.body.state as LeagueDynamicState).draft.clock;
+  assert.ok(clockAfterStart?.pickStartedAt, 'the first team is on the pick from the start');
+  assert.equal(clockAfterStart?.call, null);
+
+  // Nobody may call CLOCK in the first two minutes of a round-one pick, so back-date each pick's start.
+  const backdate = async () => {
+    await store.mutateState((draft) => {
+      if (draft.draft.clock) draft.draft.clock = { ...draft.draft.clock, pickStartedAt: new Date(Date.now() - 125_000).toISOString() };
+    });
+  };
+  const early = await request('/api/league/draft/clock/call', { method: 'POST', headers: auth('Ryan') });
+  assert.equal(early.status, 409);
+  assert.match(String(early.body.error), /CLOCK opens in/);
+  await backdate();
+
+  const pick = (owner: string, overallPick: number, index: number) => request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify({ overallPick, playerKey: dataset.players[index]!.key, playerName: dataset.players[index]!.name }),
+  });
+  const call = (owner: string) => request('/api/league/draft/clock/call', { method: 'POST', headers: auth(owner) });
+
+  // Pick 1 is Joel's. Joel cannot call it on himself; Ryan can; nobody can twice.
+  const own = await call('Joel');
+  assert.equal(own.status, 403);
+  assert.match(String(own.body.error), /your own pick/);
+  const ryanCalls = await call('Ryan');
+  assert.equal(ryanCalls.status, 200);
+  assert.equal((ryanCalls.body.state as LeagueDynamicState).draft.clock?.call?.by, 'Ryan');
+  const twice = await call(commissioner);
+  assert.equal(twice.status, 409);
+  assert.match(String(twice.body.error), /already running/);
+
+  // Joel picks: the pick keeps its seconds and who called CLOCK, and the next timer starts clean.
+  const first = await pick('Joel', 1, 0);
+  assert.equal(first.status, 200);
+  await backdate();
+  const afterFirst = (first.body.state as LeagueDynamicState).draft;
+  assert.equal(typeof afterFirst.picks['1']?.seconds, 'number');
+  assert.equal(afterFirst.picks['1']?.clockCalledBy, 'Ryan');
+  assert.equal(afterFirst.clock?.call, null);
+  assert.ok(afterFirst.clock?.pickStartedAt);
+
+  // Pick 2 is Ryan's. Joel calls it; Ryan picks with no call recorded against Joel's cooldown yet.
+  assert.equal((await call('Ryan')).status, 403);
+  assert.equal((await call('Joel')).status, 200);
+  const second = await pick('Ryan', 2, 1);
+  assert.equal(second.status, 200);
+  await backdate();
+  assert.equal((second.body.state as LeagueDynamicState).draft.picks['2']?.clockCalledBy, 'Joel');
+
+  // Pick 3: Ryan called on pick 1, so he waits three more; Joel called on pick 2, four more. The commish never waits.
+  const ryanAgain = await call('Ryan');
+  assert.equal(ryanAgain.status, 409);
+  assert.match(String(ryanAgain.body.error), /again in 3 picks/);
+  const joelAgain = await call('Joel');
+  assert.equal(joelAgain.status, 409);
+  assert.match(String(joelAgain.body.error), /again in 4 picks/);
+
+  // Pause is the commissioner's. Nobody can call CLOCK while paused.
+  assert.equal((await request('/api/league/draft/clock/pause', { method: 'POST', headers: auth('Joel') })).status, 403);
+  const paused = await request('/api/league/draft/clock/pause', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(paused.status, 200);
+  assert.ok((paused.body.state as LeagueDynamicState).draft.clock?.pausedAt);
+  const whilePaused = await call(commissioner);
+  assert.equal(whilePaused.status, 409);
+  assert.match(String(whilePaused.body.error), /paused/);
+  const resumed = await request('/api/league/draft/clock/resume', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(resumed.status, 200);
+  const clock = (resumed.body.state as LeagueDynamicState).draft.clock;
+  assert.equal(clock?.pausedAt, null);
+  assert.ok((clock?.pausedMs ?? -1) >= 0);
+  await backdate();
+  assert.equal((await call(commissioner)).status, 200);
+
+  // Clearing a pick restarts that team's timer without a call.
+  const cleared = await request('/api/league/draft/pick/2', { method: 'DELETE', headers: auth(commissioner) });
+  assert.equal(cleared.status, 200);
+  assert.equal((cleared.body.state as LeagueDynamicState).draft.clock?.call, null);
+});
+
+test('a called clock that runs out yields the pick: the next team is up, the skipped team fills in any time', async () => {
+  const next = cleanState();
+  next.keepersRevealed = true;
+  await replaceState(next);
+  assert.equal((await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+  const pick = (owner: string, overallPick: number, index: number) => request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify({ overallPick, playerKey: dataset.players[index]!.key, playerName: dataset.players[index]!.name }),
+  });
+  // Joel is on pick 1. Ryan calls CLOCK (after the two-minute wait); the 30 seconds pass with nobody picking.
+  await store.mutateState((draft) => {
+    if (draft.draft.clock) draft.draft.clock = { ...draft.draft.clock, pickStartedAt: new Date(Date.now() - 125_000).toISOString() };
+  });
+  assert.equal((await request('/api/league/draft/clock/call', { method: 'POST', headers: auth('Ryan') })).status, 200);
+  // Time is still left: a report changes nothing.
+  const tooSoon = await request('/api/league/draft/clock/expire', { method: 'POST', headers: auth('Joel') });
+  assert.equal(tooSoon.status, 200);
+  assert.equal((tooSoon.body.state as LeagueDynamicState).draft.skipped, undefined);
+  await store.mutateState((draft) => {
+    const clock = draft.draft.clock!;
+    draft.draft.clock = { ...clock, call: { ...clock.call!, atElapsedMs: clock.call!.atElapsedMs - 31_000 } };
+  });
+  const expired = await request('/api/league/draft/clock/expire', { method: 'POST', headers: auth('Joel') });
+  assert.equal(expired.status, 200);
+  const after = (expired.body.state as LeagueDynamicState).draft;
+  assert.equal(after.skipped?.['1']?.calledBy, 'Ryan');
+  assert.equal(after.clock?.call, null, 'the next team starts with a clean clock');
+
+  // Ryan (pick 2) is on the clock now. Joel cannot take pick 2, but can fill his own pick 1 whenever.
+  const joelOnTwo = await pick('Joel', 2, 0);
+  assert.equal(joelOnTwo.status, 403);
+  const ryanOnOne = await pick('Ryan', 1, 0);
+  assert.equal(ryanOnOne.status, 403);
+  const ryanPicks = await pick('Ryan', 2, 1);
+  assert.equal(ryanPicks.status, 200);
+  const joelLate = await pick('Joel', 1, 0);
+  assert.equal(joelLate.status, 200);
+  const done = (joelLate.body.state as LeagueDynamicState).draft;
+  assert.equal(done.picks['1']?.skipped, true);
+  assert.equal(done.picks['1']?.clockCalledBy, 'Ryan');
+  assert.equal(done.picks['1']?.seconds, undefined, 'a late pick has no honest time');
+  assert.equal(done.skipped?.['1'], undefined);
+  // Pick 3 is on the clock and Joel's late pick did not disturb it.
+  assert.equal(done.clock?.pickStartedAt, (ryanPicks.body.state as LeagueDynamicState).draft.clock?.pickStartedAt);
+
+  // Clearing the late pick makes it yielded again, not on the clock.
+  const cleared = await request('/api/league/draft/pick/1', { method: 'DELETE', headers: auth(commissioner) });
+  assert.equal(cleared.status, 200);
+  const back = (cleared.body.state as LeagueDynamicState).draft;
+  assert.equal(back.skipped?.['1']?.calledBy, 'Ryan');
+  assert.equal(back.clock?.pickStartedAt, done.clock?.pickStartedAt);
+});
+
+test('a write-in pick lands with its own key, and cannot double a pool player or itself', async () => {
+  const next = cleanState();
+  next.keepersRevealed = true;
+  next.draft.startedAt = '2026-10-18T21:00:00.000Z';
+  await replaceState(next);
+  const writeIn = (owner: string, overallPick: number, name: string, proTeam = 'DAL', positions = ['SF', 'PF']) => request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify({ overallPick, playerKey: 'writein', playerName: name, proTeam, positions, writeIn: true }),
+  });
+  const bad = await writeIn('Joel', 1, 'Some Rookie', 'Dallas');
+  assert.equal(bad.status, 400);
+  assert.match(String(bad.body.error), /two to four letter code/);
+  const pooled = dataset.players[0]!;
+  const inPool = await writeIn('Joel', 1, pooled.fullName ?? pooled.name);
+  assert.equal(inPool.status, 409);
+  assert.match(String(inPool.body.error), /in the player pool/);
+  const ok = await writeIn('Joel', 1, 'Some Rookie');
+  assert.equal(ok.status, 200);
+  const pick = (ok.body.state as LeagueDynamicState).draft.picks['1'];
+  assert.equal(pick?.playerKey, 'writein-some-rookie-dal');
+  assert.equal(pick?.playerName, 'Some Rookie');
+  assert.deepEqual(pick?.positions, ['SF', 'PF']);
+  assert.equal(pick?.proTeam, 'dal');
+  const again = await writeIn('Ryan', 2, 'some rookie');
+  assert.equal(again.status, 409);
+  assert.match(String(again.body.error), /already on the board/);
+});
