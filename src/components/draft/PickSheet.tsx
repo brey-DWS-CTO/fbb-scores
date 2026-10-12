@@ -344,7 +344,8 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
             )}
             {filtered.map((player) => {
               const theme = positionTheme(player.positions);
-              const postseason = postseasonGames(player.proTeam);
+              // Play-in and playoff game counts are the commissioner's too.
+              const postseason = showNumbers ? postseasonGames(player.proTeam) : null;
               const stat = showNumbers ? numbers.get(player.key) ?? null : null;
               const gone = stat?.gone ?? null;
               return (
