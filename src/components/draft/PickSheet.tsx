@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 /** Wide enough for a second row of sort chips. Phones keep one sort. */
 function useDesktop(): boolean {
@@ -37,11 +37,14 @@ import { POSITION_ORDER, positionTheme } from './boardUtils.js';
 
 /** Name, team and position for a player the pool does not have. */
 function WriteInForm({
+  teams,
   busy,
   error,
   onBack,
   onSubmit,
 }: {
+  /** NBA team codes as the pool spells them. */
+  teams: readonly string[];
   busy: boolean;
   error: string | null;
   onBack: () => void;
@@ -73,7 +76,12 @@ function WriteInForm({
       </label>
       <label style={{ display: 'grid', gap: 4 }}>
         <span className="hub-heading" style={{ fontSize: '0.55rem', color: 'var(--text-dim)' }}>NBA TEAM</span>
-        <input className="hub-input" value={proTeam} onChange={(event) => setProTeam(event.target.value.toUpperCase())} placeholder="DEN" maxLength={4} autoComplete="off" spellCheck={false} style={{ ...field, textTransform: 'uppercase' }} />
+        <select className="hub-input" value={proTeam} onChange={(event) => setProTeam(event.target.value)} style={{ ...field, textTransform: 'uppercase' }}>
+          <option value="">Pick a team…</option>
+          {teams.map((code) => (
+            <option key={code} value={code}>{code.toUpperCase()}</option>
+          ))}
+        </select>
       </label>
       <div style={{ display: 'grid', gap: 4 }}>
         <span className="hub-heading" style={{ fontSize: '0.55rem', color: 'var(--text-dim)' }}>POSITION · UP TO TWO</span>
@@ -142,12 +150,17 @@ function SheetShell({
   titleId: string;
   children: ReactNode;
 }) {
+  // The page re-renders on every poll and hands in a new onClose each time.
+  // Keep it in a ref so this runs once: otherwise the cleanup pulled focus
+  // out of whatever the person was typing in, every three seconds.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const priorOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') close.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -155,7 +168,7 @@ function SheetShell({
       window.removeEventListener('keydown', onKeyDown);
       priorFocus?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div
@@ -248,6 +261,11 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
   const thenBy = showNumbers && desktop && thenChoice && thenChoice !== sort ? thenChoice : null;
 
   const sorted = useMemo(() => sortPool(pool, sort, numbers, thenBy), [pool, sort, numbers, thenBy]);
+  // Every NBA team the pool knows, for the write-in dropdown.
+  const teamCodes = useMemo(
+    () => [...new Set(pool.map((player) => player.proTeam.toLowerCase()).filter((code) => /^[a-z]{2,4}$/.test(code)))].sort(),
+    [pool],
+  );
   const filtered = useMemo(() => filterPool(sorted, { query, position }), [sorted, position, query]);
 
   // One tap and the pick lands. The commissioner has UNDO on the board for a slip.
@@ -339,7 +357,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
       </div>
 
       {writeIn ? (
-        <WriteInForm busy={busy} error={error} onBack={() => { setWriteIn(false); setError(null); }} onSubmit={chooseWriteIn} />
+        <WriteInForm teams={teamCodes} busy={busy} error={error} onBack={() => { setWriteIn(false); setError(null); }} onSubmit={chooseWriteIn} />
       ) : (
         <div style={{ display: 'flex', minHeight: 0, flexDirection: 'column' }}>
           <label style={{ position: 'relative', display: 'block', marginBottom: 10 }}>
