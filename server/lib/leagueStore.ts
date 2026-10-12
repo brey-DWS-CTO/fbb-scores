@@ -704,8 +704,10 @@ class NeonBackend implements StoreBackend {
       fingerprint text not null,
       acknowledgement text not null,
       signed_at timestamptz not null,
+      drawing text,
       primary key (version_id, owner)
     )`;
+    await this.sql`ALTER TABLE rulebook_signatures ADD COLUMN IF NOT EXISTS drawing text`;
     await this.sql`CREATE TABLE IF NOT EXISTS league_history_draft (
       season int primary key,
       data jsonb not null,
@@ -1369,7 +1371,7 @@ class NeonBackend implements StoreBackend {
   async listRulebookSignatures(season: number): Promise<RulebookSignature[]> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT version_id, owner, season, revision, fingerprint,
-        acknowledgement, signed_at
+        acknowledgement, signed_at, drawing
       FROM rulebook_signatures WHERE season = ${season}
       ORDER BY signed_at ASC`) as Array<{
       version_id: string;
@@ -1379,6 +1381,7 @@ class NeonBackend implements StoreBackend {
       fingerprint: string;
       acknowledgement: string;
       signed_at: string | Date;
+      drawing: string | null;
     }>;
     return rows.map((row) => ({
       versionId: row.version_id,
@@ -1388,6 +1391,7 @@ class NeonBackend implements StoreBackend {
       fingerprint: row.fingerprint,
       acknowledgement: row.acknowledgement,
       signedAt: new Date(row.signed_at).toISOString(),
+      drawing: row.drawing ?? null,
     }));
   }
 
@@ -1395,9 +1399,9 @@ class NeonBackend implements StoreBackend {
     await this.ensureInit();
     // DO NOTHING, never DO UPDATE: a signature already on file stands.
     const written = (await this.sql`INSERT INTO rulebook_signatures
-      (version_id, owner, season, revision, fingerprint, acknowledgement, signed_at)
+      (version_id, owner, season, revision, fingerprint, acknowledgement, signed_at, drawing)
       VALUES (${row.versionId}, ${row.owner}, ${row.season}, ${row.revision},
-        ${row.fingerprint}, ${row.acknowledgement}, ${row.signedAt})
+        ${row.fingerprint}, ${row.acknowledgement}, ${row.signedAt}, ${row.drawing ?? null})
       ON CONFLICT (version_id, owner) DO NOTHING
       RETURNING owner`) as Array<{ owner: string }>;
     if (!written[0]) {

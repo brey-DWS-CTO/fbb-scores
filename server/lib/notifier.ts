@@ -295,11 +295,11 @@ export async function sendRulebookSignRequest(
     lines: [
       `${input.publishedBy} published revision ${input.revision} of The Nerds constitution.`,
       ...(why ? [`The note on it: ${why}`] : []),
-      'Read it, then tap I AGREE, SIGN IT at the top of the Rules page. Your name and the date go on this revision.',
+      'Read it, then sign at the bottom: tap to sign with your name, or draw your signature with a finger. It prints on the signature page.',
     ],
-    action: { label: 'READ AND SIGN', href: `${origin}/rules` },
+    action: { label: 'READ AND SIGN', href: `${origin}/rules/paper` },
     notes: [
-      `The printed copy, with the signature page, is at ${origin}/rules/paper`,
+      `The same book, rule by rule, is at ${origin}/rules`,
       'Signatures never carry forward. If a newer revision comes out, the league signs again.',
     ],
   };

@@ -161,6 +161,8 @@ export interface SignatureRow {
   owner: string;
   name: string;
   signedAt: string | null;
+  /** A hand-drawn signature as a PNG data URL, when they drew one. */
+  drawing: string | null;
 }
 
 /** One line per member in draft order: signed, with the date, or still blank. */
@@ -178,6 +180,7 @@ export function signatureRows(
       owner: team.owner,
       name: team.fullName,
       signedAt: byOwner.get(team.owner)?.signedAt ?? null,
+      drawing: byOwner.get(team.owner)?.drawing ?? null,
     }));
 }
 

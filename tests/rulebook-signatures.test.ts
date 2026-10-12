@@ -3,6 +3,8 @@ import test from 'node:test';
 import {
   ACKNOWLEDGEMENT,
   canSign,
+  checkDrawing,
+  publicSignature,
   describeSignatures,
   makeSignature,
   printedRevisionLine,
@@ -134,4 +136,35 @@ test('the printed line says which revision and whether it is published', () => {
   );
   assert.match(published, /Published/);
   assert.match(published, /2026/);
+});
+// ─── A drawn signature ───────────────────────────────────────────────────────
+
+const TINY_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+test('a drawing is a small PNG data URL or nothing; anything else is refused', () => {
+  assert.deepEqual(checkDrawing(undefined), { ok: true, drawing: null });
+  assert.deepEqual(checkDrawing(''), { ok: true, drawing: null });
+  assert.deepEqual(checkDrawing(TINY_PNG), { ok: true, drawing: TINY_PNG });
+  assert.equal(checkDrawing('data:image/jpeg;base64,AAAA').ok, false, 'only PNG');
+  assert.equal(checkDrawing('<svg onload=alert(1)>').ok, false);
+  assert.equal(checkDrawing(42).ok, false);
+  assert.equal(checkDrawing(`data:image/png;base64,${'A'.repeat(200_004)}`).ok, false, 'too big');
+});
+
+test('the public shape of a signature says it was drawn but never carries the picture', () => {
+  const row = makeSignature({
+    season: 2027,
+    versionId: 'rb-1',
+    revision: 14,
+    fingerprint: 'x',
+    owner: 'Joel',
+    acknowledgement: 'ok',
+    signedAt: '2026-10-12T01:00:00Z',
+    drawing: TINY_PNG,
+  });
+  const shown = publicSignature(row);
+  assert.equal(shown.drawn, true);
+  assert.equal('drawing' in shown, false);
+  assert.equal(publicSignature(makeSignature({ ...row, drawing: null })).drawn, false);
 });

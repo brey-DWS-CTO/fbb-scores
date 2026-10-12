@@ -145,18 +145,42 @@ test('a published revision prints as itself and a past one prints as superseded'
   assert.equal(missing.status, 404);
 });
 
-test('the book still renders once a signature lands on it', async () => {
+const TINY_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+test('a signature drawn by hand is stored, kept out of the public list, and printed', async () => {
   const versions = (await (await fetch(`${baseUrl}/api/league/rulebook/versions`)).json()) as Array<{
     id: string;
     fingerprint: string;
   }>;
   const current = versions[0];
+  const bad = await fetch(`${baseUrl}/api/league/rulebook/sign`, {
+    method: 'POST',
+    headers: auth('Joel'),
+    body: JSON.stringify({ versionId: current.id, fingerprint: current.fingerprint, drawing: 'nope' }),
+  });
+  assert.equal(bad.status, 400, 'a bad picture is refused, not dropped');
+
   const signed = await fetch(`${baseUrl}/api/league/rulebook/sign`, {
     method: 'POST',
     headers: auth('Joel'),
-    body: JSON.stringify({ versionId: current.id, fingerprint: current.fingerprint }),
+    body: JSON.stringify({ versionId: current.id, fingerprint: current.fingerprint, drawing: TINY_PNG }),
   });
   assert.equal(signed.status, 200);
+  const reply = (await signed.json()) as { signature: Record<string, unknown> };
+  assert.equal(reply.signature.drawn, true);
+  assert.equal('drawing' in reply.signature, false);
+
+  const list = (await (await fetch(`${baseUrl}/api/league/rulebook/signatures`)).json()) as {
+    signed: Array<Record<string, unknown>>;
+  };
+  const joel = list.signed.find((s) => s.owner === 'Joel');
+  assert.ok(joel);
+  assert.equal(joel.drawn, true);
+  assert.equal('drawing' in joel, false, 'the picture stays off the public list');
+
+  const stored = (await store.listRulebookSignatures(SEASON)).find((s) => s.owner === 'Joel');
+  assert.equal(stored?.drawing, TINY_PNG, 'but the store keeps it for the printed page');
 
   const result = await pdf('/api/league/rulebook/pdf?for=Joel');
   assert.equal(result.status, 200);

@@ -31,6 +31,30 @@ export interface RulebookSignature {
   owner: string;
   acknowledgement: string;
   signedAt: string;
+  /**
+   * A signature drawn by hand, as a PNG data URL, when the member drew one
+   * instead of tapping. Printed on the signature page. Absent means they
+   * signed with their name.
+   */
+  drawing?: string | null;
+}
+
+/** The most a drawn signature may weigh, in base64 characters (about 150 KB). */
+export const DRAWING_MAX_CHARS = 200_000;
+
+/**
+ * A drawing is accepted only as a small PNG data URL. Anything else, or
+ * nothing at all, is treated as "signed with the name".
+ */
+export function checkDrawing(value: unknown): { ok: true; drawing: string | null } | { ok: false; message: string } {
+  if (value === undefined || value === null || value === '') return { ok: true, drawing: null };
+  if (typeof value !== 'string') return { ok: false, message: 'A drawn signature must be a PNG image.' };
+  const match = /^data:image\/png;base64,([A-Za-z0-9+/]+=*)$/.exec(value);
+  if (!match) return { ok: false, message: 'A drawn signature must be a PNG image.' };
+  if (match[1].length > DRAWING_MAX_CHARS) {
+    return { ok: false, message: 'That drawing is too large. Clear it and sign again.' };
+  }
+  return { ok: true, drawing: value };
 }
 
 export type SignRefusal =
@@ -157,6 +181,7 @@ export function makeSignature(input: {
   owner: string;
   acknowledgement: string;
   signedAt: string;
+  drawing?: string | null;
 }): RulebookSignature {
   return {
     season: input.season,
@@ -166,7 +191,14 @@ export function makeSignature(input: {
     owner: input.owner,
     acknowledgement: input.acknowledgement,
     signedAt: input.signedAt,
+    drawing: input.drawing ?? null,
   };
+}
+
+/** The public shape of a signature: who, when, and whether they drew it. Never the picture. */
+export function publicSignature(signature: RulebookSignature): Omit<RulebookSignature, 'drawing'> & { drawn: boolean } {
+  const { drawing, ...rest } = signature;
+  return { ...rest, drawn: Boolean(drawing) };
 }
 
 /** The line the printed book carries under its title. */
