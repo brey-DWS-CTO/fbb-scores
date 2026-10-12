@@ -4607,7 +4607,8 @@ html.theme-light {
 .sign-pick input { width: 18px; height: 18px; accent-color: var(--neon-teal); }
 
 /* ─── Signing on the printed copy, by name or by hand ──────────────── */
-.paper-sign { margin-top: 14px; }
+.paper-sign { margin: 0 0 12px; }
+.sign-go { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .paper-sign-actions { flex-wrap: wrap; }
 .paper-sign-draw { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 .sign-pad { display: flex; flex-direction: column; gap: 6px; }

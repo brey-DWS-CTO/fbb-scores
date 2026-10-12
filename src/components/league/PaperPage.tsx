@@ -46,6 +46,8 @@ export default function PaperPage() {
   // ── Signing, at the bottom of the printed copy ──
   const [signatures, setSignatures] = useState<RulebookSignaturesResponse | null>(null);
   const [mode, setMode] = useState<'idle' | 'draw'>('idle');
+  // The sign panel sits under the bar and opens from the SIGN button.
+  const [signOpen, setSignOpen] = useState(false);
   const [drawing, setDrawing] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
@@ -88,6 +90,7 @@ export default function PaperPage() {
       await loadSignatures();
       setMode('idle');
       setDrawing(null);
+      setSignOpen(false);
       setGeneration((n) => n + 1);
     } catch (e) {
       setSignError(apiErrorMessage(e));
@@ -179,9 +182,13 @@ export default function PaperPage() {
           <button
             type="button"
             className="rule-edit-save tap-btn paper-jump-sign"
-            onClick={() => document.getElementById('sign')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            aria-expanded={signOpen}
+            onClick={() => {
+              setSignOpen((open) => !open);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           >
-            SIGN
+            {signOpen ? 'CLOSE' : 'SIGN'}
           </button>
         )}
         {!draft && (
@@ -190,11 +197,7 @@ export default function PaperPage() {
           </a>
         )}
       </header>
-      {status === 'loading' && <p className="paper-note">Laying out the pages...</p>}
-      {status === 'error' && <p className="rules-draft-error">{error}</p>}
-      <div ref={holder} className="paper-sheets" />
-
-      {!draft && !rev && signatures && signatures.versionId && (
+      {!draft && !rev && signatures && signatures.versionId && (signOpen || mine || !identity) && (
         <section id="sign" className="panel sign-block paper-sign">
           <div className="sign-head">
             <span className="hub-heading sign-title">SIGN REVISION {signatures.revision}</span>
@@ -207,7 +210,7 @@ export default function PaperPage() {
           {mine && (
             <p className="sign-line sign-mine">
               You signed revision {mine.revision} on {formatDay(mine.signedAt)}
-              {mine.drawn ? ', by hand' : ''}. It is on the last page above.
+              {mine.drawn ? ', by hand' : ''}. It is on the last page.
             </p>
           )}
           {!identity && !mine && <p className="sign-line">Sign in from the home page to sign.</p>}
@@ -262,6 +265,10 @@ export default function PaperPage() {
           {signError && <p className="rules-draft-error">{signError}</p>}
         </section>
       )}
+      {status === 'loading' && <p className="paper-note">Laying out the pages...</p>}
+      {status === 'error' && <p className="rules-draft-error">{error}</p>}
+      <div ref={holder} className="paper-sheets" />
+
     </main>
   );
 }

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Identity } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
   fetchOwnerEmails,
   requestRulebookSignatures,
-  signRulebook,
   withdrawRulebookSignature,
   type RulebookSignaturesResponse,
 } from '../../lib/league/api.js';
@@ -115,20 +115,6 @@ export default function SignaturePanel({
     }
   };
 
-  const sign = async () => {
-    if (!identity || !data.currentVersionId || !data.fingerprint) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await signRulebook(identity, data.currentVersionId, data.fingerprint);
-      onSigned();
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <section className="panel sign-block">
       <div className="sign-head">
@@ -201,11 +187,12 @@ export default function SignaturePanel({
 
           {canSignNow && (
             <div className="sign-actions">
-              <button type="button" className="rule-edit-save tap-btn" disabled={busy} onClick={sign}>
-                {busy ? 'SIGNING...' : 'I AGREE, SIGN IT'}
-              </button>
+              <Link to="/rules/paper" className="rule-edit-save tap-btn sign-go">
+                READ AND SIGN
+              </Link>
               <span className="rule-edit-hint">
-                Your name and the time go on this revision. A new revision means signing again.
+                You sign on the printed copy, so you have read what you are signing. Your name or
+                your drawn signature goes on this revision.
               </span>
             </div>
           )}
