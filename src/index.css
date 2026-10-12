@@ -54,6 +54,7 @@ html.theme-light {
   --nav-bg:      rgba(255, 255, 255, 0.96);
 }
 html.theme-light body::before { display: none; } /* no scanlines in daylight */
+body.paper-open::before { display: none; } /* nor over white paper */
 html.theme-light .glow-teal,
 html.theme-light .glow-red,
 html.theme-light .glow-blue,
@@ -4281,11 +4282,14 @@ html.theme-light {
 }
 .paper-bar .rules-tool { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 .paper-title { flex: 1 1 auto; color: var(--text-dim); font-size: 0.72rem; }
+.paper-jump-sign { min-height: 36px; padding: 0 14px; }
+.paper-bar { position: sticky; top: 0; z-index: 5; background: var(--bg, #0b0a14); padding-top: 6px; padding-bottom: 6px; }
 .paper-note { color: var(--text-dim); font-size: 0.8rem; margin: 12px 0; }
 .paper-sheets { display: flex; flex-direction: column; gap: 10px; }
 .paper-sheet {
   display: block;
-  max-width: 100%;
+  width: 100%;
+  height: auto;
   background: #fff;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
 }
