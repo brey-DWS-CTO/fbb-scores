@@ -129,6 +129,14 @@ export interface DraftPickState {
   seconds?: number;
   /** Who called CLOCK on this pick, if anyone. */
   clockCalledBy?: string | null;
+  /** The called clock ran out and this pick was entered late, rule 2.3.2.2. */
+  skipped?: boolean;
+}
+
+export interface SkippedPick {
+  /** When the clock ran out. */
+  at: string;
+  calledBy: string;
 }
 
 export interface ClockCall {
@@ -173,6 +181,11 @@ export interface LeagueDynamicState {
     playerPoolSnapshotId?: string | null;
     /** The pick timer and any CLOCK call, rule 2.3. See src/lib/league/draftClock.ts. */
     clock?: DraftClockState | null;
+    /**
+     * Picks whose called clock ran out, by overall pick, rule 2.3.2.1. They
+     * stay open for their owner to fill any time; the clock moves on.
+     */
+    skipped?: Record<string, SkippedPick>;
   };
   /** Commissioner-accepted pool used before the draft is frozen. */
   playerPool?: {
@@ -318,4 +331,6 @@ export interface BoardCell {
   selection: DraftPickState | null;
   keeper: ResolvedKeeper | null; // pre-filled keeper occupying this pick
   onClock: boolean;
+  /** Open, yielded by an expired CLOCK, and still the owner's to fill any time. */
+  skipped: boolean;
 }

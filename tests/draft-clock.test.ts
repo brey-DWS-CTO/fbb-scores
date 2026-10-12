@@ -3,6 +3,8 @@ import test from 'node:test';
 import type { BoardCell, DraftPickState } from '../src/lib/keeper/types.js';
 import {
   CALLED_CLOCK_SECONDS,
+  clockExpired,
+  yieldPick,
   CLOCK_COOLDOWN_PICKS,
   callClock,
   canCallClock,
@@ -108,8 +110,23 @@ function cell(overall: number, owner: string, selection: DraftPickState | null, 
     selection,
     keeper: keeper ? ({} as BoardCell['keeper']) : null,
     onClock: false,
+    skipped: false,
   } as unknown as BoardCell;
 }
+
+test('a called clock that runs out yields the pick and starts the next team from that moment', () => {
+  const clock = callClock(startPickClock(T0), 'Kyle', at(100));
+  assert.equal(clockExpired(clock, at(129)), false);
+  assert.equal(clockExpired(clock, at(130)), true);
+  assert.equal(clockExpired(pauseClock(clock, at(120)), at(200)), false, 'a paused clock never runs out');
+  assert.equal(clockExpired(startPickClock(T0), at(999)), false, 'no call, no expiry');
+  // Noticed seven seconds late: the next team's time still starts at 130.
+  const next = yieldPick({ clock, skipped: { '2': { at: T0, calledBy: 'Amy' } } }, 7, at(137));
+  assert.deepEqual(next.skipped, { '2': { at: T0, calledBy: 'Amy' }, '7': { at: at(130), calledBy: 'Kyle' } });
+  assert.equal(next.clock.pickStartedAt, at(130));
+  assert.equal(next.clock.call, null);
+  assert.equal(elapsedMs(next.clock, at(140)), 10_000);
+});
 
 test('timing stats: fastest, slowest, longest pick, most clocked, most calls', () => {
   const board = [
@@ -121,6 +138,7 @@ test('timing stats: fastest, slowest, longest pick, most clocked, most calls', (
     cell(6, 'Joel', { playerKey: 'e', playerName: 'E', seconds: 40, clockCalledBy: 'Ryan' }),
     cell(7, 'Amy', null),
     cell(8, 'Amy', { playerKey: 'f', playerName: 'F' }),
+    cell(9, 'Amy', { playerKey: 'g', playerName: 'G', skipped: true, clockCalledBy: 'Kyle' }),
   ];
   const stats = draftTimingStats(board, ['Joel', 'Ryan', 'Kyle', 'Brey', 'Amy']);
   assert.equal(stats.timedPicks, 5);
@@ -131,7 +149,11 @@ test('timing stats: fastest, slowest, longest pick, most clocked, most calls', (
   assert.equal(stats.mostClocked?.owner, 'Ryan');
   assert.equal(stats.mostClocked?.clocked, 2);
   assert.equal(stats.mostCalls?.owner, 'Kyle');
-  assert.equal(stats.mostCalls?.calls, 2);
+  assert.equal(stats.mostCalls?.calls, 3);
+  assert.equal(stats.mostYielded?.owner, 'Amy');
+  const skipped = stats.owners.find((row) => row.owner === 'Amy');
+  assert.equal(skipped?.clocked, 1, 'a skipped pick counts as clocked');
+  assert.equal(skipped?.yielded, 1);
   const brey = stats.owners.find((row) => row.owner === 'Brey');
   assert.equal(brey?.picks, 0, 'a keeper is not a timed pick');
   assert.equal(brey?.averageSeconds, null);
@@ -144,5 +166,6 @@ test('timing stats with no picks shows nothing', () => {
   assert.equal(stats.timedPicks, 0);
   assert.equal(stats.fastest, null);
   assert.equal(stats.mostClocked, null);
+  assert.equal(stats.mostYielded, null);
   assert.equal(stats.longestPick, null);
 });

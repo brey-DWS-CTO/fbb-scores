@@ -1,7 +1,7 @@
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockResultRecord } from './mockGrade.js';
 import axios from 'axios';
-import { callClock, isPaused, pauseClock, pickTiming, resumeClock, startPickClock } from './draftClock.js';
+import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
 import type {
   KeeperSelection,
   LeagueDynamicState,
@@ -391,6 +391,7 @@ export async function submitDraftPick(
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       const timestamp = new Date().toISOString();
+      const yielded = s.draft.skipped?.[String(pick.overallPick)];
       s.draft.picks[String(pick.overallPick)] = {
         playerKey: pick.playerKey,
         playerName: pick.playerName,
@@ -399,9 +400,13 @@ export async function submitDraftPick(
         isKeeper: pick.isKeeper === true,
         enteredBy: c.owner,
         timestamp,
-        ...pickTiming(s.draft.clock, timestamp),
+        ...(yielded ? { skipped: true, clockCalledBy: yielded.calledBy || null } : pickTiming(s.draft.clock, timestamp)),
       };
-      s.draft.clock = startPickClock(timestamp, isPaused(s.draft.clock));
+      if (yielded) {
+        if (s.draft.skipped) delete s.draft.skipped[String(pick.overallPick)];
+      } else {
+        s.draft.clock = startPickClock(timestamp, isPaused(s.draft.clock));
+      }
     });
   }
   const { data } = await axios.post('/api/league/draft/pick', pick, { headers: authHeaders(c) });
@@ -412,8 +417,13 @@ export async function clearDraftPick(c: Credentials, overallPick: number): Promi
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
+      const was = s.draft.picks[String(overallPick)];
       delete s.draft.picks[String(overallPick)];
-      if (s.draft.startedAt !== null) s.draft.clock = startPickClock(new Date().toISOString(), isPaused(s.draft.clock));
+      if (was?.skipped) {
+        s.draft.skipped = { ...(s.draft.skipped ?? {}), [String(overallPick)]: { at: new Date().toISOString(), calledBy: was.clockCalledBy ?? '' } };
+      } else if (s.draft.startedAt !== null) {
+        s.draft.clock = startPickClock(new Date().toISOString(), isPaused(s.draft.clock));
+      }
     });
   }
   const { data } = await axios.delete(`/api/league/draft/pick/${overallPick}`, {
@@ -447,6 +457,27 @@ export async function callDraftClock(c: Credentials): Promise<StateResponse> {
     });
   }
   const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/**
+ * The countdown hit zero on this screen. The server checks its own clock and
+ * yields the pick on the clock if time really is up. `onClockOverall` is
+ * only for test mode, which has no server to ask.
+ */
+export async function expireDraftClock(c: Credentials, onClockOverall: number): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      const now = new Date().toISOString();
+      if (s.draft.clock && clockExpired(s.draft.clock, now)) {
+        const next = yieldPick({ clock: s.draft.clock, skipped: s.draft.skipped }, onClockOverall, now);
+        s.draft.clock = next.clock;
+        s.draft.skipped = next.skipped;
+      }
+    });
+  }
+  const { data } = await axios.post('/api/league/draft/clock/expire', {}, { headers: authHeaders(c) });
   return data;
 }
 

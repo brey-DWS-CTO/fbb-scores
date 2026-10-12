@@ -165,6 +165,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
             style={{ fontSize: '0.7rem', color: 'var(--neon-teal)', marginBottom: 4 }}
           >
             PICK {pickLabel(cell.pick)} · {cell.pick.currentOwner.toUpperCase()}
+            {cell.skipped && <span style={{ color: 'var(--neon-red)' }}> · SKIPPED</span>}
           </div>
           <div style={{ color: 'var(--text-mid)', fontSize: '0.8rem' }}>
             #{cell.pick.overall} overall

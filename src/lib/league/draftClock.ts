@@ -7,9 +7,9 @@
  * time runs out: the yield in rule 2.3.2.1 is the commissioner's call at
  * the table.
  */
-import type { BoardCell, ClockCall, DraftClockState, DraftPickState } from '../keeper/types.js';
+import type { BoardCell, ClockCall, DraftClockState, DraftPickState, SkippedPick } from '../keeper/types.js';
 
-export type { ClockCall, DraftClockState };
+export type { ClockCall, DraftClockState, SkippedPick };
 
 /** Rule 2.3: the soft limit before a pick is slow. */
 export const SOFT_CLOCK_SECONDS = 90;
@@ -52,6 +52,40 @@ export function remainingMs(
 ): number | null {
   if (!clock?.call) return null;
   return Math.max(0, seconds * 1000 - (elapsedMs(clock, now) - clock.call.atElapsedMs));
+}
+
+/** How far past a called clock's end we are, in ms. Negative while time is left; null without a call. */
+export function overrunMs(
+  clock: DraftClockState | null | undefined,
+  now: string | number,
+  seconds = CALLED_CLOCK_SECONDS,
+): number | null {
+  if (!clock?.call) return null;
+  return elapsedMs(clock, now) - clock.call.atElapsedMs - seconds * 1000;
+}
+
+/** A called clock has run out and is not paused. */
+export function clockExpired(clock: DraftClockState | null | undefined, now: string | number): boolean {
+  const over = overrunMs(clock, now);
+  return over !== null && over >= 0 && !isPaused(clock);
+}
+
+/**
+ * The called clock ran out: the pick on the clock is yielded (rule 2.3.2.1)
+ * and the next team's time starts from the moment it ran out, not from
+ * whenever somebody noticed. The yielded pick stays open for its owner.
+ */
+export function yieldPick(
+  draft: { clock: DraftClockState; skipped?: Record<string, SkippedPick> },
+  onClockOverall: number,
+  now: string,
+): { clock: DraftClockState; skipped: Record<string, SkippedPick> } {
+  const over = Math.max(0, overrunMs(draft.clock, now) ?? 0);
+  const ranOutAt = new Date(ms(now) - over).toISOString();
+  return {
+    clock: startPickClock(ranOutAt),
+    skipped: { ...(draft.skipped ?? {}), [String(onClockOverall)]: { at: ranOutAt, calledBy: draft.clock.call?.by ?? '' } },
+  };
 }
 
 export function isPaused(clock: DraftClockState | null | undefined): boolean {
@@ -152,6 +186,8 @@ export interface OwnerTiming {
   longest: { overall: number; seconds: number; playerName: string } | null;
   /** Picks of theirs somebody called CLOCK on. */
   clocked: number;
+  /** Picks of theirs the clock ran out on. */
+  yielded: number;
   /** CLOCK calls they made on other people. */
   calls: number;
 }
@@ -162,6 +198,7 @@ export interface DraftTimingStats {
   slowest: OwnerTiming | null;
   longestPick: { owner: string; overall: number; seconds: number; playerName: string } | null;
   mostClocked: OwnerTiming | null;
+  mostYielded: OwnerTiming | null;
   mostCalls: OwnerTiming | null;
   /** Timed live picks counted. Zero means nothing to show yet. */
   timedPicks: number;
@@ -174,12 +211,12 @@ export interface DraftTimingStats {
  */
 export function draftTimingStats(board: readonly BoardCell[], owners: readonly string[]): DraftTimingStats {
   const byOwner = new Map<string, OwnerTiming>(
-    owners.map((owner) => [owner, { owner, picks: 0, totalSeconds: 0, averageSeconds: null, longest: null, clocked: 0, calls: 0 }]),
+    owners.map((owner) => [owner, { owner, picks: 0, totalSeconds: 0, averageSeconds: null, longest: null, clocked: 0, yielded: 0, calls: 0 }]),
   );
   const get = (owner: string): OwnerTiming => {
     let row = byOwner.get(owner);
     if (!row) {
-      row = { owner, picks: 0, totalSeconds: 0, averageSeconds: null, longest: null, clocked: 0, calls: 0 };
+      row = { owner, picks: 0, totalSeconds: 0, averageSeconds: null, longest: null, clocked: 0, yielded: 0, calls: 0 };
       byOwner.set(owner, row);
     }
     return row;
@@ -188,9 +225,16 @@ export function draftTimingStats(board: readonly BoardCell[], owners: readonly s
   let longestPick: DraftTimingStats['longestPick'] = null;
   for (const cell of board) {
     const pick = cell.selection;
-    if (!pick || pick.isKeeper || cell.keeper || typeof pick.seconds !== 'number') continue;
+    if (!pick || pick.isKeeper || cell.keeper) continue;
     const owner = cell.pick.currentOwner;
     const row = get(owner);
+    if (pick.clockCalledBy) {
+      row.clocked += 1;
+      get(pick.clockCalledBy).calls += 1;
+    }
+    if (pick.skipped) row.yielded += 1;
+    // A pick entered after its clock ran out has no honest time.
+    if (typeof pick.seconds !== 'number') continue;
     row.picks += 1;
     row.totalSeconds += pick.seconds;
     timedPicks += 1;
@@ -201,10 +245,6 @@ export function draftTimingStats(board: readonly BoardCell[], owners: readonly s
     if (!longestPick || pick.seconds > longestPick.seconds) {
       longestPick = { owner, overall: cell.pick.overall, seconds: pick.seconds, playerName };
     }
-    if (pick.clockCalledBy) {
-      row.clocked += 1;
-      get(pick.clockCalledBy).calls += 1;
-    }
   }
   const rows = [...byOwner.values()];
   for (const row of rows) row.averageSeconds = row.picks > 0 ? Math.round(row.totalSeconds / row.picks) : null;
@@ -214,6 +254,7 @@ export function draftTimingStats(board: readonly BoardCell[], owners: readonly s
   const fastest = best(timed, (a, b) => (a.averageSeconds ?? 0) < (b.averageSeconds ?? 0));
   const slowest = best(timed, (a, b) => (a.averageSeconds ?? 0) > (b.averageSeconds ?? 0));
   const clocked = rows.filter((row) => row.clocked > 0);
+  const yielded = rows.filter((row) => row.yielded > 0);
   const callers = rows.filter((row) => row.calls > 0);
   return {
     owners: rows,
@@ -221,6 +262,7 @@ export function draftTimingStats(board: readonly BoardCell[], owners: readonly s
     slowest,
     longestPick,
     mostClocked: best(clocked, (a, b) => a.clocked > b.clocked),
+    mostYielded: best(yielded, (a, b) => a.yielded > b.yielded),
     mostCalls: best(callers, (a, b) => a.calls > b.calls),
     timedPicks,
   };

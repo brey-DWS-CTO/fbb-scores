@@ -11,6 +11,7 @@ import {
   SOFT_CLOCK_SECONDS,
 } from '../../lib/league/draftClock.js';
 import { apiErrorMessage, callDraftClock, pauseDraftClock, resumeDraftClock } from '../../lib/league/api.js';
+import { ACTION_BUTTON } from './boardUtils.js';
 import { useApplyStateResponse, useIdentity } from '../../hooks/useLeague.js';
 
 /** A ticking clock. Only the component that calls this re-renders. */
@@ -106,7 +107,8 @@ export function ClockReadout({
 
 /**
  * CALL CLOCK for any signed-in member, once every five picks and never on
- * their own pick. PAUSE and RESUME for the commissioner.
+ * their own pick. PAUSE and RESUME for the commissioner. Renders bare
+ * buttons: the page puts them in its action grid.
  */
 export function ClockControls({
   clock,
@@ -149,7 +151,7 @@ export function ClockControls({
         : null;
 
   return (
-    <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+    <>
       {callLabel && (
         <button
           className="tap-btn"
@@ -158,16 +160,10 @@ export function ClockControls({
           onClick={() => run(() => callDraftClock(identity))}
           title={check.ok ? 'Rule 2.3.1: the team picking gets 30 seconds' : check.reason === 'too-early' ? 'Two minutes a pick in rounds 1 to 5, ninety seconds after' : 'Once every five picks'}
           style={{
-            flex: 1,
-            minWidth: 150,
-            minHeight: 44,
-            padding: '0 16px',
-            borderRadius: 10,
+            ...ACTION_BUTTON,
             border: `2px solid ${check.ok ? 'var(--neon-red)' : 'var(--panel-border)'}`,
             background: check.ok ? 'rgba(255,34,34,0.12)' : 'transparent',
             color: check.ok ? 'var(--neon-red)' : 'var(--text-dim)',
-            fontWeight: 800,
-            letterSpacing: '0.05em',
           }}
         >
           ⏱ {callLabel}
@@ -180,27 +176,21 @@ export function ClockControls({
           disabled={busy}
           onClick={() => run(() => (paused ? resumeDraftClock(identity) : pauseDraftClock(identity)))}
           style={{
-            flex: 1,
-            minWidth: 120,
-            minHeight: 44,
-            padding: '0 16px',
-            borderRadius: 10,
+            ...ACTION_BUTTON,
             border: '2px solid var(--neon-yellow)',
             background: paused ? 'rgba(255,230,0,0.14)' : 'transparent',
             color: 'var(--neon-yellow)',
-            fontWeight: 800,
-            letterSpacing: '0.05em',
           }}
         >
           {paused ? '▶ RESUME CLOCK' : '⏸ PAUSE CLOCK'}
         </button>
       )}
       {error && (
-        <div role="alert" style={{ width: '100%', color: 'var(--neon-red)', fontSize: '0.78rem', textAlign: 'center' }}>
+        <div role="alert" style={{ gridColumn: '1 / -1', color: 'var(--neon-red)', fontSize: '0.78rem', textAlign: 'center' }}>
           {error}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -219,6 +209,7 @@ export function DraftTimingPanel({ board, owners, tv = false }: { board: readonl
       detail: `${seconds(stats.longestPick.seconds)} on ${stats.longestPick.playerName}`,
     },
     stats.mostClocked && { label: 'MOST CLOCKED', who: stats.mostClocked.owner, detail: `${stats.mostClocked.clocked}× CLOCK called on them` },
+    stats.mostYielded && { label: 'RAN OUT OF TIME', who: stats.mostYielded.owner, detail: `skipped ${stats.mostYielded.yielded}×` },
     stats.mostCalls && { label: 'CLOCK HAPPY', who: stats.mostCalls.owner, detail: `called CLOCK ${stats.mostCalls.calls}×` },
   ].filter((row): row is { label: string; who: string; detail: string } => row !== null && row !== undefined);
   const rows = [...stats.owners].sort((a, b) => (a.averageSeconds ?? Infinity) - (b.averageSeconds ?? Infinity));

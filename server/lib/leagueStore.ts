@@ -30,7 +30,7 @@ import {
   LINK_WINDOW_MINUTES,
 } from '../../src/lib/league/auth.js';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
-import type { DraftClockState } from '../../src/lib/keeper/types.js';
+import type { DraftClockState, SkippedPick } from '../../src/lib/keeper/types.js';
 import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
@@ -55,6 +55,12 @@ export interface DraftPickState {
   isKeeper?: boolean;
   enteredBy?: string;
   timestamp?: string;
+  /** How long the team had the pick, pauses taken out. */
+  seconds?: number;
+  /** Who called CLOCK on this pick, if anyone. */
+  clockCalledBy?: string | null;
+  /** The called clock ran out and this pick was entered late, rule 2.3.2.2. */
+  skipped?: boolean;
 }
 
 export interface LeagueOverrides {
@@ -77,6 +83,7 @@ export interface LeagueDynamicState {
     playerPoolSnapshotId?: string | null;
     /** The pick timer and any CLOCK call, rule 2.3. See src/lib/league/draftClock.ts. */
     clock?: DraftClockState | null;
+    skipped?: Record<string, SkippedPick>;
   };
   playerPool?: {
     activeSnapshotId: string | null;

@@ -238,6 +238,11 @@ function GridCell({
     style.outlineOffset = -2;
     style.background = 'rgba(0,255,204,0.06)';
   }
+  if (cell.skipped) {
+    style.outline = '2px dashed var(--neon-red)';
+    style.outlineOffset = -2;
+    style.background = 'rgba(255,34,34,0.06)';
+  }
 
   // A tap that enters or clears a pick wins over the trade tooltip's tap toggle.
   const tradeHandlers = traded
@@ -354,6 +359,22 @@ function GridCell({
         >
           {pickLabel(cell.pick)} ⏱
         </span>
+      ) : cell.skipped ? (
+        <>
+          <span style={{ color: 'var(--text-dim)', fontSize: tv ? 'clamp(9px, 0.9vw, 14px)' : '0.68rem', lineHeight: 1.2 }}>
+            {pickLabel(cell.pick)}
+          </span>
+          <span
+            style={{
+              color: 'var(--neon-red)',
+              fontWeight: 800,
+              fontSize: tv ? 'clamp(7px, 0.75vw, 11px)' : '0.55rem',
+              letterSpacing: '0.05em',
+            }}
+          >
+            SKIPPED{tappable ? ' · TAP' : ''}
+          </span>
+        </>
       ) : (
         <>
           <span
