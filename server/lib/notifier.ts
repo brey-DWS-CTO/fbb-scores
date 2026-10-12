@@ -352,13 +352,12 @@ export async function sendDuesShame(
 
 function reminderContent(reminder: DueReminder, origin: string): MailContent {
   const copy = reminderCopy(reminder);
-  const keeperKind =
-    reminder.kind === 'keepers-soon' || reminder.kind === 'keepers-last-call';
+  const keeperKind = reminder.kind.startsWith('keepers-');
   return {
     subject: copy.subject,
-    preheader: copy.body,
+    preheader: copy.lines[0],
     heading: copy.heading,
-    lines: [copy.body],
+    lines: copy.lines,
     action: keeperKind
       ? { label: 'PICK YOUR KEEPERS', href: `${origin}/keepers` }
       : { label: 'OPEN THE DRAFT ROOM', href: `${origin}/draft` },
@@ -388,6 +387,12 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
   const withKeepers = Object.entries(state.keepers)
     .filter(([, selections]) => selections.length > 0)
     .map(([owner]) => owner);
+  const keeperNames = Object.fromEntries(
+    Object.entries(state.keepers).map(([owner, selections]) => [
+      owner,
+      selections.map((selection) => selection.playerName),
+    ]),
+  );
 
   const due = dueReminders({
     now,
@@ -395,6 +400,7 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
     season: state.season,
     owners: [...book.keys()],
     ownersWithKeepers: withKeepers,
+    keeperNames,
     alreadySent: await listSentNotices(state.season),
   });
 

@@ -40,14 +40,23 @@ export function DraftCountdown({
   targetIso,
   size,
   fallback = null,
+  label,
 }: {
   targetIso: string | null | undefined;
   size?: string;
   fallback?: ReactNode;
+  /** A small caption above the numbers, e.g. "KEEPERS LOCK IN". */
+  label?: string;
 }) {
   const countdown = useCountdown(targetIso);
   if (!countdown || countdown.past) return <>{fallback}</>;
-  return <CountdownDisplay countdown={countdown} size={size} />;
+  if (!label) return <CountdownDisplay countdown={countdown} size={size} />;
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <span style={{ fontSize: '0.6rem', color: 'var(--text-dim)', letterSpacing: '0.1em' }}>{label}</span>
+      <CountdownDisplay countdown={countdown} size={size} />
+    </span>
+  );
 }
 
 export function CountdownDisplay({

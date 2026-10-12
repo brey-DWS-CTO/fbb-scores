@@ -30,6 +30,7 @@ function run(options: {
     season: SEASON,
     owners: OWNERS,
     ownersWithKeepers: options.withKeepers ?? [],
+    keeperNames: { Brey: ['N. Jokic', 'S. Curry'] },
     alreadySent: options.alreadySent ?? [],
   });
 }
@@ -58,14 +59,39 @@ test('the first warning is a week before the draft', () => {
 });
 
 test('the keeper warning counts down to the deadline, not the draft', () => {
-  // Three days before the deadline is four days before the draft.
-  assert.ok(!kinds(run({ hoursBeforeDraft: 24 * 4 + 1 })).includes('keepers-soon'));
-  assert.ok(kinds(run({ hoursBeforeDraft: 24 * 4 })).includes('keepers-soon'));
+  // Five days before the deadline is six days before the draft.
+  assert.ok(!kinds(run({ hoursBeforeDraft: 24 * 6 + 1 })).includes('keepers-5-days'));
+  assert.ok(kinds(run({ hoursBeforeDraft: 24 * 6 })).includes('keepers-5-days'));
 });
 
-test('last call opens twelve hours before keepers close', () => {
-  assert.ok(!kinds(run({ hoursBeforeDraft: 37 })).includes('keepers-last-call'));
-  assert.ok(kinds(run({ hoursBeforeDraft: 36 })).includes('keepers-last-call'));
+/** A Pacific wall-clock time in draft week. PDT is seven hours behind UTC. */
+const pacific = (stamp: string) => new Date(`${stamp}-07:00`);
+const keeperKindsAt = (now: Date): string[] =>
+  dueReminders({
+    now,
+    draftAt: DRAFT_AT,
+    season: SEASON,
+    owners: OWNERS,
+    ownersWithKeepers: [],
+    alreadySent: [],
+  })
+    .map((r) => r.kind)
+    .filter((kind) => kind.startsWith('keepers-'));
+
+test('keeper mail lands Monday, Thursday and Friday at 2pm and Saturday at 8am', () => {
+  const opens: [string, string][] = [
+    ['2026-10-12T14:00:00', 'keepers-5-days'],
+    ['2026-10-15T14:00:00', 'keepers-2-days'],
+    ['2026-10-16T14:00:00', 'keepers-1-day'],
+    ['2026-10-17T08:00:00', 'keepers-last-call'],
+  ];
+  for (const [stamp, kind] of opens) {
+    const minuteBefore = new Date(pacific(stamp).getTime() - 60_000);
+    assert.ok(!keeperKindsAt(minuteBefore).includes(kind), `${kind} not before ${stamp}`);
+    assert.deepEqual(keeperKindsAt(pacific(stamp)), [kind, kind, kind], `${kind} at ${stamp}`);
+  }
+  assert.deepEqual(keeperKindsAt(pacific('2026-10-12T13:59:00')), [], 'nothing on Monday morning');
+  assert.deepEqual(keeperKindsAt(pacific('2026-10-17T14:00:00')), [], 'nothing once they lock');
 });
 
 test('the day-before warning opens a day before the draft', () => {
@@ -75,22 +101,39 @@ test('the day-before warning opens a day before the draft', () => {
 
 // ─── Who gets what ───────────────────────────────────────────────────────────
 
-test('keeper warnings skip anyone who has already saved', () => {
+test('keeper warnings go to everyone, and know who has saved', () => {
   const list = run({ hoursBeforeDraft: 30, withKeepers: ['Brey'] });
-  assert.deepEqual(owners(list, 'keepers-soon'), ['Amy', 'Joel']);
-  assert.deepEqual(owners(list, 'draft-week'), ['Amy', 'Brey', 'Joel'], 'draft news is for everyone');
+  assert.deepEqual(owners(list, 'keepers-last-call'), ['Amy', 'Brey', 'Joel']);
+  const saved = list.filter((r) => r.kind === 'keepers-last-call' && r.keeperNames.length > 0).map((r) => r.owner);
+  assert.deepEqual(saved, ['Brey']);
 });
 
-test('with everyone saved, only the draft warnings go out', () => {
-  const list = run({ hoursBeforeDraft: 30, withKeepers: OWNERS });
-  assert.deepEqual(kinds(list), ['draft-week']);
+test('the words change with whether you have saved', () => {
+  const list = run({ hoursBeforeDraft: 30, withKeepers: ['Brey'] });
+  const brey = list.find((r) => r.kind === 'keepers-last-call' && r.owner === 'Brey');
+  const amy = list.find((r) => r.kind === 'keepers-last-call' && r.owner === 'Amy');
+  assert.ok(brey && amy);
+  const breyCopy = reminderCopy(brey);
+  const amyCopy = reminderCopy(amy);
+  assert.equal(breyCopy.subject, 'Last call: Your keepers are saved. You are done.');
+  assert.match(breyCopy.lines[0], /You saved N\. Jokic and S\. Curry\. You are done\./);
+  assert.equal(amyCopy.subject, 'Last call: You have no keepers saved. Due in 6 hours.');
+  assert.match(amyCopy.lines[0], /Saturday, October 17 at 2:00 PM Pacific/);
+});
+
+test('keeper mail never tells an owner to lock anything', () => {
+  for (const reminder of run({ hoursBeforeDraft: 30, withKeepers: ['Brey'] })) {
+    if (!reminder.kind.startsWith('keepers-')) continue;
+    const copy = reminderCopy(reminder);
+    assert.ok(!/lock (it|them|your)/i.test([copy.subject, ...copy.lines].join(' ')));
+  }
 });
 
 // ─── Sending once ────────────────────────────────────────────────────────────
 
 test('a reminder already sent is not sent again', () => {
   const first = run({ hoursBeforeDraft: 24 * 5 });
-  assert.equal(first.length, 3, 'one draft-week each');
+  assert.equal(first.length, 6, 'one draft-week and one keeper warning each');
   const second = run({ hoursBeforeDraft: 24 * 5, alreadySent: first.map((r) => r.key) });
   assert.deepEqual(second, [], 'the next tick sends nothing');
 });
@@ -113,18 +156,23 @@ test('the key names the season, so next year starts clean', () => {
 
 // ─── After the fact ──────────────────────────────────────────────────────────
 
-test('a late server still warns, rather than skipping', () => {
+test('a late server sends the newest warning, not a pile of old ones', () => {
   // Nothing ran for days, and now there are six hours left before keepers close.
   const list = run({ hoursBeforeDraft: 30 });
-  assert.ok(kinds(list).includes('keepers-soon'), 'the missed three-day warning still goes');
-  assert.ok(kinds(list).includes('draft-week'), 'and so does the missed week warning');
+  assert.deepEqual(kinds(list), ['draft-week', 'keepers-last-call']);
+  assert.equal(owners(list, 'keepers-last-call').length, 3, 'one each');
+});
+
+test('a warning left unsent shuts when the next one opens', () => {
+  // The Monday warning never went to anyone, and it is now Thursday 2pm.
+  const list = run({ hoursBeforeDraft: 24 * 3 });
+  assert.ok(!kinds(list).includes('keepers-5-days'));
+  assert.ok(kinds(list).includes('keepers-2-days'));
 });
 
 test('once keepers close, no more keeper mail', () => {
   const list = run({ hoursBeforeDraft: 23 });
-  assert.ok(!kinds(list).includes('keepers-soon'));
-  assert.ok(!kinds(list).includes('keepers-last-call'));
-  assert.ok(kinds(list).includes('draft-day'), 'the draft is still ahead');
+  assert.deepEqual(kinds(list), ['draft-day'], 'the draft is still ahead');
 });
 
 test('once the draft starts, nothing goes out at all', () => {
@@ -133,6 +181,13 @@ test('once the draft starts, nothing goes out at all', () => {
 });
 
 // ─── Words ───────────────────────────────────────────────────────────────────
+
+test('a cron a minute late still says a whole day', () => {
+  const list = run({ hoursBeforeDraft: 48 - 1 / 60 });
+  const friday = list.find((r) => r.kind === 'keepers-1-day');
+  assert.equal(friday?.hoursLeft, 24);
+  assert.equal(friday && reminderCopy(friday).subject, 'You have no keepers saved. Due in 1 day.');
+});
 
 test('the countdown reads like a person wrote it', () => {
   assert.equal(humanCountdown(0), 'under an hour');
@@ -148,8 +203,8 @@ test('every reminder has a subject and no em dash', () => {
   assert.ok(list.length > 0);
   for (const reminder of list) {
     const copy = reminderCopy(reminder);
-    assert.ok(copy.subject.length > 0 && copy.heading.length > 0 && copy.body.length > 0);
-    for (const line of [copy.subject, copy.heading, copy.body]) {
+    assert.ok(copy.subject.length > 0 && copy.heading.length > 0 && copy.lines.length > 0);
+    for (const line of [copy.subject, copy.heading, ...copy.lines]) {
       assert.ok(!line.includes('—'), `em dash in: ${line}`);
     }
   }
@@ -157,7 +212,7 @@ test('every reminder has a subject and no em dash', () => {
 
 test('hoursLeft counts to the right deadline for each kind', () => {
   const list = run({ hoursBeforeDraft: 36 });
-  const keeperOne = list.find((r) => r.kind === 'keepers-last-call');
+  const keeperOne = list.find((r) => r.kind === 'keepers-1-day');
   const draftOne = list.find((r) => r.kind === 'draft-week');
   assert.equal(keeperOne?.hoursLeft, 12, 'keepers close in twelve hours');
   assert.equal(draftOne?.hoursLeft, 36, 'the draft is still a day and a half away');
