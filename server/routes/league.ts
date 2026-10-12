@@ -94,6 +94,10 @@ import {
   deleteRulebookSignature,
   listRulebookSignatures,
   insertRulebookSignature,
+  listDues,
+  saveDues,
+  getDuesSettings,
+  saveDuesSettings,
   listPolls,
   getPoll,
   insertPoll,
@@ -113,6 +117,18 @@ import {
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
+import {
+  DUES_ACTIONS,
+  DUES_FULL,
+  DUES_HALF,
+  DUES_HALF_MAX_TEAMS,
+  applyDuesAction,
+  blankDuesRow,
+  duesBoard,
+  parseVenmoHandle,
+  type DuesAction,
+  type DuesSettings,
+} from '../../src/lib/league/dues.js';
 import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
@@ -3077,6 +3093,94 @@ router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
 });
 
 // ─── Error handler ───────────────────────────────────────────────────────────
+
+// ─── Dues ────────────────────────────────────────────────────────────────────
+//
+// The app cannot see Venmo. A member says they paid; a commissioner confirms
+// it landed. Everything else is the commissioner's.
+
+const DUES_SEASON = leagueDataset.season;
+
+async function duesResponse() {
+  const [rows, settings] = await Promise.all([listDues(DUES_SEASON), getDuesSettings(DUES_SEASON)]);
+  return {
+    season: DUES_SEASON,
+    full: DUES_FULL,
+    half: DUES_HALF,
+    halfMaxTeams: DUES_HALF_MAX_TEAMS,
+    venmo: settings?.venmo ?? '',
+    payee: settings?.payee ?? '',
+    ...duesBoard(DUES_SEASON, OWNERS, rows),
+  };
+}
+
+/** Anyone may read who has paid. It is league business, like the standings. */
+router.get('/dues', async (_req, res, next) => {
+  try {
+    res.json(await duesResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/dues/:owner — one change to one team's dues. A member may
+ * mark their own team paid, or take that back until it is confirmed. The
+ * commissioner may do anything.
+ */
+router.post('/dues/:owner', requireAuth, async (req, res, next) => {
+  try {
+    const owner = String(req.params.owner);
+    if (!OWNERS.includes(owner)) throw new HttpError(404, 'No such member');
+    const action = (req.body as { action?: unknown }).action;
+    if (typeof action !== 'string' || !DUES_ACTIONS.includes(action as DuesAction)) {
+      throw new HttpError(400, `action must be one of ${DUES_ACTIONS.join(', ')}`);
+    }
+    const rows = await listDues(DUES_SEASON);
+    const current = rows.find((r) => r.owner === owner) ?? blankDuesRow(DUES_SEASON, owner);
+    const result = applyDuesAction({
+      row: current,
+      action: action as DuesAction,
+      actor: res.locals.owner as string,
+      isCommissioner: res.locals.isCommissioner === true,
+      now: new Date().toISOString(),
+      rows,
+    });
+    if (!result.ok) throw new HttpError(result.status, result.message);
+    const saved = await saveDues(result.row, current.updatedAt);
+    if (!saved) throw new HttpError(409, 'Someone else just changed this. Look again and retry.');
+    await appendAudit(actor(res), `dues.${action}`, { owner, season: DUES_SEASON });
+    res.json(await duesResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PUT /api/league/dues/settings — who collects, and their Venmo (commissioner only). */
+router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const body = req.body as { venmo?: unknown; payee?: unknown };
+    const venmoInput = typeof body.venmo === 'string' ? body.venmo : '';
+    const venmo = venmoInput.trim() === '' ? '' : parseVenmoHandle(venmoInput);
+    if (venmo === null) {
+      throw new HttpError(400, 'That is not a Venmo username or link. Try @name or venmo.com/u/name.');
+    }
+    const payee = typeof body.payee === 'string' ? body.payee : '';
+    if (payee !== '' && !OWNERS.includes(payee)) throw new HttpError(400, 'Pick a member to collect');
+    const row: DuesSettings = {
+      season: DUES_SEASON,
+      venmo,
+      payee,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor(res),
+    };
+    await saveDuesSettings(row);
+    await appendAudit(actor(res), 'dues.settings', { venmo, payee });
+    res.json(await duesResponse());
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;

@@ -13,6 +13,7 @@
 
 import type { LeagueDataset } from '../keeper/types.js';
 import { buildRulebookIndex, type Rulebook, type RulebookEntry } from './rulebook.js';
+import { DUES_FULL } from './dues.js';
 
 export interface SettingSpec {
   key: string;
@@ -78,6 +79,12 @@ export function buildSettingsRegistry(dataset: LeagueDataset): Map<string, Setti
       label: 'Rounds that can be traded',
       value: `1-${dataset.draftRounds} in the offseason, ${3}-${dataset.keeperRounds} in season, none after Week 15`,
       source: 'Pick trade rules',
+    },
+    {
+      key: 'fees.total',
+      label: 'Dues per team',
+      value: DUES_FULL,
+      source: 'Dues page',
     },
   ];
   return new Map(specs.map((spec) => [spec.key, spec]));
