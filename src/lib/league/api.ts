@@ -1347,6 +1347,12 @@ export async function cancelPickTrade(
 
 export function apiErrorMessage(e: unknown): string {
   if (axios.isAxiosError(e)) {
+    // A phone can hold a sign-in the server no longer accepts: a PIN that was
+    // reset, or a link that ran out. "Invalid owner" reads like an insult;
+    // say what to do instead.
+    if (e.response?.status === 401) {
+      return 'Your sign-in is out of date. Sign in again from the home page, then try that once more.';
+    }
     const data = e.response?.data as { error?: string } | undefined;
     return data?.error ?? e.message;
   }
