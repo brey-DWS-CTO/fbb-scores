@@ -13,13 +13,22 @@
  */
 
 /** How long a sign-in link works. Short, because email sits in inboxes. */
-export const LINK_TTL_MINUTES = 15;
+/**
+ * Two days. A member reads the email on the bus, taps it that night, and the
+ * link must still work. A link is one-use, and it only ever reaches the
+ * address on file, so a long life costs little.
+ */
+export const LINK_TTL_MINUTES = 48 * 60;
 
 /** How long a session lasts. Long, because this is a league, not a bank. */
 export const SESSION_TTL_DAYS = 30;
 
 /** Links one address may hold inside LINK_WINDOW_MINUTES. */
-export const MAX_LINKS_PER_WINDOW = 3;
+/**
+ * Five, because a sign request from the commissioner issues one per member,
+ * and a manual resend or two on top of that must not bounce.
+ */
+export const MAX_LINKS_PER_WINDOW = 5;
 
 export const LINK_WINDOW_MINUTES = 15;
 
@@ -136,4 +145,15 @@ export function emailTakenBy(entries: OwnerEmail[], email: string, owner: string
   const holder = ownerForEmail(entries, email);
   if (holder === null) return null;
   return sameOwner(holder, owner) ? null : holder;
+}
+
+/**
+ * Where a sign-in link may send someone afterwards: a path inside this app and
+ * nothing else. Anything that could leave the site, or is not a path at all,
+ * lands on the home page.
+ */
+export function safeNextPath(value: string | null | undefined): string {
+  if (!value) return '/';
+  if (!value.startsWith('/') || value.startsWith('//') || /[\s\\]/.test(value)) return '/';
+  return value;
 }

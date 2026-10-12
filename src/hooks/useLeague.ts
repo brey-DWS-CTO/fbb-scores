@@ -6,6 +6,7 @@ import {
   fetchPlayerPool,
   fetchPublishedHistory,
   sandboxActive,
+  pinDead,
   sessionExpired,
   actAsOwner,
   apiErrorMessage,
@@ -63,7 +64,7 @@ export function useLeagueState(fast = false) {
   // empty team under a real name. Check, and sign the phone out if so.
   const serverViewer = query.isSuccess ? query.data.meta?.viewer : undefined;
   useEffect(() => {
-    if (serverViewer === undefined || !identity?.session) return;
+    if (serverViewer === undefined || !identity) return;
     if (serverViewer === identity.owner || sandboxActive()) return;
     void dropExpiredSignIn(identity);
   }, [serverViewer, identity]);
@@ -228,9 +229,12 @@ async function dropExpiredSignIn(identity: Identity): Promise<void> {
   if (checkingSignIn) return;
   checkingSignIn = true;
   try {
-    if (!(await sessionExpired(identity))) return;
+    // A link sign-in is checked one way, an old PIN sign-in another. Both
+    // only ever drop the identity on a clear 401 from the server.
+    const gone = identity.session ? await sessionExpired(identity) : await pinDead(identity);
+    if (!gone) return;
     const current = loadIdentity();
-    if (current?.session !== identity.session) return;
+    if (current?.session !== identity.session || current?.owner !== identity.owner) return;
     let parked: Identity | null = null;
     try {
       const raw = localStorage.getItem(REAL_ID_KEY);

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { consumeLoginToken, apiErrorMessage } from '../../lib/league/api.js';
 import { leagueDataset } from '../../lib/league/data.js';
+import { safeNextPath } from '../../lib/league/auth.js';
 import NavIcon from './NavIcon.js';
 
 /**
@@ -11,6 +12,9 @@ import NavIcon from './NavIcon.js';
  */
 export default function SignInLinkPage() {
   const { token } = useParams<{ token: string }>();
+  const [params] = useSearchParams();
+  // A sign request's button lands on the printed copy, not the home page.
+  const next = safeNextPath(params.get('next'));
   const { identity, signInWithSession } = useIdentity();
   const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +47,9 @@ export default function SignInLinkPage() {
       });
   }, [token, signInWithSession]);
 
-  // Home sends a signed-in owner straight on to their keeper worksheet.
-  if (signedIn) return <Navigate to="/" replace />;
+  // Home sends a signed-in owner straight on to their keeper worksheet,
+  // unless the link said where to go.
+  if (signedIn) return <Navigate to={next} replace />;
 
   const problem = token ? error : 'That link is missing its code. Ask for a new one.';
 
