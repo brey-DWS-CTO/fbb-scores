@@ -42,6 +42,7 @@ Every feature above follows this, and it is why 372 tests run in ~10 seconds.
 2. **Tier algorithm** (validated 100% vs the 2026 worksheet): >25 GP players ranked by FPPG, decile = round; ≤25 GP → prior-year avg value-slotted; 0 GP → flat R3; cap = R3max+R3min (**77.8**).
 3. **Keeper secrecy until commissioner reveal** — enforced by server-side redaction in `GET /state` (own keepers always; everything for commissioner; counts for everyone). The commissioner controls `state.keepersRevealed` from Commish Mode. Never expose full keepers in any new endpoint pre-reveal.
 4. **Draft static until START** — `draft.startedAt` set only by `POST /draft/start` (commissioner). On-clock = first cell neither drafted nor keeper-locked.
+5. **The clock (rule 2.3)** — `draft.clock` holds the pick timer, a pause, and any CLOCK call; the server stamps every moment and the screens only do arithmetic (`src/lib/league/draftClock.ts`). Any member may call CLOCK on the team picking, never on themselves, once every five picks; the commissioner has no cooldown and can pause and resume. CLOCK gives 30 seconds; at zero the screens flash TIME and nothing is skipped, the yield in 2.3.2.1 stays a call at the table. Each pick stores `seconds` and `clockCalledBy`, and the board and TV show DRAFT STATS once the draft is complete.
 5. Commissioner **overrides** (cap, per-player rounds) live in dynamic state; apply via `applyOverrides` — always consume the dataset through `useLeagueData()`.
 
 ## Auth / PINs

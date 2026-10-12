@@ -1,6 +1,7 @@
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockResultRecord } from './mockGrade.js';
 import axios from 'axios';
+import { callClock, isPaused, pauseClock, pickTiming, resumeClock, startPickClock } from './draftClock.js';
 import type {
   KeeperSelection,
   LeagueDynamicState,
@@ -389,6 +390,7 @@ export async function submitDraftPick(
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
+      const timestamp = new Date().toISOString();
       s.draft.picks[String(pick.overallPick)] = {
         playerKey: pick.playerKey,
         playerName: pick.playerName,
@@ -396,8 +398,10 @@ export async function submitDraftPick(
         positions: pick.positions,
         isKeeper: pick.isKeeper === true,
         enteredBy: c.owner,
-        timestamp: new Date().toISOString(),
+        timestamp,
+        ...pickTiming(s.draft.clock, timestamp),
       };
+      s.draft.clock = startPickClock(timestamp, isPaused(s.draft.clock));
     });
   }
   const { data } = await axios.post('/api/league/draft/pick', pick, { headers: authHeaders(c) });
@@ -409,6 +413,7 @@ export async function clearDraftPick(c: Credentials, overallPick: number): Promi
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       delete s.draft.picks[String(overallPick)];
+      if (s.draft.startedAt !== null) s.draft.clock = startPickClock(new Date().toISOString(), isPaused(s.draft.clock));
     });
   }
   const { data } = await axios.delete(`/api/league/draft/pick/${overallPick}`, {
@@ -425,10 +430,45 @@ export async function startDraft(c: Credentials): Promise<StateResponse> {
         s.draft.playerPoolSnapshotId =
           s.playerPool?.activeSnapshotId ?? `dataset-${s.season}`;
         s.draft.startedAt = new Date().toISOString();
+        s.draft.clock = startPickClock(s.draft.startedAt);
       }
     });
   }
   const { data } = await axios.post('/api/league/draft/start', {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** Call CLOCK on the team picking (rule 2.3.1). The screen checks `canCallClock` first; the server checks again. */
+export async function callDraftClock(c: Credentials): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      if (s.draft.clock && !s.draft.clock.call) s.draft.clock = callClock(s.draft.clock, c.owner, new Date().toISOString());
+    });
+  }
+  const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function pauseDraftClock(c: Credentials): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      if (s.draft.clock) s.draft.clock = pauseClock(s.draft.clock, new Date().toISOString());
+    });
+  }
+  const { data } = await axios.post('/api/league/draft/clock/pause', {}, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function resumeDraftClock(c: Credentials): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      if (s.draft.clock) s.draft.clock = resumeClock(s.draft.clock, new Date().toISOString());
+    });
+  }
+  const { data } = await axios.post('/api/league/draft/clock/resume', {}, { headers: authHeaders(c) });
   return data;
 }
 

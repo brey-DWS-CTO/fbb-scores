@@ -30,6 +30,7 @@ import {
   LINK_WINDOW_MINUTES,
 } from '../../src/lib/league/auth.js';
 import leagueConfig from '../../src/data/source/league-2027-config.json' with { type: 'json' };
+import type { DraftClockState } from '../../src/lib/keeper/types.js';
 import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
@@ -74,6 +75,8 @@ export interface LeagueDynamicState {
     /** When the commissioner called the draft finished; null while it runs. */
     closedAt?: string | null;
     playerPoolSnapshotId?: string | null;
+    /** The pick timer and any CLOCK call, rule 2.3. See src/lib/league/draftClock.ts. */
+    clock?: DraftClockState | null;
   };
   playerPool?: {
     activeSnapshotId: string | null;

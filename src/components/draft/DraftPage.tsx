@@ -22,6 +22,7 @@ import IdentityChip from '../league/IdentityChip.js';
 import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
+import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
   cellDisplay,
@@ -468,6 +469,8 @@ export default function DraftPage() {
                 ENTER PICK {pickLabel(onClock.pick)}
               </button>
             )}
+            <ClockReadout clock={boardState.draft.clock} />
+            <ClockControls clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>
@@ -499,6 +502,10 @@ export default function DraftPage() {
           </div>
         )}
       </div>
+
+      {started && !onClock && (
+        <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
+      )}
 
       {meta && !meta.revealed && started && (
         <div

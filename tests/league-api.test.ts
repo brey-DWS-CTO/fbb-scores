@@ -942,3 +942,76 @@ test('refuses names nobody previewed and a fetch that changed nothing', async ()
   assert.equal(quiet.status, 409);
   assert.match(String(quiet.body.error), /Nothing changed/);
 });
+
+test('CLOCK: anyone but the picker may call it once every five picks, the commish can pause, and picks keep their time', async () => {
+  const next = cleanState();
+  next.keepersRevealed = true;
+  await replaceState(next);
+  const started = await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(started.status, 200);
+  const clockAfterStart = (started.body.state as LeagueDynamicState).draft.clock;
+  assert.ok(clockAfterStart?.pickStartedAt, 'the first team is on the pick from the start');
+  assert.equal(clockAfterStart?.call, null);
+
+  const pick = (owner: string, overallPick: number, index: number) => request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify({ overallPick, playerKey: dataset.players[index]!.key, playerName: dataset.players[index]!.name }),
+  });
+  const call = (owner: string) => request('/api/league/draft/clock/call', { method: 'POST', headers: auth(owner) });
+
+  // Pick 1 is Joel's. Joel cannot call it on himself; Ryan can; nobody can twice.
+  const own = await call('Joel');
+  assert.equal(own.status, 403);
+  assert.match(String(own.body.error), /your own pick/);
+  const ryanCalls = await call('Ryan');
+  assert.equal(ryanCalls.status, 200);
+  assert.equal((ryanCalls.body.state as LeagueDynamicState).draft.clock?.call?.by, 'Ryan');
+  const twice = await call(commissioner);
+  assert.equal(twice.status, 409);
+  assert.match(String(twice.body.error), /already running/);
+
+  // Joel picks: the pick keeps its seconds and who called CLOCK, and the next timer starts clean.
+  const first = await pick('Joel', 1, 0);
+  assert.equal(first.status, 200);
+  const afterFirst = (first.body.state as LeagueDynamicState).draft;
+  assert.equal(typeof afterFirst.picks['1']?.seconds, 'number');
+  assert.equal(afterFirst.picks['1']?.clockCalledBy, 'Ryan');
+  assert.equal(afterFirst.clock?.call, null);
+  assert.ok(afterFirst.clock?.pickStartedAt);
+
+  // Pick 2 is Ryan's. Joel calls it; Ryan picks with no call recorded against Joel's cooldown yet.
+  assert.equal((await call('Ryan')).status, 403);
+  assert.equal((await call('Joel')).status, 200);
+  const second = await pick('Ryan', 2, 1);
+  assert.equal(second.status, 200);
+  assert.equal((second.body.state as LeagueDynamicState).draft.picks['2']?.clockCalledBy, 'Joel');
+
+  // Pick 3: Ryan called on pick 1, so he waits three more; Joel called on pick 2, four more. The commish never waits.
+  const ryanAgain = await call('Ryan');
+  assert.equal(ryanAgain.status, 409);
+  assert.match(String(ryanAgain.body.error), /again in 3 picks/);
+  const joelAgain = await call('Joel');
+  assert.equal(joelAgain.status, 409);
+  assert.match(String(joelAgain.body.error), /again in 4 picks/);
+
+  // Pause is the commissioner's. Nobody can call CLOCK while paused.
+  assert.equal((await request('/api/league/draft/clock/pause', { method: 'POST', headers: auth('Joel') })).status, 403);
+  const paused = await request('/api/league/draft/clock/pause', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(paused.status, 200);
+  assert.ok((paused.body.state as LeagueDynamicState).draft.clock?.pausedAt);
+  const whilePaused = await call(commissioner);
+  assert.equal(whilePaused.status, 409);
+  assert.match(String(whilePaused.body.error), /paused/);
+  const resumed = await request('/api/league/draft/clock/resume', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(resumed.status, 200);
+  const clock = (resumed.body.state as LeagueDynamicState).draft.clock;
+  assert.equal(clock?.pausedAt, null);
+  assert.ok((clock?.pausedMs ?? -1) >= 0);
+  assert.equal((await call(commissioner)).status, 200);
+
+  // Clearing a pick restarts that team's timer without a call.
+  const cleared = await request('/api/league/draft/pick/2', { method: 'DELETE', headers: auth(commissioner) });
+  assert.equal(cleared.status, 200);
+  assert.equal((cleared.body.state as LeagueDynamicState).draft.clock?.call, null);
+});
