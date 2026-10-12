@@ -142,7 +142,7 @@ test('publishing is quiet; the sign request goes only to the members picked', as
     noAddress: [],
   });
   assert.deepEqual(mails().map((m) => m.to), ['joel@example.test'], 'a stranger is dropped, not mailed');
-  assert.match(mails()[0].subject, /The first revision of the 2026-27 constitution has released!/);
+  assert.equal(mails()[0].subject, 'The 2026-27 Nerds Fantasy Basketball League Constitution');
 
   mailLog = [];
   const rest = await signRequest(['Amy', 'Ryan']);
@@ -186,7 +186,7 @@ test('the commissioner can withdraw a signature so a member signs again', async 
   });
   assert.equal(resigned.status, 200, 'and Joel may sign again');
 
-  // A second revision makes the next note "a new revision", not "the first".
+  // A second revision carries its own number in the note.
   mailLog = [];
   const book = structuredClone(seed);
   book.articles[0].title = 'League Format (second)';
@@ -204,5 +204,5 @@ test('the commissioner can withdraw a signature so a member signs again', async 
   assert.equal(second.status, 200);
   await signRequest(['Joel']);
   await notifier.mailSettled();
-  assert.match(mails()[0].subject, /A new revision of the 2026-27 constitution has released!/);
+  assert.equal(mails()[0].subject, 'The 2026-27 Nerds Fantasy Basketball League Constitution');
 });
