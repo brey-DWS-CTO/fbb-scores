@@ -321,8 +321,7 @@ export async function sendRulebookSignRequest(
 
 function reminderContent(reminder: DueReminder, origin: string): MailContent {
   const copy = reminderCopy(reminder);
-  const keeperKind =
-    reminder.kind === 'keepers-soon' || reminder.kind === 'keepers-last-call';
+  const keeperKind = reminder.kind.startsWith('keepers-');
   return {
     subject: copy.subject,
     preheader: copy.body,

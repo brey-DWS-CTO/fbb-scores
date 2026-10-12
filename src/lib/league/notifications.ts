@@ -17,28 +17,44 @@ export const KEEPER_DEADLINE_HOURS_BEFORE_DRAFT = 24;
 
 const HOUR = 60 * 60 * 1000;
 
-export type ReminderKind = 'draft-week' | 'draft-day' | 'keepers-soon' | 'keepers-last-call';
+export type ReminderKind =
+  | 'draft-week'
+  | 'draft-day'
+  | 'keepers-5-days'
+  | 'keepers-2-days'
+  | 'keepers-1-day'
+  | 'keepers-last-call';
 
 export interface ReminderWindow {
   kind: ReminderKind;
   /** Hours before the moment this reminder counts down to. */
   hoursBefore: number;
-  /** Only owners with no keepers saved get it. */
-  keeperlessOnly: boolean;
 }
 
 /**
- * Two warnings for the draft, two for the keeper deadline.
+ * Two warnings for the draft, four for the keeper deadline.
  *
  * The keeper ones count down to the deadline, which is a day earlier than the
- * draft, so "12 hours before keepers close" is 36 hours before the draft.
+ * draft. With the deadline at Saturday 2pm Pacific they land Monday 2pm,
+ * Thursday 2pm, Friday 2pm and Saturday 8am. Every owner gets them, saved or
+ * not; the words change with whether they have saved.
+ *
+ * A window stays open until the next one for the same deadline opens. So a
+ * server that slept, or an address added late, sends the newest warning once
+ * instead of a pile of stale ones.
  */
 export const REMINDERS: ReminderWindow[] = [
-  { kind: 'draft-week', hoursBefore: 24 * 7, keeperlessOnly: false },
-  { kind: 'keepers-soon', hoursBefore: 24 * 3, keeperlessOnly: true },
-  { kind: 'draft-day', hoursBefore: 24, keeperlessOnly: false },
-  { kind: 'keepers-last-call', hoursBefore: 12, keeperlessOnly: true },
+  { kind: 'draft-week', hoursBefore: 24 * 7 },
+  { kind: 'keepers-5-days', hoursBefore: 24 * 5 },
+  { kind: 'keepers-2-days', hoursBefore: 24 * 2 },
+  { kind: 'keepers-1-day', hoursBefore: 24 },
+  { kind: 'draft-day', hoursBefore: 24 },
+  { kind: 'keepers-last-call', hoursBefore: 6 },
 ];
+
+function isKeeperKind(kind: ReminderKind): boolean {
+  return kind.startsWith('keepers-');
+}
 
 export function keeperDeadline(draftAt: Date): Date {
   return new Date(draftAt.getTime() - KEEPER_DEADLINE_HOURS_BEFORE_DRAFT * HOUR);
@@ -46,7 +62,20 @@ export function keeperDeadline(draftAt: Date): Date {
 
 /** What each reminder counts down to. */
 function targetFor(kind: ReminderKind, draftAt: Date): Date {
-  return kind === 'draft-week' || kind === 'draft-day' ? draftAt : keeperDeadline(draftAt);
+  return isKeeperKind(kind) ? keeperDeadline(draftAt) : draftAt;
+}
+
+/**
+ * When a window shuts: when the next window for the same deadline opens, or
+ * at the deadline itself.
+ */
+function closesAt(window: ReminderWindow, draftAt: Date): number {
+  const target = targetFor(window.kind, draftAt).getTime();
+  const later = REMINDERS.filter(
+    (other) => isKeeperKind(other.kind) === isKeeperKind(window.kind) && other.hoursBefore < window.hoursBefore,
+  );
+  if (later.length === 0) return target;
+  return target - Math.max(...later.map((other) => other.hoursBefore)) * HOUR;
 }
 
 /**
@@ -60,6 +89,8 @@ export interface DueReminder {
   /** Whole hours left until the thing being warned about. Never negative. */
   hoursLeft: number;
   deadlineAt: string;
+  /** Whether this owner has at least one keeper saved. */
+  keepersSaved: boolean;
 }
 
 export function reminderKey(kind: ReminderKind, owner: string, season: number): string {
@@ -82,10 +113,10 @@ export interface ReminderInput {
  * Which reminders should go out right now.
  *
  * A reminder becomes due once the clock is inside its window and stays due
- * until the moment it counts down to. That means a server which was asleep
- * still sends a late warning rather than skipping it, which is the right way
- * round: a late "keepers close in a few hours" is useful, a silent miss is
- * not. Once the deadline passes, nothing more goes out about it.
+ * until the next window for the same deadline opens. That means a server
+ * which was asleep still sends a late warning rather than skipping it, which
+ * is the right way round: a late "keepers close in a few hours" is useful, a
+ * silent miss is not. Once the deadline passes, nothing more goes out about it.
  */
 export function dueReminders(input: ReminderInput): DueReminder[] {
   const sent = new Set(input.alreadySent);
@@ -97,18 +128,20 @@ export function dueReminders(input: ReminderInput): DueReminder[] {
     const opensAt = target.getTime() - window.hoursBefore * HOUR;
     const msLeft = target.getTime() - input.now.getTime();
     if (input.now.getTime() < opensAt) continue;
-    if (msLeft <= 0) continue;
+    if (input.now.getTime() >= closesAt(window, input.draftAt)) continue;
 
     for (const owner of input.owners) {
-      if (window.keeperlessOnly && withKeepers.has(owner)) continue;
       const key = reminderKey(window.kind, owner, input.season);
       if (sent.has(key)) continue;
       due.push({
         kind: window.kind,
         owner,
         key,
-        hoursLeft: Math.max(0, Math.floor(msLeft / HOUR)),
+        // Rounded, not floored: a cron that fires a minute late should still
+        // say "1 day", not "23 hours".
+        hoursLeft: Math.max(0, Math.round(msLeft / HOUR)),
         deadlineAt: target.toISOString(),
+        keepersSaved: withKeepers.has(owner),
       });
     }
   }
@@ -142,33 +175,47 @@ export interface ReminderCopy {
   body: string;
 }
 
+/** "Saturday, October 17 at 2:00 PM Pacific". The league says dates in Pacific. */
+export function pacificLabel(iso: string): string {
+  const at = new Date(iso);
+  const day = at.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+  const time = at.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  return `${day} at ${time} Pacific`;
+}
+
 /** The words for each reminder. Kept here so the tests can read them. */
 export function reminderCopy(reminder: DueReminder): ReminderCopy {
   const left = humanCountdown(reminder.hoursLeft);
-  switch (reminder.kind) {
-    case 'draft-week':
-      return {
-        subject: `The draft is in ${left}`,
-        heading: `Draft in ${left}`,
-        body: 'Check your keepers and your picks before the room fills up.',
-      };
-    case 'draft-day':
-      return {
-        subject: `The draft is in ${left}`,
-        heading: `Draft in ${left}`,
-        body: 'Last look at the board. Keepers are already closed.',
-      };
-    case 'keepers-soon':
-      return {
-        subject: `Your keepers are due in ${left}`,
-        heading: `Keepers close in ${left}`,
-        body: 'You have not saved any keepers. Pick two, one, or none, but save it so the commish knows.',
-      };
-    case 'keepers-last-call':
-      return {
-        subject: `Last call: keepers close in ${left}`,
-        heading: `Keepers close in ${left}`,
-        body: 'Still nothing saved for your team. After this the roster you had is what you get.',
-      };
+  if (isKeeperKind(reminder.kind)) {
+    const lastCall = reminder.kind === 'keepers-last-call';
+    const when = `Keepers lock ${pacificLabel(reminder.deadlineAt)}.`;
+    return {
+      subject: lastCall ? `Last call: keepers are due in ${left}` : `Keepers are due in ${left}`,
+      heading: `Keepers due in ${left}`,
+      body: reminder.keepersSaved
+        ? `${when} Yours are saved. You can change them until then.`
+        : `${when} You have none saved. Pick two, one, or none, but save it so the commish knows.`,
+    };
   }
+  if (reminder.kind === 'draft-week') {
+    return {
+      subject: `The draft is in ${left}`,
+      heading: `Draft in ${left}`,
+      body: 'Check your keepers and your picks before the room fills up.',
+    };
+  }
+  return {
+    subject: `The draft is in ${left}`,
+    heading: `Draft in ${left}`,
+    body: 'Last look at the board. Keepers are already closed.',
+  };
 }
