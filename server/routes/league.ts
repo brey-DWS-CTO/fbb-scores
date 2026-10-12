@@ -25,6 +25,7 @@ import {
   startPickClock,
   yieldPick,
 } from '../../src/lib/league/draftClock.js';
+import { nameTaken, parseWriteIn } from '../../src/lib/league/writeIn.js';
 import type {
   LeagueDataset,
   PickRef,
@@ -1167,10 +1168,23 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
   const isCommissioner = res.locals.isCommissioner as boolean;
   const current = await getState();
   const draftPoolDataset = await resolveDraftDataset(current.state);
-  const player = draftPoolDataset.players.find((candidate) => candidate.key === playerKey);
-  if (!player) {
-    res.status(400).json({ error: `Unknown player: ${playerKey}` });
-    return;
+  // A write-in is a player the locked pool does not have: name, team and position typed in.
+  const writeIn = body.writeIn === true;
+  let player: { key: string; name: string; proTeam: string; positions: string[] };
+  if (writeIn) {
+    const parsed = parseWriteIn({ name: body.playerName, proTeam: body.proTeam, positions: body.positions });
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+    player = parsed.player;
+  } else {
+    const found = draftPoolDataset.players.find((candidate) => candidate.key === playerKey);
+    if (!found) {
+      res.status(400).json({ error: `Unknown player: ${playerKey}` });
+      return;
+    }
+    player = found;
   }
   const timestamp = new Date().toISOString();
   const result = await mutateState((draft) => {
@@ -1193,7 +1207,12 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     if (!isCommissioner && cell.pick.currentOwner !== authedOwner) {
       throw new HttpError(403, `Only ${cell.pick.currentOwner} can enter this pick`);
     }
-    if (!availablePlayers(dataset, draft).some((candidate) => candidate.key === player.key)) {
+    if (writeIn) {
+      const wanted = player.name.toLowerCase();
+      const inPool = dataset.players.find((entry) => entry.name.toLowerCase() === wanted || entry.fullName?.toLowerCase() === wanted);
+      if (inPool) throw new HttpError(409, `${inPool.fullName ?? inPool.name} is in the player pool. Pick him from the list.`);
+      if (nameTaken(player.name, draft.draft.picks, [], new Set())) throw new HttpError(409, `${player.name} is already on the board`);
+    } else if (!availablePlayers(dataset, draft).some((candidate) => candidate.key === player.key)) {
       throw new HttpError(409, `${player.name} is already off the board`);
     }
     const yielded = draft.draft.skipped?.[String(overallPick)];
@@ -1224,6 +1243,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     proTeam: player.proTeam,
     positions: player.positions,
     isKeeper: false,
+    writeIn,
   });
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
 });

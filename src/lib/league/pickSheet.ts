@@ -15,7 +15,7 @@ export type PositionFilter = 'ALL' | PlayerPosition;
 /** Sorts anyone may use. */
 export const MEMBER_SORTS = ['name', 'team', 'position'] as const;
 /** Sorts only the commissioner may use, on numbers only he sees. */
-export const COMMISH_SORTS = ['fppg', 'adp', 'gone'] as const;
+export const COMMISH_SORTS = ['fppg', 'total', 'adp', 'gone'] as const;
 export type PickSort = (typeof MEMBER_SORTS)[number] | (typeof COMMISH_SORTS)[number];
 
 export const SORT_LABELS: Record<PickSort, string> = {
@@ -23,6 +23,7 @@ export const SORT_LABELS: Record<PickSort, string> = {
   team: 'TEAM',
   position: 'POS',
   fppg: 'FPPG',
+  total: 'TOTAL',
   adp: 'ADP',
   gone: 'GONE',
 };
@@ -31,6 +32,8 @@ export const SORT_LABELS: Record<PickSort, string> = {
 export interface PickNumbers {
   /** Projected fantasy points per game in our scoring. */
   fppg: number | null;
+  /** Projected points for the season: FPPG times the games ESPN projects. */
+  total: number | null;
   /** ESPN's average draft position. */
   adp: number | null;
   /** Place on our value board. */
@@ -104,6 +107,8 @@ export function sortPool(
       return rows.sort((a, b) => positionIndex(a) - positionIndex(b) || byName(a, b));
     case 'fppg':
       return rows.sort((a, b) => numberDesc(of(a)?.fppg ?? null, of(b)?.fppg ?? null) || byName(a, b));
+    case 'total':
+      return rows.sort((a, b) => numberDesc(of(a)?.total ?? null, of(b)?.total ?? null) || byName(a, b));
     case 'adp':
       return rows.sort((a, b) => numberAsc(of(a)?.adp ?? null, of(b)?.adp ?? null) || byName(a, b));
     case 'gone':

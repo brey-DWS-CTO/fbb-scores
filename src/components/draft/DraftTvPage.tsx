@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
 import { useDraftData } from '../../hooks/useLeague.js';
@@ -150,6 +151,23 @@ export default function DraftTvPage() {
         </div>
 
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <Link
+            to="/draft"
+            style={{
+              display: 'inline-block',
+              marginBottom: 4,
+              padding: '3px 10px',
+              border: '1px solid var(--panel-border)',
+              borderRadius: 999,
+              color: 'var(--text-mid)',
+              textDecoration: 'none',
+              fontSize: 'clamp(0.6rem, 1.4vh, 0.85rem)',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+            }}
+          >
+            EXIT TV
+          </Link>
           {sandboxActive() && (
             <div
               style={{

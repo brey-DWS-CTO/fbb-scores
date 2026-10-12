@@ -38,7 +38,7 @@ const keys = (rows: DatasetPlayer[]) => rows.map((row) => row.key);
 
 test('members get name, team and position; the commissioner adds the numbers', () => {
   assert.deepEqual(sortsFor(false), ['name', 'team', 'position']);
-  assert.deepEqual(sortsFor(true), ['name', 'team', 'position', 'fppg', 'adp', 'gone']);
+  assert.deepEqual(sortsFor(true), ['name', 'team', 'position', 'fppg', 'total', 'adp', 'gone']);
   assert.equal(allowedSort('fppg', false), 'name');
   assert.equal(allowedSort('fppg', true), 'fppg');
   assert.equal(allowedSort('team', false), 'team');
@@ -58,13 +58,14 @@ test('position follows PG, SG, SF, PF, C by the first listed position, then name
 
 test('fppg high to low, adp low to high, gone high to low; unknowns last', () => {
   const numbers = new Map<string, PickNumbers>([
-    ['jokic', { fppg: 60.2, adp: 1.1, rank: 1, playIn: 2, playoff: 7, gone: 1 }],
-    ['wemby', { fppg: 55.0, adp: 2.4, rank: 2, playIn: 3, playoff: 6, gone: 0.8 }],
-    ['tatum', { fppg: 44.1, adp: 6.0, rank: 5, playIn: 2, playoff: 7, gone: 0.3 }],
-    ['murray', { fppg: null, adp: null, rank: null, playIn: null, playoff: null, gone: null }],
+    ['jokic', { fppg: 60.2, total: 4800, adp: 1.1, rank: 1, playIn: 2, playoff: 7, gone: 1 }],
+    ['wemby', { fppg: 55.0, total: 3900, adp: 2.4, rank: 2, playIn: 3, playoff: 6, gone: 0.8 }],
+    ['tatum', { fppg: 44.1, total: 3600, adp: 6.0, rank: 5, playIn: 2, playoff: 7, gone: 0.3 }],
+    ['murray', { fppg: null, total: null, adp: null, rank: null, playIn: null, playoff: null, gone: null }],
   ]);
   assert.deepEqual(keys(sortPool(POOL, 'fppg', numbers)), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
   assert.deepEqual(keys(sortPool(POOL, 'adp', numbers)), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
+  assert.deepEqual(keys(sortPool(POOL, 'total', numbers)), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
   assert.deepEqual(keys(sortPool(POOL, 'gone', numbers)), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
 });
 

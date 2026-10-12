@@ -146,9 +146,14 @@ test('on the real board, the odds count from the pick on the clock to the person
   assert.ok(best.some((candidate) => (odds.get(candidate.playerKey) ?? 0) > 0.5));
   // The same seed gives the same answer.
   assert.deepEqual([...oddsGoneFromClock(real, 1, 'Brey', 4, 30)], [...odds]);
-  // From Brey's own pick, his choice is not counted and the window runs to 3.9.
+  // From Brey's own pick the question is "if I pass, is he there at 3.9?", so the
+  // best value left is mostly gone, not quietly taken by Brey himself.
   const fromOwn = oddsGoneFromClock(real, 1, 'Brey', 12, 30);
   assert.ok(fromOwn.size > 5);
+  const run = createMockRun(real, 1);
+  while (run.nextSlot() && run.nextSlot()!.pick.overall < 12) run.next();
+  const bestLeft = run.available()[0]!;
+  assert.ok((fromOwn.get(bestLeft.playerKey) ?? 0) > 0.5, `${bestLeft.playerName} should be mostly gone, got ${fromOwn.get(bestLeft.playerKey)}`);
   // No open pick left: nothing.
   assert.equal(oddsGoneFromClock(real, 1, 'Brey', 140, 30).size, 0);
 });

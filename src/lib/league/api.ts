@@ -385,6 +385,8 @@ export async function submitDraftPick(
     proTeam?: string;
     positions?: string[];
     isKeeper?: boolean;
+    /** The player is not in the pool; name, team and position were typed in. */
+    writeIn?: boolean;
   },
 ): Promise<StateResponse> {
   const sandbox = readSandbox();

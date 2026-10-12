@@ -18,7 +18,106 @@ import {
   type PickSort,
   type PositionFilter,
 } from '../../lib/league/pickSheet.js';
+import { parseWriteIn, WRITE_IN_POSITIONS, type WriteInPosition } from '../../lib/league/writeIn.js';
 import { POSITION_ORDER, positionTheme } from './boardUtils.js';
+
+/** Name, team and position for a player the pool does not have. */
+function WriteInForm({
+  busy,
+  error,
+  onBack,
+  onSubmit,
+}: {
+  busy: boolean;
+  error: string | null;
+  onBack: () => void;
+  onSubmit: (input: { name: string; proTeam: string; positions: WriteInPosition[] }) => void;
+}) {
+  const [name, setName] = useState('');
+  const [proTeam, setProTeam] = useState('');
+  const [positions, setPositions] = useState<WriteInPosition[]>([]);
+  const togglePosition = (code: WriteInPosition) =>
+    setPositions((current) => (current.includes(code)
+      ? current.filter((entry) => entry !== code)
+      : current.length >= 2 ? current : [...current, code]));
+  const check = parseWriteIn({ name, proTeam, positions });
+  const field = { width: '100%', minHeight: 48, padding: '11px 14px', fontSize: '0.95rem' } as const;
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (check.ok) onSubmit({ name, proTeam, positions });
+      }}
+      style={{ display: 'grid', gap: 10 }}
+    >
+      <div style={{ color: 'var(--text-soft)', fontSize: '0.8rem' }}>
+        Not in the pool? Type him in. The name goes on the board as written.
+      </div>
+      <label style={{ display: 'grid', gap: 4 }}>
+        <span className="hub-heading" style={{ fontSize: '0.55rem', color: 'var(--text-dim)' }}>PLAYER NAME</span>
+        <input className="hub-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="First Last" autoComplete="off" spellCheck={false} autoFocus style={field} />
+      </label>
+      <label style={{ display: 'grid', gap: 4 }}>
+        <span className="hub-heading" style={{ fontSize: '0.55rem', color: 'var(--text-dim)' }}>NBA TEAM</span>
+        <input className="hub-input" value={proTeam} onChange={(event) => setProTeam(event.target.value.toUpperCase())} placeholder="DEN" maxLength={4} autoComplete="off" spellCheck={false} style={{ ...field, textTransform: 'uppercase' }} />
+      </label>
+      <div style={{ display: 'grid', gap: 4 }}>
+        <span className="hub-heading" style={{ fontSize: '0.55rem', color: 'var(--text-dim)' }}>POSITION · UP TO TWO</span>
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+          {WRITE_IN_POSITIONS.map((code) => {
+            const active = positions.includes(code);
+            const theme = positionTheme([code]);
+            return (
+              <button
+                key={code}
+                className="tap-btn"
+                type="button"
+                aria-pressed={active}
+                onClick={() => togglePosition(code)}
+                style={{
+                  minWidth: 52,
+                  minHeight: 40,
+                  padding: '6px 12px',
+                  border: `1px solid ${active ? theme.border : 'var(--panel-border)'}`,
+                  borderRadius: 999,
+                  background: active ? theme.deepBackground : 'var(--chip-bg)',
+                  color: active ? theme.color : 'var(--text-mid)',
+                  fontWeight: 800,
+                }}
+              >
+                {code}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <button
+        className="tap-btn"
+        type="submit"
+        disabled={busy || !check.ok}
+        style={{
+          minHeight: 48,
+          marginTop: 4,
+          border: 'none',
+          borderRadius: 8,
+          background: busy || !check.ok ? 'var(--panel-border)' : 'var(--neon-teal)',
+          color: busy || !check.ok ? 'var(--text-dim)' : '#001a14',
+          fontWeight: 800,
+          fontSize: '0.95rem',
+        }}
+      >
+        {busy ? 'ENTERING…' : check.ok ? `DRAFT ${check.player.name.toUpperCase()}` : 'DRAFT WRITE-IN'}
+      </button>
+      {!check.ok && (name || proTeam || positions.length > 0) && (
+        <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>{check.error}</div>
+      )}
+      {error && <div role="alert" style={{ color: 'var(--neon-red)', fontSize: '0.85rem' }}>{error}</div>}
+      <button className="tap-btn" type="button" onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'var(--text-mid)', textDecoration: 'underline' }}>
+        Back to the list
+      </button>
+    </form>
+  );
+}
 
 function SheetShell({
   onClose,
@@ -123,6 +222,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PositionFilter>('ALL');
   const [sortChoice, setSortChoice] = useState<PickSort>('name');
+  const [writeIn, setWriteIn] = useState(false);
 
   const isCommissioner = identity?.isCommissioner === true;
   const showNumbers = isCommissioner && numbers !== null;
@@ -152,6 +252,32 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
       setError(apiErrorMessage(e));
       setBusy(false);
       setPicking(null);
+    }
+  };
+
+  const chooseWriteIn = async (input: { name: string; proTeam: string; positions: WriteInPosition[] }) => {
+    if (!identity || busy) return;
+    const parsed = parseWriteIn(input);
+    if (!parsed.ok) {
+      setError(parsed.error);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await submitDraftPick(identity, {
+        overallPick: cell.pick.overall,
+        playerKey: parsed.player.key,
+        playerName: parsed.player.name,
+        proTeam: parsed.player.proTeam,
+        positions: parsed.player.positions,
+        writeIn: true,
+      });
+      applyState(res);
+      onClose();
+    } catch (e) {
+      setError(apiErrorMessage(e));
+      setBusy(false);
     }
   };
 
@@ -194,7 +320,9 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
         </button>
       </div>
 
-      {(
+      {writeIn ? (
+        <WriteInForm busy={busy} error={error} onBack={() => { setWriteIn(false); setError(null); }} onSubmit={chooseWriteIn} />
+      ) : (
         <div style={{ display: 'flex', minHeight: 0, flexDirection: 'column' }}>
           <label style={{ position: 'relative', display: 'block', marginBottom: 10 }}>
             <span className="sr-only">Search available players</span>
@@ -402,11 +530,23 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
                           textAlign: 'left',
                         }}
                       >
-                        <span><b style={{ color: 'var(--text-dim)' }}>FPPG</b> <span className="room-strong">{pickNumber(stat?.fppg)}</span></span>
-                        <span><b style={{ color: 'var(--text-dim)' }}>ADP</b> {pickNumber(stat?.adp)}</span>
-                        <span><b style={{ color: 'var(--text-dim)' }}>RK</b> {pickNumber(stat?.rank, 0)}</span>
-                        <span><b style={{ color: 'var(--text-dim)' }}>PLAY-IN</b> {pickNumber(stat?.playIn, 0)}</span>
-                        <span><b style={{ color: 'var(--text-dim)' }}>PLAYOFF</b> {pickNumber(stat?.playoff, 0)}</span>
+                        {([
+                          ['fppg', 'FPPG', pickNumber(stat?.fppg)],
+                          ['total', 'TOT', pickNumber(stat?.total, 0)],
+                          ['adp', 'ADP', pickNumber(stat?.adp)],
+                          ['rank', 'RK', pickNumber(stat?.rank, 0)],
+                          ['playIn', 'PLAY-IN', pickNumber(stat?.playIn, 0)],
+                          ['playoff', 'PLAYOFF', pickNumber(stat?.playoff, 0)],
+                        ] as const).map(([key, label, value]) => {
+                          // The stat the list is sorted by stands out.
+                          const sortedBy = sort === key;
+                          return (
+                            <span key={key} style={sortedBy ? { color: 'var(--neon-teal)' } : undefined}>
+                              <b style={{ color: sortedBy ? 'var(--neon-teal)' : 'var(--text-dim)' }}>{label}</b>{' '}
+                              <span className={sortedBy ? 'room-strong' : undefined} style={sortedBy ? { color: 'var(--neon-teal)' } : undefined}>{value}</span>
+                            </span>
+                          );
+                        })}
                       </span>
                     )}
                   </span>
@@ -419,7 +559,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
                         marginRight: 10,
                         padding: '4px 6px',
                         borderRadius: 8,
-                        border: `1px solid ${gone !== null && gone >= 0.5 ? 'var(--neon-red)' : 'var(--panel-border)'}`,
+                        border: `${sort === 'gone' ? 2 : 1}px solid ${gone !== null && gone >= 0.5 ? 'var(--neon-red)' : sort === 'gone' ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
                         background: gone !== null && gone >= 0.5 ? 'rgba(255,34,34,0.12)' : 'var(--chip-bg)',
                         color: gone !== null && gone >= 0.5 ? 'var(--neon-red)' : 'var(--text-mid)',
                         textAlign: 'center',
@@ -457,10 +597,28 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
               );
             })}
           </div>
+          <button
+            className="tap-btn"
+            type="button"
+            disabled={busy}
+            onClick={() => { setWriteIn(true); setError(null); }}
+            style={{
+              marginTop: 10,
+              minHeight: 40,
+              border: '1px dashed var(--panel-border)',
+              borderRadius: 8,
+              background: 'transparent',
+              color: 'var(--text-mid)',
+              fontWeight: 800,
+              fontSize: '0.7rem',
+              letterSpacing: '0.05em',
+            }}
+          >
+            NOT IN THE LIST? WRITE IN A PLAYER
+          </button>
         </div>
       )}
-
-      {error && (
+      {error && !writeIn && (
         <div style={{ color: 'var(--neon-red)', marginTop: 10, fontSize: '0.85rem' }}>{error}</div>
       )}
     </SheetShell>

@@ -1083,3 +1083,32 @@ test('a called clock that runs out yields the pick: the next team is up, the ski
   assert.equal(back.skipped?.['1']?.calledBy, 'Ryan');
   assert.equal(back.clock?.pickStartedAt, done.clock?.pickStartedAt);
 });
+
+test('a write-in pick lands with its own key, and cannot double a pool player or itself', async () => {
+  const next = cleanState();
+  next.keepersRevealed = true;
+  next.draft.startedAt = '2026-10-18T21:00:00.000Z';
+  await replaceState(next);
+  const writeIn = (owner: string, overallPick: number, name: string, proTeam = 'DAL', positions = ['SF', 'PF']) => request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify({ overallPick, playerKey: 'writein', playerName: name, proTeam, positions, writeIn: true }),
+  });
+  const bad = await writeIn('Joel', 1, 'Some Rookie', 'Dallas');
+  assert.equal(bad.status, 400);
+  assert.match(String(bad.body.error), /two to four letter code/);
+  const pooled = dataset.players[0]!;
+  const inPool = await writeIn('Joel', 1, pooled.fullName ?? pooled.name);
+  assert.equal(inPool.status, 409);
+  assert.match(String(inPool.body.error), /in the player pool/);
+  const ok = await writeIn('Joel', 1, 'Some Rookie');
+  assert.equal(ok.status, 200);
+  const pick = (ok.body.state as LeagueDynamicState).draft.picks['1'];
+  assert.equal(pick?.playerKey, 'writein-some-rookie-dal');
+  assert.equal(pick?.playerName, 'Some Rookie');
+  assert.deepEqual(pick?.positions, ['SF', 'PF']);
+  assert.equal(pick?.proTeam, 'dal');
+  const again = await writeIn('Ryan', 2, 'some rookie');
+  assert.equal(again.status, 409);
+  assert.match(String(again.body.error), /already on the board/);
+});

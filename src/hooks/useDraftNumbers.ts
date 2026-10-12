@@ -55,6 +55,7 @@ export function useDraftNumbers(input: {
     for (const row of projections) {
       out.set(row.key, {
         fppg: row.fppg,
+        total: row.total,
         adp: row.adp,
         rank: row.valueRank,
         playIn: row.playInGames,
