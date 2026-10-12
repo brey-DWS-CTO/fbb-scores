@@ -111,7 +111,8 @@ export default function BoardGrid({
       style={{
         display: 'grid',
         gridTemplateColumns: `${tv ? 'minmax(26px, 3vw)' : '30px'} repeat(${OWNERS.length}, minmax(0, 1fr))`,
-        gridTemplateRows: tv ? `auto repeat(${rounds.length}, minmax(0, 1fr))` : undefined,
+        // Every round the same height: the tallest cell on the board sets it.
+        gridTemplateRows: tv ? `auto repeat(${rounds.length}, minmax(0, 1fr))` : `auto repeat(${rounds.length}, 1fr)`,
         gap: 3,
         height: tv ? '100%' : undefined,
         minWidth: 900,
