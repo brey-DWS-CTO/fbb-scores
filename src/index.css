@@ -2546,8 +2546,9 @@ th.schedule-col-active {
   flex-wrap: wrap;
   padding: 8px 14px;
   border-bottom: 2px solid var(--neon-purple);
-  background: rgba(160, 60, 255, 0.16);
-  backdrop-filter: blur(6px);
+  /* Solid, not a tint: over the white pages of the PDF view a see-through
+     bar turned to mush. */
+  background: #1c1230;
 }
 .acting-banner-text {
   color: var(--text-hi);
