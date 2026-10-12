@@ -1126,40 +1126,39 @@ export default function TeamKeeperPage() {
 
       {/* ── Full roster (tap a player to keep them) ────────────── */}
       <section className="panel" style={{ padding: '12px 0 4px', borderRadius: 10, marginBottom: 14 }}>
-        <div
-          className="hub-heading"
-          style={{ fontSize: '0.62rem', color: 'var(--neon-blue)', margin: '0 14px 4px' }}
-        >
-          FULL ROSTER ({rosterPlayers.length})
-        </div>
-        {canEdit && (
-          <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
-            {projectionMode
-              ? `Tap players to project ${owner}'s keepers. Only you can see these picks.`
-              : 'Tap a player to keep them. Choices that break the cap or another rule are greyed out.'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, margin: '0 14px 4px' }}>
+          <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-blue)' }}>
+            FULL ROSTER ({rosterPlayers.length})
           </div>
-        )}
-        {!canEdit && (
-          <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
-            Their final 2026 roster, with keeper value, price, and contract status. This does not show saved picks.
-          </div>
-        )}
-        {oddsWorld && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 14px 8px' }}>
+          {/* Commissioner only: the sort sits on the heading line, no row of its own. */}
+          {oddsWorld && (
             <div className="mock-seg" role="radiogroup" aria-label="Sort the roster">
-              {([['value', 'BY VALUE'], ['odds', 'BY GONE %']] as const).map(([key, label]) => (
+              {([['value', 'VALUE'], ['odds', 'GONE %']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   role="radio"
                   aria-checked={rosterByOdds === (key === 'odds')}
                   className={`tap-btn mock-seg-btn${rosterByOdds === (key === 'odds') ? ' is-on' : ''}`}
+                  style={{ minHeight: 30, padding: '0 10px', fontSize: '0.6rem' }}
                   onClick={() => setRosterByOdds(key === 'odds')}
                 >
                   {label}
                 </button>
               ))}
             </div>
+          )}
+        </div>
+        {canEdit && (
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
+            {projectionMode
+              ? `Tap to project ${owner}'s keepers. Private to you.`
+              : 'Tap to keep. Greyed rows break a rule.'}
+          </div>
+        )}
+        {!canEdit && (
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', margin: '0 14px 8px' }}>
+            Their 2026 roster with keeper value, price and contract. Saved picks are not shown.
           </div>
         )}
         <div>
