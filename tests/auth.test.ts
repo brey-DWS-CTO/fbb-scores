@@ -8,6 +8,7 @@ import {
   linkExpiresAt,
   normalizeEmail,
   ownerForEmail,
+  sessionEndsAt,
   sessionExpiresAt,
   LINK_TTL_MINUTES,
   safeNextPath,
@@ -59,11 +60,11 @@ test('an address that cannot is refused', () => {
 
 const issued = at('2026-09-05T10:00:00.000Z');
 
-test('a link lasts two days and a session thirty days', () => {
+test('a link lasts two days and a session a whole season', () => {
   assert.equal(LINK_TTL_MINUTES, 48 * 60);
-  assert.equal(SESSION_TTL_DAYS, 30);
+  assert.equal(SESSION_TTL_DAYS, 365);
   assert.equal(linkExpiresAt(issued), '2026-09-07T10:00:00.000Z');
-  assert.equal(sessionExpiresAt(issued), '2026-10-05T10:00:00.000Z');
+  assert.equal(sessionExpiresAt(issued), '2027-09-05T10:00:00.000Z');
 });
 
 test('the deadline itself counts as expired', () => {
@@ -73,11 +74,33 @@ test('the deadline itself counts as expired', () => {
   assert.equal(isExpired(ends, at('2026-09-07T10:00:01.000Z')), true, 'one second past');
 });
 
-test('a session runs to the same rule, a month out', () => {
+test('a session runs to the same rule, a year out', () => {
   const ends = sessionExpiresAt(issued);
-  assert.equal(isExpired(ends, at('2026-10-05T09:59:59.000Z')), false);
-  assert.equal(isExpired(ends, at('2026-10-05T10:00:00.000Z')), true);
-  assert.equal(isExpired(ends, at('2026-10-05T10:00:01.000Z')), true);
+  assert.equal(isExpired(ends, at('2027-09-05T09:59:59.000Z')), false);
+  assert.equal(isExpired(ends, at('2027-09-05T10:00:00.000Z')), true);
+  assert.equal(isExpired(ends, at('2027-09-05T10:00:01.000Z')), true);
+});
+
+test('a sign-in written under the old 30-day rule stretches to a season', () => {
+  const old = { issuedAt: issued.toISOString(), expiresAt: '2026-10-05T10:00:00.000Z', impersonatedBy: null };
+  assert.equal(sessionEndsAt(old), '2027-09-05T10:00:00.000Z');
+  assert.equal(isExpired(sessionEndsAt(old), at('2026-10-11T22:00:00.000Z')), false, 'still good in draft week');
+});
+
+test('a commissioner sitting in another seat keeps the short end', () => {
+  const seat = {
+    issuedAt: issued.toISOString(),
+    expiresAt: '2026-09-05T18:00:00.000Z',
+    impersonatedBy: 'Brey',
+  };
+  assert.equal(sessionEndsAt(seat), '2026-09-05T18:00:00.000Z');
+});
+
+test('a session row with a broken issue time keeps the end it was written with', () => {
+  assert.equal(
+    sessionEndsAt({ issuedAt: 'whenever', expiresAt: '2026-10-05T10:00:00.000Z' }),
+    '2026-10-05T10:00:00.000Z',
+  );
 });
 
 test('a time nobody can read is treated as expired', () => {

@@ -20,8 +20,12 @@
  */
 export const LINK_TTL_MINUTES = 48 * 60;
 
-/** How long a session lasts. Long, because this is a league, not a bank. */
-export const SESSION_TTL_DAYS = 30;
+/**
+ * How long a session lasts. A whole season, because this is a league, not a
+ * bank. It was 30 days until October 2026, and the league's first sign-ins
+ * ran out a week before the keeper deadline.
+ */
+export const SESSION_TTL_DAYS = 365;
 
 /** Links one address may hold inside LINK_WINDOW_MINUTES. */
 /**
@@ -62,6 +66,28 @@ export function linkExpiresAt(issuedAt: Date): string {
 /** When a session started now runs out. Same ISO reasoning as the link. */
 export function sessionExpiresAt(issuedAt: Date): string {
   return new Date(issuedAt.getTime() + SESSION_TTL_DAYS * DAY_MS).toISOString();
+}
+
+/**
+ * When a session really ends.
+ *
+ * An ordinary sign-in runs SESSION_TTL_DAYS from when it was issued. Rows
+ * written under the old 30-day rule carry the old end date, so this takes the
+ * later of the two and they stretch to a season with no rewrite. A
+ * commissioner sitting in someone's seat keeps its own short end.
+ */
+export function sessionEndsAt(row: {
+  issuedAt: string;
+  expiresAt: string;
+  impersonatedBy?: string | null;
+}): string {
+  if (row.impersonatedBy) return row.expiresAt;
+  const issued = Date.parse(row.issuedAt);
+  if (Number.isNaN(issued)) return row.expiresAt;
+  const seasonEnd = sessionExpiresAt(new Date(issued));
+  const stored = Date.parse(row.expiresAt);
+  if (Number.isNaN(stored)) return seasonEnd;
+  return Date.parse(seasonEnd) > stored ? seasonEnd : row.expiresAt;
 }
 
 /**
