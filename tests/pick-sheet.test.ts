@@ -38,7 +38,7 @@ const keys = (rows: DatasetPlayer[]) => rows.map((row) => row.key);
 
 test('members get name, team and position; the commissioner adds the numbers', () => {
   assert.deepEqual(sortsFor(false), ['name', 'team', 'position']);
-  assert.deepEqual(sortsFor(true), ['name', 'team', 'position', 'fppg', 'total', 'adp', 'gone']);
+  assert.deepEqual(sortsFor(true), ['name', 'team', 'position', 'fppg', 'total', 'adp', 'gone', 'playIn', 'playoff']);
   assert.equal(allowedSort('fppg', false), 'name');
   assert.equal(allowedSort('fppg', true), 'fppg');
   assert.equal(allowedSort('team', false), 'team');
@@ -67,6 +67,24 @@ test('fppg high to low, adp low to high, gone high to low; unknowns last', () =>
   assert.deepEqual(keys(sortPool(POOL, 'adp', numbers)), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
   assert.deepEqual(keys(sortPool(POOL, 'total', numbers)), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
   assert.deepEqual(keys(sortPool(POOL, 'gone', numbers)), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
+});
+
+test('two sorts chain: games then points groups the deep runs; points then games is points first', () => {
+  const numbers = new Map<string, PickNumbers>([
+    ['jokic', { fppg: 60.2, total: 4800, adp: 1.1, rank: 1, playIn: 2, playoff: 7, gone: 1 }],
+    ['wemby', { fppg: 55.0, total: 3900, adp: 2.4, rank: 2, playIn: 3, playoff: 6, gone: 0.8 }],
+    ['tatum', { fppg: 44.1, total: 3600, adp: 6.0, rank: 5, playIn: 2, playoff: 7, gone: 0.3 }],
+    ['brown', { fppg: 40.0, total: 3000, adp: 9.0, rank: 9, playIn: 4, playoff: 9, gone: 0.1 }],
+    ['murray', { fppg: 44.1, total: 3100, adp: 15.0, rank: 20, playIn: 3, playoff: 6, gone: 0 }],
+  ]);
+  assert.deepEqual(keys(sortPool(POOL, 'playoff', numbers)), ['brown', 'tatum', 'jokic', 'murray', 'wemby'], 'name breaks a games tie');
+  assert.deepEqual(keys(sortPool(POOL, 'playoff', numbers, 'fppg')), ['brown', 'jokic', 'tatum', 'wemby', 'murray']);
+  assert.deepEqual(keys(sortPool(POOL, 'playIn', numbers, 'total')), ['brown', 'wemby', 'murray', 'jokic', 'tatum']);
+  // Points first: Tatum and Murray tie on FPPG, and playoff games break it.
+  assert.deepEqual(keys(sortPool(POOL, 'fppg', numbers, 'playoff')), ['jokic', 'wemby', 'tatum', 'murray', 'brown']);
+  assert.deepEqual(keys(sortPool(POOL, 'fppg', numbers, 'playIn')), ['jokic', 'wemby', 'murray', 'tatum', 'brown']);
+  // The same sort twice is just the sort.
+  assert.deepEqual(keys(sortPool(POOL, 'fppg', numbers, 'fppg')), keys(sortPool(POOL, 'fppg', numbers)));
 });
 
 test('a commissioner sort with no numbers still gives a stable name order', () => {

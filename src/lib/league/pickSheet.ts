@@ -15,7 +15,9 @@ export type PositionFilter = 'ALL' | PlayerPosition;
 /** Sorts anyone may use. */
 export const MEMBER_SORTS = ['name', 'team', 'position'] as const;
 /** Sorts only the commissioner may use, on numbers only he sees. */
-export const COMMISH_SORTS = ['fppg', 'total', 'adp', 'gone'] as const;
+export const COMMISH_SORTS = ['fppg', 'total', 'adp', 'gone', 'playIn', 'playoff'] as const;
+/** Sorts that can come second: points, then games, or games, then points. */
+export const THEN_SORTS = ['fppg', 'total', 'playIn', 'playoff'] as const;
 export type PickSort = (typeof MEMBER_SORTS)[number] | (typeof COMMISH_SORTS)[number];
 
 export const SORT_LABELS: Record<PickSort, string> = {
@@ -26,6 +28,8 @@ export const SORT_LABELS: Record<PickSort, string> = {
   total: 'TOTAL',
   adp: 'ADP',
   gone: 'GONE',
+  playIn: 'PLAY-IN',
+  playoff: 'PLAYOFF',
 };
 
 /** The numbers the commissioner sees beside a player. Members never get these. */
@@ -87,33 +91,46 @@ function numberAsc(a: number | null, b: number | null): number {
   return a - b;
 }
 
+/** One sort as a comparison, with name as the tie-break left to the caller. */
+function compareBy(sort: PickSort, numbers?: PickNumbersByKey | null): (a: DatasetPlayer, b: DatasetPlayer) => number {
+  const of = (player: DatasetPlayer) => numbers?.get(player.key) ?? null;
+  switch (sort) {
+    case 'name':
+      return byName;
+    case 'team':
+      return (a, b) => a.proTeam.localeCompare(b.proTeam, 'en', { sensitivity: 'base' });
+    case 'position':
+      return (a, b) => positionIndex(a) - positionIndex(b);
+    case 'fppg':
+      return (a, b) => numberDesc(of(a)?.fppg ?? null, of(b)?.fppg ?? null);
+    case 'total':
+      return (a, b) => numberDesc(of(a)?.total ?? null, of(b)?.total ?? null);
+    case 'adp':
+      return (a, b) => numberAsc(of(a)?.adp ?? null, of(b)?.adp ?? null);
+    case 'gone':
+      return (a, b) => numberDesc(of(a)?.gone ?? null, of(b)?.gone ?? null);
+    case 'playIn':
+      return (a, b) => numberDesc(of(a)?.playIn ?? null, of(b)?.playIn ?? null);
+    case 'playoff':
+      return (a, b) => numberDesc(of(a)?.playoff ?? null, of(b)?.playoff ?? null);
+  }
+}
+
 /**
- * Sort the picker's list. Name is the tie-break for every other sort so the
- * order never shifts between polls.
+ * Sort the picker's list: by `sort`, then by `thenBy` when given, then by
+ * name so the order never shifts between polls. Playoff games then FPPG
+ * groups the deep runs and ranks each group by points; FPPG then playoff
+ * games is points first with games breaking ties.
  */
 export function sortPool(
   players: readonly DatasetPlayer[],
   sort: PickSort,
   numbers?: PickNumbersByKey | null,
+  thenBy: PickSort | null = null,
 ): DatasetPlayer[] {
-  const rows = [...players];
-  const of = (player: DatasetPlayer) => numbers?.get(player.key) ?? null;
-  switch (sort) {
-    case 'name':
-      return rows.sort(byName);
-    case 'team':
-      return rows.sort((a, b) => a.proTeam.localeCompare(b.proTeam, 'en', { sensitivity: 'base' }) || byName(a, b));
-    case 'position':
-      return rows.sort((a, b) => positionIndex(a) - positionIndex(b) || byName(a, b));
-    case 'fppg':
-      return rows.sort((a, b) => numberDesc(of(a)?.fppg ?? null, of(b)?.fppg ?? null) || byName(a, b));
-    case 'total':
-      return rows.sort((a, b) => numberDesc(of(a)?.total ?? null, of(b)?.total ?? null) || byName(a, b));
-    case 'adp':
-      return rows.sort((a, b) => numberAsc(of(a)?.adp ?? null, of(b)?.adp ?? null) || byName(a, b));
-    case 'gone':
-      return rows.sort((a, b) => numberDesc(of(a)?.gone ?? null, of(b)?.gone ?? null) || byName(a, b));
-  }
+  const first = compareBy(sort, numbers);
+  const second = thenBy && thenBy !== sort ? compareBy(thenBy, numbers) : null;
+  return [...players].sort((a, b) => first(a, b) || (second ? second(a, b) : 0) || byName(a, b));
 }
 
 /** Position chip first, then the search box over name, team and positions. */

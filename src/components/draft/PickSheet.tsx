@@ -1,4 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
+
+/** Wide enough for a second row of sort chips. Phones keep one sort. */
+function useDesktop(): boolean {
+  const query = '(min-width: 840px)';
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const onChange = () => setWide(media.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+  return wide;
+}
 import type { ReactNode } from 'react';
 import type { BoardCell, DatasetPlayer } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
@@ -14,6 +27,7 @@ import {
   SORT_LABELS,
   sortPool,
   sortsFor,
+  THEN_SORTS,
   type PickNumbersByKey,
   type PickSort,
   type PositionFilter,
@@ -222,14 +236,18 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PositionFilter>('ALL');
   const [sortChoice, setSortChoice] = useState<PickSort>('name');
+  const [thenChoice, setThenChoice] = useState<PickSort | null>(null);
   const [writeIn, setWriteIn] = useState(false);
+  const desktop = useDesktop();
 
   const isCommissioner = identity?.isCommissioner === true;
   const showNumbers = isCommissioner && numbers !== null;
   const sort = allowedSort(sortChoice, showNumbers);
   const sorts = sortsFor(showNumbers);
+  // A second sort is a desktop, commish-only thing.
+  const thenBy = showNumbers && desktop && thenChoice && thenChoice !== sort ? thenChoice : null;
 
-  const sorted = useMemo(() => sortPool(pool, sort, numbers), [pool, sort, numbers]);
+  const sorted = useMemo(() => sortPool(pool, sort, numbers, thenBy), [pool, sort, numbers, thenBy]);
   const filtered = useMemo(() => filterPool(sorted, { query, position }), [sorted, position, query]);
 
   // One tap and the pick lands. The commissioner has UNDO on the board for a slip.
@@ -440,6 +458,42 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
             })}
           </div>
 
+          {showNumbers && desktop && (
+            <div
+              aria-label="Then sort players by"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}
+            >
+              <span className="hub-heading" style={{ color: 'var(--text-dim)', fontSize: '0.55rem', marginRight: 2, flexShrink: 0 }}>
+                THEN
+              </span>
+              {THEN_SORTS.filter((option) => option !== sort).map((option) => {
+                const active = thenBy === option;
+                return (
+                  <button
+                    key={option}
+                    className="tap-btn"
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setThenChoice(active ? null : option)}
+                    style={{
+                      minHeight: 28,
+                      padding: '3px 10px',
+                      border: `1px solid ${active ? 'var(--neon-teal)' : 'var(--panel-border)'}`,
+                      borderRadius: 999,
+                      background: active ? 'rgba(0,255,204,0.1)' : 'var(--chip-bg)',
+                      color: active ? 'var(--neon-teal)' : 'var(--text-mid)',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {SORT_LABELS[option]}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div
             style={{
               display: 'flex',
@@ -452,7 +506,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
             }}
           >
             <span>{busy && picking ? `ENTERING ${(picking.fullName ?? picking.name).toUpperCase()}…` : `${filtered.length} AVAILABLE`}</span>
-            <span>{showNumbers ? 'COMMISH VIEW · MEMBERS SEE NO NUMBERS' : `BY ${SORT_LABELS[sort]}`}</span>
+            <span>{showNumbers ? `BY ${SORT_LABELS[sort]}${thenBy ? `, THEN ${SORT_LABELS[thenBy]}` : ''} · MEMBERS SEE NO NUMBERS` : `BY ${SORT_LABELS[sort]}`}</span>
           </div>
 
           <div
@@ -538,8 +592,8 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
                           ['playIn', 'PLAY-IN', pickNumber(stat?.playIn, 0)],
                           ['playoff', 'PLAYOFF', pickNumber(stat?.playoff, 0)],
                         ] as const).map(([key, label, value]) => {
-                          // The stat the list is sorted by stands out.
-                          const sortedBy = sort === key;
+                          // The stats the list is sorted by stand out.
+                          const sortedBy = sort === key || thenBy === key;
                           return (
                             <span key={key} style={sortedBy ? { color: 'var(--neon-teal)' } : undefined}>
                               <b style={{ color: sortedBy ? 'var(--neon-teal)' : 'var(--text-dim)' }}>{label}</b>{' '}
