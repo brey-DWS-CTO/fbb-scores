@@ -62,7 +62,7 @@ test('a top player is almost always gone by 1.9; nobody is gone before 1.1', () 
   assert.equal(shareGoneBefore(simulateTakenAt(prepared, 7, 40), cade.playerKey, 9), byNine);
 });
 
-test('the cost slot is the owner's pick in that round; a charged pick bumps the keep a round earlier', () => {
+test('the cost slot is the team pick in that round; a charged pick bumps the keep a round earlier', () => {
   const slot = keeperCostSlot(board.slots, 'Brey', 1);
   assert.equal(slot?.pick.overall, 9);
   // Round one already charged to Cade: a second round-one keeper has nowhere to go.
