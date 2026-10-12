@@ -9,7 +9,8 @@
  *   verified -> a commissioner saw it land and confirmed it
  *
  * A member may only speak for their own team, and may take back "I paid" until
- * a commissioner has confirmed it. Confirming, and every other change, is the
+ * it is confirmed. The member who collects may confirm, undo, and mark not
+ * received, since they see the money land. Every other change is the
  * commissioner's. Owner names are the key here, as everywhere: whoever the
  * commissioners are, they can confirm.
  *
@@ -82,10 +83,16 @@ export function applyDuesAction(input: {
   action: DuesAction;
   actor: string;
   isCommissioner: boolean;
+  /**
+   * The actor is the member who collects. They see the money land, so they may
+   * confirm, undo, and mark not received. Nothing else.
+   */
+  isCollector?: boolean;
   now: string;
   rows: readonly DuesRow[];
 }): DuesResult {
   const { action, actor, isCommissioner, now, rows } = input;
+  const canConfirm = isCommissioner || input.isCollector === true;
   const row: DuesRow = { ...input.row, updatedAt: now };
   const own = actor === row.owner;
   const status = duesStatus(input.row);
@@ -98,9 +105,9 @@ export function applyDuesAction(input: {
       return { ok: true, row };
 
     case 'unpaid':
-      if (!own && !isCommissioner) return refuse(403, 'You can only change your own team.');
+      if (!own && !canConfirm) return refuse(403, 'You can only change your own team.');
       if (status === 'unpaid') return refuse(409, `${row.owner} is not marked paid.`);
-      if (status === 'verified' && !isCommissioner) {
+      if (status === 'verified' && !canConfirm) {
         return refuse(409, 'A commissioner already confirmed this. Ask them to undo it.');
       }
       row.paidAt = null;
@@ -109,7 +116,7 @@ export function applyDuesAction(input: {
       return { ok: true, row };
 
     case 'verify':
-      if (!isCommissioner) return refuse(403, 'Only a commissioner can confirm a payment.');
+      if (!canConfirm) return refuse(403, 'Only a commissioner or the collector can confirm a payment.');
       if (status === 'verified') return refuse(409, `${row.owner} is already confirmed.`);
       // Confirming a team that never tapped "I paid" records it as paid now,
       // for cash or a payment the member forgot to mark.
@@ -119,7 +126,7 @@ export function applyDuesAction(input: {
       return { ok: true, row };
 
     case 'unverify':
-      if (!isCommissioner) return refuse(403, 'Only a commissioner can undo a confirmation.');
+      if (!canConfirm) return refuse(403, 'Only a commissioner or the collector can undo a confirmation.');
       if (status !== 'verified') return refuse(409, `${row.owner} is not confirmed.`);
       row.verifiedAt = null;
       row.verifiedBy = null;
@@ -216,6 +223,56 @@ export function venmoPayUrl(handle: string, amount: number, note: string): strin
 
 export function duesNote(season: number, owner: string): string {
   return `Nerds ${season} dues - ${owner}`;
+}
+
+/** The teams a shame email goes to: nobody has said a word about paying. */
+export function shameList(board: DuesBoard): string[] {
+  return board.lines.filter((l) => l.status === 'unpaid').map((l) => l.owner);
+}
+
+export interface ShameCopy {
+  subject: string;
+  preheader: string;
+  heading: string;
+  lines: string[];
+  actionLabel: string;
+  notes: string[];
+}
+
+/**
+ * The words of the "pay up" email, for one late team. The mailer owns the
+ * layout; this owns only what it says.
+ */
+export function shameEmailCopy(input: {
+  owner: string;
+  season: number;
+  board: DuesBoard;
+  /** Who collects. Empty when nobody is set yet. */
+  payee: string;
+}): ShameCopy {
+  const { owner, season, board, payee } = input;
+  const line = board.lines.find((l) => l.owner === owner);
+  const amount = formatDollars(line?.amount ?? DUES_FULL);
+  const total = board.lines.length;
+  const wall = shameList(board);
+  const others = wall.filter((o) => o !== owner);
+  const score =
+    board.paid === 0
+      ? 'Nobody has paid yet. Be the first.'
+      : `${board.paid} of ${total} teams have paid. You are not one of them.`;
+  const company =
+    others.length === 0
+      ? 'You are the last name on the wall. Everyone else paid.'
+      : `Also on the wall: ${others.join(', ')}.`;
+  const who = payee ? `Pay ${payee} on Venmo` : 'Pay on Venmo';
+  return {
+    subject: `Wall of shame: you owe ${amount} in ${season} dues`,
+    preheader: score,
+    heading: 'THE WALL OF SHAME',
+    lines: [`${owner}, you still owe ${amount} in league dues.`, score, company, `${who}, then tap I PAID to get your name off the wall.`],
+    actionLabel: 'PAY YOUR DUES',
+    notes: ['Already paid? Tap I PAID on the dues page. Your name comes down once a commissioner sees it on Venmo.'],
+  };
 }
 
 export function formatDollars(amount: number): string {

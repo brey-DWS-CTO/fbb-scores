@@ -7,11 +7,13 @@ import {
   changeDues,
   fetchDues,
   saveDuesSettings,
+  sendDuesShame,
   type DuesResponse,
 } from '../../lib/league/api.js';
 import {
   duesNote,
   formatDollars,
+  shameList,
   venmoPayUrl,
   type DuesAction,
   type DuesLine,
@@ -28,12 +30,15 @@ const STATUS_LABEL: Record<DuesStatus, string> = {
 };
 
 /** What a commissioner can do to one team, in the order the buttons show. */
-function commishActions(line: DuesLine): Array<{ action: DuesAction; label: string }> {
+function commishActions(line: DuesLine, isCommish: boolean): Array<{ action: DuesAction; label: string }> {
   const actions: Array<{ action: DuesAction; label: string }> = [];
   if (line.status !== 'verified') actions.push({ action: 'verify', label: 'CONFIRM' });
   if (line.status === 'paid') actions.push({ action: 'unpaid', label: 'NOT RECEIVED' });
   if (line.status === 'verified') actions.push({ action: 'unverify', label: 'UNDO' });
-  actions.push(line.half ? { action: 'full', label: 'FULL FEE' } : { action: 'half', label: 'HALF FEE' });
+  // The collector confirms money; only a commissioner sets the fee.
+  if (isCommish) {
+    actions.push(line.half ? { action: 'full', label: 'FULL FEE' } : { action: 'half', label: 'HALF FEE' });
+  }
   return actions;
 }
 
@@ -46,6 +51,7 @@ export default function DuesPage() {
   const [data, setData] = useState<DuesResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [venmoDraft, setVenmoDraft] = useState('');
   const [payeeDraft, setPayeeDraft] = useState('');
 
@@ -64,6 +70,7 @@ export default function DuesPage() {
   const act = async (run: () => Promise<DuesResponse>) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       show(await run());
     } catch (e) {
@@ -74,8 +81,31 @@ export default function DuesPage() {
   };
 
   const isCommish = identity?.isCommissioner === true;
+  const isCollector = Boolean(identity && data?.payee && data.payee === identity.owner);
+  const canConfirm = isCommish || isCollector;
   const mine = identity && data ? data.lines.find((l) => l.owner === identity.owner) : undefined;
   const collector = data?.payee || 'the commissioner';
+
+  const shame = async () => {
+    if (!identity || !data) return;
+    const late = shameList(data);
+    if (!window.confirm(`Email ${late.join(', ')} that they still owe?`)) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await sendDuesShame(identity);
+      const sent = result.sent.length ? `Shamed ${result.sent.join(', ')}.` : 'Nothing sent.';
+      const missing = result.noAddress.length
+        ? ` No address on file for ${result.noAddress.join(', ')}.`
+        : '';
+      setNotice(sent + missing);
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const change = (owner: string, action: DuesAction, ask?: string) => {
     if (!identity) return;
@@ -101,6 +131,7 @@ export default function DuesPage() {
       </header>
 
       {error && <p className="rules-draft-error">{error}</p>}
+      {!error && notice && <p className="rules-draft-note">{notice}</p>}
 
       {data && mine && identity && (
         <section className="panel dues-mine">
@@ -194,9 +225,9 @@ export default function DuesPage() {
                   {line.status === 'paid' && line.paidAt && ` ${formatDay(line.paidAt)}`}
                   {line.status === 'verified' && line.verifiedAt && ` ${formatDay(line.verifiedAt)}`}
                 </span>
-                {isCommish && (
+                {canConfirm && (
                   <span className="dues-row-actions">
-                    {commishActions(line).map(({ action, label }) => (
+                    {commishActions(line, isCommish).map(({ action, label }) => (
                       <button
                         key={action}
                         type="button"
@@ -220,6 +251,20 @@ export default function DuesPage() {
               </li>
             ))}
           </ul>
+          {isCommish && (
+            <div className="dues-actions">
+              <button
+                type="button"
+                className="rule-edit-delete tap-btn"
+                disabled={busy || shameList(data).length === 0}
+                onClick={() => void shame()}
+              >
+                {shameList(data).length === 0
+                  ? 'NOBODY TO SHAME'
+                  : `SEND SHAME EMAIL (${shameList(data).length})`}
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -258,7 +303,7 @@ export default function DuesPage() {
             </button>
           </div>
           <p className="rule-edit-hint">
-            Only commissioners see this and the CONFIRM buttons. Up to {data.halfMaxTeams} teams may pay
+            Only commissioners see this box. The member who collects also gets the CONFIRM buttons. Up to {data.halfMaxTeams} teams may pay
             the {formatDollars(data.half)} half fee.
           </p>
         </section>

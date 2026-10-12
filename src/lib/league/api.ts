@@ -911,6 +911,16 @@ export async function changeDues(c: Credentials, owner: string, action: DuesActi
   return data;
 }
 
+/** Mail every team that has not paid (commissioner only). */
+export async function sendDuesShame(c: Credentials): Promise<{ sent: string[]; noAddress: string[] }> {
+  const { data } = await axios.post<{ sent: string[]; noAddress: string[] }>(
+    '/api/league/dues/shame',
+    {},
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
 /** Who collects and their Venmo (commissioner only). */
 export async function saveDuesSettings(
   c: Credentials,

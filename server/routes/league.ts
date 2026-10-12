@@ -126,6 +126,7 @@ import {
   blankDuesRow,
   duesBoard,
   parseVenmoHandle,
+  shameList,
   type DuesAction,
   type DuesSettings,
 } from '../../src/lib/league/dues.js';
@@ -133,6 +134,7 @@ import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
   sendRulebookSignRequest,
+  sendDuesShame,
   notifyTradeAccepted,
   notifyTradeOffered,
   notifyTradeSettled,
@@ -3124,6 +3126,26 @@ router.get('/dues', async (_req, res, next) => {
 });
 
 /**
+ * POST /api/league/dues/shame — mail every team that has not paid or said it
+ * paid (commissioner only). Teams that tapped I PAID are left alone.
+ */
+router.post('/dues/shame', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const dues = await duesResponse();
+    const owners = shameList(dues);
+    if (!owners.length) throw new HttpError(409, 'Every team has paid or says it has. Nobody to shame.');
+    const result = await sendDuesShame(
+      { owners, season: DUES_SEASON, board: dues, payee: dues.payee },
+      appOrigin(req),
+    );
+    await appendAudit(actor(res), 'dues.shame', { sent: result.sent, noAddress: result.noAddress });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /api/league/dues/:owner — one change to one team's dues. A member may
  * mark their own team paid, or take that back until it is confirmed. The
  * commissioner may do anything.
@@ -3136,13 +3158,15 @@ router.post('/dues/:owner', requireAuth, async (req, res, next) => {
     if (typeof action !== 'string' || !DUES_ACTIONS.includes(action as DuesAction)) {
       throw new HttpError(400, `action must be one of ${DUES_ACTIONS.join(', ')}`);
     }
-    const rows = await listDues(DUES_SEASON);
+    const [rows, settings] = await Promise.all([listDues(DUES_SEASON), getDuesSettings(DUES_SEASON)]);
     const current = rows.find((r) => r.owner === owner) ?? blankDuesRow(DUES_SEASON, owner);
     const result = applyDuesAction({
       row: current,
       action: action as DuesAction,
       actor: res.locals.owner as string,
       isCommissioner: res.locals.isCommissioner === true,
+      // The member who collects confirms payments, and gains nothing else.
+      isCollector: Boolean(settings?.payee) && settings?.payee === res.locals.owner,
       now: new Date().toISOString(),
       rows,
     });

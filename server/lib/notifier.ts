@@ -31,6 +31,7 @@ import {
   listSentNotices,
 } from './leagueStore.js';
 import { sendMail, type MailContent } from './mailer.js';
+import { shameEmailCopy, type DuesBoard } from '../../src/lib/league/dues.js';
 
 const leagueDataset = rawDataset as unknown as LeagueDataset;
 
@@ -308,6 +309,36 @@ export async function sendRulebookSignRequest(
   };
   queueMail('rule book sign request', async () => {
     for (const owner of sent) {
+      await sendMail(book.get(owner) as string, content, origin, 'notify');
+    }
+  });
+  return { sent, noAddress };
+}
+
+// ─── Dues ────────────────────────────────────────────────────────────────────
+
+/**
+ * "Pay up": one note to each team the commissioner is shaming, each with its
+ * own amount and the names still on the wall.
+ */
+export async function sendDuesShame(
+  input: { owners: string[]; season: number; board: DuesBoard; payee: string },
+  origin: string,
+): Promise<SignRequestResult> {
+  const book = await addressBook();
+  const sent = input.owners.filter((owner) => book.has(owner));
+  const noAddress = input.owners.filter((owner) => !book.has(owner));
+  queueMail('dues shame', async () => {
+    for (const owner of sent) {
+      const copy = shameEmailCopy({ owner, season: input.season, board: input.board, payee: input.payee });
+      const content: MailContent = {
+        subject: copy.subject,
+        preheader: copy.preheader,
+        heading: copy.heading,
+        lines: copy.lines,
+        action: { label: copy.actionLabel, href: `${origin}/dues` },
+        notes: copy.notes,
+      };
       await sendMail(book.get(owner) as string, content, origin, 'notify');
     }
   });

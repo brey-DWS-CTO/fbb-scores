@@ -8,6 +8,8 @@ import {
   duesBoard,
   duesStatus,
   parseVenmoHandle,
+  shameEmailCopy,
+  shameList,
   venmoPayUrl,
   type DuesAction,
   type DuesRow,
@@ -104,4 +106,31 @@ test('the pay link fills in the amount and a note', () => {
   assert.equal(url.searchParams.get('txn'), 'pay');
   assert.equal(url.searchParams.get('amount'), '304');
   assert.equal(url.searchParams.get('note'), 'Nerds 2027 dues - Joel');
+});
+
+test('the shame email names the late team, the score, and who else is late', () => {
+  const joel = ok(run(blank('Joel'), 'verify', 'Brey', true));
+  const board = duesBoard(2027, ['Joel', 'Amy', 'Kyle'], [joel]);
+  assert.deepEqual(shameList(board), ['Amy', 'Kyle']);
+  const copy = shameEmailCopy({ owner: 'Amy', season: 2027, board, payee: 'Ryan' });
+  assert.match(copy.subject, /\$304/);
+  assert.ok(copy.lines.some((l) => l.includes('1 of 3 teams have paid')));
+  assert.ok(copy.lines.some((l) => l === 'Also on the wall: Kyle.'));
+  assert.ok(copy.lines.some((l) => l.startsWith('Pay Ryan on Venmo')));
+  const all = [copy.subject, copy.preheader, copy.heading, ...copy.lines, ...copy.notes].join(' ');
+  assert.ok(!all.includes('—'), 'no em dashes in league copy');
+});
+
+test('the last team on the wall is told so', () => {
+  const rows = ['Joel', 'Amy'].map((o) => ok(run(blank(o), 'paid', o)));
+  const copy = shameEmailCopy({ owner: 'Kyle', season: 2027, board: duesBoard(2027, ['Joel', 'Amy', 'Kyle'], rows), payee: '' });
+  assert.ok(copy.lines.includes('You are the last name on the wall. Everyone else paid.'));
+});
+
+test('the collector may confirm and undo, but not set the half fee', () => {
+  const paid = ok(run(blank('Joel'), 'paid', 'Joel'));
+  const confirmed = applyDuesAction({ row: paid, action: 'verify', actor: 'Ryan', isCommissioner: false, isCollector: true, now: NOW, rows: [] });
+  assert.ok(confirmed.ok);
+  const half = applyDuesAction({ row: blank('Joel'), action: 'half', actor: 'Ryan', isCommissioner: false, isCollector: true, now: NOW, rows: [] });
+  assert.equal(half.ok, false);
 });

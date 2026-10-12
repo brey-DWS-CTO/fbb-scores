@@ -147,3 +147,34 @@ test('the commissioner sets who collects from a pasted Venmo link', async () => 
   });
   assert.equal(bad.status, 400);
 });
+
+test('only the commissioner sends the shame email, and only to teams that have not paid', async () => {
+  const ryan = await request('/api/league/dues/shame', { method: 'POST', headers: auth('Ryan'), body: '{}' });
+  assert.equal(ryan.status, 403);
+
+  const brey = await request('/api/league/dues/shame', { method: 'POST', headers: auth('Brey'), body: '{}' });
+  assert.equal(brey.status, 200);
+  const body = brey.body as unknown as { sent: string[]; noAddress: string[] };
+  const mailed = [...body.sent, ...body.noAddress];
+  assert.ok(!mailed.includes('Joel'), 'Joel is confirmed paid');
+  assert.ok(mailed.includes('Ryan'));
+  assert.equal(mailed.length, 9);
+});
+
+test('the collector confirms payments, but cannot set the fee or the Venmo', async () => {
+  // Ryan collects (set in an earlier test) but is not a commissioner.
+  const confirm = await act('Ryan', 'Ryan', 'verify');
+  assert.equal(confirm.status, 200);
+  assert.equal(lineOf(confirm.body, 'Ryan').status, 'verified');
+  assert.equal((await act('Ryan', 'Ryan', 'unverify')).status, 200);
+
+  assert.equal((await act('Ryan', 'Joel', 'half')).status, 403);
+  const settings = await request('/api/league/dues/settings', {
+    method: 'PUT',
+    headers: auth('Ryan'),
+    body: JSON.stringify({ venmo: '@someone', payee: 'Ryan' }),
+  });
+  assert.equal(settings.status, 403);
+  const shame = await request('/api/league/dues/shame', { method: 'POST', headers: auth('Ryan'), body: '{}' });
+  assert.equal(shame.status, 403);
+});
