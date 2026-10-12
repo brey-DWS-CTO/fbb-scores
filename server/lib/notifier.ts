@@ -301,9 +301,12 @@ export async function sendRulebookSignRequest(
   const title = `The ${input.seasonLabel} Nerds Fantasy Basketball League Constitution`;
   const content: MailContent = {
     subject: title,
-    preheader: `Revision ${input.revision} released on ${stamp}`,
-    heading: title,
-    lines: [`Revision ${input.revision} released on ${stamp}`],
+    preheader: `Revision ${input.revision} has been released on ${stamp}.`,
+    heading: 'The Nerds',
+    lines: [
+      `${title}, revision ${input.revision}, has been released on ${stamp}.`,
+      'Get in here and pretend to read and sign it!',
+    ],
     action: { label: 'READ AND SIGN', href: `${origin}/rules/paper` },
   };
   queueMail('rule book sign request', async () => {

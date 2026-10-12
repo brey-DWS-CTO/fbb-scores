@@ -1992,6 +1992,11 @@ th.schedule-col-active {
 .sign-line { margin: 0; color: var(--text-dim); font-size: 0.66rem; line-height: 1.5; }
 .sign-mine { color: var(--neon-teal); }
 .sign-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* A sign button is as wide as its words, on one line, never a tall sliver. */
+.sign-actions .rule-edit-save,
+.sign-actions .rule-edit-cancel,
+.sign-actions .rules-tool,
+.sign-go { flex: 0 0 auto; width: auto; padding: 0 18px; white-space: nowrap; }
 
 /* Paper only. On screen the history lives behind the REVISIONS button. */
 .rules-print-history { display: none; }
