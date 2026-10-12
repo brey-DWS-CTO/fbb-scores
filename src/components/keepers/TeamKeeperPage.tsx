@@ -11,6 +11,12 @@ import {
   saveKeepers,
 } from '../../lib/league/api.js';
 import { fmt1 } from '../../lib/league/format.js';
+import { valueBoard } from '../../lib/league/draftValue.js';
+import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
+import { buildWorld } from '../../lib/league/whatIf.js';
+import { defaultMockSettings, prepareMock, type MockSlot } from '../../lib/league/mockDraft.js';
+import { keeperCostSlot, oddsTone, openOwnerBoard, shareGoneBefore, simulateTakenAt, type TakenAt } from '../../lib/league/keeperOdds.js';
+import { useProjectionData } from '../../hooks/useProjectionData.js';
 import {
   useApplyStateResponse,
   useIdentity,
@@ -37,6 +43,7 @@ function RosterRow({
   postseason,
   showApiSource,
   tapThrough,
+  odds,
   onTap,
 }: {
   p: DatasetPlayer;
@@ -50,6 +57,8 @@ function RosterRow({
   showApiSource: boolean;
   /** Blocked only by the cap: keep the greyed look but let the tap land. */
   tapThrough?: boolean;
+  /** Commissioner only: how often he is gone by the pick the keep costs. */
+  odds?: KeeperOdds | null;
   onTap: () => void;
 }) {
   const s = p.stats2026 ?? p.api2026;
@@ -128,6 +137,7 @@ function RosterRow({
       </div>
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
         {p.keeper.round !== null && <RoundChip round={p.keeper.round} />}
+        {odds && <OddsChip odds={odds} />}
       </div>
       {tappable && !looksBlocked && (
         <span
@@ -147,16 +157,39 @@ function RosterRow({
   );
 }
 
+/** How often a player is gone by the pick his keep costs, and that pick's label. */
+interface KeeperOdds {
+  share: number;
+  label: string;
+}
+
+/**
+ * Commissioner only. The keeper question as one number: across 60 drafts
+ * played with this team's keeper slots left live, how often he was taken
+ * before the pick the keep would cost. Green: keep him, he would be gone.
+ * Red: you could draft him anyway.
+ */
+function OddsChip({ odds, inCost = false }: { odds: KeeperOdds; inCost?: boolean }) {
+  return (
+    <span className={`keeper-odds is-${oddsTone(odds.share)}${inCost ? ' in-cost' : ''}`} title="How often he is gone by this pick, across 60 drafts. Only the commish sees this.">
+      <strong>{Math.round(odds.share * 100)}%</strong> gone by {odds.label}
+    </span>
+  );
+}
+
 /** One selected-keeper card with pick cost, contract projection and errors. */
 function KeeperCard({
   k,
   canEdit,
   projected = false,
+  odds = null,
   onRemove,
 }: {
   k: ResolvedKeeper;
   canEdit: boolean;
   projected?: boolean;
+  /** Commissioner only: how often he is gone by the pick the keep costs. */
+  odds?: KeeperOdds | null;
   onRemove: () => void;
 }) {
   const p = k.player;
@@ -256,6 +289,7 @@ function KeeperCard({
               (from {k.pick.viaTradeFrom})
             </span>
           )}
+          {odds && <OddsChip odds={odds} inCost />}
         </div>
       )}
 
@@ -468,6 +502,35 @@ export default function TeamKeeperPage() {
 
   // Every derived number comes from the engine, recomputed each render
   const result = useMemo(() => resolveTeamKeepers(dataset, owner, selections), [owner, selections, dataset]);
+
+  // Commissioner only: the keeper question as a number. This team's keeper
+  // slots are opened, and the room drafts 60 times from the commish's full
+  // view of the league (entered keepers, projections for the rest). The
+  // answer per candidate: how often he is gone by the pick his keep costs.
+  const { snapshot } = useProjectionData();
+  const oddsWorld = useMemo((): { taken: TakenAt; slots: MockSlot[] } | null => {
+    if (!isCommish || !identity || !snapshot) return null;
+    const values = valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true });
+    if (values.entries.length === 0) return null;
+    const world = buildWorld(dataset, {
+      viewer: identity.owner, state, scenario: scenarioQuery.scenario, proposals: [], tradesOn: [], useEntered: true, guessInstead: [],
+    });
+    const board = openOwnerBoard(world.board, owner);
+    const prepared = prepareMock({ board, values, settings: defaultMockSettings('sharp', OWNERS, 7) });
+    return { taken: simulateTakenAt(prepared, 7, 60), slots: board.slots };
+  }, [isCommish, identity, snapshot, dataset, state, scenarioQuery.scenario, owner]);
+  const keeperOdds = (playerKey: string, round: number | null): KeeperOdds | null => {
+    if (!oddsWorld || round === null) return null;
+    // A chosen keeper is judged at the pick the engine charged him. Anyone
+    // else is judged at this team's pick in his round, skipping picks the
+    // chosen keepers already use.
+    const chosen = result.keepers.find((k) => k.selection.playerKey === playerKey);
+    const charged = new Set(result.keepers.flatMap((k) => (k.pick ? [k.pick.overall] : [])));
+    const overall = chosen?.pick?.overall ?? keeperCostSlot(oddsWorld.slots, owner, round, charged)?.pick.overall;
+    if (overall === undefined) return null;
+    const slot = oddsWorld.slots.find((entry) => entry.pick.overall === overall);
+    return { share: shareGoneBefore(oddsWorld.taken, playerKey, overall), label: slot ? `${slot.pick.round}.${slot.pick.slot}` : `#${overall}` };
+  };
 
   const rosterPlayers = useMemo(
     () =>
@@ -974,6 +1037,7 @@ export default function TeamKeeperPage() {
               k={k}
               canEdit={canEdit}
               projected={projectionMode}
+              odds={keeperOdds(k.selection.playerKey, k.round)}
               onRemove={() => removeKeeper(k.selection.playerKey)}
             />
           ))}
@@ -1090,6 +1154,7 @@ export default function TeamKeeperPage() {
               postseason={postseasonGames(p.proTeam)}
               showApiSource={identity?.isCommissioner === true}
               tapThrough={overCapTapThrough(p)}
+              odds={keeperOdds(p.key, p.keeper.round)}
               onTap={() => toggleKeeper(p)}
             />
           ))}
