@@ -110,6 +110,8 @@ import {
   saveDues,
   getDuesSettings,
   saveDuesSettings,
+  listGamesCaps,
+  saveGamesCap,
   listPolls,
   getPoll,
   insertPoll,
@@ -142,6 +144,13 @@ import {
   type DuesAction,
   type DuesSettings,
 } from '../../src/lib/league/dues.js';
+import {
+  DEFAULT_GAMES_CAP,
+  MAX_GAMES_CAP,
+  MIN_GAMES_CAP,
+  parseGamesCap,
+  type GamesCapRow,
+} from '../../src/lib/league/gamesCap.js';
 import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
@@ -3353,6 +3362,54 @@ router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, 
     await saveDuesSettings(row);
     await appendAudit(actor(res), 'dues.settings', { venmo, payee });
     res.json(await duesResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Weekly games cap ────────────────────────────────────────────────────────
+//
+// How many started player-games a team may count in one fantasy week. The
+// scores pages show games played against it and the win chance stops at it.
+// One number per week; a week nobody has set is the default.
+
+async function gamesCapsResponse() {
+  return {
+    season: leagueDataset.season,
+    defaultCap: DEFAULT_GAMES_CAP,
+    caps: await listGamesCaps(leagueDataset.season),
+  };
+}
+
+/** GET /api/league/games-caps — anyone may read the caps, like the standings. */
+router.get('/games-caps', async (_req, res, next) => {
+  try {
+    res.json(await gamesCapsResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PUT /api/league/games-caps/:matchupPeriod — set one week's cap (commissioner only). */
+router.put('/games-caps/:matchupPeriod', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const matchupPeriodId = Number(routeParam(req.params.matchupPeriod));
+    if (!Number.isInteger(matchupPeriodId) || matchupPeriodId < 1 || matchupPeriodId > 30) {
+      throw new HttpError(400, 'That is not a fantasy week');
+    }
+    const body = req.body as { cap?: unknown };
+    const cap = parseGamesCap(body.cap);
+    if (cap === null) throw new HttpError(400, `The cap is a whole number from ${MIN_GAMES_CAP} to ${MAX_GAMES_CAP}`);
+    const row: GamesCapRow = {
+      season: leagueDataset.season,
+      matchupPeriodId,
+      cap,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor(res),
+    };
+    await saveGamesCap(row);
+    await appendAudit(actor(res), 'scores.gamesCap', { matchupPeriodId, cap });
+    res.json(await gamesCapsResponse());
   } catch (err) {
     next(err);
   }
