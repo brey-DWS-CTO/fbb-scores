@@ -120,6 +120,18 @@ export interface WeekRef {
   phase: SchedulePhase;
 }
 
+/**
+ * One scoring period pinned to a calendar date, which dates every other
+ * period: ESPN's periods are consecutive days. In season the current
+ * period is today. Before it, period 1 is opening night.
+ */
+export interface DateAnchor {
+  scoringPeriodId: number;
+  date: string;
+  /** Where the anchor came from, for anyone checking the plan. */
+  source: 'scoring-period' | 'opening-night' | 'season-start' | 'pro-schedule' | 'demo';
+}
+
 export interface WeekPlan {
   season: number;
   matchupPeriodId: number;
@@ -129,6 +141,8 @@ export interface WeekPlan {
   weeks: WeekRef[];
   /** Games a team may count this week, from ESPN's lineup limit. */
   gamesCap: number | null;
+  /** The anchor the dates were counted from. */
+  anchor: DateAnchor;
 }
 
 export interface ScoresWeek extends WeekPlan {
@@ -183,11 +197,14 @@ export function expandWeekNumbers(listed: readonly ListedPeriod[], weekOneStart:
   if (!weekNumbers) {
     return listed.map((entry) => ({ matchupPeriodId: entry.matchupPeriodId, scoringPeriodIds: entry.values }));
   }
+  // Week 1 can open on a Monday before opening night; those days have no
+  // scoring period, so they drop out and week 1 is a short week.
   return listed.map((entry) => ({
     matchupPeriodId: entry.matchupPeriodId,
     scoringPeriodIds: [...entry.values]
       .sort((a, b) => a - b)
-      .flatMap((week) => Array.from({ length: 7 }, (_, day) => weekOneStart + (week - 1) * 7 + day)),
+      .flatMap((week) => Array.from({ length: 7 }, (_, day) => weekOneStart + (week - 1) * 7 + day))
+      .filter((scoringPeriodId) => scoringPeriodId >= 1),
   }));
 }
 
@@ -329,22 +346,45 @@ export function gamesCapFor(rosterSettings: unknown, dayCount: number): number {
   return Math.round((30 * dayCount) / 7);
 }
 
+/** ESPN's current scoring period from a league payload: 0 before the season. */
+export function readCurrentScoringPeriod(settings: unknown): number {
+  const body = dict(settings);
+  return num(body.scoringPeriodId) ?? num(dict(body.status).latestScoringPeriod) ?? 0;
+}
+
+/**
+ * The first date with a regular-season game, from ESPN's public scoreboard
+ * for a run of dates. Preseason games carry season type 1; the regular
+ * season is type 2. Null when none of the dates has one.
+ */
+export function firstRegularSeasonDate(days: ReadonlyArray<{ date: string; payload: unknown }>): string | null {
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
+  for (const day of sorted) {
+    const regular = list(dict(day.payload).events).some((event) => {
+      const season = dict(dict(event).season);
+      return num(season.type) === 2 || str(season.slug) === 'regular-season';
+    });
+    if (regular) return day.date;
+  }
+  return null;
+}
+
 /**
  * Which days make up the requested week, and every week the picker can show.
  *
  * `settings` is ESPN's league payload with the `mSettings`, `mStatus` and
- * (ideally) `proTeamSchedules_wl` views. `today` anchors the dates when the
- * pro schedule is missing: the current scoring period is today, and the rest
- * count out from there. Throws `no-schedule` when ESPN lists no weeks and
+ * `mTeam` views, and `proTeamSchedules_wl` when ESPN sends it. `anchor`
+ * pins one scoring period to a date; the pro schedule's own dates win over
+ * it where they exist. Throws `no-schedule` when ESPN lists no weeks and
  * `unknown-week` when the requested one does not exist.
  */
-export function planWeek(settings: unknown, requested: number | null, today: string): WeekPlan {
+export function planWeek(settings: unknown, requested: number | null, anchor: DateAnchor): WeekPlan {
   const body = dict(settings);
   const status = dict(body.status);
   const leagueSettings = dict(body.settings);
   const schedule = dict(leagueSettings.scheduleSettings);
 
-  const currentScoringPeriodId = num(body.scoringPeriodId) ?? num(status.latestScoringPeriod) ?? 1;
+  const currentScoringPeriodId = readCurrentScoringPeriod(settings);
   const currentMatchupPeriodId = num(status.currentMatchupPeriod) ?? 1;
   const season = num(body.seasonId) ?? 0;
 
@@ -361,20 +401,15 @@ export function planWeek(settings: unknown, requested: number | null, today: str
   // lists a pro game, preseason included. A date it names pins the line;
   // every other period is counted out along it.
   const known = scoringPeriodDates(leagueSettings.proTeams);
-  let anchor: { scoringPeriodId: number; date: string } | null = null;
+  let line: DateAnchor = anchor;
   for (const [scoringPeriodId, date] of known) {
-    if (!anchor || scoringPeriodId < anchor.scoringPeriodId) anchor = { scoringPeriodId, date };
+    if (line.source !== 'pro-schedule' || scoringPeriodId < line.scoringPeriodId) {
+      line = { scoringPeriodId, date, source: 'pro-schedule' };
+    }
   }
-  const dateFor = (scoringPeriodId: number): string => {
-    const named = known.get(scoringPeriodId);
-    if (named) return named;
-    if (anchor) return addDaysIso(anchor.date, scoringPeriodId - anchor.scoringPeriodId);
-    return addDaysIso(today, scoringPeriodId - Math.max(1, currentScoringPeriodId));
-  };
-  const periodFor = (iso: string): number => {
-    const from = anchor ?? { scoringPeriodId: 1, date: seasonStartDate() };
-    return from.scoringPeriodId + daysBetween(from.date, iso);
-  };
+  const dateFor = (scoringPeriodId: number): string =>
+    known.get(scoringPeriodId) ?? addDaysIso(line.date, scoringPeriodId - line.scoringPeriodId);
+  const periodFor = (iso: string): number => line.scoringPeriodId + daysBetween(line.date, iso);
 
   const periods = expandWeekNumbers(listed, periodFor(seasonStartDate()));
 
@@ -398,6 +433,7 @@ export function planWeek(settings: unknown, requested: number | null, today: str
     days,
     weeks,
     gamesCap: gamesCapFor(leagueSettings.rosterSettings, days.length),
+    anchor: line,
   };
 }
 

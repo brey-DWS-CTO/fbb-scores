@@ -270,7 +270,7 @@ export function demoWeek(seed = 7): ScoresWeek {
     teams,
   };
 
-  const plan = planWeek(settings, DEMO_MATCHUP_PERIOD, DEMO_TODAY);
+  const plan = planWeek(settings, DEMO_MATCHUP_PERIOD, { scoringPeriodId: 1, date: SEASON_START, source: 'demo' });
   const pairs: Array<[number, number]> = [];
   for (let i = 0; i + 1 < teams.length; i += 2) pairs.push([teams[i].id, teams[i + 1].id]);
 

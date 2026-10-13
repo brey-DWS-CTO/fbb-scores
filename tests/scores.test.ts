@@ -8,6 +8,7 @@ import {
   defaultDay,
   espnToday,
   expandWeekNumbers,
+  firstRegularSeasonDate,
   gameText,
   gamesCapFor,
   gamesLeft,
@@ -20,6 +21,7 @@ import {
   ownerByEspnTeamId,
   planWeek,
   playerWeek,
+  readCurrentScoringPeriod,
   readEspnWeek,
   readNbaScoreboard,
   recordText,
@@ -56,6 +58,9 @@ const range = (from: number, to: number) => Array.from({ length: to - from + 1 }
 
 /** 7:30 PM in New York on an ISO date, as the epoch ms ESPN sends. */
 const tipMs = (iso: string) => Date.parse(`${iso}T19:30:00-05:00`);
+
+/** In season: ESPN's current scoring period is today. */
+const TODAY_ANCHOR = { scoringPeriodId: 18, date: '2026-11-05', source: 'scoring-period' } as const;
 
 const SETTINGS = {
   seasonId: 2027,
@@ -183,7 +188,7 @@ const DAY_18_GAMES: Record<string, GameLine> = {
 };
 
 function buildWeek(): ScoresWeek {
-  const plan = planWeek(SETTINGS, 3, '2026-11-05');
+  const plan = planWeek(SETTINGS, 3, TODAY_ANCHOR);
   return readEspnWeek({
     plan,
     settings: SETTINGS,
@@ -212,9 +217,10 @@ function buildWeek(): ScoresWeek {
 // ─── The plan ───────────────────────────────────────────────────────────────
 
 test('the plan lists the week\'s days, dated from the pro schedule and counted out from today', () => {
-  const plan = planWeek(SETTINGS, null, '2026-11-05');
+  const plan = planWeek(SETTINGS, null, TODAY_ANCHOR);
   assert.equal(plan.matchupPeriodId, 3);
   assert.equal(plan.currentScoringPeriodId, 18);
+  assert.equal(plan.anchor.source, 'pro-schedule', 'a date ESPN names beats the anchor passed in');
   assert.deepEqual(plan.days.map((day) => day.scoringPeriodId), range(15, 21));
   // Scoring period 15 comes from LAL's tip-off; the rest count out from today, period 18.
   assert.deepEqual(plan.days.map((day) => day.date), ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08']);
@@ -227,8 +233,8 @@ test('the plan lists the week\'s days, dated from the pro schedule and counted o
 
 /**
  * What ESPN really sent for this league on 12 October 2026: week numbers,
- * not days, in `matchupPeriods`; scoring period 1 on 14 October, a
- * preseason day; the season not started (scoringPeriodId 0).
+ * not days, in `matchupPeriods`; no pro-team schedule; the season not
+ * started (scoringPeriodId 0). The regular season opens Tuesday 20 October.
  */
 const LIVE_SETTINGS = {
   seasonId: 2027,
@@ -242,44 +248,75 @@ const LIVE_SETTINGS = {
         '20': [21, 22],
       },
     },
-    proTeams: [
-      {
-        id: 14,
-        proGamesByScoringPeriod: {
-          '1': [{ date: Date.parse('2026-10-14T19:30:00-04:00') }],
-          '7': [{ date: Date.parse('2026-10-20T19:30:00-04:00') }],
-        },
-      },
-    ],
   },
   teams: [{ id: 2, name: 'Tu  Mamacita', abbrev: 'TU' }],
 };
 
-test('ESPN\'s week numbers become Monday-to-Sunday days anchored on the league\'s week 1', () => {
-  const plan = planWeek(LIVE_SETTINGS, null, '2026-10-12');
+const OPENING_NIGHT = { scoringPeriodId: 1, date: '2026-10-20', source: 'opening-night' } as const;
+
+test('ESPN\'s week numbers become Monday-to-Sunday days anchored on opening night', () => {
+  const plan = planWeek(LIVE_SETTINGS, null, OPENING_NIGHT);
   assert.equal(plan.matchupPeriodId, 1);
   assert.equal(plan.currentScoringPeriodId, 0);
-  // 14 October is scoring period 1, so Monday 19 October is period 6.
-  assert.deepEqual(plan.days.map((day) => day.scoringPeriodId), range(6, 12));
-  assert.deepEqual(plan.days.map((day) => day.date), ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
-  assert.equal(plan.gamesCap, 30);
+  assert.equal(plan.anchor.source, 'opening-night');
+  // Opening night is scoring period 1; Monday 19 October has none, so week 1 is six days.
+  assert.deepEqual(plan.days.map((day) => day.scoringPeriodId), range(1, 6));
+  assert.deepEqual(plan.days.map((day) => day.date), ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
+  assert.equal(plan.gamesCap, 26);
   assert.equal(plan.weeks.length, 20);
-  assert.deepEqual([plan.weeks[0].label, plan.weeks[0].startDate, plan.weeks[0].endDate], ['Week 1', '2026-10-19', '2026-10-25']);
-  assert.deepEqual([plan.weeks[1].startDate, plan.weeks[1].scoringPeriodIds[0]], ['2026-10-26', 13]);
+  assert.deepEqual([plan.weeks[0].label, plan.weeks[0].startDate, plan.weeks[0].endDate], ['Week 1', '2026-10-20', '2026-10-25']);
+  assert.deepEqual([plan.weeks[1].startDate, plan.weeks[1].scoringPeriodIds[0], plan.weeks[1].scoringPeriodIds.length], ['2026-10-26', 7, 7]);
   assert.deepEqual([plan.weeks[16].label, plan.weeks[16].startDate], ['Play-In 1', '2027-02-08']);
   assert.deepEqual([plan.weeks[17].label, plan.weeks[17].startDate, plan.weeks[17].endDate], ['Play-In 2', '2027-02-15', '2027-02-21']);
   // ESPN's two-week playoff rounds: fourteen days each, and no league label fits their start.
   assert.deepEqual([plan.weeks[18].label, plan.weeks[18].startDate, plan.weeks[18].scoringPeriodIds.length], ['Week 19', '2027-02-22', 14]);
   assert.deepEqual([plan.weeks[19].startDate, plan.weeks[19].endDate], ['2027-03-08', '2027-03-21']);
   // Before the season the week opens on its first day.
-  assert.equal(defaultDay({ days: plan.days.map((day) => ({ ...day, games: null })), currentScoringPeriodId: 0 }), 6);
-  assert.equal(planWeek(LIVE_SETTINGS, 19, '2026-10-12').days.length, 14);
+  assert.equal(defaultDay({ days: plan.days.map((day) => ({ ...day, games: null })), currentScoringPeriodId: 0 }), 1);
+  assert.equal(planWeek(LIVE_SETTINGS, 19, OPENING_NIGHT).days.length, 14);
 
   const week = readEspnWeek({
     plan, settings: LIVE_SETTINGS, fetchedAt: 'now',
-    days: [{ scoringPeriodId: 6, date: '2026-10-19', games: null, payload: { schedule: [{ id: 2, matchupPeriodId: 1, home: { teamId: 2 }, away: { teamId: 7 } }] } }],
+    days: [{ scoringPeriodId: 1, date: '2026-10-20', games: null, payload: { schedule: [{ id: 2, matchupPeriodId: 1, home: { teamId: 2 }, away: { teamId: 7 } }] } }],
   });
   assert.equal(week.matchups[0].home.name, 'Tu Mamacita', 'one space is enough');
+});
+
+test('in season the current scoring period is today, and a pro schedule date wins over any anchor', () => {
+  // Week 3 on Thursday 5 November: scoring period 17 is today.
+  const plan = planWeek(LIVE_SETTINGS, null, { scoringPeriodId: 17, date: '2026-11-05', source: 'scoring-period' });
+  assert.deepEqual([plan.weeks[2].startDate, plan.weeks[2].endDate, plan.weeks[2].scoringPeriodIds[0]], ['2026-11-02', '2026-11-08', 14]);
+  assert.equal(plan.anchor.source, 'scoring-period');
+
+  // ESPN lists preseason games too: scoring period 1 on 14 October, so week 1 starts at period 6.
+  const withSchedule = {
+    ...LIVE_SETTINGS,
+    settings: {
+      ...LIVE_SETTINGS.settings,
+      proTeams: [{ id: 14, proGamesByScoringPeriod: { '1': [{ date: Date.parse('2026-10-14T19:30:00-04:00') }] } }],
+    },
+  };
+  const listed = planWeek(withSchedule, null, OPENING_NIGHT);
+  assert.equal(listed.anchor.source, 'pro-schedule');
+  assert.deepEqual(listed.days.map((day) => day.scoringPeriodId), range(6, 12));
+  assert.deepEqual([listed.days[0].date, listed.days[6].date], ['2026-10-19', '2026-10-25']);
+});
+
+test('opening night is the first date with a regular-season game on the public scoreboard', () => {
+  const pre = { events: [{ season: { type: 1, slug: 'preseason' } }] };
+  const regular = { events: [{ season: { type: 2, slug: 'regular-season' } }] };
+  assert.equal(firstRegularSeasonDate([
+    { date: '2026-10-21', payload: regular },
+    { date: '2026-10-19', payload: { events: [] } },
+    { date: '2026-10-20', payload: regular },
+    { date: '2026-10-18', payload: pre },
+  ]), '2026-10-20');
+  assert.equal(firstRegularSeasonDate([{ date: '2026-10-19', payload: null }, { date: '2026-10-20', payload: pre }]), null);
+  assert.equal(firstRegularSeasonDate([{ date: '2026-10-20', payload: { events: [{ season: { slug: 'regular-season' } }] } }]), '2026-10-20');
+  assert.equal(firstRegularSeasonDate([]), null);
+  assert.equal(readCurrentScoringPeriod({ scoringPeriodId: 0 }), 0);
+  assert.equal(readCurrentScoringPeriod({ status: { latestScoringPeriod: 9 } }), 9);
+  assert.equal(readCurrentScoringPeriod(undefined), 0);
 });
 
 test('days listed outright pass through, and the two forms are told apart by size', () => {
@@ -287,16 +324,19 @@ test('days listed outright pass through, and the two forms are told apart by siz
   assert.deepEqual(days.map((entry) => entry.scoringPeriodIds), [range(1, 7), range(8, 14)]);
   const weeks = expandWeekNumbers([{ matchupPeriodId: 1, values: [1] }, { matchupPeriodId: 2, values: [2, 3] }], 6);
   assert.deepEqual(weeks.map((entry) => entry.scoringPeriodIds), [range(6, 12), range(13, 26)]);
+  // A Monday before opening night has no scoring period: week 1 loses it and runs short.
+  const short = expandWeekNumbers([{ matchupPeriodId: 1, values: [1] }, { matchupPeriodId: 2, values: [2] }], 0);
+  assert.deepEqual(short.map((entry) => entry.scoringPeriodIds), [range(1, 6), range(7, 13)]);
   assert.equal(daysBetween('2026-10-14', '2026-10-19'), 5);
   assert.equal(daysBetween('2026-10-19', '2026-10-14'), -5);
   assert.equal(daysBetween('2026-12-31', '2027-01-01'), 1);
 });
 
 test('asking for a week by number works, and the missing ones say so', () => {
-  assert.equal(planWeek(SETTINGS, 2, '2026-11-05').days[0].scoringPeriodId, 8);
-  assert.throws(() => planWeek(SETTINGS, 9, '2026-11-05'), /unknown-week/);
-  assert.throws(() => planWeek({}, null, '2026-11-05'), /no-schedule/);
-  assert.throws(() => planWeek(null, null, '2026-11-05'), /no-schedule/);
+  assert.equal(planWeek(SETTINGS, 2, TODAY_ANCHOR).days[0].scoringPeriodId, 8);
+  assert.throws(() => planWeek(SETTINGS, 9, TODAY_ANCHOR), /unknown-week/);
+  assert.throws(() => planWeek({}, null, TODAY_ANCHOR), /no-schedule/);
+  assert.throws(() => planWeek(null, null, TODAY_ANCHOR), /no-schedule/);
 });
 
 test('a late West Coast tip still lands on its own date in New York', () => {
@@ -409,7 +449,7 @@ test('words for the screen cover every game state', () => {
 });
 
 test('nothing crashes on a payload with nothing in it', () => {
-  const plan = planWeek(SETTINGS, 3, '2026-11-05');
+  const plan = planWeek(SETTINGS, 3, TODAY_ANCHOR);
   const empty = readEspnWeek({ plan, settings: {}, fetchedAt: 'now', days: [{ scoringPeriodId: 15, date: '2026-11-02', payload: {}, games: null }] });
   assert.deepEqual(empty.matchups, []);
   assert.equal(empty.days.length, 7);
