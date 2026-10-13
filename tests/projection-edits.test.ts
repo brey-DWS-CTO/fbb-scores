@@ -99,3 +99,51 @@ test('one cell at a time: a change is kept, typing ESPN back drops it, and an em
   assert.deepEqual(third, { games: 60, perGame: {}, note: '' });
   assert.equal(withCellEdit(third, jokic.projection, '42', 72), null);
 });
+
+test('minutes move the line: more floor time lifts the counting stats, a little under one for one', async () => {
+  const { minutesFactor, scaleToMinutes } = await import('../src/lib/league/projectionEdits.ts');
+  const jokic = espnOf('Nikola Jokic');
+  const line = projectedPerGame(jokic.projection)!;
+  const minutes = line['40'];
+  const more = Math.round((minutes * 8) / 7 * 10) / 10; // about 14% more
+  const factor = minutesFactor(minutes, more);
+  assert.ok(factor > 1.1 && factor < 1.14, `factor ${factor}`);
+  const row = editedProjection(jokic.projection, edit(jokic.espnId, 'Nikola Jokic', null, { '40': more }))!;
+  const raw = projectedPerGame(row)!;
+  const tenth = (value: number) => Math.round(value * 10) / 10;
+  const scaled = Object.fromEntries(Object.entries(raw).map(([id, value]) => [id, tenth(value)]));
+  assert.equal(scaled['40'], more);
+  assert.equal(scaled['0'], tenth(line['0'] * factor));
+  assert.ok(scaled['6'] > line['6'] && scaled['11'] > line['11']);
+  // Percentages stay: makes and attempts moved together.
+  assert.ok(Math.abs(scaled['13'] / scaled['14'] - line['13'] / line['14']) < 0.01);
+  // Missed shots still follow makes and attempts.
+  assert.equal(scaled['23'], tenth(Math.max(0, scaled['14'] - scaled['13'])));
+  // Fewer minutes cuts the line.
+  const less = projectedPerGame(editedProjection(jokic.projection, edit(jokic.espnId, 'Nikola Jokic', null, { '40': minutes - 6 }))!)!;
+  assert.ok(less['0'] < line['0']);
+  // Scoring follows, through the same preview the editor uses.
+  const before = previewEdit(jokic.projection, { games: null, perGame: {} }, scoring);
+  const after = previewEdit(jokic.projection, { games: null, perGame: { '40': more } }, scoring);
+  assert.ok(after.fppg! > before.fppg!, `${after.fppg} > ${before.fppg}`);
+  // Nothing to scale from means nothing moves.
+  assert.deepEqual(scaleToMinutes({ '0': 10 }, 30), { '0': 10, '40': 30 });
+  assert.equal(minutesFactor(0, 30), 1);
+});
+
+test('a typed stat wins over the minutes, and typing ESPN minutes back stops the scaling', async () => {
+  const { cellFollowsMinutes, withCellEdit } = await import('../src/lib/league/projectionEdits.ts');
+  const jokic = espnOf('Nikola Jokic');
+  const line = projectedPerGame(jokic.projection)!;
+  const pinned = projectedPerGame(editedProjection(jokic.projection, edit(jokic.espnId, 'Nikola Jokic', null, { '40': line['40'] + 4, '0': 20 }))!)!;
+  assert.equal(Math.round(pinned['0'] * 10) / 10, 20);
+  assert.ok(pinned['6'] > line['6']);
+  assert.equal(cellFollowsMinutes({ perGame: { '40': 30, '0': 20 } }, '0'), false);
+  assert.equal(cellFollowsMinutes({ perGame: { '40': 30, '0': 20 } }, '6'), true);
+  assert.equal(cellFollowsMinutes({ perGame: { '40': 30 } }, '40'), false);
+  assert.equal(cellFollowsMinutes({ perGame: { '0': 20 } }, '6'), false);
+  assert.equal(cellFollowsMinutes(null, '6'), false);
+  const first = withCellEdit(null, jokic.projection, '40', line['40'] + 4);
+  assert.deepEqual(first?.perGame, { '40': Math.round((line['40'] + 4) * 10) / 10 });
+  assert.equal(withCellEdit(first, jokic.projection, '40', line['40']), null);
+});
