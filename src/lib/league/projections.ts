@@ -301,16 +301,23 @@ export function visibleColumns(hidden: ReadonlySet<string>): ProjectionColumn[] 
   return PROJECTION_COLUMNS.filter((column) => FIXED_COLUMNS.has(column.id) || !hidden.has(column.id));
 }
 
-/** Hidden column ids from storage. Anything unknown or malformed is ignored. */
+/** The columns hidden until somebody picks their own. Brey's choice, 2026-10-12. */
+export const DEFAULT_HIDDEN_COLUMNS: readonly ProjectionColumnId[] = ['tag', 'base', 'bonus', 'fga', 'fta', 'lastSeason', 'valueRank'];
+
+/**
+ * Hidden column ids from storage. Nothing stored, or something malformed,
+ * means the default set. A stored empty list means show everything, which
+ * is what SHOW ALL saves.
+ */
 export function parseHiddenColumns(raw: string | null): Set<ProjectionColumnId> {
-  if (!raw) return new Set();
+  if (!raw) return new Set(DEFAULT_HIDDEN_COLUMNS);
   try {
     const value: unknown = JSON.parse(raw);
-    if (!Array.isArray(value)) return new Set();
+    if (!Array.isArray(value)) return new Set(DEFAULT_HIDDEN_COLUMNS);
     return new Set(value.filter((id): id is ProjectionColumnId =>
       typeof id === 'string' && COLUMN_BY_ID.has(id as ProjectionColumnId) && !FIXED_COLUMNS.has(id as ProjectionColumnId)));
   } catch {
-    return new Set();
+    return new Set(DEFAULT_HIDDEN_COLUMNS);
   }
 }
 
