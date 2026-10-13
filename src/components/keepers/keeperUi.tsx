@@ -34,8 +34,8 @@ export function SourceBadge({ info, compact }: { info: PlayerKeeperInfo; compact
   let label: string;
   let color: string;
   let bg: string;
-  if (info.zeroGp2026) {
-    label = compact ? 'R3 RULE' : "R3 RULE · didn't play 2026";
+  if (info.zeroGp2026 && !info.usesPriorYear) {
+    label = compact ? 'R3 RULE' : "R3 RULE · didn't play 2026, no earlier average";
     color = 'var(--neon-orange)';
     bg = 'rgba(255,102,0,0.1)';
   } else if (info.usesPriorYear) {

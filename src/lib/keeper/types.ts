@@ -67,7 +67,7 @@ export interface PlayerKeeperInfo {
   effectiveAvg: number | null; // the FPPG that counts for tiers + salary cap
   avgSource: AvgSource;
   usesPriorYear: boolean; // <=25 GP in 2026 → prior season average
-  zeroGp2026: boolean; // didn't play at all in 2026 → flat 3rd-round rule
+  zeroGp2026: boolean; // didn't play at all in 2026; with no earlier average → flat 3rd-round rule
   contract: ContractSeed | null;
   flags: string[];
 }

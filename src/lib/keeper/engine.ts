@@ -130,17 +130,21 @@ export function computeTiers(
     });
   });
 
-  // Value-slot substitutes (≤25 GP) and handle 0-GP players
+  // Value-slot substitutes (≤25 GP) and the players with nothing to go on.
   for (const p of players) {
     if (assignments.has(p.key)) continue;
     const zeroGp = p.gp2026 === 0;
-    if (zeroGp) {
+    // Zero games is "25 or fewer", so the season before sets his tier like
+    // anyone else's (rule keepers.cap.exception). Only a player who did not
+    // play the previous season AND has no earlier average falls to the flat
+    // 3rd round pick. Settled with Brey on 2026-10-12 (Haliburton).
+    if (zeroGp && p.priorAvg === null) {
       assignments.set(p.key, {
         key: p.key,
-        round: p.priorAvg !== null || p.avg2026 !== null ? 3 : null,
+        round: 3,
         rank: null,
-        effectiveAvg: p.priorAvg,
-        usesPriorYear: p.priorAvg !== null,
+        effectiveAvg: null,
+        usesPriorYear: false,
         zeroGp: true,
       });
       continue;
@@ -165,7 +169,7 @@ export function computeTiers(
       rank: null,
       effectiveAvg: eff,
       usesPriorYear: usesPrior,
-      zeroGp: false,
+      zeroGp,
     });
   }
 

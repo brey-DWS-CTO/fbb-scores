@@ -1,6 +1,6 @@
 {
  "season": 2027,
- "generatedAt": "2026-08-26T04:09:07.390Z",
+ "generatedAt": "2026-10-13T05:15:36.443Z",
  "cap": 77.8,
  "capRule": {
   "round3Max": 40.1,
@@ -81,7 +81,8 @@
    "fullName": "Ryan Shaug",
    "espnTeamId": 1,
    "espnTeamName": "Trump is my Herro",
-   "draftPosition": 2
+   "draftPosition": 2,
+   "originalMember": true
   },
   {
    "owner": "Patrick",
@@ -117,7 +118,8 @@
    "fullName": "Aaron Jensen",
    "espnTeamId": 4,
    "espnTeamName": "The Hardened Knueppels",
-   "draftPosition": 7
+   "draftPosition": 7,
+   "originalMember": true
   },
   {
    "owner": "Derek",
@@ -132,6 +134,7 @@
    "espnTeamId": 7,
    "espnTeamName": "Mamu, There Goes That Amen",
    "draftPosition": 9,
+   "originalMember": true,
    "isCommissioner": true
   },
   {
@@ -139,7 +142,8 @@
    "fullName": "Amy Shaug",
    "espnTeamId": 2,
    "espnTeamName": "Tu Mamacita",
-   "draftPosition": 10
+   "draftPosition": 10,
+   "originalMember": true
   }
  ],
  "players": [
@@ -918,7 +922,7 @@
    },
    "keeper": {
     "eligible": true,
-    "round": 3,
+    "round": 2,
     "rank": null,
     "effectiveAvg": 40.7,
     "avgSource": "2025-official",
@@ -926,7 +930,7 @@
     "zeroGp2026": true,
     "contract": null,
     "flags": [
-     "no-2026-games-3rd-round-rule",
+     "no-2026-games",
      "uses-prior-year-avg (2025-official)"
     ]
    }
@@ -1224,7 +1228,7 @@
     "zeroGp2026": true,
     "contract": null,
     "flags": [
-     "no-2026-games-3rd-round-rule",
+     "no-2026-games",
      "uses-prior-year-avg (2025-official)"
     ]
    }
@@ -3595,7 +3599,7 @@
    },
    "keeper": {
     "eligible": false,
-    "round": 3,
+    "round": 9,
     "rank": null,
     "effectiveAvg": 29.2,
     "avgSource": "2025-official",
@@ -3603,7 +3607,7 @@
     "zeroGp2026": true,
     "contract": null,
     "flags": [
-     "no-2026-games-3rd-round-rule",
+     "no-2026-games",
      "uses-prior-year-avg (2025-official)"
     ]
    }
@@ -5610,7 +5614,7 @@
    },
    "keeper": {
     "eligible": false,
-    "round": 3,
+    "round": 10,
     "rank": null,
     "effectiveAvg": 23.9,
     "avgSource": "2025-api",
@@ -5618,7 +5622,7 @@
     "zeroGp2026": true,
     "contract": null,
     "flags": [
-     "no-2026-games-3rd-round-rule",
+     "no-2026-games",
      "uses-prior-year-avg (2025-api)"
     ]
    }
@@ -6310,7 +6314,7 @@
    },
    "keeper": {
     "eligible": false,
-    "round": 3,
+    "round": 10,
     "rank": null,
     "effectiveAvg": 21.9,
     "avgSource": "2025-api",
@@ -6318,7 +6322,7 @@
     "zeroGp2026": true,
     "contract": null,
     "flags": [
-     "no-2026-games-3rd-round-rule",
+     "no-2026-games",
      "uses-prior-year-avg (2025-api)"
     ]
    }
@@ -7059,7 +7063,7 @@
    },
    "keeper": {
     "eligible": false,
-    "round": 3,
+    "round": 10,
     "rank": null,
     "effectiveAvg": 20.9,
     "avgSource": "2025-api",
@@ -7067,7 +7071,7 @@
     "zeroGp2026": true,
     "contract": null,
     "flags": [
-     "no-2026-games-3rd-round-rule",
+     "no-2026-games",
      "uses-prior-year-avg (2025-api)"
     ]
    }
