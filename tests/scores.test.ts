@@ -364,6 +364,9 @@ test('week labels follow the league schedule by start date', () => {
   assert.deepEqual(weekLabel(18, '2027-02-15'), { label: 'Play-In 2', phase: 'fantasy-play-in' });
   assert.deepEqual(weekLabel(19, '2027-03-01'), { label: 'Playoff Round 1', phase: 'fantasy-playoff' });
   assert.deepEqual(weekLabel(21, '2027-03-15'), { label: 'Playoff Round 2', phase: 'fantasy-playoff' });
+  // The second week of a round is not the round. ESPN's last period starts here.
+  assert.deepEqual(weekLabel(20, '2027-03-08'), { label: 'Week 20', phase: 'fantasy-playoff' });
+  assert.deepEqual(weekLabel(22, '2027-03-22'), { label: 'Week 22', phase: 'fantasy-playoff' });
   assert.deepEqual(weekLabel(5, '2030-01-01'), { label: 'Week 5', phase: 'regular' });
 });
 

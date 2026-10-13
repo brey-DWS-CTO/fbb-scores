@@ -317,12 +317,22 @@ export function scoringPeriodDates(proTeams: unknown): Map<number, string> {
   return dates;
 }
 
-/** The league's label for the fantasy week that starts on `startDate`. */
+/**
+ * The league's label for the fantasy week that starts on `startDate`.
+ *
+ * A playoff round is two league weeks; the round's name goes only on the
+ * week that opens it, so an ESPN period that happens to start on a round's
+ * second week is not called the round.
+ */
 export function weekLabel(matchupPeriodId: number, startDate: string): { label: string; phase: SchedulePhase } {
   const period = leagueSchedule2027.find((entry) => entry.startDate === startDate);
   if (!period) return { label: `Week ${matchupPeriodId}`, phase: 'regular' };
   if (period.phase === 'fantasy-playoff') {
-    return { label: `Playoff Round ${period.playoffRound ?? ''}`.trim(), phase: period.phase };
+    const opensRound = !leagueSchedule2027.some((entry) =>
+      entry.phase === 'fantasy-playoff' && entry.playoffRound === period.playoffRound && entry.leagueWeek < period.leagueWeek);
+    return opensRound
+      ? { label: `Playoff Round ${period.playoffRound ?? ''}`.trim(), phase: period.phase }
+      : { label: `Week ${matchupPeriodId}`, phase: period.phase };
   }
   return { label: period.label, phase: period.phase };
 }
