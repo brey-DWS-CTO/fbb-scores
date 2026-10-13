@@ -1,13 +1,14 @@
 /**
  * The app's sections: what the sidebar and the phone bar list, and the tabs
- * inside each one. Six sections instead of twelve pages, so the sidebar stays
- * short. Every page keeps its own address, so old links still work and land
- * on the right tab.
+ * inside each one. Seven sections instead of thirteen pages, so the sidebar
+ * stays short. Every page keeps its own address, so old links still work and
+ * land on the right tab.
  *
  * Pure. No server, no browser.
  */
+import { leagueSchedule2027 } from './scheduleData.js';
 
-export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield';
+export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv';
 
 export interface SectionTab {
   to: string;
@@ -16,7 +17,7 @@ export interface SectionTab {
 }
 
 export interface NavSection {
-  id: 'keepers' | 'draft' | 'trades' | 'league' | 'rules' | 'commish';
+  id: 'scores' | 'keepers' | 'draft' | 'trades' | 'league' | 'rules' | 'commish';
   label: string;
   icon: SectionIcon;
   /** On the phone's bottom bar; the rest sit behind MORE. */
@@ -30,6 +31,7 @@ export interface NavSection {
   tabs: SectionTab[];
 }
 
+/** The sections in their pre-season order. `visibleSections` reorders them once the season starts. */
 export const NAV_SECTIONS: readonly NavSection[] = [
   { id: 'keepers', label: 'KEEPERS', icon: 'lock', primary: true, tabs: [{ to: '/keepers', label: 'KEEPERS' }] },
   {
@@ -45,6 +47,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { to: '/tiers', label: 'TIERS' },
     ],
   },
+  { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
   { id: 'trades', label: 'TRADES', icon: 'arrows', primary: true, tabs: [{ to: '/trades', label: 'TRADES' }] },
   {
     id: 'league',
@@ -79,16 +82,43 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
 ];
 
+/** The first day of the league's week 1. */
+export const SEASON_START = leagueSchedule2027[0].startDate;
+
+/** Today as YYYY-MM-DD in the viewer's own time zone. */
+export function todayIso(now: Date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** True from the first day of week 1 on. */
+export function seasonUnderway(today: string): boolean {
+  return today >= SEASON_START;
+}
+
 /** True when `pathname` is `to` or a page under it, so /keepers/Brey is KEEPERS. */
 export function onPath(pathname: string, to: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
-/** The sections a viewer may see, with only the tabs they may see. */
-export function visibleSections(isCommissioner: boolean): NavSection[] {
-  return NAV_SECTIONS
+/**
+ * The sections a viewer may see, with only the tabs they may see.
+ *
+ * Before the season SCORES sits after DRAFT and behind MORE on a phone: there
+ * is nothing to score yet. From the first day of week 1 it moves to the
+ * front of the bar, and KEEPERS steps back behind MORE, because the keepers
+ * are set and the phone bar holds four sections and no more.
+ */
+export function visibleSections(isCommissioner: boolean, today: string = todayIso()): NavSection[] {
+  const sections = NAV_SECTIONS
     .filter((section) => !section.commishOnly || isCommissioner)
     .map((section) => ({ ...section, tabs: section.tabs.filter((tab) => !tab.commishOnly || isCommissioner) }));
+  if (!seasonUnderway(today)) return sections;
+  const scores = sections.find((section) => section.id === 'scores');
+  const rest = sections
+    .filter((section) => section.id !== 'scores')
+    .map((section) => (section.id === 'keepers' ? { ...section, primary: false } : section));
+  return scores ? [{ ...scores, primary: true }, ...rest] : rest;
 }
 
 /** The section a page belongs to, or null for pages outside the nav. */
