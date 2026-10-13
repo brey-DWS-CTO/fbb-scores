@@ -198,7 +198,12 @@ test('columns: VS LAST sits beside ESPN; hidden ones drop out; the player always
   assert.ok(!shown.includes('pts') && !shown.includes('fgPct'));
   assert.ok(shown.includes('name'));
   assert.deepEqual([...parseHiddenColumns(JSON.stringify(['pts', 'name', 'nope', 3]))], ['pts']);
-  assert.equal(parseHiddenColumns('garbage').size, 0);
+  // Nothing saved, or junk, means Brey's default set; a saved empty list means show all.
+  const { DEFAULT_HIDDEN_COLUMNS } = await import('../src/lib/league/projections.ts');
+  assert.deepEqual([...parseHiddenColumns(null)], [...DEFAULT_HIDDEN_COLUMNS]);
+  assert.deepEqual([...parseHiddenColumns('garbage')], [...DEFAULT_HIDDEN_COLUMNS]);
+  assert.equal(parseHiddenColumns('[]').size, 0);
+  assert.ok(DEFAULT_HIDDEN_COLUMNS.includes('valueRank') && !DEFAULT_HIDDEN_COLUMNS.includes('fppg'));
   const csv = projectionsToCsv(rows.slice(0, 1), visibleColumns(new Set(['proTeam']))).split('\r\n')[0];
   assert.ok(csv.startsWith('#,Player,Positions'));
 });

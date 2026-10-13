@@ -410,7 +410,8 @@ export default function ProjectionsPage() {
               className="tap-btn mock-mini-btn"
               onClick={() => {
                 setHidden(new Set());
-                try { window.localStorage.removeItem(HIDDEN_KEY); } catch { /* nothing to clear */ }
+                // An empty list is a choice; no list at all means the default columns.
+                try { window.localStorage.setItem(HIDDEN_KEY, '[]'); } catch { /* no storage: lasts until reload */ }
               }}
             >
               SHOW ALL
