@@ -4073,6 +4073,8 @@ th.schedule-col-active {
   border-width: 0 7px 7px 0;
   border-color: transparent var(--neon-yellow) transparent transparent;
 }
+/* A cell that moved because his minutes did: yellow like a typed one, no corner. */
+.proj-table td.proj-cell-scaled { color: var(--neon-yellow) !important; font-weight: 600; }
 .proj-cell-input {
   width: 64px;
   padding: 3px 4px;

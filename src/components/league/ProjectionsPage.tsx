@@ -31,7 +31,7 @@ import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLea
 import { PROJECTION_EDITS_KEY, useProjectionData } from '../../hooks/useProjectionData.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
-import { EDITABLE_COLUMNS, cellEdited, withCellEdit } from '../../lib/league/projectionEdits.js';
+import { EDITABLE_COLUMNS, cellEdited, cellFollowsMinutes, editedProjection, projectionGames, withCellEdit } from '../../lib/league/projectionEdits.js';
 import IdentityChip from './IdentityChip.js';
 import SignInPanel from './SignInPanel.js';
 import { relativeScheduleHeat } from './scheduleUi.js';
@@ -221,15 +221,11 @@ export default function ProjectionsPage() {
     const value = projectionColumn(column).value(row);
     return typeof value === 'number' ? value : null;
   };
-  // Save whatever is typed in the open row: one write for all its stats.
-  const commitRow = async (open = rowEdit) => {
-    setRowEdit(null);
-    if (!open || !identity) return;
-    const row = rows.find((entry) => entry.key === open.key);
-    if (!row || row.espnId === null) return;
+  // The edit the open row would save: the stored edit with every typed cell laid over it.
+  const draftOf = (row: PlayerProjection, values: Record<string, string>) => {
     let next: ReturnType<typeof withCellEdit> = row.edit ? { games: row.edit.games, perGame: { ...row.edit.perGame }, note: row.edit.note } : null;
     let changed = false;
-    for (const [column, text] of Object.entries(open.values)) {
+    for (const [column, text] of Object.entries(values)) {
       const number = Number(text);
       if (text.trim() === '' || !Number.isFinite(number) || number < 0) continue;
       const before = shownValue(row, column as ProjectionColumnId);
@@ -237,6 +233,26 @@ export default function ProjectionsPage() {
       next = withCellEdit(next, espnRowOf(row), EDITABLE_COLUMNS[column], number);
       changed = true;
     }
+    return { next, changed };
+  };
+  // What a cell nobody typed in shows while the row is open: the line after
+  // the typed cells, so new minutes move the stats before anything is saved.
+  const previewText = (row: PlayerProjection, column: string): string => {
+    const espn = espnRowOf(row);
+    const { next } = draftOf(row, rowEdit?.values ?? {});
+    const projection = next ? editedProjection(espn, { ...next, espnId: 0, name: '', editedAt: '', editedBy: '' }) : espn;
+    const statId = EDITABLE_COLUMNS[column];
+    const value = statId === '42' ? projectionGames(projection) : projectedPerGame(projection)?.[statId] ?? null;
+    if (value === null) return '';
+    return String(column === 'games' ? Math.round(value) : Math.round(value * 10) / 10);
+  };
+  // Save whatever is typed in the open row: one write for all its stats.
+  const commitRow = async (open = rowEdit) => {
+    setRowEdit(null);
+    if (!open || !identity) return;
+    const row = rows.find((entry) => entry.key === open.key);
+    if (!row || row.espnId === null) return;
+    const { next, changed } = draftOf(row, open.values);
     if (!changed) return;
     try {
       if (next) await saveProjectionEdit(identity, row.espnId, { name: row.name, ...next });
@@ -251,12 +267,8 @@ export default function ProjectionsPage() {
     // Opening another player saves the one that was open.
     if (rowEdit && rowEdit.key !== row.key) void commitRow();
     setSaveError(null);
-    const values: Record<string, string> = {};
-    for (const column of Object.keys(EDITABLE_COLUMNS)) {
-      const value = shownValue(row, column as ProjectionColumnId);
-      values[column] = value === null ? '' : String(column === 'games' ? Math.round(value) : value);
-    }
-    setRowEdit({ key: row.key, values });
+    // Every cell shows the live line until it is typed in; only typed cells are saved.
+    setRowEdit({ key: row.key, values: {} });
   };
   const commitRowRef = useRef(commitRow);
   useEffect(() => {
@@ -448,7 +460,8 @@ export default function ProjectionsPage() {
                     const { text, className } = cell(row, column.id);
                     const statId = EDITABLE_COLUMNS[column.id];
                     const edited = statId !== undefined && cellEdited(row.edit, statId);
-                    const classes = `proj-col-${column.id}${className ? ` ${className}` : ''}${edited ? ' proj-cell-edited' : ''}`;
+                    const scaled = statId !== undefined && !edited && cellFollowsMinutes(row.edit, statId);
+                    const classes = `proj-col-${column.id}${className ? ` ${className}` : ''}${edited ? ' proj-cell-edited' : ''}${scaled ? ' proj-cell-scaled' : ''}`;
                     if (column.id === 'name') {
                       return (
                         <td key={column.id} className={classes}>
@@ -476,7 +489,7 @@ export default function ProjectionsPage() {
                       <td
                         key={column.id}
                         className={classes}
-                        title={edited && !open ? `ESPN: ${espnValue(row, statId)?.toFixed(column.id === 'games' ? 0 : 1) ?? 'none'}` : undefined}
+                        title={(edited || scaled) && !open ? `ESPN: ${espnValue(row, statId)?.toFixed(column.id === 'games' ? 0 : 1) ?? 'none'}${scaled ? '. Follows his minutes.' : ''}` : undefined}
                       >
                         {open && statId !== undefined ? (
                           <input
@@ -486,7 +499,7 @@ export default function ProjectionsPage() {
                             autoComplete="off"
                             autoFocus={column.id === 'games'}
                             aria-label={`${row.name} ${column.header}`}
-                            value={rowEdit.values[column.id] ?? ''}
+                            value={rowEdit.values[column.id] ?? previewText(row, column.id)}
                             onFocus={(event) => event.currentTarget.select()}
                             // Typed numbers only: no spinner, wheel or arrow keys can change a value.
                             onChange={(event) => setRowEdit({ ...rowEdit, values: { ...rowEdit.values, [column.id]: event.target.value.replace(/[^0-9.]/g, '') } })}

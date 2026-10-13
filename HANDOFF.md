@@ -412,6 +412,12 @@ UI: `/history` (public) has the season table with per-season sources and standin
 
 54 tests in `tests/history.test.ts` and `tests/history-api.test.ts`, taking the suite to 336.
 
+### 6. Projection edits, and minutes that move the line
+
+The commissioner edits ESPN's projections in place on `/projections`: open a row with the pencil, type into any cell, Enter or click away saves. `src/lib/league/projectionEdits.ts` is the pure core and `applyProjectionEdits` lays the edits over the snapshot, so points per game, the double-double bonus, draft value, the mock draft and keeper odds all read the edited line through code they already had. An edit stores only what was typed; a value typed back to ESPN's drops out.
+
+Minutes are special. Change MIN and every counting stat that was not typed follows it through `scaleToMinutes`: rates per minute scale by `(new / old) ^ MINUTES_EROSION`, 0.85 today, so 14% more floor time is about 12% more of everything. Makes and attempts move together, so the percentages hold. A typed stat is pinned and never rescaled. The scaling happens at apply time, not at save time, so a later change of minutes rescales from ESPN's line again. The editor shows the moved stats live while the row is open (yellow, no corner mark), and a hover on a moved cell says it follows his minutes.
+
 ### Later
 
 Missed-games tracking · projections (Brey-only) · live scoring revival · **season-average freeze** (before ESPN pollutes averages, ~March 2027) · optimal lineups (see memory files) · **reskin to the handoff palette** (Brey liked the light, cool-neutral look of the handoff artifact: Fraunces headings, Public Sans body, indigo accent, blue-biased greys. Parked, not scheduled. It would touch every page, so treat it as its own project and keep the neon theme working until the swap is complete).
