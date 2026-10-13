@@ -36,6 +36,7 @@ import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
+import type { GamesCapRow } from '../../src/lib/league/gamesCap.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
 
@@ -506,6 +507,9 @@ interface StoreBackend {
   saveDues(row: DuesRow, expected: string): Promise<boolean>;
   getDuesSettings(season: number): Promise<DuesSettings | null>;
   saveDuesSettings(row: DuesSettings): Promise<void>;
+  /** The weekly games caps the commissioner has set this season. */
+  listGamesCaps(season: number): Promise<GamesCapRow[]>;
+  saveGamesCap(row: GamesCapRow): Promise<void>;
   getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null>;
   saveHistoryDraft(
     season: number,
@@ -758,6 +762,16 @@ class NeonBackend implements StoreBackend {
       payee text not null default '',
       updated_at timestamptz,
       updated_by text
+    )`;
+    // The weekly games cap, one row per fantasy week the commissioner has
+    // set. A week with no row is the default, so the table starts empty.
+    await this.sql`CREATE TABLE IF NOT EXISTS league_games_caps (
+      season int not null,
+      matchup_period int not null,
+      cap int not null,
+      updated_at timestamptz not null,
+      updated_by text not null,
+      primary key (season, matchup_period)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS league_history_draft (
       season int primary key,
@@ -1547,6 +1561,33 @@ class NeonBackend implements StoreBackend {
         updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
   }
 
+  async listGamesCaps(season: number): Promise<GamesCapRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT season, matchup_period, cap, updated_at, updated_by
+      FROM league_games_caps WHERE season = ${season} ORDER BY matchup_period`) as Array<{
+      season: number;
+      matchup_period: number;
+      cap: number;
+      updated_at: string | Date;
+      updated_by: string;
+    }>;
+    return rows.map((row) => ({
+      season: row.season,
+      matchupPeriodId: row.matchup_period,
+      cap: row.cap,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      updatedBy: row.updated_by,
+    }));
+  }
+
+  async saveGamesCap(row: GamesCapRow): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO league_games_caps (season, matchup_period, cap, updated_at, updated_by)
+      VALUES (${row.season}, ${row.matchupPeriodId}, ${row.cap}, ${row.updatedAt}, ${row.updatedBy})
+      ON CONFLICT (season, matchup_period) DO UPDATE SET cap = EXCLUDED.cap,
+        updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
+  }
+
   async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -1752,6 +1793,7 @@ interface FileDoc {
   rulebookSignatures: RulebookSignature[];
   dues: DuesRow[];
   duesSettings: DuesSettings[];
+  gamesCaps: GamesCapRow[];
   historyDrafts: LeagueHistoryDraftRow[];
   historyVersions: LeagueHistoryVersionRow[];
   polls: PollRow[];
@@ -1780,6 +1822,7 @@ function emptyDoc(): FileDoc {
     rulebookSignatures: [],
     dues: [],
     duesSettings: [],
+    gamesCaps: [],
     historyDrafts: [],
     historyVersions: [],
     polls: [],
@@ -1839,6 +1882,7 @@ class FileBackend implements StoreBackend {
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
         dues: Array.isArray(doc.dues) ? doc.dues : [],
         duesSettings: Array.isArray(doc.duesSettings) ? doc.duesSettings : [],
+        gamesCaps: Array.isArray(doc.gamesCaps) ? doc.gamesCaps : [],
         historyDrafts: Array.isArray(doc.historyDrafts) ? doc.historyDrafts : [],
         historyVersions: Array.isArray(doc.historyVersions) ? doc.historyVersions : [],
         polls: Array.isArray(doc.polls) ? doc.polls : [],
@@ -2393,6 +2437,23 @@ class FileBackend implements StoreBackend {
       const doc = this.readDoc();
       doc.duesSettings = doc.duesSettings.filter((r) => r.season !== row.season);
       doc.duesSettings.push(structuredClone(row));
+      this.writeDoc(doc);
+    });
+  }
+
+  async listGamesCaps(season: number): Promise<GamesCapRow[]> {
+    await this.ensureInit();
+    return this.readDoc().gamesCaps
+      .filter((row) => row.season === season)
+      .sort((a, b) => a.matchupPeriodId - b.matchupPeriodId);
+  }
+
+  async saveGamesCap(row: GamesCapRow): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.gamesCaps = doc.gamesCaps.filter((r) => !(r.season === row.season && r.matchupPeriodId === row.matchupPeriodId));
+      doc.gamesCaps.push(structuredClone(row));
       this.writeDoc(doc);
     });
   }
@@ -3136,6 +3197,14 @@ export async function getDuesSettings(season: number): Promise<DuesSettings | nu
 
 export async function saveDuesSettings(row: DuesSettings): Promise<void> {
   return getBackend().saveDuesSettings(row);
+}
+
+export async function listGamesCaps(season: number): Promise<GamesCapRow[]> {
+  return getBackend().listGamesCaps(season);
+}
+
+export async function saveGamesCap(row: GamesCapRow): Promise<void> {
+  return getBackend().saveGamesCap(row);
 }
 
 export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {

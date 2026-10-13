@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
-import { useExpectedPoints, useScoresWeek } from '../../hooks/useScores.js';
+import { useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import { todayIso } from '../../lib/league/navSections.js';
 import {
@@ -50,12 +50,18 @@ export default function ScoresPage() {
   const preseason = !demo && beforeSeason(todayIso());
   const query = useScoresWeek(requestedWeek, demo, !preseason);
   const expected = useExpectedPoints();
+  const { capFor } = useGamesCaps();
   const owners = useMemo(() => ownerByEspnTeamId(leagueDataset.teams), []);
   const myTeamId = identity
     ? (leagueDataset.teams.find((team) => team.owner === identity.owner)?.espnTeamId ?? null)
     : null;
 
-  const week = query.data;
+  const loaded = query.data;
+  // The commissioner's cap for this week, in place of ESPN's lineup limit.
+  const week = useMemo(
+    () => (loaded ? { ...loaded, gamesCap: capFor(loaded.matchupPeriodId) } : undefined),
+    [loaded, capFor],
+  );
   const matchups = useMemo(() => (week ? orderForViewer(week.matchups, myTeamId) : []), [week, myTeamId]);
   const selectedWeek = week?.matchupPeriodId ?? requestedWeek;
 

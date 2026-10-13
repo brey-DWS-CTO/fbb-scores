@@ -9,6 +9,9 @@ import {
   gameText,
   gamesCapFor,
   gamesLeft,
+  gamesPlayed,
+  injuryBadge,
+  latestSlot,
   lineupOrder,
   matchupChance,
   orderForViewer,
@@ -22,6 +25,8 @@ import {
   seasonStartDate,
   shortName,
   sideOdds,
+  slotLabel,
+  slotOn,
   statLineText,
   weekLabel,
   weekOrder,
@@ -523,11 +528,12 @@ test('your own matchup sits on top', () => {
   assert.equal(owners.get(3), undefined);
 });
 
+const player = (name: string, days: Record<string, { lineupSlotId: number; started: boolean; points: number }>): ScorePlayer => ({
+  id: name.length, name, position: '', proTeamId: 0, proTeam: '', injuryStatus: null, seasonAvg: null,
+  days: Object.fromEntries(Object.entries(days).map(([key, day]) => [key, { ...day, stats: null, played: day.points > 0, game: null }])),
+});
+
 test('a lineup lists starters by slot, then the bench', () => {
-  const player = (name: string, days: Record<string, { lineupSlotId: number; started: boolean; points: number }>): ScorePlayer => ({
-    id: name.length, name, position: '', proTeamId: 0, proTeam: '', injuryStatus: null, seasonAvg: null,
-    days: Object.fromEntries(Object.entries(days).map(([key, day]) => [key, { ...day, stats: null, played: day.points > 0, game: null }])),
-  });
   const players = [
     player('Bench', { '15': { lineupSlotId: 12, started: false, points: 20 } }),
     player('Center', { '15': { lineupSlotId: 4, started: true, points: 10 } }),
@@ -536,4 +542,53 @@ test('a lineup lists starters by slot, then the bench', () => {
   ];
   assert.deepEqual(lineupOrder(players, 15).map((p) => p.name), ['Guard', 'Center', 'Bench', 'Missing']);
   assert.deepEqual(weekOrder(players).map((p) => p.name), ['Guard', 'Center', 'Bench', 'Missing']);
+});
+
+test('the lineup reads PG, SG, SF, PF, C, F, G, FLEX, then the bench, then IR', () => {
+  const players = [
+    player('Ir', { '15': { lineupSlotId: 13, started: false, points: 0 } }),
+    player('Flex', { '15': { lineupSlotId: 11, started: true, points: 0 } }),
+    player('G', { '15': { lineupSlotId: 5, started: true, points: 0 } }),
+    player('Be', { '15': { lineupSlotId: 12, started: false, points: 0 } }),
+    player('F', { '15': { lineupSlotId: 6, started: true, points: 0 } }),
+    player('Pg', { '15': { lineupSlotId: 0, started: true, points: 0 } }),
+    player('C', { '15': { lineupSlotId: 4, started: true, points: 0 } }),
+    player('Odd', { '15': { lineupSlotId: 77, started: true, points: 0 } }),
+  ];
+  assert.deepEqual(lineupOrder(players, 15).map((p) => p.name), ['Pg', 'C', 'F', 'G', 'Flex', 'Odd', 'Be', 'Ir']);
+  assert.deepEqual(weekOrder(players).map((p) => p.name), ['Pg', 'C', 'F', 'G', 'Flex', 'Odd', 'Be', 'Ir']);
+  // A day the server never fetched takes the latest slot before it.
+  const moved = player('Moved', { '15': { lineupSlotId: 12, started: false, points: 0 }, '16': { lineupSlotId: 0, started: true, points: 0 } });
+  assert.equal(slotOn(moved, 15), 12);
+  assert.equal(slotOn(moved, 16), 0);
+  assert.equal(slotOn(moved, 17), 0);
+  assert.equal(slotOn(moved, 14), 12);
+  assert.equal(latestSlot(moved), 0);
+});
+
+test('slots and injuries have the league\'s words', () => {
+  assert.equal(slotLabel(0), 'PG');
+  assert.equal(slotLabel(5), 'G');
+  assert.equal(slotLabel(6), 'F');
+  assert.equal(slotLabel(11), 'FLEX');
+  assert.equal(slotLabel(12), 'BE');
+  assert.equal(slotLabel(13), 'IR');
+  assert.equal(slotLabel(99), '99');
+  assert.deepEqual(injuryBadge('OUT'), { text: 'O', tone: 'out' });
+  assert.deepEqual(injuryBadge('SUSPENSION'), { text: 'SSPD', tone: 'out' });
+  assert.deepEqual(injuryBadge('DAY_TO_DAY'), { text: 'DTD', tone: 'doubt' });
+  assert.deepEqual(injuryBadge('QUESTIONABLE'), { text: 'Q', tone: 'doubt' });
+  assert.deepEqual(injuryBadge('DOUBTFUL'), { text: 'D', tone: 'doubt' });
+  assert.equal(injuryBadge('ACTIVE'), null);
+  assert.equal(injuryBadge(null), null);
+  assert.equal(injuryBadge(undefined), null);
+});
+
+test('games played counts started games finished or under way, never the bench', () => {
+  const week = buildWeek();
+  const [matchup] = week.matchups;
+  // Home: Jokic played Wednesday; today his game has not tipped. Doncic never played.
+  assert.equal(gamesPlayed(matchup.home, week), 1);
+  // Away: Curry played Wednesday and is on the floor now, Giannis is on the floor now.
+  assert.equal(gamesPlayed(matchup.away, week), 3);
 });

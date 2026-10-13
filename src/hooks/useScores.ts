@@ -1,12 +1,26 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchScoresWeek } from '../lib/league/api.js';
+import { fetchGamesCaps, fetchScoresWeek } from '../lib/league/api.js';
 import { projectedFppg } from '../lib/league/draftRankings.js';
+import { capForWeek, type GamesCapRow } from '../lib/league/gamesCap.js';
 import type { ExpectedPoints, ScorePlayer, ScoresWeek } from '../lib/league/scores.js';
 import { useProjectionData } from './useProjectionData.js';
 
 /** How often the current week asks ESPN again while someone is looking. */
 export const SCORES_POLL_MS = 60_000;
+
+export const GAMES_CAPS_KEY = ['games-caps'] as const;
+
+/**
+ * The weekly games caps, and the cap for any week: what the commissioner
+ * set, else the default. Until the caps load every week reads the default.
+ */
+export function useGamesCaps(): { rows: GamesCapRow[]; capFor: (matchupPeriodId: number) => number } {
+  const query = useQuery({ queryKey: GAMES_CAPS_KEY, queryFn: fetchGamesCaps, staleTime: 60_000 });
+  const rows = useMemo(() => query.data?.caps ?? [], [query.data]);
+  const capFor = useCallback((matchupPeriodId: number) => capForWeek(rows, matchupPeriodId), [rows]);
+  return { rows, capFor };
+}
 
 /**
  * One fantasy week of scores. The current week keeps asking while the tab

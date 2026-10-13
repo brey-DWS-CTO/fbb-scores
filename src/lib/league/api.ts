@@ -42,6 +42,7 @@ import type {
 } from './schedule.js';
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 import type { ScoresWeek } from './scores.js';
+import type { GamesCapRow } from './gamesCap.js';
 
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
@@ -689,6 +690,26 @@ export async function deleteProjectionEdit(c: Credentials, espnId: number): Prom
 export async function fetchScoresWeek(matchupPeriod: number | null): Promise<ScoresWeek> {
   const { data } = await axios.get<ScoresWeek>('/api/espn/week', {
     params: matchupPeriod === null ? undefined : { matchupPeriod },
+  });
+  return data;
+}
+
+export interface GamesCapsResponse {
+  season: number;
+  defaultCap: number;
+  caps: GamesCapRow[];
+}
+
+/** The weekly games caps the commissioner has set. Anyone may read them. */
+export async function fetchGamesCaps(): Promise<GamesCapsResponse> {
+  const { data } = await axios.get<GamesCapsResponse>('/api/league/games-caps');
+  return data;
+}
+
+/** Set one week's games cap. Commissioner only. */
+export async function saveGamesCap(c: Credentials, matchupPeriodId: number, cap: number): Promise<GamesCapsResponse> {
+  const { data } = await axios.put<GamesCapsResponse>(`/api/league/games-caps/${matchupPeriodId}`, { cap }, {
+    headers: authHeaders(c),
   });
   return data;
 }

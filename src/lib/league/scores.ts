@@ -781,8 +781,11 @@ export function yetToPlay(side: ScoreSide, week: Pick<ScoresWeek, 'days' | 'curr
     .sort((a, b) => (b.seasonAvg ?? 0) - (a.seasonAvg ?? 0));
 }
 
-/** Started games already counted toward the cap: finished, or on the floor now. */
-function gamesUsed(side: ScoreSide, week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>): number {
+/**
+ * Started player-games that count so far this week: finished, or on the
+ * floor now. The bench never counts. This is the number against the cap.
+ */
+export function gamesPlayed(side: ScoreSide, week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>): number {
   let used = 0;
   for (const player of side.players) {
     for (const day of week.days) {
@@ -823,7 +826,7 @@ export function sideOdds(
   }
   remaining.sort((a, b) => a.scoringPeriodId - b.scoringPeriodId);
 
-  let budget = week.gamesCap === null ? Number.POSITIVE_INFINITY : Math.max(0, week.gamesCap - gamesUsed(side, week));
+  let budget = week.gamesCap === null ? Number.POSITIVE_INFINITY : Math.max(0, week.gamesCap - gamesPlayed(side, week));
   const kept: RemainingGame[] = [];
   for (const game of remaining) {
     if (game.live) {
@@ -913,26 +916,87 @@ export function orderForViewer(matchups: readonly ScoreMatchup[], espnTeamId: nu
   return [...mine, ...rest];
 }
 
-/** Starters in slot order, then the bench. */
-export function lineupOrder(players: readonly ScorePlayer[], scoringPeriodId: number): ScorePlayer[] {
-  const key = String(scoringPeriodId);
-  const slot = (player: ScorePlayer) => player.days[key]?.lineupSlotId ?? 99;
-  const started = (player: ScorePlayer) => player.days[key]?.started === true;
-  return [...players].sort((a, b) => {
-    if (started(a) !== started(b)) return started(a) ? -1 : 1;
-    return slot(a) - slot(b) || a.name.localeCompare(b.name);
-  });
+/** ESPN's lineup slots as the league reads them. UTIL is FLEX here. */
+export const SLOT_LABELS: Readonly<Record<number, string>> = {
+  0: 'PG', 1: 'SG', 2: 'SF', 3: 'PF', 4: 'C', 5: 'G', 6: 'F',
+  7: 'SG/SF', 8: 'G/F', 9: 'PF/C', 10: 'F/C', 11: 'FLEX',
+  12: 'BE', 13: 'IR', 20: 'BE', 21: 'IR', 23: 'IR+',
+};
+
+/**
+ * Top to bottom as the league's lineup reads: PG, SG, SF, PF, C, F, G, the
+ * three FLEX spots, then the bench, then IR. Anything ESPN adds later lands
+ * between the starters and the bench.
+ */
+const SLOT_ORDER: readonly number[] = [0, 1, 2, 3, 4, 6, 5, 11, 7, 8, 9, 10, 12, 20, 13, 21, 23];
+
+/** "PG", "FLEX", "BE". A slot nobody has named shows its number. */
+export function slotLabel(lineupSlotId: number): string {
+  return SLOT_LABELS[lineupSlotId] ?? String(lineupSlotId);
 }
 
-/** Anyone who started this week first, by points; the rest after, by name. */
+/** Where a slot sits in the lineup. Unknown slots sit after the known starters. */
+export function slotRank(lineupSlotId: number): number {
+  const index = SLOT_ORDER.indexOf(lineupSlotId);
+  return index >= 0 ? index : SLOT_ORDER.indexOf(12) - 0.5;
+}
+
+/** The slot a player holds on a day, else his latest slot before it, else the bench. */
+export function slotOn(player: ScorePlayer, scoringPeriodId: number): number {
+  const own = player.days[String(scoringPeriodId)];
+  if (own) return own.lineupSlotId;
+  let latest = 12;
+  let latestId = -1;
+  for (const [key, day] of Object.entries(player.days)) {
+    const id = Number(key);
+    if (id < scoringPeriodId && id > latestId) {
+      latest = day.lineupSlotId;
+      latestId = id;
+    }
+  }
+  return latest;
+}
+
+/** The slot a player held most recently this week, for the week view. */
+export function latestSlot(player: ScorePlayer): number {
+  let latest = 12;
+  let latestId = -1;
+  for (const [key, day] of Object.entries(player.days)) {
+    const id = Number(key);
+    if (id > latestId) {
+      latest = day.lineupSlotId;
+      latestId = id;
+    }
+  }
+  return latest;
+}
+
+/** The lineup on one day: PG to FLEX, then the bench, then IR. */
+export function lineupOrder(players: readonly ScorePlayer[], scoringPeriodId: number): ScorePlayer[] {
+  return [...players].sort((a, b) =>
+    slotRank(slotOn(a, scoringPeriodId)) - slotRank(slotOn(b, scoringPeriodId)) || a.name.localeCompare(b.name));
+}
+
+/** The week view in the same order, by each player's latest slot. */
 export function weekOrder(players: readonly ScorePlayer[]): ScorePlayer[] {
-  const started = (player: ScorePlayer) => Object.values(player.days).some((day) => day.started);
-  const points = (player: ScorePlayer) =>
-    Object.values(player.days).reduce((sum, day) => sum + (day.started ? day.points : 0), 0);
-  return [...players].sort((a, b) => {
-    if (started(a) !== started(b)) return started(a) ? -1 : 1;
-    return points(b) - points(a) || a.name.localeCompare(b.name);
-  });
+  return [...players].sort((a, b) => slotRank(latestSlot(a)) - slotRank(latestSlot(b)) || a.name.localeCompare(b.name));
+}
+
+export interface InjuryBadge {
+  text: string;
+  tone: 'out' | 'doubt';
+}
+
+/** ESPN's red O and yellow DTD, as a badge beside the name. Null when he is fine. */
+export function injuryBadge(status: string | null | undefined): InjuryBadge | null {
+  switch (status) {
+    case 'OUT': return { text: 'O', tone: 'out' };
+    case 'SUSPENSION': return { text: 'SSPD', tone: 'out' };
+    case 'DAY_TO_DAY': return { text: 'DTD', tone: 'doubt' };
+    case 'QUESTIONABLE': return { text: 'Q', tone: 'doubt' };
+    case 'DOUBTFUL': return { text: 'D', tone: 'doubt' };
+    default: return null;
+  }
 }
 
 /** Owner name by ESPN team id, from the league config. Owners are the key to everything. */

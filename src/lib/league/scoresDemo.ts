@@ -38,6 +38,9 @@ const DEMO_TODAY_PERIOD = 18;
 
 const POSITION_ID: Record<string, number> = { PG: 1, SG: 2, SF: 3, PF: 4, C: 5 };
 
+/** The league's ten scoring slots in ESPN's ids: PG, SG, SF, PF, C, G, F and three FLEX. */
+const STARTER_SLOTS = [0, 1, 2, 3, 4, 5, 6, 11, 11, 11];
+
 /** A small seeded random source, so the demo never changes under anyone. */
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -136,7 +139,7 @@ function demoRosters(): Map<number, DemoPlayer[]> {
     let slot = 0;
     for (const player of roster) {
       if (player.lineupSlotId === 13) continue;
-      player.lineupSlotId = slot < 10 ? slot : 12;
+      player.lineupSlotId = STARTER_SLOTS[slot] ?? 12;
       slot += 1;
     }
     byTeam.set(team.espnTeamId, roster);
