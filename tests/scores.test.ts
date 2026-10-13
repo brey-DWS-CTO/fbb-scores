@@ -4,8 +4,10 @@ import {
   addDaysIso,
   beforeSeason,
   dateRangeText,
+  daysBetween,
   defaultDay,
   espnToday,
+  expandWeekNumbers,
   gameText,
   gamesCapFor,
   gamesLeft,
@@ -221,6 +223,73 @@ test('the plan lists the week\'s days, dated from the pro schedule and counted o
   assert.equal(plan.weeks[2].startDate, '2026-11-02');
   assert.equal(plan.weeks[2].endDate, '2026-11-08');
   assert.equal(plan.season, 2027);
+});
+
+/**
+ * What ESPN really sent for this league on 12 October 2026: week numbers,
+ * not days, in `matchupPeriods`; scoring period 1 on 14 October, a
+ * preseason day; the season not started (scoringPeriodId 0).
+ */
+const LIVE_SETTINGS = {
+  seasonId: 2027,
+  scoringPeriodId: 0,
+  status: { currentMatchupPeriod: 1 },
+  settings: {
+    scheduleSettings: {
+      matchupPeriods: {
+        ...Object.fromEntries(range(1, 18).map((week) => [String(week), [week]])),
+        '19': [19, 20],
+        '20': [21, 22],
+      },
+    },
+    proTeams: [
+      {
+        id: 14,
+        proGamesByScoringPeriod: {
+          '1': [{ date: Date.parse('2026-10-14T19:30:00-04:00') }],
+          '7': [{ date: Date.parse('2026-10-20T19:30:00-04:00') }],
+        },
+      },
+    ],
+  },
+  teams: [{ id: 2, name: 'Tu  Mamacita', abbrev: 'TU' }],
+};
+
+test('ESPN\'s week numbers become Monday-to-Sunday days anchored on the league\'s week 1', () => {
+  const plan = planWeek(LIVE_SETTINGS, null, '2026-10-12');
+  assert.equal(plan.matchupPeriodId, 1);
+  assert.equal(plan.currentScoringPeriodId, 0);
+  // 14 October is scoring period 1, so Monday 19 October is period 6.
+  assert.deepEqual(plan.days.map((day) => day.scoringPeriodId), range(6, 12));
+  assert.deepEqual(plan.days.map((day) => day.date), ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
+  assert.equal(plan.gamesCap, 30);
+  assert.equal(plan.weeks.length, 20);
+  assert.deepEqual([plan.weeks[0].label, plan.weeks[0].startDate, plan.weeks[0].endDate], ['Week 1', '2026-10-19', '2026-10-25']);
+  assert.deepEqual([plan.weeks[1].startDate, plan.weeks[1].scoringPeriodIds[0]], ['2026-10-26', 13]);
+  assert.deepEqual([plan.weeks[16].label, plan.weeks[16].startDate], ['Play-In 1', '2027-02-08']);
+  assert.deepEqual([plan.weeks[17].label, plan.weeks[17].startDate, plan.weeks[17].endDate], ['Play-In 2', '2027-02-15', '2027-02-21']);
+  // ESPN's two-week playoff rounds: fourteen days each, and no league label fits their start.
+  assert.deepEqual([plan.weeks[18].label, plan.weeks[18].startDate, plan.weeks[18].scoringPeriodIds.length], ['Week 19', '2027-02-22', 14]);
+  assert.deepEqual([plan.weeks[19].startDate, plan.weeks[19].endDate], ['2027-03-08', '2027-03-21']);
+  // Before the season the week opens on its first day.
+  assert.equal(defaultDay({ days: plan.days.map((day) => ({ ...day, games: null })), currentScoringPeriodId: 0 }), 6);
+  assert.equal(planWeek(LIVE_SETTINGS, 19, '2026-10-12').days.length, 14);
+
+  const week = readEspnWeek({
+    plan, settings: LIVE_SETTINGS, fetchedAt: 'now',
+    days: [{ scoringPeriodId: 6, date: '2026-10-19', games: null, payload: { schedule: [{ id: 2, matchupPeriodId: 1, home: { teamId: 2 }, away: { teamId: 7 } }] } }],
+  });
+  assert.equal(week.matchups[0].home.name, 'Tu Mamacita', 'one space is enough');
+});
+
+test('days listed outright pass through, and the two forms are told apart by size', () => {
+  const days = expandWeekNumbers([{ matchupPeriodId: 1, values: range(1, 7) }, { matchupPeriodId: 2, values: range(8, 14) }], 6);
+  assert.deepEqual(days.map((entry) => entry.scoringPeriodIds), [range(1, 7), range(8, 14)]);
+  const weeks = expandWeekNumbers([{ matchupPeriodId: 1, values: [1] }, { matchupPeriodId: 2, values: [2, 3] }], 6);
+  assert.deepEqual(weeks.map((entry) => entry.scoringPeriodIds), [range(6, 12), range(13, 26)]);
+  assert.equal(daysBetween('2026-10-14', '2026-10-19'), 5);
+  assert.equal(daysBetween('2026-10-19', '2026-10-14'), -5);
+  assert.equal(daysBetween('2026-12-31', '2027-01-01'), 1);
 });
 
 test('asking for a week by number works, and the missing ones say so', () => {

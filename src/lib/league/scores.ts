@@ -153,6 +153,44 @@ export function addDaysIso(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Whole days from one ISO date to another. Negative when `to` is earlier. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+interface ListedPeriod {
+  matchupPeriodId: number;
+  values: number[];
+}
+
+interface ExpandedPeriod {
+  matchupPeriodId: number;
+  scoringPeriodIds: number[];
+}
+
+/**
+ * ESPN writes `matchupPeriods` one of two ways. Some leagues list the
+ * scoring periods (days) of each fantasy week outright. This league lists
+ * NBA week numbers: `{"1":[1], ..., "19":[19,20]}`, a week being seven
+ * scoring periods from a Monday, and a playoff round two weeks. Week
+ * numbers are told apart by their size: every entry is one or two small
+ * numbers, never a run of seven days. `weekOneStart` is the scoring period
+ * of the Monday that opens the league's week 1.
+ */
+export function expandWeekNumbers(listed: readonly ListedPeriod[], weekOneStart: number): ExpandedPeriod[] {
+  const largest = Math.max(...listed.flatMap((entry) => entry.values));
+  const weekNumbers = listed.every((entry) => entry.values.length <= 2) && largest <= 2 * listed.length + 2;
+  if (!weekNumbers) {
+    return listed.map((entry) => ({ matchupPeriodId: entry.matchupPeriodId, scoringPeriodIds: entry.values }));
+  }
+  return listed.map((entry) => ({
+    matchupPeriodId: entry.matchupPeriodId,
+    scoringPeriodIds: [...entry.values]
+      .sort((a, b) => a - b)
+      .flatMap((week) => Array.from({ length: 7 }, (_, day) => weekOneStart + (week - 1) * 7 + day)),
+  }));
+}
+
 /** A Date as YYYY-MM-DD in a named time zone. */
 function dateIsoInZone(date: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -310,18 +348,35 @@ export function planWeek(settings: unknown, requested: number | null, today: str
   const currentMatchupPeriodId = num(status.currentMatchupPeriod) ?? 1;
   const season = num(body.seasonId) ?? 0;
 
-  const periods = Object.entries(dict(schedule.matchupPeriods))
+  const listed = Object.entries(dict(schedule.matchupPeriods))
     .map(([key, value]) => ({
       matchupPeriodId: Number(key),
-      scoringPeriodIds: list(value).map(num).filter((id): id is number => id !== null),
+      values: list(value).map(num).filter((id): id is number => id !== null),
     }))
-    .filter((entry) => Number.isInteger(entry.matchupPeriodId) && entry.scoringPeriodIds.length > 0)
+    .filter((entry) => Number.isInteger(entry.matchupPeriodId) && entry.values.length > 0)
     .sort((a, b) => a.matchupPeriodId - b.matchupPeriodId);
-  if (periods.length === 0) throw new Error('no-schedule');
+  if (listed.length === 0) throw new Error('no-schedule');
 
+  // ESPN's scoring periods are calendar days, numbered from the first day it
+  // lists a pro game, preseason included. A date it names pins the line;
+  // every other period is counted out along it.
   const known = scoringPeriodDates(leagueSettings.proTeams);
-  const dateFor = (scoringPeriodId: number): string =>
-    known.get(scoringPeriodId) ?? addDaysIso(today, scoringPeriodId - currentScoringPeriodId);
+  let anchor: { scoringPeriodId: number; date: string } | null = null;
+  for (const [scoringPeriodId, date] of known) {
+    if (!anchor || scoringPeriodId < anchor.scoringPeriodId) anchor = { scoringPeriodId, date };
+  }
+  const dateFor = (scoringPeriodId: number): string => {
+    const named = known.get(scoringPeriodId);
+    if (named) return named;
+    if (anchor) return addDaysIso(anchor.date, scoringPeriodId - anchor.scoringPeriodId);
+    return addDaysIso(today, scoringPeriodId - Math.max(1, currentScoringPeriodId));
+  };
+  const periodFor = (iso: string): number => {
+    const from = anchor ?? { scoringPeriodId: 1, date: seasonStartDate() };
+    return from.scoringPeriodId + daysBetween(from.date, iso);
+  };
+
+  const periods = expandWeekNumbers(listed, periodFor(seasonStartDate()));
 
   const weeks: WeekRef[] = periods.map((entry) => {
     const ids = [...entry.scoringPeriodIds].sort((a, b) => a - b);
@@ -503,7 +558,8 @@ function readTeams(payload: unknown, into: Map<number, TeamMeta>): void {
     const id = num(team.id);
     if (id === null || into.has(id)) continue;
     const joined = `${str(team.location) ?? ''} ${str(team.nickname) ?? ''}`.trim();
-    const name = str(team.name) ?? (joined || `Team ${id}`);
+    // ESPN hands back "Tu  Mamacita"; one space is enough.
+    const name = (str(team.name) ?? (joined || `Team ${id}`)).replace(/\s+/g, ' ');
     into.set(id, { name, abbrev: str(team.abbrev) ?? '', record: readRecord(team) });
   }
 }
