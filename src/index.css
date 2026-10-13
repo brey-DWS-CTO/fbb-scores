@@ -4745,6 +4745,132 @@ html.theme-light {
   font-size: 0.8rem;
 }
 
+/* ─── Scores: the week's matchups, and one matchup day by day ────────── */
+.scores-page { max-width: 760px; }
+.score-demo {
+  margin: 0 0 10px;
+  padding: 7px 10px;
+  border: 2px solid var(--neon-yellow);
+  border-radius: 8px;
+  background: rgba(255,230,0,0.08);
+  color: var(--neon-yellow);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.score-demo a { color: var(--neon-yellow); }
+.score-back { display: inline-flex; align-items: center; gap: 4px; color: var(--neon-teal); font-size: 0.78rem; text-decoration: none; }
+.score-week { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.score-week-select { flex: 1; min-width: 0; min-height: 40px; padding: 0 10px; font-size: 0.8rem; font-weight: 700; }
+.score-arrow {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-mid);
+}
+.score-arrow:disabled { opacity: 0.35; cursor: default; }
+.score-arrow:disabled:active { transform: none; }
+.score-arrow-next svg { transform: rotate(180deg); }
+.score-notice { border-radius: 10px; padding: 18px 14px; text-align: center; color: var(--text-mid); font-size: 0.86rem; line-height: 1.5; }
+.score-notice p { margin: 0 0 10px; }
+.score-notice p:last-child { margin: 0; }
+.score-notice a { color: var(--neon-teal); }
+.score-foot { margin: 14px 2px 0; color: var(--text-dim); font-size: 0.7rem; line-height: 1.5; }
+
+/* The scoreboard: one card per matchup, your own first. */
+.score-list { display: flex; flex-direction: column; gap: 10px; }
+.score-card { display: block; border-radius: 10px; padding: 10px 12px; text-decoration: none; color: inherit; }
+.score-card.is-mine { border-color: var(--neon-teal); }
+.score-card:active { transform: scale(0.99); }
+.score-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; color: var(--text-mid); }
+.score-row-who { flex: 1; min-width: 0; }
+.score-row-name { font-size: 0.9rem; font-weight: 800; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-row-owner { font-size: 0.7rem; color: var(--text-dim); margin-top: 1px; }
+.score-row-total { font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-body); }
+.score-row.is-leading .score-row-name, .score-row.is-leading .score-row-total { color: var(--text-max); }
+.score-row.is-mine .score-row-name { color: var(--neon-teal); }
+.score-final { margin-top: 6px; text-align: center; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--neon-orange); }
+
+/* The thin bar between the two sides, split by win chance. */
+.score-bar-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.score-pct { flex: 0 0 38px; font-size: 0.72rem; font-weight: 800; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-pct-right { text-align: right; }
+.score-pct.is-up { color: var(--neon-teal); }
+.score-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--neon-purple); overflow: hidden; }
+.score-bar-left { height: 100%; background: var(--neon-teal); transition: width 0.4s ease; }
+
+/* One matchup: the two sides over the bar, then who still has games. */
+.score-head { border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.score-head-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.score-side-head { min-width: 0; }
+.score-side-head.is-right { text-align: right; }
+.score-side-name { font-size: 0.86rem; font-weight: 800; color: var(--text-body); line-height: 1.25; overflow-wrap: anywhere; }
+.score-side-owner { font-size: 0.68rem; color: var(--text-dim); margin-top: 2px; }
+.score-side-total { font-size: 1.7rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-body); line-height: 1.2; margin-top: 4px; }
+.score-side-chance { font-size: 0.68rem; font-weight: 700; color: var(--text-mid); }
+.score-side-head.is-leading .score-side-name, .score-side-head.is-leading .score-side-total { color: var(--text-max); }
+.score-yet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--panel-border); }
+.score-yet { min-width: 0; font-size: 0.68rem; line-height: 1.45; color: var(--text-dim); }
+.score-yet.is-right { text-align: right; }
+.score-yet-title { display: block; font-size: 0.6rem; color: var(--text-mid); }
+.score-yet-names { overflow-wrap: anywhere; }
+
+/* The day strip: Mon to Sun, each with both sides' score, then WEEK. */
+.score-days { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.score-day {
+  flex: 1 0 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 4px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-mid);
+  font-size: 0.66rem;
+  line-height: 1.3;
+}
+.score-day.is-today { border-color: var(--text-dim); }
+.score-day.is-on { border-color: var(--neon-teal); background: rgba(0,255,204,0.1); color: var(--neon-teal); }
+.score-day-name { font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.6rem; }
+.score-day-date { font-size: 0.6rem; color: var(--text-dim); }
+.score-day.is-on .score-day-date { color: inherit; }
+.score-day-pts { font-weight: 700; font-variant-numeric: tabular-nums; }
+.score-day-week { flex-basis: 72px; }
+.score-day-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 8px; }
+.score-day-title { font-size: 0.68rem; color: var(--text-soft); text-align: center; }
+
+/* Two columns of players, one side each, rows lined up like Sleeper. */
+.score-grid-head { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 4px 4px; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.score-grid-head .is-right { text-align: right; }
+.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+.score-player { min-width: 0; padding: 7px 8px; border: 1px solid var(--cell-border); border-radius: 8px; background: var(--cell-bg); color: var(--text-mid); }
+.score-player.is-empty { border-style: dashed; opacity: 0.35; }
+.score-player.is-bench { opacity: 0.55; }
+.score-player.is-out .score-player-name { text-decoration: line-through; text-decoration-color: var(--neon-red); }
+.score-player-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.score-player-name { font-size: 0.78rem; font-weight: 800; color: var(--text-body); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score-player-pts { font-size: 0.86rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-max); flex: 0 0 auto; }
+.score-player-meta { font-size: 0.62rem; color: var(--text-dim); margin-top: 1px; }
+.score-out { color: var(--neon-red); font-weight: 800; }
+.score-bench-tag { color: var(--text-faint); }
+.score-player-game { font-size: 0.64rem; color: var(--text-soft); margin-top: 3px; }
+.score-player-line { font-size: 0.64rem; color: var(--text-mid); margin-top: 2px; line-height: 1.35; }
+@media (min-width: 640px) {
+  .score-row-name { font-size: 1rem; }
+  .score-side-name { font-size: 1rem; }
+  .score-side-total { font-size: 2rem; }
+  .score-day { flex-basis: 80px; }
+  .score-player-name { font-size: 0.84rem; }
+  .score-player-meta, .score-player-game, .score-player-line { font-size: 0.7rem; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

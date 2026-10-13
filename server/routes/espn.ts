@@ -4,6 +4,15 @@ import { EspnClient } from '../../src/lib/espn/client.js';
 import { normalizeLeagueResponse, normalizeMatchupDetail, normalizeDailyView } from '../../src/lib/espn/adapter.js';
 import type { EspnMatchupRaw, EspnRosterEntry, GameStatus, NbaGameInfo } from '../../src/types/index.js';
 import { NBA_TEAM_ABBREV } from '../../src/lib/espn/calculations.js';
+import {
+  espnToday,
+  planWeek,
+  readEspnWeek,
+  readNbaScoreboard,
+  type EspnDayInput,
+  type GameLine,
+  type ScoresWeek,
+} from '../../src/lib/league/scores.js';
 
 const router = Router();
 
@@ -346,6 +355,84 @@ router.get('/espn/matchup/:matchupId', async (req, res) => {
 });
 
 /**
+ * GET /api/espn/week?matchupPeriod=N
+ *
+ * One fantasy week of scores, every day of it: each side's lineup and
+ * points on each day, the NBA games around them, and every week the picker
+ * can show. No week means the current one. The pure reader in
+ * `src/lib/league/scores.ts` does the shaping; this route only fetches.
+ *
+ * A week is up to fifteen ESPN calls and as many public scoreboard calls,
+ * so one answer is kept for a short while and shared between phones that
+ * ask at the same moment.
+ */
+const WEEK_CACHE_MS = 45_000;
+const weekCache = new Map<string, { at: number; week: Promise<ScoresWeek> }>();
+
+async function loadWeek(client: EspnClient, requested: number | null): Promise<ScoresWeek> {
+  const settings = await client.fetchWeekSettings();
+  const plan = planWeek(settings, requested, espnToday());
+
+  const days: EspnDayInput[] = [];
+  const BATCH_SIZE = 4;
+  for (let i = 0; i < plan.days.length; i += BATCH_SIZE) {
+    const batch = plan.days.slice(i, i + BATCH_SIZE);
+    const loaded = await Promise.all(batch.map(async (day) => {
+      const [payload, games] = await Promise.all([
+        client.fetchDailyBoxScore(day.scoringPeriodId),
+        fetchNbaGamesForDate(day.date),
+      ]);
+      return { scoringPeriodId: day.scoringPeriodId, date: day.date, payload, games };
+    }));
+    days.push(...loaded);
+  }
+
+  return readEspnWeek({ plan, settings, days, fetchedAt: new Date().toISOString() });
+}
+
+router.get('/espn/week', async (req, res) => {
+  const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
+  if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
+    res.status(500).json({ error: 'Missing credentials' });
+    return;
+  }
+
+  const rawWeek = req.query.matchupPeriod;
+  const requested = typeof rawWeek === 'string' && rawWeek !== '' ? parseInt(rawWeek, 10) : null;
+  if (requested !== null && !Number.isInteger(requested)) {
+    res.status(400).json({ error: 'Invalid week' });
+    return;
+  }
+
+  const seasonId = ESPN_SEASON_ID ? parseInt(ESPN_SEASON_ID, 10) : 2026;
+  const cookieString = buildCookieString(req);
+  const cacheKey = `${seasonId}:${requested ?? 'current'}`;
+  const cached = weekCache.get(cacheKey);
+  let week = cached && Date.now() - cached.at < WEEK_CACHE_MS ? cached.week : null;
+  if (!week) {
+    const client = new EspnClient({
+      leagueId: ESPN_LEAGUE_ID, seasonId,
+      espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: cookieString,
+    });
+    week = loadWeek(client, requested);
+    weekCache.set(cacheKey, { at: Date.now(), week });
+  }
+
+  try {
+    res.json(await week);
+  } catch (err) {
+    weekCache.delete(cacheKey);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message === 'unknown-week' || message === 'no-schedule') {
+      res.status(404).json({ error: message });
+      return;
+    }
+    console.error('[ESPN proxy] Error fetching week:', message);
+    res.status(502).json({ error: message });
+  }
+});
+
+/**
  * GET /api/espn/debug-stats — inspect raw player stat entries to debug rolling averages.
  * Only available in development.
  */
@@ -633,6 +720,21 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
   }
 
   return gameMap;
+}
+
+/**
+ * One day's NBA games from ESPN's public scoreboard, by fantasy team code.
+ * Null when ESPN did not answer, so the reader can fall back to the week
+ * grid for that day instead of treating it as a day with no games.
+ */
+async function fetchNbaGamesForDate(date: string): Promise<Record<string, GameLine> | null> {
+  try {
+    const { data } = await axios.get<unknown>(`${NBA_SCOREBOARD_URL}?dates=${date.replace(/-/g, '')}`, { timeout: 8000 });
+    return readNbaScoreboard(data);
+  } catch (err) {
+    console.error(`[NBA Scoreboard] Failed to fetch ${date}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /**

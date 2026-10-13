@@ -5,6 +5,7 @@ import {
   beforeSeason,
   dateRangeText,
   defaultDay,
+  espnToday,
   gameText,
   gamesCapFor,
   gamesLeft,
@@ -19,6 +20,7 @@ import {
   recordText,
   scoringPeriodDates,
   seasonStartDate,
+  shortName,
   sideOdds,
   statLineText,
   weekLabel,
@@ -249,6 +251,21 @@ test('week labels follow the league schedule by start date', () => {
   assert.deepEqual(weekLabel(19, '2027-03-01'), { label: 'Playoff Round 1', phase: 'fantasy-playoff' });
   assert.deepEqual(weekLabel(21, '2027-03-15'), { label: 'Playoff Round 2', phase: 'fantasy-playoff' });
   assert.deepEqual(weekLabel(5, '2030-01-01'), { label: 'Week 5', phase: 'regular' });
+});
+
+test('names shorten to an initial and the surname', () => {
+  assert.equal(shortName('Giannis Antetokounmpo'), 'G. Antetokounmpo');
+  assert.equal(shortName('Shai Gilgeous-Alexander'), 'S. Gilgeous-Alexander');
+  assert.equal(shortName('Gary Payton II'), 'G. Payton II');
+  assert.equal(shortName('Nene'), 'Nene');
+  assert.equal(shortName('  Luka   Doncic '), 'L. Doncic');
+});
+
+test('ESPN\'s today is New York\'s, not the server\'s', () => {
+  // 1 AM in New York on the 6th is the 6th; 10 PM in New York on the 5th is still the 5th
+  // even though the server's UTC clock already says the 6th.
+  assert.equal(espnToday(new Date('2026-11-06T06:00:00Z')), '2026-11-06');
+  assert.equal(espnToday(new Date('2026-11-06T03:00:00Z')), '2026-11-05');
 });
 
 test('the season starts on the first Monday of week 1', () => {

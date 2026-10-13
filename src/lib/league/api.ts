@@ -41,6 +41,7 @@ import type {
   StoredScheduleSnapshot,
 } from './schedule.js';
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
+import type { ScoresWeek } from './scores.js';
 
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
@@ -681,6 +682,17 @@ export async function deleteProjectionEdit(c: Credentials, espnId: number): Prom
 }
 
 /** The accepted ESPN draft rankings, or the empty fallback. Commissioner-only for now. */
+/**
+ * One fantasy week of scores from ESPN, every day of it. No week means the
+ * current one. Nothing here is secret, so no sign-in is needed.
+ */
+export async function fetchScoresWeek(matchupPeriod: number | null): Promise<ScoresWeek> {
+  const { data } = await axios.get<ScoresWeek>('/api/espn/week', {
+    params: matchupPeriod === null ? undefined : { matchupPeriod },
+  });
+  return data;
+}
+
 export async function fetchDraftRankings(
   c: Credentials,
 ): Promise<{ snapshot: DraftRankingSnapshot; fallback: boolean }> {

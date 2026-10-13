@@ -259,6 +259,25 @@ export class EspnClient {
   }
 
   /**
+   * What the scores page needs before it asks for any day: the fantasy
+   * weeks and their days (`mSettings`), where the season stands
+   * (`mStatus`), every team's record (`mTeam`), and each NBA team's games
+   * by scoring period with tip-off times (`proTeamSchedules_wl`), which is
+   * how a scoring period becomes a calendar date. Returned raw; the pure
+   * reader in `src/lib/league/scores.ts` takes it from here.
+   */
+  async fetchWeekSettings(): Promise<unknown> {
+    const { data } = await this.http.get<unknown>('', {
+      params: {
+        view: ['mSettings', 'mStatus', 'mTeam', 'proTeamSchedules_wl'],
+        _: Date.now(),
+      },
+      paramsSerializer: { indexes: null },
+    });
+    return data;
+  }
+
+  /**
    * Fetch daily box score data for a specific scoring period.
    * Uses the x-fantasy-filter header to request per-scoring-period stat breakdowns,
    * which ESPN otherwise omits from the standard mMatchup response.

@@ -161,6 +161,14 @@ function dateIsoInZone(date: Date, timeZone: string): string {
   return `${read('year')}-${read('month')}-${read('day')}`;
 }
 
+/**
+ * Today where ESPN keeps its days. A Vercel function runs on UTC, where a
+ * West Coast evening is already tomorrow; ESPN's scoring day is not.
+ */
+export function espnToday(now: Date = new Date()): string {
+  return dateIsoInZone(now, 'America/New_York');
+}
+
 /** The first day of the league's week 1. Before this there is nothing to score. */
 export function seasonStartDate(): string {
   return leagueSchedule2027[0].startDate;
@@ -871,6 +879,13 @@ export function gameText(game: GameLine | null, tipoffText: string | null): stri
     ? ''
     : game.teamScore > game.oppScore ? 'W' : game.teamScore < game.oppScore ? 'L' : 'T';
   return ['Final', result, score, where].filter(Boolean).join(' ');
+}
+
+/** "Giannis Antetokounmpo" as "G. Antetokounmpo", which fits a phone column. */
+export function shortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName.trim();
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
 }
 
 /** "12-3" or "12-3-1". */
