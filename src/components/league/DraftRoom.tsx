@@ -467,7 +467,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     const wrap = wrapRef.current;
     if (!wrap) return;
     const offset = () => {
-      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]:not(.room-gone-trail)`);
+      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]`);
       const pinned = wrap.querySelector<HTMLElement>('th.room-player-col');
       return column && pinned ? column.offsetLeft - (pinned.offsetLeft + pinned.offsetWidth) : 0;
     };
@@ -719,7 +719,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               <table className={`room-table${myTurn ? ' is-my-turn' : ''}`}>
                 <thead>
                   <tr>
-                    {/* On a phone DRAFT and GONE BY NEXT lead the row, under a thumb. On a wide screen they trail. */}
+                    {/* DRAFT and GONE lead the row, on a phone and a wide screen alike. */}
                     {myTurn && <th className="room-draft-col room-draft-lead" />}
                     {myTurn && sortHead('gone', 'GONE', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-lead')}
                     <th className="room-star" aria-label="Queue" />
@@ -738,8 +738,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('blk', 'BLK')}
                     {sortHead('threes', '3PM')}
                     {sortHead('to', 'TO')}
-                    {myTurn && sortHead('gone', 'GONE BY NEXT', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-trail')}
-                    {myTurn && <th className="room-draft-col room-draft-trail" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -808,8 +806,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num">{one(projection?.line?.blk)}</td>
                         <td className="room-num">{one(projection?.line?.threes)}</td>
                         <td className="room-num">{one(projection?.line?.to)}</td>
-                        {myTurn && goneCell('room-gone-trail')}
-                        {myTurn && <td className="room-draft-col room-draft-trail">{draftButton}</td>}
                       </tr>
                       </Fragment>
                     );
@@ -818,7 +814,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 </tbody>
               </table>
             </div>
-            {myTurn && <div className="mock-note mock-note-dim">GONE BY NEXT: how often he is taken before your next pick, across 60 drafts played from here.</div>}
+            {myTurn && <div className="mock-note mock-note-dim">GONE: how often he is taken before your next pick, across 60 drafts played from here.</div>}
           </div>
         )}
 

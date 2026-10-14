@@ -4395,8 +4395,6 @@ html.theme-light {
 .room-clock .room-share { margin-left: auto; }
 .room-queue-toggle { margin-left: auto; }
 .room-queue-fold { display: none; }
-/* DRAFT and GONE BY NEXT lead the row on a phone and trail it on a wide screen. */
-.room-draft-lead, .room-gone-lead { display: none; }
 .room-name-short { display: none; }
 .room-sort-quick { display: none; }
 .mock-shared .room-grade { margin-top: 10px; }
@@ -4510,7 +4508,6 @@ html.theme-light {
 
   /* DRAFT, GONE and the name pin on the left; the stats slide under them. */
   .room .room-draft-lead, .room .room-gone-lead { display: table-cell; position: sticky; z-index: 3; }
-  .room .room-gone-trail, .room .room-draft-trail { display: none; }
   .room .room-table .room-draft-lead { left: 0; width: 56px; min-width: 56px; padding: 4px; }
   .room .room-table .room-draft-lead .mock-mini-btn { min-height: 32px; padding: 0 6px; font-size: 0.6rem; width: 100%; }
   .room .room-table .room-gone-lead { left: 56px; width: 44px; min-width: 44px; padding: 4px; font-size: 0.72rem; }
