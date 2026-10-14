@@ -23,6 +23,8 @@ export interface GradePlayer {
   positions: readonly Position[];
   /** Projected season points in league scoring, or null when unknown. */
   total: number | null;
+  /** Projected points a game, when known. */
+  fppg?: number | null;
   /** Average draft position, when it means something. */
   adp: number | null;
 }
@@ -34,6 +36,8 @@ export interface GradedPick {
   name: string;
   positions: Position[];
   total: number | null;
+  /** Projected points a game. Grades saved before it was kept have none. */
+  fppg?: number | null;
   /** Starting slot in the best lineup, or 'BE'. */
   slot: StarterSlot | 'BE';
   how: MockPick['how'];
@@ -136,6 +140,7 @@ export function gradeMock(
     name: players.get(pick.playerKey!)?.name ?? pick.playerName ?? pick.playerKey!,
     positions: [...pick.positions],
     total: players.get(pick.playerKey!)?.total ?? null,
+    fppg: players.get(pick.playerKey!)?.fppg ?? null,
     slot: seatOf.get(pick.playerKey!) ?? 'BE',
     how: pick.how,
   }));

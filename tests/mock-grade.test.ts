@@ -27,7 +27,7 @@ const state: LeagueDynamicState = {
 const board = buildMockBoard(dataset, { viewer: 'Brey', state, scenario: {} });
 const prepared = prepareMock({ board, values, settings: defaultMockSettings('realistic', OWNERS, 7) });
 const players = new Map<string, GradePlayer>(
-  buildProjections(values, fixture, { keepers: {}, status: {} }).map((row) => [row.key, { name: row.name, positions: row.positions, total: row.total, adp: row.adp }]),
+  buildProjections(values, fixture, { keepers: {}, status: {} }).map((row) => [row.key, { name: row.name, positions: row.positions, total: row.total, fppg: row.fppg, adp: row.adp }]),
 );
 
 function finishedDraft() {
@@ -74,6 +74,9 @@ test('a finished mock is ranked against the room and graded', () => {
   assert.ok(grade.standings.every((team, index, all) => index === 0 || all[index - 1].points >= team.points));
   assert.equal(grade.roster.length, live.picks.filter((pick) => pick.owner === 'Brey').length);
   assert.equal(grade.roster.filter((pick) => pick.slot !== 'BE').length, 10 - grade.openSlots.length);
+  // Each pick carries his points a game, so the grade can show more than the total.
+  assert.ok(grade.roster.every((pick) => pick.fppg === players.get(pick.playerKey)?.fppg));
+  assert.ok(grade.roster.some((pick) => typeof pick.fppg === 'number'));
   assert.ok(grade.points > grade.average * 0.5);
   if (grade.steal) assert.ok(grade.steal.by > 0);
   if (grade.reach) assert.ok(grade.reach.by > 0);
