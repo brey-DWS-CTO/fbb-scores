@@ -1028,7 +1028,27 @@ test('one trade cannot mix two drafts', () => {
 
 /* ─── The rule-book limits, counted inside one draft ───────────────────── */
 
-test('a team may trade away two of its own picks in a draft, not three', () => {
+test('in season a team may trade away two of its own picks in a draft, not three', () => {
+  const closedDraft = { picks: {}, startedAt: '2026-10-18T21:00:00.000Z', closedAt: '2026-10-19T00:00:00.000Z' };
+  const twoGone = state({
+    draft: closedDraft,
+    pickTransfers: [
+      transfer(5, 'Amy', 'Amy', 'Joel', '2026-11-01T00:00:00.000Z', 'trade-1', NEXT),
+      transfer(6, 'Amy', 'Amy', 'Joel', '2026-11-02T00:00:00.000Z', 'trade-2', NEXT),
+    ],
+  });
+  const data = datasetWithTransfers(dataset, twoGone.pickTransfers ?? []);
+  const third = checkProposalAgainstState(
+    data,
+    twoGone,
+    input({ offer: [ref(7, 'Amy', NEXT)], request: [ref(7, 'Kyle', NEXT)] }),
+    IN_SEASON,
+  );
+  assert.equal(third.reason, 'too-many-away');
+  assert.match(third.message ?? '', /Oct 2027 draft/);
+});
+
+test('before and during the draft a team may trade away as many of its own picks as it likes', () => {
   const twoGone = state({
     pickTransfers: [
       transfer(5, 'Amy', 'Amy', 'Joel', '2026-09-01T00:00:00.000Z', 'trade-1'),
@@ -1036,67 +1056,44 @@ test('a team may trade away two of its own picks in a draft, not three', () => {
     ],
   });
   const data = datasetWithTransfers(dataset, twoGone.pickTransfers ?? []);
-  const third = checkProposalAgainstState(data, twoGone, input());
-  assert.equal(third.reason, 'too-many-away');
-  assert.match(third.message ?? '', /Oct 2026 draft/);
-
-  // What Amy did with this draft does not limit the next one.
-  const closed = state({
-    pickTransfers: twoGone.pickTransfers,
-    draft: {
-      picks: {},
-      startedAt: '2026-10-18T21:00:00.000Z',
-      closedAt: '2026-10-19T00:00:00.000Z',
-    },
-  });
+  assert.equal(checkProposalAgainstState(data, twoGone, input()).ok, true);
+  // Four in one trade, the shape from the trade screen, is fine too.
   assert.equal(
-    checkProposalAgainstState(
-      data,
-      closed,
-      input({ offer: [ref(7, 'Amy', NEXT)], request: [ref(7, 'Kyle', NEXT)] }),
-      IN_SEASON,
-    ).ok,
+    checkProposalAgainstState(dataset, state(), input({
+      offer: [ref(2, 'Amy'), ref(5, 'Amy'), ref(6, 'Amy'), ref(10, 'Amy')],
+      request: [ref(2, 'Kyle'), ref(3, 'Kyle'), ref(6, 'Kyle'), ref(13, 'Kyle')],
+    })).ok,
     true,
   );
+  // So is a live draft.
+  const live = state({ pickTransfers: twoGone.pickTransfers, draft: { picks: {}, startedAt: '2026-10-18T21:00:00.000Z', closedAt: null } });
+  assert.equal(checkProposalAgainstState(data, live, input()).ok, true);
 });
 
-test('a team may hold two picks in a round, not three', () => {
-  // Ryan already holds his own 3rd and Derek's. A third round-3 pick is out.
+test('in season a team may hold two picks in a round, not three; before the draft, any number', () => {
+  // Ryan already holds his own 3rd and Derek's. Before the draft a third is fine.
+  const third = input({
+    proposer: 'Ryan',
+    recipient: 'Amy',
+    offer: [ref(8, 'Ryan')],
+    request: [ref(3, 'Amy')],
+  });
+  assert.equal(checkProposalAgainstState(dataset, state(), third).ok, true);
+
+  // In season, with two of next year's 3rds already his, a third is out.
+  const closed = state({
+    draft: { picks: {}, startedAt: '2026-10-18T21:00:00.000Z', closedAt: '2026-10-19T00:00:00.000Z' },
+    pickTransfers: [transfer(3, 'Derek', 'Derek', 'Ryan', '2026-11-01T00:00:00.000Z', 'trade-1', NEXT)],
+  });
+  const data = datasetWithTransfers(dataset, closed.pickTransfers ?? []);
   const check = checkProposalAgainstState(
-    dataset,
-    state(),
-    input({
-      proposer: 'Ryan',
-      recipient: 'Amy',
-      offer: [ref(8, 'Ryan')],
-      request: [ref(3, 'Amy')],
-    }),
+    data,
+    closed,
+    input({ proposer: 'Ryan', recipient: 'Amy', offer: [ref(8, 'Ryan', NEXT)], request: [ref(3, 'Amy', NEXT)] }),
+    IN_SEASON,
   );
   assert.equal(check.reason, 'too-many-in-round');
   assert.match(check.message ?? '', /round-3/);
-
-  // Next season Ryan holds only his own 3rd, so the same shape is fine there.
-  const closed = state({
-    draft: {
-      picks: {},
-      startedAt: '2026-10-18T21:00:00.000Z',
-      closedAt: '2026-10-19T00:00:00.000Z',
-    },
-  });
-  assert.equal(
-    checkProposalAgainstState(
-      dataset,
-      closed,
-      input({
-        proposer: 'Ryan',
-        recipient: 'Amy',
-        offer: [ref(8, 'Ryan', NEXT)],
-        request: [ref(3, 'Amy', NEXT)],
-      }),
-      IN_SEASON,
-    ).ok,
-    true,
-  );
 });
 
 /* ─── Next season's trades never touch this season's keepers ───────────── */
