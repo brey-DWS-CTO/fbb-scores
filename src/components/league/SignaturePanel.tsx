@@ -4,6 +4,7 @@ import type { Identity } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
   fetchOwnerEmails,
+  foldRulebookVersion,
   requestRulebookSignatures,
   withdrawRulebookSignature,
   type RulebookSignaturesResponse,
@@ -96,6 +97,29 @@ export default function SignaturePanel({
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
+      setBusy(false);
+    }
+  };
+
+  // A fix everyone already knows: put the newest revision's words into the
+  // one before it, so the signatures on that one still count.
+  const canFold = isCommish && isCurrent && !historical && status.signed.length === 0 && (data.revision ?? 0) > 1;
+  const fold = async () => {
+    if (!identity || !data.versionId || data.revision === null) return;
+    const into = data.revision - 1;
+    if (!window.confirm(
+      `Fold revision ${data.revision} into revision ${into}?
+
+Revision ${into} takes this wording and keeps its signatures. Revision ${data.revision} is deleted. Use this only for a change everyone already knows.`,
+    )) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await foldRulebookVersion(identity, data.versionId);
+      // The book, the revision list and the signatures all change: start the page over.
+      window.location.reload();
+    } catch (e) {
+      setError(apiErrorMessage(e));
       setBusy(false);
     }
   };
@@ -204,6 +228,18 @@ export default function SignaturePanel({
               </button>
               <span className="rule-edit-hint">
                 Pick who gets the "read it, sign it" email. Try it on yourself first.
+              </span>
+            </div>
+          )}
+
+          {canFold && !picking && (
+            <div className="sign-actions sign-send">
+              <button type="button" className="rules-tool tap-btn" disabled={busy} onClick={() => void fold()}>
+                FOLD INTO REVISION {(data.revision ?? 1) - 1}
+              </button>
+              <span className="rule-edit-hint">
+                Nobody has signed this one yet. Folding moves this wording into revision {(data.revision ?? 1) - 1} and
+                deletes this one, so the signatures already on {(data.revision ?? 1) - 1} still count.
               </span>
             </div>
           )}
