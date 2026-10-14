@@ -33,6 +33,8 @@ import type {
 } from '../../src/lib/keeper/types.js';
 import {
   canAnswer,
+  canRevise,
+  reviseProposal,
   checkProposalAgainstState,
   checkProposalShape,
   datasetForState,
@@ -2646,6 +2648,73 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
     });
     // After the answer, never before it. The offer is saved either way.
     notifyTradeOffered(proposal, appOrigin(req));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /pick-trades/:id/revise — the member who sent an offer changes it and
+ * sends it again. Same partner, new picks and note. Every check a new offer
+ * gets runs again inside the write, and the other member is mailed.
+ */
+router.post('/pick-trades/:id/revise', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
+    const id = routeParam(req.params.id);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const version = typeof body.version === 'number' ? body.version : NaN;
+    const offer = parsePickRefs(body.offer, 'offer', leagueDataset.season);
+    const want = parsePickRefs(body.request, 'request', leagueDataset.season);
+    const note = typeof body.note === 'string' ? body.note.trim().slice(0, MAX_TRADE_NOTE) : '';
+
+    const now = new Date().toISOString();
+    const outcomes: TradeOutcome[] = [];
+    const result = await mutateState((draft) => {
+      outcomes.length = 0;
+      const proposals = expireStale(proposalsOf(draft), now).proposals;
+      draft.pickTradeProposals = proposals;
+      const index = proposals.findIndex((p) => p.id === id);
+      if (index === -1) {
+        outcomes.push({ refusal: { status: 404, message: 'No such offer' } });
+        return;
+      }
+      const current = proposals[index];
+      const allowed = canRevise(current, owner, version);
+      if (!allowed.ok) {
+        outcomes.push({
+          refusal: {
+            status: allowed.reason === 'not-yours-to-answer' ? 403 : 409,
+            message: allowed.message ?? '',
+            code: allowed.reason,
+          },
+        });
+        return;
+      }
+      const input: ProposalInput = { proposer: owner, recipient: current.recipient, offer, request: want, note };
+      const shape = checkProposalShape(leagueDataset, input, tradeWindow(draft) !== 'in-season');
+      const check = shape.ok ? checkProposalAgainstState(currentDataset(draft), draft, input) : shape;
+      if (!check.ok) {
+        outcomes.push({ refusal: { status: 409, message: check.message ?? '', code: check.reason } });
+        return;
+      }
+      const revised = reviseProposal(current, input, now);
+      draft.pickTradeProposals = proposals.map((p, i) => (i === index ? revised : p));
+      outcomes.push({ proposal: revised });
+    });
+
+    if (sendOutcome(res, outcomes[0])) return;
+    const proposal = outcomes[0]?.proposal;
+    if (!proposal) throw new HttpError(500, 'The offer could not be saved');
+    await appendAudit(actor(res), 'pick-trade.revised', {
+      proposalId: proposal.id,
+      recipient: proposal.recipient,
+      offer: proposal.offer,
+      request: proposal.request,
+    });
+    res.json({ proposal, ...redactState(result, { owner, isCommissioner: isCommish }) });
+    notifyTradeOffered(proposal, appOrigin(req), true);
   } catch (err) {
     next(err);
   }

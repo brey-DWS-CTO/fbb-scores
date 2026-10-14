@@ -1089,6 +1089,43 @@ export function canAnswer(
     : refuse('not-yours-to-answer', 'Only the member who sent the offer, or a commissioner, can pull it.');
 }
 
+/**
+ * Whether `owner` may change an offer and send it again. Only the member who
+ * sent it, only while it is waiting, and only the version they last saw, so
+ * an edit never lands on an offer that moved underneath it.
+ */
+export function canRevise(proposal: PickTradeProposal, owner: string, version: number): TradeCheck {
+  if (!isPending(proposal)) return refuse('not-pending', 'That offer has already been settled.');
+  if (proposal.proposer !== owner) {
+    return refuse('not-yours-to-answer', 'Only the member who sent the offer can change it.');
+  }
+  if (proposal.version !== version) {
+    return refuse('stale-version', 'That offer changed since you opened it. Reload and try again.');
+  }
+  return OK;
+}
+
+/**
+ * The offer with new picks and a new note. Same id and partner; the version
+ * moves, so the other side cannot accept what they saw before, and the clock
+ * starts again from the resend.
+ */
+export function reviseProposal(
+  proposal: PickTradeProposal,
+  input: Pick<ProposalInput, 'offer' | 'request' | 'note'>,
+  now: string,
+): PickTradeProposal {
+  return {
+    ...proposal,
+    offer: input.offer,
+    request: input.request,
+    note: input.note,
+    version: proposal.version + 1,
+    revisedAt: now,
+    expiresAt: expiresAtFrom(now),
+  };
+}
+
 export function proposalInput(proposal: PickTradeProposal): ProposalInput {
   return {
     proposer: proposal.proposer,

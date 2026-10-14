@@ -1413,6 +1413,20 @@ export async function rejectPickTrade(
   return data;
 }
 
+/** Change an offer you sent and send it again. `version` is the one you saw. */
+export async function revisePickTrade(
+  c: Credentials,
+  id: string,
+  input: { version: number; offer: PickRef[]; request: PickRef[]; note: string },
+): Promise<{ proposal: PickTradeProposal } & StateResponse> {
+  const { data } = await axios.post(
+    `/api/league/pick-trades/${encodeURIComponent(id)}/revise`,
+    input,
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
 export async function cancelPickTrade(
   c: Credentials,
   id: string,

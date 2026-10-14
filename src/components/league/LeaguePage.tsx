@@ -3,6 +3,7 @@ import { useMemo, type CSSProperties, type ReactNode } from 'react';
 
 
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import { leagueActivity } from '../../lib/league/activity.js';
 
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
@@ -43,10 +44,15 @@ const formatDate = (iso: string) =>
     year: 'numeric',
   });
 
+/** A moment in the activity log: "Oct 14, 3:05 PM". */
+const formatWhen = (iso: string) =>
+  new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
 /** /league — rules reference (tiers, contracts, trades) + identity. */
 export default function LeaguePage() {
-  const { dataset } = useLeagueData();
+  const { dataset, state } = useLeagueData();
   const { identity, signOut } = useIdentity();
+  const activity = useMemo(() => leagueActivity(state.pickTradeProposals ?? [], dataset), [state.pickTradeProposals, dataset]);
 
   const contractPlayers = useMemo(
     () => dataset.players.filter((p) => p.keeper.contract != null),
@@ -90,6 +96,25 @@ export default function LeaguePage() {
         </h1>
         <IdentityChip />
       </div>
+
+      {/* ── Activity: every trade that went through, newest first ── */}
+      <Section title="ACTIVITY" color="var(--neon-yellow)">
+        {activity.length === 0 ? (
+          <div style={{ color: 'var(--text-faint)' }}>No trades in the app yet. When one goes through, it shows here and everyone gets an email.</div>
+        ) : (
+          <ol className="league-activity">
+            {activity.map((entry) => (
+              <li key={entry.id}>
+                <div className="league-activity-head">
+                  <strong>{entry.title}</strong>
+                  <span>{formatWhen(entry.at)}</span>
+                </div>
+                {entry.lines.map((line) => <div key={line} className="league-activity-line">{line}</div>)}
+              </li>
+            ))}
+          </ol>
+        )}
+      </Section>
 
       {/* ── a. Keeper tiers ────────────────────────────────────── */}
       <Section title={`${dataset.season} KEEPER TIERS`} color="var(--neon-teal)">

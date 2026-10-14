@@ -197,7 +197,7 @@ test('an offer mails the person who has to answer it, and nobody else', async ()
   assert.equal(sent[0].subject, 'Amy offered you a trade');
 });
 
-test('taking an offer mails the member who sent it', async () => {
+test('taking an offer mails the member who sent it, and tells the rest of the league', async () => {
   const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
   const proposal = asRecord(created.body).proposal as PickTradeProposal;
   mailLog = [];
@@ -207,9 +207,32 @@ test('taking an offer mails the member who sent it', async () => {
   await settled();
 
   const sent = mails();
+  assert.equal(sent.length, 2, `expected two emails, saw ${JSON.stringify(sent)}`);
+  const toAmy = sent.find((mail) => mail.to === addresses.Amy);
+  assert.equal(toAmy?.subject, 'Your trade went through');
+  // Brey is the only other member with an address. Kyle took it, so he hears nothing.
+  const toBrey = sent.find((mail) => mail.to === addresses.Brey);
+  assert.equal(toBrey?.subject, 'Trade: Amy and Kyle');
+  assert.ok(!sent.some((mail) => mail.to === addresses.Kyle));
+});
+
+test('a changed offer mails the member who has to answer it', async () => {
+  const created = await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')]);
+  const proposal = asRecord(created.body).proposal as PickTradeProposal;
+  mailLog = [];
+
+  const changed = await request(`/api/league/pick-trades/${encodeURIComponent(proposal.id)}/revise`, {
+    method: 'POST',
+    headers: auth('Amy'),
+    body: JSON.stringify({ version: proposal.version, offer: [ref(6, 'Amy')], request: [ref(4, 'Kyle')], note: '' }),
+  });
+  assert.equal(changed.status, 200);
+  await settled();
+
+  const sent = mails();
   assert.equal(sent.length, 1, `expected one email, saw ${JSON.stringify(sent)}`);
-  assert.equal(sent[0].to, addresses.Amy);
-  assert.equal(sent[0].subject, 'Your trade went through');
+  assert.equal(sent[0].to, addresses.Kyle);
+  assert.equal(sent[0].subject, 'Amy changed the trade offer');
 });
 
 test('turning an offer down mails the member who sent it', async () => {
