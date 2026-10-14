@@ -4800,6 +4800,18 @@ html.theme-light {
 .league-activity-head span { margin-left: auto; color: var(--text-dim); font-size: 0.7rem; white-space: nowrap; }
 .league-activity-line { color: var(--text-body); font-size: 0.8rem; margin-top: 2px; }
 
+/* ─── Mock draft, wide screen: the keeper pause gets the clock column's full width ─── */
+@media (min-width: 840px) {
+  .room-turn.is-keeper { flex-wrap: wrap; row-gap: 10px; padding: 12px; }
+  .room-turn.is-keeper > span { flex: 1 1 100%; line-height: 1.45; }
+  .room-turn.is-keeper > .mock-mini-btn { flex: 1 1 auto; margin-left: 0; }
+  .room-turn.is-keeper .room-keeper-odds { margin-top: 6px; font-size: 0.74rem; line-height: 1.45; }
+}
+
+/* ─── Mock draft results list: a traded pick says whose it was; a projected trade is dashed ─── */
+.room-update-owner .board-traded-tag { display: block; margin-top: 2px; font-size: 0.55rem; width: fit-content; margin-left: auto; }
+.board-traded-tag.is-projected { background: transparent; color: var(--neon-yellow); border: 1px dashed var(--neon-yellow); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
