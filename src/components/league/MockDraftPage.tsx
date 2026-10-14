@@ -181,6 +181,14 @@ function MockDraftScreen() {
     [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead],
   );
 
+  // Picks a switched-on trade moves: traded only if that offer goes through.
+  const projectedTrades = useMemo((): ReadonlySet<number> => {
+    const before = new Map(now.board.slots.map((slot) => [slot.pick.overall, slot.pick.currentOwner]));
+    return new Set(whatIf.board.slots
+      .filter((slot) => before.get(slot.pick.overall) !== slot.pick.currentOwner)
+      .map((slot) => slot.pick.overall));
+  }, [now.board, whatIf.board]);
+
   const owners = useMemo(() => dataset.teams.map((team) => team.owner), [dataset.teams]);
   const settings = useMemo(() => defaultMockSettings(mode, owners, seed), [mode, owners, seed]);
   const canRun = values.entries.length > 0;
@@ -423,6 +431,7 @@ function MockDraftScreen() {
           prepared={livePrepared}
           values={values}
           projections={projections}
+          projectedTrades={projectedTrades}
           person={viewer}
           seed={seed}
           mode={mode}

@@ -46,6 +46,8 @@ interface Props {
   prepared: PreparedMock;
   values: ValueBoard;
   projections: ReadonlyMap<string, PlayerProjection>;
+  /** Picks that move only if a switched-on pending trade goes through. */
+  projectedTrades?: ReadonlySet<number>;
   person: string;
   seed: number;
   mode: MockMode;
@@ -88,7 +90,7 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 
  * before. What is new is that it is saved as it goes, so leaving the page and
  * coming back finds it where it was, with the clock paused.
  */
-export default function DraftRoom({ prepared, values, projections, person, seed, mode, saved, onProgress, onNewDraft, onFinished }: Props) {
+export default function DraftRoom({ prepared, values, projections, projectedTrades, person, seed, mode, saved, onProgress, onNewDraft, onFinished }: Props) {
   const navigate = useNavigate();
   // Only the first render restores; after that the room owns its state.
   const [restored] = useState(() => replaySaved(prepared, seed, person, saved?.choices ?? {}));
@@ -420,6 +422,28 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     prepared.roster,
   );
   const teamRoster = rosterOf(teamView);
+  // Whose pick this was before a trade, and whether that trade is only projected.
+  const tradeOf = (overall: number): { from: string; projected: boolean } | null => {
+    const slot = slots.find((entry) => entry.pick.overall === overall);
+    if (!slot) return null;
+    const original = slot.pick.originalOwner ?? slot.pick.currentOwner;
+    if (original === slot.pick.currentOwner) return null;
+    return { from: original, projected: projectedTrades?.has(overall) === true };
+  };
+  const tradeTag = (overall: number, owner: string) => {
+    const trade = tradeOf(overall);
+    if (!trade) return null;
+    return (
+      <span
+        className={`board-traded-tag${trade.projected ? ' is-projected' : ''}`}
+        title={trade.projected
+          ? `${owner} holds ${trade.from}'s pick only if the trade you switched on goes through`
+          : `${owner} holds ${trade.from}'s pick`}
+      >
+        {trade.projected ? `${trade.from.toUpperCase()}'S, IF TRADED` : `${trade.from.toUpperCase()}'S`}
+      </span>
+    );
+  };
   // Open a tab and bring it into view: on a phone it sits under the grade.
   const viewRef = useRef<HTMLDivElement>(null);
   const showView = (tab: CenterTab) => {
@@ -467,7 +491,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     const wrap = wrapRef.current;
     if (!wrap) return;
     const offset = () => {
-      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]:not(.room-gone-trail)`);
+      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]`);
       const pinned = wrap.querySelector<HTMLElement>('th.room-player-col');
       return column && pinned ? column.offsetLeft - (pinned.offsetLeft + pinned.offsetWidth) : 0;
     };
@@ -719,7 +743,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               <table className={`room-table${myTurn ? ' is-my-turn' : ''}`}>
                 <thead>
                   <tr>
-                    {/* On a phone DRAFT and GONE BY NEXT lead the row, under a thumb. On a wide screen they trail. */}
+                    {/* DRAFT and GONE lead the row, on a phone and a wide screen alike. */}
                     {myTurn && <th className="room-draft-col room-draft-lead" />}
                     {myTurn && sortHead('gone', 'GONE', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-lead')}
                     <th className="room-star" aria-label="Queue" />
@@ -738,8 +762,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('blk', 'BLK')}
                     {sortHead('threes', '3PM')}
                     {sortHead('to', 'TO')}
-                    {myTurn && sortHead('gone', 'GONE BY NEXT', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-trail')}
-                    {myTurn && <th className="room-draft-col room-draft-trail" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -808,8 +830,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num">{one(projection?.line?.blk)}</td>
                         <td className="room-num">{one(projection?.line?.threes)}</td>
                         <td className="room-num">{one(projection?.line?.to)}</td>
-                        {myTurn && goneCell('room-gone-trail')}
-                        {myTurn && <td className="room-draft-col room-draft-trail">{draftButton}</td>}
                       </tr>
                       </Fragment>
                     );
@@ -818,7 +838,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 </tbody>
               </table>
             </div>
-            {myTurn && <div className="mock-note mock-note-dim">GONE BY NEXT: how often he is taken before your next pick, across 60 drafts played from here.</div>}
+            {myTurn && <div className="mock-note mock-note-dim">GONE: how often he is taken before your next pick, across 60 drafts played from here.</div>}
           </div>
         )}
 
@@ -923,7 +943,14 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                             >
                               <span className="room-grid-label">
                                 {cell.round}.{cell.slot}
-                                {cell.via && <span className="board-traded-tag" title={`${cell.owner} holds ${cell.via}'s pick`}>→ {cell.owner.toUpperCase()}</span>}
+                                {cell.via && (
+                  <span
+                    className={`board-traded-tag${projectedTrades?.has(cell.overall) ? ' is-projected' : ''}`}
+                    title={projectedTrades?.has(cell.overall)
+                      ? `${cell.owner} holds ${cell.via}'s pick only if the trade you switched on goes through`
+                      : `${cell.owner} holds ${cell.via}'s pick`}
+                  >→ {cell.owner.toUpperCase()}</span>
+                )}
                                 {kept && <KeeperChip projected={projected} early={cell.pick?.keeperEarly ?? null} />}
                               </span>
                               {cell.pick?.playerName
@@ -951,7 +978,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {pick.how === 'keeper'
                       ? <span><KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></span>
                       : <span />}
-                    <span className="room-update-owner">{pick.owner}</span>
+                    <span className="room-update-owner">{pick.owner}{tradeTag(pick.overall, pick.owner)}</span>
                   </li>
                 ))}
                 {shownPicks.length === 0 && <li className="mock-live">No picks yet.</li>}
