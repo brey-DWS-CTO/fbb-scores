@@ -75,6 +75,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     tabs: [
       { to: '/admin', label: 'CONTROLS' },
       { to: '/schedule', label: 'SCHEDULE' },
+      { to: '/awards', label: 'AWARDS & DEPTH' },
     ],
   },
 ];

@@ -1,5 +1,6 @@
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockResultRecord } from './mockGrade.js';
+import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
 import type {
@@ -637,6 +638,12 @@ export async function acceptTeamNames(
 export async function fetchMockResults(c: Credentials): Promise<MockResultRecord[]> {
   const { data } = await axios.get('/api/league/mock-results', { headers: authHeaders(c) });
   return data.results as MockResultRecord[];
+}
+
+/** Commish only: award odds from Kalshi and depth charts from ESPN. `fresh` reads them again. */
+export async function fetchNbaWatch(c: Credentials, fresh = false): Promise<NbaWatch> {
+  const { data } = await axios.get<NbaWatch>(`/api/league/nba-watch${fresh ? '?fresh=1' : ''}`, { headers: authHeaders(c) });
+  return data;
 }
 
 /** Save a finished mock draft. Saving the same draft twice is a no-op. */
