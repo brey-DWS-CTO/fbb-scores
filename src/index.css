@@ -4749,6 +4749,10 @@ html.theme-light {
 .mock-grade-table tr.is-tappable:hover td { background: color-mix(in srgb, var(--neon-teal) 8%, transparent); }
 /* "See the board" scrolls here; the pinned clock must not cover it. */
 .room-view-anchor { scroll-margin-top: calc(var(--room-clock-h, 0px) + 8px); }
+/* A team's roster is short: it slides sideways for the stats, and an up or down swipe on it moves the page. */
+@media (max-width: 839px) {
+  .room .room-roster-wrap { max-height: none; min-height: 0; overscroll-behavior-y: auto; }
+}
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
