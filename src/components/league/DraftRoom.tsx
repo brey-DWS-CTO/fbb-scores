@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, oddsKeeperThere, type LiveChoices } from '../../lib/league/liveMock.js';
 import type { MockCandidate, MockMode, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
-import { PLAY_IN_COUNTS, PLAYOFF_COUNTS, editTitle, type PlayerProjection } from '../../lib/league/projections.js';
-import { relativeScheduleHeat } from './scheduleUi.js';
+import { editTitle, type PlayerProjection } from '../../lib/league/projections.js';
 import {
   draftGrid,
   moveQueued,
@@ -62,13 +61,9 @@ type CenterTab = 'players' | 'teams' | 'results';
 type SortKey = 'rank' | 'adp' | 'fppg' | 'total' | 'games' | 'pi' | 'po' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone';
 
 const pct = (share: number) => `${Math.round(share * 100)}%`;
-/** His NBA team's games in our play-in or playoff weeks, coloured against all 30 teams. */
-function PostseasonCell({ games, counts }: { games: number | null | undefined; counts: readonly number[] }) {
-  return (
-    <td className={`room-num${games === null || games === undefined ? '' : ` schedule-heat-${relativeScheduleHeat(games, counts)}`}`}>
-      {games ?? '–'}
-    </td>
-  );
+/** His NBA team's games in our play-in or playoff weeks. */
+function PostseasonCell({ games }: { games: number | null | undefined }) {
+  return <td className="room-num">{games ?? '–'}</td>;
 }
 const one = (value: number | null | undefined) => (value === null || value === undefined ? '–' : value.toFixed(1));
 type Clock = { overall: number; deadline: number; pausedAt: number | null } | null;
@@ -123,7 +118,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // The player list scrolled sideways: names shorten so the stats fit.
   const [scrolled, setScrolled] = useState(false);
   // Scrolled down into the list: the pinned clock and card slim down.
-  const [compact, setCompact] = useState(false);
+  // The page and the list each say whether they are scrolled down; either one
+  // slims the stack. Kept apart so one never undoes the other mid-swipe.
+  const [pageDown, setPageDown] = useState(false);
+  const [listDown, setListDown] = useState(false);
+  const compact = pageDown || listDown;
   // Tap a player anywhere (updates, a roster, the board) to see him in the card.
   const look = (key: string | null | undefined) => {
     if (!key) return;
@@ -177,7 +176,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     return () => observer.disconnect();
   }, [selected, atMyKeeper, over, center, compact]);
   useEffect(() => {
-    const onScroll = () => setCompact((current) => (window.scrollY > 80 ? true : current && window.scrollY > 20));
+    const onScroll = () => setPageDown((current) => (window.scrollY > 80 ? true : current && window.scrollY > 20));
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -447,13 +446,18 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     </th>
   );
   const wrapRef = useRef<HTMLDivElement>(null);
+  const listTop = useRef(0);
   const onListScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const left = event.currentTarget.scrollLeft;
     // A gap between the two marks, so a finger resting near one does not flicker.
     const next = scrolled ? left > FULL_NAME_AT : left > SHORT_NAME_AT;
     if (next !== scrolled) setScrolled(next);
-    const down = event.currentTarget.scrollTop > 80;
-    if (down !== compact) setCompact(down);
+    // A sideways swipe leaves scrollTop alone, so it never touches the stack.
+    const top = event.currentTarget.scrollTop;
+    if (top === listTop.current) return;
+    listTop.current = top;
+    const down = listDown ? top > 20 : top > 80;
+    if (down !== listDown) setListDown(down);
   };
   // A sort chosen from the chips slides the list so that column lands flush
   // against the pinned name column. That column is narrower once the list is
@@ -795,8 +799,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
-                        <PostseasonCell games={projection?.playInGames} counts={PLAY_IN_COUNTS} />
-                        <PostseasonCell games={projection?.playoffGames} counts={PLAYOFF_COUNTS} />
+                        <PostseasonCell games={projection?.playInGames} />
+                        <PostseasonCell games={projection?.playoffGames} />
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -854,8 +858,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num room-strong">{candidate ? one(projection?.fppg) : '–'}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num">{projection?.games ?? '–'}</td>
-                        <PostseasonCell games={projection?.playInGames} counts={PLAY_IN_COUNTS} />
-                        <PostseasonCell games={projection?.playoffGames} counts={PLAYOFF_COUNTS} />
+                        <PostseasonCell games={projection?.playInGames} />
+                        <PostseasonCell games={projection?.playoffGames} />
                         <td className="room-num">{one(line?.min)}</td>
                         <td className="room-num">{one(line?.pts)}</td>
                         <td className="room-num">{one(line?.reb)}</td>
