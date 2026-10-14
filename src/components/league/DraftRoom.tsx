@@ -40,6 +40,8 @@ export interface RoomProgress {
   choices: Record<number, string>;
   queue: string[];
   clockLeft: number | null;
+  /** The last pick landed. */
+  finished?: boolean;
 }
 
 interface Props {
@@ -204,14 +206,27 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
     const current = clockRef.current;
     return current && current.overall === turnRef.current ? secondsOn(current, Date.now()) : null;
   };
-  const progressRef = useRef<RoomProgress>({ started, choices: { ...choices }, queue, clockLeft: null });
+  const progressRef = useRef<RoomProgress>({ started, choices: { ...choices }, queue, clockLeft: null, finished: saved?.finished === true });
+  // A restore that could not replay every saved pick must not save over the
+  // draft until the person does something: the board may only be part
+  // loaded, and the full draft comes back once it is.
+  const pristine = useRef(restored.dropped > 0);
+  const firstReport = useRef(true);
   useEffect(() => {
-    progressRef.current = { started, choices: { ...choices }, queue, clockLeft: clockLeftNow() };
+    progressRef.current = { started, choices: { ...choices }, queue, clockLeft: clockLeftNow(), finished: over };
+    if (firstReport.current) {
+      firstReport.current = false;
+      if (pristine.current) return;
+    }
+    pristine.current = false;
     onProgress(progressRef.current);
-  }, [started, choices, queue, onProgress]);
+  }, [started, choices, queue, over, onProgress]);
   useEffect(() => {
     // Leaving the page or the app keeps the clock where it stood.
-    const keep = () => onProgress({ ...progressRef.current, clockLeft: clockLeftNow() });
+    const keep = () => {
+      if (pristine.current) return;
+      onProgress({ ...progressRef.current, clockLeft: clockLeftNow() });
+    };
     window.addEventListener('pagehide', keep);
     return () => {
       window.removeEventListener('pagehide', keep);
@@ -307,7 +322,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
     if (fresh) setQueue([]);
     // Written now, not after the next render: NEW DRAFT unmounts this room
     // straight away, and the last thing it saves must be the empty draft.
-    progressRef.current = { started: !fresh, choices: {}, queue: fresh ? [] : queue, clockLeft: null };
+    progressRef.current = { started: !fresh, choices: {}, queue: fresh ? [] : queue, clockLeft: null, finished: false };
   };
   // Leave the room. The draft stays saved; DRAFT brings it back.
   const exit = () => navigate('/draft/start');

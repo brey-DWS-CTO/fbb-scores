@@ -17,6 +17,7 @@ import {
   picksUntilTurn,
   queuedPick,
   replaySaved,
+  finishedDraftNoLongerFits,
   rosterBySlot,
   shortName,
   toggleQueued,
@@ -109,7 +110,7 @@ test('the grid is rounds by teams in first-round order, snake intact', () => {
 });
 
 const save: MockSave = {
-  version: 1, seed: 7, mode: 'sharp', started: true, choices: { 9: 'k1' }, queue: ['k2'], clockLeft: 80,
+  version: 1, seed: 7, mode: 'sharp', started: true, choices: { 9: 'k1' }, queue: ['k2'], clockLeft: 80, finished: false,
   tradesOn: [], tryKeepers: false, tryPicks: ['', ''], useEntered: true, guessInstead: [],
 };
 
@@ -138,6 +139,19 @@ test('saved picks replay; one that no longer fits is dropped, not the draft', ()
   assert.equal(bad.dropped, 1);
   assert.deepEqual(bad.choices, {});
   assert.equal(bad.live.waitingOn?.pick.overall, mine);
+});
+
+test('a finished draft the board moved under starts over instead of reopening half done', () => {
+  const first = replayLive(prepared, 7, 'Brey', {});
+  const mine = first.waitingOn!.pick.overall;
+  const pickOne = first.run.available()[0].playerKey;
+  const jokic = select('Nikola Jokic').playerKey;
+  assert.equal(finishedDraftNoLongerFits(prepared, 7, 'Brey', { finished: true, choices: { [mine]: pickOne } }), false);
+  assert.equal(finishedDraftNoLongerFits(prepared, 7, 'Brey', { finished: true, choices: { [mine]: jokic } }), true);
+  // A draft still under way keeps what replays, as before.
+  assert.equal(finishedDraftNoLongerFits(prepared, 7, 'Brey', { finished: false, choices: { [mine]: jokic } }), false);
+  // Saves from before the flag read as unfinished.
+  assert.equal(parseMockSave(JSON.stringify({ ...save, finished: undefined }))?.finished, false);
 });
 
 test('a short name is first initial and last name, suffix kept', () => {
