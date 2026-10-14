@@ -394,6 +394,9 @@ export interface ValueOptions {
 /** Fewest games last season for a player to help fit the rank bridge. */
 const MIN_BRIDGE_GAMES = 25;
 
+/** Fewer games than this last season are too few to say a player's numbers swing. */
+const MIN_SWING_GAMES = 10;
+
 /** Name, then id. Only ever a tie-break. */
 const byNameThenId = (a: DatasetPlayer, b: DatasetPlayer): number =>
   (a.fullName ?? a.name).localeCompare(b.fullName ?? b.name) || (a.espnId ?? 0) - (b.espnId ?? 0);
@@ -481,7 +484,12 @@ export function valueBoard(
     if (last !== null && !options.projectionsOnly) candidates['last-season'] = last;
     const source = order.find((candidate) => candidates[candidate] !== undefined) ?? 'none';
     const fppg = source === 'none' ? null : candidates[source] ?? null;
-    const others = [last, player.prior?.avg ?? null].filter((value): value is number => value !== null && Number.isFinite(value));
+    // A handful of games says nothing about how a man's numbers swing: one
+    // who missed the year hurt (Lillard: one game, no points) is not shaded
+    // by it. Twenty real games (Davis) still count.
+    const lastGames = player.stats2026?.gp ?? player.api2026?.gp ?? 0;
+    const lastCounts = lastGames >= MIN_SWING_GAMES ? last : null;
+    const others = [lastCounts, player.prior?.avg ?? null].filter((value): value is number => value !== null && Number.isFinite(value));
     const fppgLow = fppg === null ? null : round1(Math.min(fppg, ...others));
 
     const teamId = nbaTeamIdForProTeam(player.proTeam);
