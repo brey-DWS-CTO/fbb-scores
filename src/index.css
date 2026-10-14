@@ -4505,10 +4505,8 @@ html.theme-light {
 
   /* The queue folds open above the list. The right column stays put away. */
   .room .room-queue-fold { display: block; padding: 8px 10px; margin-bottom: 8px; }
-  /* The queue star stays, pinned between GONE and the name. */
-  .room .room-table .room-star { position: sticky; left: 0; z-index: 3; width: 30px; min-width: 30px; padding: 4px 0; }
-  .room .room-table .room-star button { padding: 2px 4px; }
-  .room .room-table th.room-star { z-index: 5; }
+  /* No queue star in the list: it costs the names their room. Tap a player and queue him from his card. */
+  .room .room-table .room-star { display: none; }
 
   /* DRAFT, GONE and the name pin on the left; the stats slide under them. */
   .room .room-draft-lead, .room .room-gone-lead { display: table-cell; position: sticky; z-index: 3; }
@@ -4517,9 +4515,8 @@ html.theme-light {
   .room .room-table .room-draft-lead .mock-mini-btn { min-height: 32px; padding: 0 6px; font-size: 0.6rem; width: 100%; }
   .room .room-table .room-gone-lead { left: 56px; width: 44px; min-width: 44px; padding: 4px; font-size: 0.72rem; }
   .room .room-table th.room-gone-lead button { padding: 8px 4px; }
-  .room .room-table .room-player-col { position: sticky; left: 30px; z-index: 3; min-width: 0; }
-  .room .room-table.is-my-turn .room-star { left: 100px; }
-  .room .room-table.is-my-turn .room-player-col { left: 130px; }
+  .room .room-table .room-player-col { position: sticky; left: 0; z-index: 3; min-width: 0; }
+  .room .room-table.is-my-turn .room-player-col { left: 100px; }
   /* Scrolled sideways, the name column eases narrower instead of snapping. */
   .room .room-table td.room-player-col, .room .room-table th.room-player-col { transition: max-width 0.22s ease; }
   .room .room-table th { z-index: 4; }
@@ -4746,6 +4743,12 @@ html.theme-light {
   font-family: inherit;
   font-size: 0.8rem;
 }
+
+/* ─── Finished mock: tap a team in the standings to see its roster ─── */
+.mock-grade-team { text-decoration: underline dotted; text-underline-offset: 3px; }
+.mock-grade-table tr.is-tappable:hover td { background: color-mix(in srgb, var(--neon-teal) 8%, transparent); }
+/* "See the board" scrolls here; the pinned clock must not cover it. */
+.room-view-anchor { scroll-margin-top: calc(var(--room-clock-h, 0px) + 8px); }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

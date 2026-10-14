@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, oddsKeeperThere, type LiveChoices } from '../../lib/league/liveMock.js';
 import type { MockCandidate, MockMode, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
-import { editTitle, type PlayerProjection } from '../../lib/league/projections.js';
+import { PLAY_IN_COUNTS, PLAYOFF_COUNTS, editTitle, type PlayerProjection } from '../../lib/league/projections.js';
+import { relativeScheduleHeat } from './scheduleUi.js';
 import {
   draftGrid,
   moveQueued,
@@ -58,9 +59,17 @@ interface Props {
 }
 
 type CenterTab = 'players' | 'teams' | 'results';
-type SortKey = 'rank' | 'adp' | 'fppg' | 'total' | 'games' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone';
+type SortKey = 'rank' | 'adp' | 'fppg' | 'total' | 'games' | 'pi' | 'po' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone';
 
 const pct = (share: number) => `${Math.round(share * 100)}%`;
+/** His NBA team's games in our play-in or playoff weeks, coloured against all 30 teams. */
+function PostseasonCell({ games, counts }: { games: number | null | undefined; counts: readonly number[] }) {
+  return (
+    <td className={`room-num${games === null || games === undefined ? '' : ` schedule-heat-${relativeScheduleHeat(games, counts)}`}`}>
+      {games ?? '–'}
+    </td>
+  );
+}
 const one = (value: number | null | undefined) => (value === null || value === undefined ? '–' : value.toFixed(1));
 type Clock = { overall: number; deadline: number; pausedAt: number | null } | null;
 
@@ -342,6 +351,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       case 'fppg': return projection?.fppg ?? null;
       case 'total': return projection?.total ?? null;
       case 'games': return projection?.games ?? null;
+      case 'pi': return projection?.playInGames ?? null;
+      case 'po': return projection?.playoffGames ?? null;
       case 'gone': return odds.get(candidate.playerKey) ?? (odds.size > 0 ? 0 : null);
       default: return projection?.line?.[key] ?? null;
     }
@@ -384,7 +395,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const grade = useMemo((): MockGrade | null => {
     if (!over) return null;
     const players = new Map<string, GradePlayer>();
-    for (const [key, row] of projections) players.set(key, { name: row.name, positions: row.positions, total: row.total, adp: row.adp });
+    for (const [key, row] of projections) players.set(key, { name: row.name, positions: row.positions, total: row.total, fppg: row.fppg, adp: row.adp });
     return gradeMock(live.picks, person, players, prepared.roster);
   }, [over, projections, live.picks, person, prepared.roster]);
   const reported = useRef(false);
@@ -410,6 +421,21 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     prepared.roster,
   );
   const teamRoster = rosterOf(teamView);
+  // Open a tab and bring it into view: on a phone it sits under the grade.
+  const viewRef = useRef<HTMLDivElement>(null);
+  const showView = (tab: CenterTab) => {
+    setCenter(tab);
+    setSelected(null);
+    window.setTimeout(() => viewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+  const seeBoard = () => {
+    setResultsView('board');
+    showView('results');
+  };
+  const seeTeam = (owner: string) => {
+    setTeamView(owner);
+    showView('teams');
+  };
   const grid = draftGrid(slots, shownPicks, myTurn || !over ? currentOverall : null);
   const owners = grid.owners;
 
@@ -476,7 +502,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   );
 
   const queueList = queue.length === 0 ? (
-    <div className="mock-note mock-note-dim">Tap ☆ next to a player to queue him. If your clock runs out, you take the top one still there.</div>
+    <div className="mock-note mock-note-dim">Tap a player, then ☆ QUEUE on his card. If your clock runs out, you take the top one still there.</div>
   ) : (
     <ol className="room-queue-list">
       {queue.map((key, index) => {
@@ -537,7 +563,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 {shareUrl && grade && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} className="room-share" />}
                 {menu}
               </div>
-              <button type="button" className="room-link" onClick={() => setCenter('results')}>See the board</button>
+              <button type="button" className="room-link" onClick={seeBoard}>See the board</button>
             </>
           ) : (
             <>
@@ -625,7 +651,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               HOW YOU DID
               {shareUrl && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} />}
             </div>
-            <MockGradeCard grade={grade} person={person} onPlayer={(key) => setSelected(key)} />
+            <MockGradeCard grade={grade} person={person} onPlayer={(key) => setSelected(key)} onTeam={seeTeam} />
           </section>
         )}
 
@@ -654,6 +680,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             </button>
           ))}
         </div>
+        <div ref={viewRef} className="room-view-anchor" />
 
         {center === 'players' && (
           <div className="room-players">
@@ -664,7 +691,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               </select>
               {/* Phone: sort chips, pinned with this row under the clock. Wide screens sort by the column heads. */}
               <span className="room-sort-quick" role="group" aria-label="Sort by">
-                {([['rank', 'RK'], ['adp', 'ADP'], ['total', 'TOT'], ['fppg', 'FPPG']] as const).map(([key, label]) => (
+                {([['rank', 'RK'], ['adp', 'ADP'], ['total', 'TOT'], ['fppg', 'FPPG'], ...(myTurn ? [['gone', 'GONE']] as const : [])] as const).map(([key, label]) => (
                   <button key={key} type="button" className={sort.key === key ? 'is-on' : ''} aria-pressed={sort.key === key} onClick={() => quickSort(key)}>
                     {label}{sort.key === key ? (sort.dir === 1 ? '▲' : '▼') : ''}
                   </button>
@@ -698,6 +725,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('fppg', 'FPPG')}
                     {sortHead('total', 'TOTAL', 'Projected season points')}
                     {sortHead('games', 'GP')}
+                    {sortHead('pi', 'PI', 'Team games in our play-in weeks')}
+                    {sortHead('po', 'PO', 'Team games in our playoff weeks')}
                     {sortHead('pts', 'PTS')}
                     {sortHead('reb', 'REB')}
                     {sortHead('ast', 'AST')}
@@ -726,7 +755,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     return (
                       <Fragment key={candidate.playerKey}>
                       {pickLineAt === index && myNext && (
-                        <tr className="room-pickline"><td colSpan={18}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
+                        <tr className="room-pickline"><td colSpan={20}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
                       )}
                       <tr
                         className={`${taken ? 'is-taken' : ''}${focus === candidate.playerKey ? ' is-focus' : ''}`}
@@ -766,6 +795,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
+                        <PostseasonCell games={projection?.playInGames} counts={PLAY_IN_COUNTS} />
+                        <PostseasonCell games={projection?.playoffGames} counts={PLAYOFF_COUNTS} />
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -779,7 +810,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                       </Fragment>
                     );
                   })}
-                  {rows.length === 0 && <tr><td colSpan={18} className="proj-empty">No players match.</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={20} className="proj-empty">No players match.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -798,7 +829,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                   <tr>
                     <th className="room-slot-col">Slot</th>
                     <th className="room-player-col">Player</th>
-                    {['FPPG', 'TOTAL', 'GP', 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
+                    {['FPPG', 'TOTAL', 'GP', 'PI', 'PO', 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
                       <th key={label} className="room-num"><span className="room-th">{label}</span></th>
                     ))}
                   </tr>
@@ -823,6 +854,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num room-strong">{candidate ? one(projection?.fppg) : '–'}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num">{projection?.games ?? '–'}</td>
+                        <PostseasonCell games={projection?.playInGames} counts={PLAY_IN_COUNTS} />
+                        <PostseasonCell games={projection?.playoffGames} counts={PLAYOFF_COUNTS} />
                         <td className="room-num">{one(line?.min)}</td>
                         <td className="room-num">{one(line?.pts)}</td>
                         <td className="room-num">{one(line?.reb)}</td>
