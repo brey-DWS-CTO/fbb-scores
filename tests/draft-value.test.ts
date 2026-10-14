@@ -411,3 +411,12 @@ test('risk shading moves the least certain players a few places and leaves stead
   }
   assert.deepEqual(values.entries.map((e) => e.riskRank).sort((a, b) => a - b), values.entries.map((_, i) => i + 1));
 });
+
+test('a season lost to injury does not count as a swing', () => {
+  // Lillard missed 2025-26 with his Achilles: one game, no points. That is no
+  // season, so the projection is shaded only by the season before.
+  const values = valueBoard(dataset.players, liveFixture, { schedule: leagueSchedule2027, projectionsOnly: true });
+  const dame = values.entries.find((entry) => entry.player.fullName === 'Damian Lillard')!;
+  assert.ok(dame.fppgLow !== null && dame.fppgLow > 30, `fppgLow ${dame.fppgLow}`);
+  assert.ok(Math.abs(dame.riskRank - dame.rank) <= 10, `Lillard ${dame.rank} -> ${dame.riskRank}`);
+});

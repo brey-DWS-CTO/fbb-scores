@@ -4812,6 +4812,10 @@ html.theme-light {
 .room-update-owner .board-traded-tag { display: block; margin-top: 2px; font-size: 0.55rem; width: fit-content; margin-left: auto; }
 .board-traded-tag.is-projected { background: transparent; color: var(--neon-yellow); border: 1px dashed var(--neon-yellow); }
 
+/* ─── Mock draft board: a filled cell is always a dark position color, so its words stay light in either theme ─── */
+.room-grid td[style] .room-grid-name { color: #f4f4fb; }
+.room-grid td[style] .room-grid-label { color: rgba(244, 244, 251, 0.72); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
