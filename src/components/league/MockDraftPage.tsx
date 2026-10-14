@@ -16,7 +16,7 @@ import {
 } from '../../lib/league/mockDraft.js';
 import { describeTrade } from '../../lib/league/pickTrades.js';
 import { buildProjections, type PlayerProjection } from '../../lib/league/projections.js';
-import { mockSaveKey, parseMockSave, type MockSave } from '../../lib/league/draftRoom.js';
+import { finishedDraftNoLongerFits, mockSaveKey, parseMockSave, type MockSave } from '../../lib/league/draftRoom.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { buildWorld, privateTrades, switchableTrades, tradeConflicts } from '../../lib/league/whatIf.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
@@ -61,14 +61,15 @@ export default function MockDraftPage() {
 
 function MockDraftScreen() {
   const { identity } = useIdentity();
-  const { state, dataset, meta } = useDraftData();
+  const draftData = useDraftData();
+  const { state, dataset, meta } = draftData;
   const scenarioQuery = useKeeperScenario();
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
   const signedIn = viewer !== null;
 
   // ESPN's numbers with the commissioner's projection edits laid over them.
-  const { snapshot, original, edits } = useProjectionData();
+  const { snapshot, original, edits, loading: projectionsLoading } = useProjectionData();
   const tradesQuery = useQuery({
     queryKey: ['pick-trades', viewer ?? 'anon'],
     queryFn: () => fetchPickTrades(identity as NonNullable<typeof identity>),
@@ -90,7 +91,7 @@ function MockDraftScreen() {
   const [useEntered, setUseEntered] = useState(saved?.useEntered ?? true);
   const [guessInstead, setGuessInstead] = useState<string[]>(saved?.guessInstead ?? []);
   const [progress, setProgress] = useState<RoomProgress | null>(() => (saved
-    ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft }
+    ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft, finished: saved.finished }
     : null));
   const onProgress = useCallback((next: RoomProgress) => setProgress(next), []);
 
@@ -124,6 +125,7 @@ function MockDraftScreen() {
       choices: progress?.choices ?? {},
       queue: progress?.queue ?? [],
       clockLeft: progress?.clockLeft ?? null,
+      finished: progress?.finished ?? false,
       tradesOn,
       tryKeepers,
       tryPicks,
@@ -202,6 +204,25 @@ function MockDraftScreen() {
       `${slot.pick.currentOwner}${slot.keeper ? '=' + slot.keeper.playerKey : slot.made ? '+' + slot.made.playerKey : ''}`).join(',')}`,
     [seed, mode, whatIf.board],
   );
+
+  // A saved draft is replayed pick by pick on the board these build. Replaying
+  // on half the data drops picks that no longer fit, so wait for all of it.
+  const loading = draftData.isLoading || draftData.playerPoolQuery.isLoading || projectionsLoading
+    || tradesQuery.isLoading || scenarioQuery.isLoading;
+
+  // A finished draft the board has moved under (a keeper or a trade since)
+  // would reopen half done. Start a new one; the old one is in Past mocks.
+  const staleFinish = useMemo(
+    () => !loading && viewer !== null && livePrepared !== null && progress?.finished === true
+      && finishedDraftNoLongerFits(livePrepared, seed, viewer, progress),
+    [loading, viewer, livePrepared, progress, seed],
+  );
+  const [boardMoved, setBoardMoved] = useState(false);
+  if (staleFinish) {
+    setProgress(null);
+    setSeed((seed * 7919 + 1) % 100_000);
+    setBoardMoved(true);
+  }
 
   if (!viewer) {
     return (
@@ -425,7 +446,12 @@ function MockDraftScreen() {
 
       {setupFirst && setup}
 
-      {livePrepared ? (
+      {boardMoved && !progress?.started && (
+        <div className="mock-note">Keepers or trades changed since your last mock, so a new draft is ready. The last one is in Past mocks.</div>
+      )}
+      {loading || staleFinish ? (
+        <div className="mock-note">Loading your draft…</div>
+      ) : livePrepared ? (
         <DraftRoom
           key={liveKey}
           prepared={livePrepared}

@@ -212,6 +212,8 @@ export interface MockSave {
   queue: string[];
   /** Seconds left on the person's clock when they left, if it was running. */
   clockLeft: number | null;
+  /** The last pick landed. */
+  finished: boolean;
   /** The what-if switches that shape the board. */
   tradesOn: string[];
   tryKeepers: boolean;
@@ -257,6 +259,7 @@ export function parseMockSave(raw: string | null): MockSave | null {
     choices,
     queue: isStringList(save.queue) ? save.queue : [],
     clockLeft: typeof save.clockLeft === 'number' && save.clockLeft >= 0 ? save.clockLeft : null,
+    finished: save.finished === true,
     tradesOn: isStringList(save.tradesOn) ? save.tradesOn : [],
     tryKeepers: save.tryKeepers === true,
     tryPicks,
@@ -290,4 +293,20 @@ export function replaySaved(
       dropped += 1;
     }
   }
+}
+
+/**
+ * A finished draft that no longer replays in full on today's board, because a
+ * keeper or a trade changed after it. Reopening it would land the person in
+ * the middle of a draft they already finished, so the page starts a new one
+ * instead. The finished one is already in Past mocks.
+ */
+export function finishedDraftNoLongerFits(
+  prepared: PreparedMock,
+  seed: number,
+  person: string,
+  saved: { finished?: boolean; choices: LiveChoices },
+): boolean {
+  if (saved.finished !== true) return false;
+  return replaySaved(prepared, seed, person, saved.choices).dropped > 0;
 }
