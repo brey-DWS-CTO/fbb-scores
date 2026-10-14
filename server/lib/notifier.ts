@@ -104,17 +104,23 @@ function tradeLink(origin: string): string {
   return `${origin}/trades`;
 }
 
-/** An offer landed in someone's inbox. Mails the person who has to answer. */
-export function notifyTradeOffered(proposal: PickTradeProposal, origin: string): void {
+/**
+ * An offer landed in someone's inbox, or the proposer changed it and sent it
+ * again. Mails the person who has to answer.
+ */
+export function notifyTradeOffered(proposal: PickTradeProposal, origin: string, revised = false): void {
   const theirs = sideLabel(proposal.offer);
   const yours = sideLabel(proposal.request);
-  queueMail('trade offered', () =>
+  const headline = revised
+    ? `${proposal.proposer} changed the trade offer`
+    : `${proposal.proposer} offered you a trade`;
+  queueMail(revised ? 'trade revised' : 'trade offered', () =>
     mailTo(
       proposal.recipient,
       {
-        subject: `${proposal.proposer} offered you a trade`,
+        subject: headline,
         preheader: describeTrade(proposal, leagueDataset),
-        heading: `${proposal.proposer} offered you a trade`,
+        heading: headline,
         lines: [
           `${proposal.proposer} sends you ${theirs}.`,
           `${proposal.proposer} wants ${yours} back.`,
@@ -185,6 +191,25 @@ export function notifyTradeAccepted(
       origin,
     ),
   );
+
+  // Everyone else hears the trade went through, so no deal happens quietly.
+  queueMail('trade announced', async () => {
+    const book = await addressBook();
+    const content: MailContent = {
+      subject: `Trade: ${proposal.proposer} and ${proposal.recipient}`,
+      preheader: describeTrade(proposal, leagueDataset),
+      heading: 'A trade went through',
+      lines: [
+        `${proposal.proposer} gets ${sideLabel(proposal.request)}.`,
+        `${proposal.recipient} gets ${sideLabel(proposal.offer)}.`,
+      ],
+      action: { label: 'SEE LEAGUE ACTIVITY', href: `${origin}/league` },
+    };
+    for (const [owner, address] of book) {
+      if (owner === proposal.proposer || owner === proposal.recipient) continue;
+      await sendMail(address, content, origin, 'notify');
+    }
+  });
 
   // The member who accepted gets no trade mail, because they were there. They
   // do get one when their own keepers went with it.

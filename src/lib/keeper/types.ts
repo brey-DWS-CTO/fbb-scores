@@ -271,6 +271,8 @@ export interface PickTradeProposal {
   version: number;
   createdAt: string;
   expiresAt: string;
+  /** The last time the proposer changed the offer and sent it again. */
+  revisedAt?: string;
   resolvedAt?: string;
   resolvedBy?: string;
   /** Why it left the pending state, when that needs saying. */
