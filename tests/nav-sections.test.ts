@@ -34,12 +34,16 @@ test('every old page address finds its section', () => {
     ['/votes', 'rules'],
     ['/rules', 'rules'],
     ['/schedule', 'commish'],
+    ['/awards', 'commish'],
+    ['/depth', 'commish'],
     ['/admin', 'commish'],
     ['/', null],
   ];
   for (const [path, id] of cases) assert.equal(sectionFor(path, commish)?.id ?? null, id, path);
   // A member who follows a commish link lands nowhere, not on a tab they cannot see.
   assert.equal(sectionFor('/admin', member), null);
+  assert.equal(sectionFor('/awards', member), null);
+  assert.equal(sectionFor('/depth', member), null);
   assert.equal(sectionFor('/mock', member)?.id, 'draft');
 });
 

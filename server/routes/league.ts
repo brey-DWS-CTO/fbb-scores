@@ -226,6 +226,7 @@ import {
   prepareDraftRankingCandidate,
   resolveCurrentDraftRankings,
 } from '../lib/draftRankingService.js';
+import { getNbaWatch } from '../lib/nbaWatchService.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -738,6 +739,17 @@ router.post('/team-names/accept', requireAuth, requireCommissioner, async (req, 
 // ESPN's ADP, draft ranks and projections, frozen the same way as the player
 // pool. Any signed-in owner reads them, for the mock draft and projections.
 // Only the commissioner fetches or accepts new ones.
+
+// ─── Award odds and depth charts ─────────────────────────────────────────────
+
+/** GET /api/league/nba-watch — Kalshi award odds and ESPN depth charts. `?fresh=1` reads them again. */
+router.get('/nba-watch', requireAuth, requireCommissioner, async (req, res) => {
+  try {
+    res.json(await getNbaWatch(req.query.fresh === '1'));
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : 'Could not read the odds or depth charts.' });
+  }
+});
 
 // ─── Mock draft history ──────────────────────────────────────────────────────
 //
