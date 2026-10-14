@@ -87,7 +87,8 @@ function App() {
         <Route path="/projections" element={<ProjectionsPage />} />
         <Route path="/tiers" element={<TiersPage />} />
         <Route path="/schedule" element={<SchedulePage />} />
-        <Route path="/awards" element={<NbaWatchPage />} />
+        <Route path="/awards" element={<NbaWatchPage view="awards" />} />
+        <Route path="/depth" element={<NbaWatchPage view="depth" />} />
         <Route path="*" element={<SplashPage />} />
       </Routes>
     </div>

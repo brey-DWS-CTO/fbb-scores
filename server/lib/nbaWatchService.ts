@@ -1,6 +1,6 @@
 /**
  * Read NBA depth charts from ESPN and award odds from Kalshi for the commish's
- * AWARDS & DEPTH page. Nothing is stored: each server keeps the last read for
+ * AWARDS and DEPTH CHARTS pages. Nothing is stored: each server keeps the last read for
  * an hour, and REFRESH reads again.
  */
 import {

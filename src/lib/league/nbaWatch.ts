@@ -1,5 +1,5 @@
 /**
- * NBA award odds and team depth charts, for the commish's AWARDS & DEPTH page.
+ * NBA award odds and team depth charts, for the commish's AWARDS and DEPTH CHARTS pages.
  *
  * Depth charts come from ESPN's public site API, one call a team. Award odds
  * come from Kalshi's public market API, one call an award. Both are read on
@@ -214,7 +214,7 @@ export interface AwardResult {
   error?: string;
 }
 
-/** What the server sends the AWARDS & DEPTH page. */
+/** What the server sends the AWARDS and DEPTH CHARTS pages. */
 export interface NbaWatch {
   fetchedAt: string;
   teams: TeamDepth[];

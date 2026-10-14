@@ -16,15 +16,22 @@ import {
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 
-/** Rows shown for each award. */
-const AWARD_ROWS = 8;
+/** Rows shown for each award. DPOY is one man's to lose, so it shows fewer. */
+const AWARD_ROWS = 10;
+const rowsFor = (awardId: string) => (awardId === 'dpoy' ? 5 : AWARD_ROWS);
 /** Depth shown for each position: starter, second, third. */
 const DEPTH = 3;
 
 const pct = (chance: number) => `${Math.round(chance * 100)}%`;
 
-/** /awards — commish only: award odds from Kalshi and every team's depth chart from ESPN. */
-export default function NbaWatchPage() {
+export type NbaWatchView = 'awards' | 'depth';
+
+/**
+ * Commish only. /awards: award odds from Kalshi. /depth: every team's depth
+ * chart from ESPN. One read feeds both: each page uses the other's data for
+ * its tags.
+ */
+export default function NbaWatchPage({ view }: { view: NbaWatchView }) {
   const { identity } = useIdentity();
   const isCommish = identity?.isCommissioner === true;
   const queryClient = useQueryClient();
@@ -58,7 +65,7 @@ export default function NbaWatchPage() {
         <div className="panel" style={{ padding: 20, borderRadius: 10, textAlign: 'center' }}>
           <div className="hub-heading" style={{ fontSize: '0.72rem', color: 'var(--neon-red)' }}>COMMISH ONLY</div>
           <div style={{ color: 'var(--text-mid)', marginTop: 10, fontSize: '0.85rem' }}>
-            Sign in as the commish to see award odds and depth charts.
+            Sign in as the commish to see {view === 'awards' ? 'award odds' : 'depth charts'}.
           </div>
         </div>
       </div>
@@ -76,11 +83,11 @@ export default function NbaWatchPage() {
         <div>
           <Link className="schedule-back-link" to="/admin">← COMMISH MODE</Link>
           <h1 className="hub-heading glow-orange">
-            <NavIcon name="trophy" size={18} className="icon-in-heading" />
-            AWARDS &amp; DEPTH
+            <NavIcon name={view === 'awards' ? 'trophy' : 'people'} size={18} className="icon-in-heading" />
+            {view === 'awards' ? 'AWARDS' : 'DEPTH CHARTS'}
           </h1>
           <p>
-            Award odds from Kalshi. Depth charts from ESPN.
+            {view === 'awards' ? 'Award odds from Kalshi. Team and depth spot from ESPN.' : 'Depth charts from ESPN. Award badges from Kalshi.'}
             {data && <> Read {new Date(data.fetchedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.</>}
           </p>
         </div>
@@ -97,9 +104,10 @@ export default function NbaWatchPage() {
 
       {data && (
         <>
-          <section className="nba-awards">
+          {view === 'awards' && <section className="nba-awards">
             {data.awards.map(({ award, rows, error }) => {
-              const thin = rows.slice(0, AWARD_ROWS).some((row) => row.thin);
+              const shown = rows.slice(0, rowsFor(award.id));
+              const thin = shown.some((row) => row.thin);
               return (
                 <div key={award.id} className="panel nba-award">
                   <div className="hub-heading nba-award-head">
@@ -110,7 +118,7 @@ export default function NbaWatchPage() {
                     : rows.length === 0 ? <div className="mock-note mock-note-dim">No open market yet.</div>
                       : (
                         <ol className="nba-award-list">
-                          {rows.slice(0, AWARD_ROWS).map((row, index) => {
+                          {shown.map((row, index) => {
                             const spot = spots.get(nameKey(row.name));
                             return (
                               <li key={row.name}>
@@ -132,11 +140,10 @@ export default function NbaWatchPage() {
                 </div>
               );
             })}
-          </section>
+          </section>}
 
-          <section className="nba-depth">
+          {view === 'depth' && <section className="nba-depth">
             <div className="hub-heading nba-depth-head">
-              DEPTH CHARTS
               <small>Starter first. OUT marks an injury, with ESPN's note on hover. Badges show a 10% or better shot at an award.</small>
             </div>
             <div className="nba-depth-filters">
@@ -181,7 +188,7 @@ export default function NbaWatchPage() {
                 </div>
               ))}
             </div>
-          </section>
+          </section>}
         </>
       )}
     </main>

@@ -4754,7 +4754,7 @@ html.theme-light {
   .room .room-roster-wrap { max-height: none; min-height: 0; overscroll-behavior-y: auto; }
 }
 
-/* ─── AWARDS & DEPTH: award odds and depth charts (commish) ─── */
+/* ─── AWARDS and DEPTH CHARTS pages (commish) ─── */
 .nba-watch-actions { display: flex; align-items: center; gap: 10px; }
 .nba-awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .nba-award { padding: 12px 14px; border-radius: 10px; }
@@ -4791,8 +4791,6 @@ html.theme-light {
   .nba-watch .schedule-page-header { flex-wrap: wrap; }
   .nba-depth-filters { grid-template-columns: 1fr 1fr; }
   .nba-depth-grid { grid-template-columns: 1fr; }
-  /* Five a card on a phone, so the depth charts are not a long scroll away. */
-  .nba-award-list li:nth-child(n+6) { display: none; }
   .nba-team-table { font-size: 0.7rem; }
   .nba-name-full { display: none; }
   .nba-name-short { display: inline; }
