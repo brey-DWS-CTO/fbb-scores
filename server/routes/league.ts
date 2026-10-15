@@ -128,6 +128,9 @@ import {
   findMockResult,
   saveMockResult,
   listMockFinishes,
+  listMockTrades,
+  saveMockTrade,
+  deleteMockTrade,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
@@ -169,6 +172,7 @@ import {
   type PropSide,
 } from '../../src/lib/league/propBets.js';
 import { mockStats } from '../../src/lib/league/mockStats.js';
+import { MAX_MOCK_TRADES, mockTradeId, type MockTrade } from '../../src/lib/league/mockTrades.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import {
   DUES_ACTIONS,
@@ -2795,6 +2799,64 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ─── Mock trades ─────────────────────────────────────────────────────────────
+//
+// An offer the member builds and keeps for themselves, to draft off in the
+// mock draft. It never reaches the other owner and sends no email. Only the
+// owner from the sign-in can read, add or delete theirs.
+
+/** GET /api/league/pick-trades/mock — your mock trades, oldest first. */
+router.get('/pick-trades/mock', requireAuth, async (_req, res) => {
+  res.json({ trades: await listMockTrades(leagueDataset.season, res.locals.owner as string) });
+});
+
+/** POST /api/league/pick-trades/mock — keep a trade as a mock. Same checks as a real offer; nothing is sent. */
+router.post('/pick-trades/mock', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const input: ProposalInput = {
+      proposer: owner,
+      recipient: typeof body.recipient === 'string' ? body.recipient : '',
+      offer: parsePickRefs(body.offer, 'offer', leagueDataset.season),
+      request: parsePickRefs(body.request, 'request', leagueDataset.season),
+      note: typeof body.note === 'string' ? body.note.trim().slice(0, MAX_TRADE_NOTE) : '',
+    };
+    const { state } = await getState();
+    const check = checkProposalAgainstState(currentDataset(state), state, input);
+    if (!check.ok) {
+      res.status(409).json({ error: check.message, code: check.reason });
+      return;
+    }
+    const existing = await listMockTrades(leagueDataset.season, owner);
+    if (existing.length >= MAX_MOCK_TRADES) {
+      res.status(409).json({ error: `Keep it to ${MAX_MOCK_TRADES} mock trades. Delete one first.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const trade: MockTrade = {
+      id: mockTradeId(owner, at),
+      season: leagueDataset.season,
+      owner,
+      recipient: input.recipient,
+      offer: input.offer,
+      request: input.request,
+      note: input.note,
+      createdAt: at,
+    };
+    await saveMockTrade(trade);
+    res.json({ trade });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** DELETE /api/league/pick-trades/mock/:id — drop one of your mock trades. */
+router.delete('/pick-trades/mock/:id', requireAuth, async (req, res) => {
+  await deleteMockTrade(leagueDataset.season, res.locals.owner as string, routeParam(req.params.id));
+  res.json({ ok: true });
 });
 
 /**

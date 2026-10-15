@@ -368,6 +368,38 @@ test('only the sender can change an offer, and only while it waits', async () =>
   assert.equal(asRecord(late.body).code, 'not-pending');
 });
 
+test('a mock trade is kept for its builder alone, never reaches the other side, and deletes', async () => {
+  const saved = await request('/api/league/pick-trades/mock', {
+    method: 'POST',
+    headers: auth('Amy'),
+    body: JSON.stringify({ recipient: 'Kyle', offer: [ref(7, 'Amy')], request: [ref(4, 'Kyle')], note: 'just looking' }),
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const trade = asRecord(saved.body).trade as { id: string; owner: string };
+  assert.ok(trade.id.startsWith('mock:'));
+  assert.equal(trade.owner, 'Amy');
+
+  const amy = (await request('/api/league/pick-trades/mock', { headers: auth('Amy') })).body as { trades: unknown[] };
+  assert.equal(amy.trades.length, 1);
+  const kyle = (await request('/api/league/pick-trades/mock', { headers: auth('Kyle') })).body as { trades: unknown[] };
+  assert.equal(kyle.trades.length, 0, 'the other side never sees it');
+  const kyleOffers = asRecord((await list('Kyle')).body);
+  assert.equal((kyleOffers.proposals as unknown[]).length, 0, 'and it is not an offer');
+
+  const bad = await request('/api/league/pick-trades/mock', {
+    method: 'POST',
+    headers: auth('Amy'),
+    body: JSON.stringify({ recipient: 'Kyle', offer: [ref(5, 'Kyle')], request: [ref(4, 'Kyle')], note: '' }),
+  });
+  assert.equal(bad.status, 409, 'the same checks as a real offer');
+
+  // Kyle cannot delete Amy's; Amy can.
+  await request(`/api/league/pick-trades/mock/${encodeURIComponent(trade.id)}`, { method: 'DELETE', headers: auth('Kyle') });
+  assert.equal(((await request('/api/league/pick-trades/mock', { headers: auth('Amy') })).body as { trades: unknown[] }).trades.length, 1);
+  await request(`/api/league/pick-trades/mock/${encodeURIComponent(trade.id)}`, { method: 'DELETE', headers: auth('Amy') });
+  assert.equal(((await request('/api/league/pick-trades/mock', { headers: auth('Amy') })).body as { trades: unknown[] }).trades.length, 0);
+});
+
 test('pulling an offer beats a later accept', async () => {
   const proposal = asRecord(
     (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,

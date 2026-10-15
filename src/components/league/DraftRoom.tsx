@@ -50,8 +50,8 @@ interface Props {
   prepared: PreparedMock;
   values: ValueBoard;
   projections: ReadonlyMap<string, PlayerProjection>;
-  /** Picks that move only if a switched-on pending trade goes through. */
-  projectedTrades?: ReadonlySet<number>;
+  /** Picks that move only if a switched-on pending trade goes through, to who holds them now. */
+  projectedTrades?: ReadonlyMap<number, string>;
   person: string;
   seed: number;
   mode: MockMode;
@@ -351,6 +351,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   const currentSlot = currentOverall !== null ? slots.find((slot) => slot.pick.overall === currentOverall) ?? null : null;
   const untilTurn = currentOverall !== null ? picksUntilTurn(slots, currentOverall, person) : null;
   const myNext = slots.find((slot) => slot.pick.currentOwner === person && slot.pick.overall >= (currentOverall ?? 1) && !slot.keeper && !slot.made) ?? null;
+  // On your pick: the one after it, so you can tell whether a player will wait.
+  const myAfter = slots.find((slot) => slot.pick.currentOwner === person && slot.pick.overall > (currentOverall ?? 1) && !slot.keeper && !slot.made) ?? null;
   const upcoming = upcomingPicks(slots, currentOverall ?? 1, person, 30);
 
   // The pool as the screen sees it: who is still there, plus the taken when asked.
@@ -439,25 +441,25 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
     prepared.roster,
   );
   const teamRoster = rosterOf(teamView);
-  // Whose pick this was before a trade, and whether that trade is only projected.
-  const tradeOf = (overall: number): { from: string; projected: boolean } | null => {
-    const slot = slots.find((entry) => entry.pick.overall === overall);
-    if (!slot) return null;
-    const original = slot.pick.originalOwner ?? slot.pick.currentOwner;
-    if (original === slot.pick.currentOwner) return null;
-    return { from: original, projected: projectedTrades?.has(overall) === true };
-  };
+  // Who a pick's row names, and its tag. A real trade: the holder, and whose
+  // pick it was. A trade only switched on: who holds it now, and who would
+  // if that trade goes through.
+  const ownerShown = (overall: number, owner: string) => projectedTrades?.get(overall) ?? owner;
   const tradeTag = (overall: number, owner: string) => {
-    const trade = tradeOf(overall);
-    if (!trade) return null;
+    const holderNow = projectedTrades?.get(overall);
+    if (holderNow !== undefined) {
+      return (
+        <span className="board-traded-tag is-projected" title={`${holderNow}'s now. ${owner}'s if the trade you switched on goes through`}>
+          {`${owner.toUpperCase()}'S, IF TRADED`}
+        </span>
+      );
+    }
+    const slot = slots.find((entry) => entry.pick.overall === overall);
+    const original = slot ? slot.pick.originalOwner ?? slot.pick.currentOwner : owner;
+    if (original === owner) return null;
     return (
-      <span
-        className={`board-traded-tag${trade.projected ? ' is-projected' : ''}`}
-        title={trade.projected
-          ? `${owner} holds ${trade.from}'s pick only if the trade you switched on goes through`
-          : `${owner} holds ${trade.from}'s pick`}
-      >
-        {trade.projected ? `${trade.from.toUpperCase()}'S, IF TRADED` : `${trade.from.toUpperCase()}'S`}
+      <span className="board-traded-tag" title={`${owner} holds ${original}'s pick`}>
+        {`${original.toUpperCase()}'S`}
       </span>
     );
   };
@@ -658,7 +660,10 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                 </div>
               ) : myTurn ? (
                 <div className="room-turn is-mine">
-                  YOUR PICK
+                  <span>
+                    YOUR PICK
+                    {myAfter && <small className="room-turn-next"> · next at {myAfter.pick.round}.{myAfter.pick.slot}</small>}
+                  </span>
                   <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>
                   {menu}
                 </div>
@@ -953,7 +958,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                     {pick.how === 'keeper'
                       ? <span><KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></span>
                       : <span />}
-                    <span className="room-update-owner">{pick.owner}{tradeTag(pick.overall, pick.owner)}</span>
+                    <span className="room-update-owner">{ownerShown(pick.overall, pick.owner)}{tradeTag(pick.overall, pick.owner)}</span>
                   </li>
                 ))}
                 {shownPicks.length === 0 && <li className="mock-live">No picks yet.</li>}
