@@ -107,6 +107,7 @@ import {
   RulebookSignError,
   CONFIG_TEAMS,
   deleteRulebookSignature,
+  foldLatestRulebookVersion,
   listRulebookSignatures,
   insertRulebookSignature,
   listDues,
@@ -126,25 +127,27 @@ import {
   listMockResults,
   findMockResult,
   saveMockResult,
+  listMockFinishes,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
-import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
+import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
 import {
   NO_FACTS,
-  bestGrade,
   canReveal,
+  coversAllProps,
   earnedCount,
   earnedFrom,
   firstGuessToRecord,
   guessHit,
+  guessNear,
+  hiddenCount,
+  hiddenKeepers,
   ledgerOf,
-  mocksFinished,
-  nextMockCount,
-  pickRevealTarget,
-  revealCandidates,
+  pickReveal,
   revealsLeft,
+  revealsReady,
   stampEarned,
   standings,
   type AchievementLedger,
@@ -163,6 +166,7 @@ import {
   type PropBet,
   type PropSide,
 } from '../../src/lib/league/propBets.js';
+import { mockStats } from '../../src/lib/league/mockStats.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import {
   DUES_ACTIONS,
@@ -471,15 +475,13 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
   };
 }
 
-/** Keeper reveals waiting for this viewer. Drives the LEAGUE badge. */
+/** Keeper reveals this viewer could spend now. Drives the LEAGUE badge. */
 function revealsReadyFor(state: LeagueDynamicState, viewer: Viewer): number {
   if (!viewer.owner || viewer.isCommissioner || state.keepersRevealed === true) return 0;
   const ledger = ledgerOf(state.achievements);
-  return revealsLeft(
-    earnedCount(ledger.earned[viewer.owner]),
-    (ledger.reveals[viewer.owner] ?? []).length,
-    OWNERS.length - 1,
-  );
+  const reveals = ledger.reveals[viewer.owner] ?? [];
+  const left = revealsLeft(earnedCount(ledger.earned[viewer.owner]), reveals.length);
+  return revealsReady(left, hiddenCount(hiddenKeepers(viewer.owner, OWNERS, state.keepers, reveals)));
 }
 
 function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer: Viewer) {
@@ -805,6 +807,12 @@ router.get('/nba-watch', requireAuth, requireCommissioner, async (req, res) => {
 // comes from the sign-in, never the body. The commissioner keeps every one;
 // everyone else keeps their latest ten.
 
+/** GET /api/league/mock-stats — every owner's finished mocks and best grade. Everyone sees it. */
+router.get('/mock-stats', requireAuth, async (_req, res) => {
+  const finishes = await listMockFinishes(leagueDataset.season);
+  res.json({ stats: mockStats(OWNERS, finishes) });
+});
+
 /** GET /api/league/mock-results — your saved mocks, newest first. */
 router.get('/mock-results', requireAuth, async (_req, res) => {
   const rows = await listMockResults(leagueDataset.season, res.locals.owner as string);
@@ -822,17 +830,7 @@ router.post('/mock-results', requireAuth, async (req, res) => {
     return;
   }
   const keep = res.locals.isCommissioner === true ? null : MEMBER_MOCK_LIMIT;
-  const before = await listMockResults(leagueDataset.season, owner);
   await saveMockResult({ season: leagueDataset.season, owner, id: record.id, result: record, createdAt: record.finishedAt }, keep);
-  // Members keep ten, so the rows alone cannot count to MOCK ADDICT honestly.
-  // Keep a running total beside them.
-  if (!before.some((row) => row.id === record.id)) {
-    await mutateState((draft) => {
-      const ledger = ledgerOf(draft.achievements);
-      ledger.mocks[owner] = nextMockCount(ledger.mocks[owner], before.length);
-      draft.achievements = ledger;
-    });
-  }
   res.json({ result: record });
 });
 
@@ -2008,6 +2006,28 @@ router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (r
  * one member's signature on the revision in force, so they can sign again.
  * Audited, since a signature is otherwise never touched.
  */
+/**
+ * POST /api/league/rulebook/fold — fold the newest revision into the one
+ * before it, so a fix everyone already understands costs nobody a second
+ * signature (commissioner only). Body: { versionId } of the newest, as the
+ * page showed it. Refused once anyone has signed the newest.
+ */
+router.post('/rulebook/fold', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const versionId = (req.body as { versionId?: unknown }).versionId;
+    if (typeof versionId !== 'string' || !versionId) throw new HttpError(400, 'versionId is required');
+    const result = await foldLatestRulebookVersion(RULEBOOK_SEASON, versionId);
+    await appendAudit(actor(res), 'rulebook-fold', result);
+    res.json(result);
+  } catch (err) {
+    if (err instanceof RulebookPublishError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
 router.delete('/rulebook/signatures/:owner', requireAuth, requireCommissioner, async (req, res, next) => {
   try {
     const owner = String(req.params.owner);
@@ -3514,40 +3534,52 @@ router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, 
 
 // ─── Achievements ────────────────────────────────────────────────────────────
 //
-// Each achievement buys one look at another team's keepers. What an owner has
-// done is read from the league's own records every time, then stamped into
-// the ledger so it sticks. See src/lib/league/achievements.ts.
+// Each achievement buys one look at one keeper. What an owner has done is read
+// from the league's own records every time, then stamped into the ledger so it
+// sticks. See src/lib/league/achievements.ts.
 
 /** What every owner has done, from the records. */
 async function achievementFacts(state: LeagueDynamicState): Promise<Record<string, OwnerFacts>> {
   const season = leagueDataset.season;
-  const [signatures, polls, dues, mocks] = await Promise.all([
+  const [signatures, polls, dues, finishes, mocks] = await Promise.all([
     listRulebookSignatures(RULEBOOK_SEASON),
     seasonPolls(),
     listDues(DUES_SEASON),
+    listMockFinishes(season),
     Promise.all(OWNERS.map((owner) => listMockResults(season, owner))),
   ]);
+  // The same counts the MOCKS DONE table shows, from the log that is never trimmed.
+  const mockRows = new Map(mockStats(OWNERS, finishes).map((row) => [row.owner, row]));
   const ledger = ledgerOf(state.achievements);
   const proposals = proposalsOf(state);
   const props = allProps(state);
   const facts: Record<string, OwnerFacts> = {};
   OWNERS.forEach((owner, i) => {
-    const grades = mocks[i]
-      .map((row) => (row.result as { grade?: { grade?: unknown } } | null)?.grade?.grade)
-      .filter((g): g is string => typeof g === 'string');
+    const saved = mocks[i].map((row) => row.result as Partial<MockResultRecord> | null);
+    const visible = visibleProps(props, [owner]);
+    const sides = visible.filter((p) => p.takes.some((t) => t.owner === owner)).length;
+    const mine = proposals.filter((p) => p.proposer === owner);
+    // The commissioner sees every keeper, so a guess proves nothing.
+    const guesses = isCommissionerOwner(owner) ? { hits: 0, near: 0 } : keeperGuessScore(state, ledger, owner);
     facts[owner] = {
       ...NO_FACTS,
       signedRulebook: signatures.some((sig) => sig.owner === owner),
-      mocksFinished: mocksFinished(ledger.mocks[owner], mocks[i].length),
-      bestMockGrade: bestGrade(grades),
-      tradesOffered: proposals.filter((p) => p.proposer === owner).length,
-      tradesDone: proposals.filter(
-        (p) => p.status === 'accepted' && (p.proposer === owner || p.recipient === owner),
-      ).length,
+      drewSignature: signatures.some((sig) => sig.owner === owner && Boolean(sig.drawing)),
+      mocksFinished: mockRows.get(owner)?.mocks ?? 0,
+      bestMockGrade: mockRows.get(owner)?.bestGrade ?? null,
+      bestSteal: Math.max(0, ...saved.map((r) => r?.grade?.steal?.by ?? 0)),
+      mockedWithTrade: saved.some((r) => (r?.tradesOn?.length ?? 0) > 0),
+      tradesOffered: mine.length,
+      offersRevised: mine.filter((p) => Boolean(p.revisedAt)).length,
+      offersClosed: mine.filter((p) => p.status === 'accepted').length,
+      offersTaken: proposals.filter((p) => p.recipient === owner && p.status === 'accepted').length,
       propBetsSet: props.filter((p) => p.createdBy === owner).length,
+      propSidesTaken: sides,
+      allPropsCovered: coversAllProps(visible.length, sides),
       votesCast: polls.filter((poll) => poll.votes.some((v) => v.owner === owner)).length,
-      // The commissioner sees every keeper, so a guess proves nothing.
-      scoutHits: isCommissionerOwner(owner) ? 0 : scoutHits(state, ledger, owner),
+      pollsOpened: polls.filter((poll) => poll.proposedBy === owner).length,
+      scoutHits: guesses.hits,
+      closeCalls: guesses.near,
       // Marking it sent is not enough; the collector has to confirm it.
       duesPaid: dues.some((row) => row.owner === owner && row.verifiedAt !== null),
     };
@@ -3555,15 +3587,19 @@ async function achievementFacts(state: LeagueDynamicState): Promise<Record<strin
   return facts;
 }
 
-/** Teams whose exact keepers this owner named on their first saved guess. */
-function scoutHits(state: LeagueDynamicState, ledger: AchievementLedger, owner: string): number {
-  const guesses = ledger.firstGuesses[owner] ?? {};
+/** Teams whose keepers this owner named on the first saved guess: all of them, or at least one. */
+function keeperGuessScore(state: LeagueDynamicState, ledger: AchievementLedger, owner: string): { hits: number; near: number } {
+  const guesses = Object.entries(ledger.firstGuesses[owner] ?? {}).filter(([target]) => target !== owner);
   const reveals = ledger.reveals[owner] ?? [];
-  return Object.entries(guesses).filter(([target, guess]) => {
+  let hits = 0;
+  let near = 0;
+  for (const [target, guess] of guesses) {
     const actual = (state.keepers[target] ?? []).map((k) => k.playerKey);
     const revealedAt = reveals.find((r) => r.target === target)?.at ?? null;
-    return target !== owner && guessHit(guess, actual, revealedAt);
-  }).length;
+    if (guessHit(guess, actual, revealedAt)) hits += 1;
+    if (guessNear(guess, actual, revealedAt)) near += 1;
+  }
+  return { hits, near };
 }
 
 /**
@@ -3614,24 +3650,18 @@ async function syncAchievements(): Promise<{ state: LeagueDynamicState; facts: R
   return { state: result.state, facts };
 }
 
-function keeperCounts(state: LeagueDynamicState): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const [owner, sels] of Object.entries(state.keepers)) counts[owner] = sels.length;
-  return counts;
-}
-
 function revealState(state: LeagueDynamicState, ledger: AchievementLedger, owner: string, isCommissioner: boolean) {
   const earned = ledger.earned[owner] ?? {};
   const reveals = ledger.reveals[owner] ?? [];
-  const left = revealsLeft(earnedCount(earned), reveals.length, OWNERS.length - 1);
-  const candidates = revealCandidates(owner, OWNERS, keeperCounts(state), reveals);
+  const left = revealsLeft(earnedCount(earned), reveals.length);
+  const hidden = hiddenKeepers(owner, OWNERS, state.keepers, reveals);
   const check = canReveal({
     keepersPublic: state.keepersRevealed === true,
     isCommissioner,
     left,
-    candidates: candidates.length,
+    hidden: hiddenCount(hidden),
   });
-  return { earned, reveals, left, candidates, check };
+  return { earned, reveals, left, hidden, check };
 }
 
 function achievementsPayload(
@@ -3642,6 +3672,20 @@ function achievementsPayload(
 ) {
   const ledger = ledgerOf(state.achievements);
   const mine = revealState(state, ledger, owner, isCommissioner);
+  // One card per team, with only the keepers this owner has been shown.
+  const teams = [...new Set(mine.reveals.map((r) => r.target))].map((target) => {
+    const kept = state.keepers[target] ?? [];
+    const shown = mine.reveals.filter((r) => r.target === target);
+    return {
+      target,
+      keeping: kept.length,
+      shown: shown.map((r) => {
+        const still = kept.find((k) => k.playerKey === r.playerKey);
+        return { playerKey: r.playerKey, at: r.at, playerName: still?.playerName ?? null };
+      }),
+      lastAt: shown[shown.length - 1].at,
+    };
+  });
   return {
     you: {
       owner,
@@ -3649,8 +3693,7 @@ function achievementsPayload(
       facts: facts[owner] ?? NO_FACTS,
       left: mine.left,
       check: mine.check,
-      // Live, so a team that changes its keepers after the reveal shows the change.
-      reveals: mine.reveals.map((r) => ({ ...r, keepers: state.keepers[r.target] ?? [] })),
+      teams,
     },
     standings: standings(OWNERS, ledger),
     keepersPublic: state.keepersRevealed === true,
@@ -3663,23 +3706,24 @@ router.get('/achievements', requireAuth, async (_req, res) => {
   res.json(achievementsPayload(state, facts, res.locals.owner as string, res.locals.isCommissioner === true));
 });
 
-/** POST /api/league/achievements/reveal — spend one reveal on a random team with keepers in. */
+/** POST /api/league/achievements/reveal — spend one reveal on one keeper of a random team. */
 router.post('/achievements/reveal', requireAuth, async (_req, res) => {
   const owner = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner === true;
   const { facts } = await syncAchievements();
-  let target: string | null = null;
+  let shown: { target: string; playerKey: string } | null = null;
   const result = await mutateState((draft) => {
     const ledger = ledgerOf(draft.achievements);
     const mine = revealState(draft, ledger, owner, isCommissioner);
     if (!mine.check.ok) throw new HttpError(409, mine.check.message ?? 'No reveal to spend');
-    target = pickRevealTarget(mine.candidates, Math.random);
-    if (!target) throw new HttpError(409, 'No team to reveal');
-    ledger.reveals[owner] = [...mine.reveals, { target, at: new Date().toISOString() }];
+    const pick = pickReveal(mine.hidden, Math.random);
+    if (!pick) throw new HttpError(409, 'No keeper to show');
+    shown = pick;
+    ledger.reveals[owner] = [...mine.reveals, { ...pick, at: new Date().toISOString() }];
     draft.achievements = ledger;
   });
-  await appendAudit(actor(res), 'achievement.reveal', { target });
-  res.json({ ...achievementsPayload(result.state, facts, owner, isCommissioner), revealed: target });
+  await appendAudit(actor(res), 'achievement.reveal', { target: (shown as { target: string } | null)?.target ?? null });
+  res.json({ ...achievementsPayload(result.state, facts, owner, isCommissioner), revealed: shown });
 });
 
 // ─── Prop bets ───────────────────────────────────────────────────────────────

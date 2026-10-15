@@ -35,6 +35,8 @@ import type { DraftClockState, SkippedPick } from '../../src/lib/keeper/types.js
 import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
+import { foldProblem, foldedBook } from '../../src/lib/league/rulebookFold.js';
+import type { MockFinish } from '../../src/lib/league/mockStats.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
@@ -154,6 +156,13 @@ export class PlayerPoolAcceptError extends Error {
     super(message);
     this.reason = reason;
   }
+}
+
+/** The rank and room size a saved mock finished with, for the counts. */
+function finishOf(row: MockResultRow): MockFinish | null {
+  const grade = (row.result as { grade?: { rank?: unknown; teams?: unknown } } | null)?.grade;
+  if (typeof grade?.rank !== 'number' || typeof grade?.teams !== 'number') return null;
+  return { owner: row.owner, id: row.id, rank: grade.rank, teams: grade.teams };
 }
 
 /** One finished, graded mock draft. Each owner keeps their own. */
@@ -335,6 +344,11 @@ export class HistoryPublishError extends Error {
   }
 }
 
+export interface RulebookFoldResult {
+  kept: { id: string; revision: number };
+  removed: { id: string; revision: number };
+}
+
 export class RulebookPublishError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -486,6 +500,8 @@ interface StoreBackend {
   findMockResult(season: number, id: string): Promise<MockResultRow | null>;
   /** Insert unless the same id is already there. Then keep only the newest `keep`, or all when null. */
   saveMockResult(row: MockResultRow, keep: number | null): Promise<void>;
+  /** Every finished mock this season, each owner's saved ones and the never-trimmed log. */
+  listMockFinishes(season: number): Promise<MockFinish[]>;
   deleteMockResult(season: number, owner: string, id: string): Promise<void>;
   listProjectionEdits(season: number): Promise<ProjectionEditRow[]>;
   saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow>;
@@ -507,6 +523,12 @@ interface StoreBackend {
   insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature>;
   /** Removes one signature. True when there was one to remove. */
   deleteRulebookSignature(versionId: string, owner: string): Promise<boolean>;
+  /**
+   * Fold the newest published revision into the one before it: the older one
+   * takes the newer one's book and fingerprint and keeps its id, number, date
+   * and signatures; the newer one is deleted. See rulebookFold.ts.
+   */
+  foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult>;
   listDues(season: number): Promise<DuesRow[]>;
   /**
    * Writes one team's dues row only if nobody changed it since `expected` was
@@ -787,6 +809,16 @@ class NeonBackend implements StoreBackend {
       reason text not null,
       published_at timestamptz not null,
       published_by text not null
+    )`;
+    // One row per finished mock, never trimmed, so counts outlive the last ten.
+    await this.sql`CREATE TABLE IF NOT EXISTS mock_finishes (
+      season int not null,
+      owner text not null,
+      id text not null,
+      rank int not null,
+      teams int not null,
+      finished_at timestamptz not null,
+      primary key (season, owner, id)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS mock_results (
       season int not null,
@@ -1281,6 +1313,12 @@ class NeonBackend implements StoreBackend {
     await this.sql`INSERT INTO mock_results (season, owner, id, data, created_at)
       VALUES (${row.season}, ${row.owner}, ${row.id}, ${JSON.stringify(row.result)}::jsonb, ${row.createdAt})
       ON CONFLICT (season, owner, id) DO NOTHING`;
+    const finish = finishOf(row);
+    if (finish) {
+      await this.sql`INSERT INTO mock_finishes (season, owner, id, rank, teams, finished_at)
+        VALUES (${row.season}, ${row.owner}, ${row.id}, ${finish.rank}, ${finish.teams}, ${row.createdAt})
+        ON CONFLICT (season, owner, id) DO NOTHING`;
+    }
     if (keep !== null) {
       await this.sql`DELETE FROM mock_results WHERE season = ${row.season} AND owner = ${row.owner}
         AND id NOT IN (
@@ -1288,6 +1326,18 @@ class NeonBackend implements StoreBackend {
           ORDER BY created_at DESC LIMIT ${keep}
         )`;
     }
+  }
+
+  async listMockFinishes(season: number): Promise<MockFinish[]> {
+    await this.ensureInit();
+    // The log, plus whatever saved mocks predate it. The pure count takes each draft once.
+    const rows = (await this.sql`SELECT owner, id, rank, teams FROM mock_finishes WHERE season = ${season}
+      UNION
+      SELECT owner, id, (data->'grade'->>'rank')::int, (data->'grade'->>'teams')::int
+        FROM mock_results WHERE season = ${season} AND data->'grade'->>'rank' IS NOT NULL`) as Array<{
+      owner: string; id: string; rank: number; teams: number;
+    }>;
+    return rows.map((row) => ({ owner: row.owner, id: row.id, rank: Number(row.rank), teams: Number(row.teams) }));
   }
 
   async deleteMockResult(season: number, owner: string, id: string): Promise<void> {
@@ -1473,6 +1523,46 @@ class NeonBackend implements StoreBackend {
       throw new RulebookSignError('already-signed', 'You have already signed this revision');
     }
     return row;
+  }
+
+  async foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, data, notes,
+        published_at, published_by
+      FROM rulebook_versions WHERE season = ${season}
+      ORDER BY published_at DESC, id DESC LIMIT 2`) as RawVersionRow[];
+    const [latest, previous] = rows.map(toVersionRow);
+    const signed = latest
+      ? (await this.sql`SELECT owner FROM rulebook_signatures WHERE version_id = ${latest.id}`) as unknown[]
+      : [];
+    const problem = foldProblem(latest ?? null, previous ?? null, latestId, signed.length);
+    if (problem) throw new RulebookPublishError('fold-refused', problem);
+    const polls = (await this.sql`SELECT id, data FROM polls
+      WHERE data->>'appliedVersionId' = ${latest.id}`) as Array<{ id: string; data: Record<string, unknown> }>;
+    const book = foldedBook(latest.book, previous.revision);
+    // Every write checks nobody signed the newest meanwhile, so a late
+    // signature leaves both revisions exactly as they were.
+    await this.sql.transaction([
+      this.sql`UPDATE rulebook_versions
+        SET data = ${JSON.stringify(book)}::jsonb, fingerprint = ${latest.fingerprint}
+        WHERE id = ${previous.id}
+          AND NOT EXISTS (SELECT 1 FROM rulebook_signatures WHERE version_id = ${latest.id})`,
+      ...polls.map((poll) => this.sql`UPDATE polls
+        SET data = ${JSON.stringify({ ...poll.data, appliedVersionId: previous.id, appliedRevision: previous.revision })}::jsonb,
+          updated_at = now()
+        WHERE id = ${poll.id}
+          AND NOT EXISTS (SELECT 1 FROM rulebook_signatures WHERE version_id = ${latest.id})`),
+      this.sql`DELETE FROM rulebook_versions WHERE id = ${latest.id}
+        AND NOT EXISTS (SELECT 1 FROM rulebook_signatures WHERE version_id = ${latest.id})`,
+    ]);
+    const after = (await this.sql`SELECT id FROM rulebook_versions WHERE id = ${latest.id}`) as unknown[];
+    if (after.length > 0) {
+      throw new RulebookPublishError('fold-refused', `Someone signed revision ${latest.revision} just now, so it stands.`);
+    }
+    return {
+      kept: { id: previous.id, revision: previous.revision },
+      removed: { id: latest.id, revision: latest.revision },
+    };
   }
 
   async deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
@@ -1756,6 +1846,7 @@ interface FileDoc {
   }>;
   projectionEdits: ProjectionEditRow[];
   mockResults: MockResultRow[];
+  mockFinishes: Array<MockFinish & { season: number }>;
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
@@ -1784,6 +1875,7 @@ function emptyDoc(): FileDoc {
     keeperScenarios: [],
     projectionEdits: [],
     mockResults: [],
+    mockFinishes: [],
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
@@ -1843,6 +1935,7 @@ class FileBackend implements StoreBackend {
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
         projectionEdits: Array.isArray(doc.projectionEdits) ? doc.projectionEdits : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
+        mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
@@ -2208,12 +2301,26 @@ class FileBackend implements StoreBackend {
       const doc = this.readDoc();
       const mine = (entry: MockResultRow) => entry.season === row.season && entry.owner === row.owner;
       if (!doc.mockResults.some((entry) => mine(entry) && entry.id === row.id)) doc.mockResults.push(row);
+      const finish = finishOf(row);
+      if (finish && !doc.mockFinishes.some((entry) => entry.season === row.season && entry.owner === row.owner && entry.id === row.id)) {
+        doc.mockFinishes.push({ season: row.season, ...finish });
+      }
       if (keep !== null) {
         const newest = doc.mockResults.filter(mine).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, keep);
         doc.mockResults = doc.mockResults.filter((entry) => !mine(entry) || newest.includes(entry));
       }
       this.writeDoc(doc);
     });
+  }
+
+  async listMockFinishes(season: number): Promise<MockFinish[]> {
+    await this.ensureInit();
+    const doc = this.readDoc();
+    const saved = doc.mockResults.filter((row) => row.season === season).map(finishOf)
+      .filter((finish): finish is MockFinish => finish !== null);
+    const logged = doc.mockFinishes.filter((row) => row.season === season)
+      .map(({ owner, id, rank, teams }) => ({ owner, id, rank, teams }));
+    return [...logged, ...saved];
   }
 
   async deleteMockResult(season: number, owner: string, id: string): Promise<void> {
@@ -2354,6 +2461,32 @@ class FileBackend implements StoreBackend {
       doc.rulebookSignatures.push(structuredClone(row));
       this.writeDoc(doc);
       return row;
+    });
+  }
+
+  async foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const [latest, previous] = this.sortedVersions(season);
+      const signed = latest ? doc.rulebookSignatures.filter((row) => row.versionId === latest.id).length : 0;
+      const problem = foldProblem(latest ?? null, previous ?? null, latestId, signed);
+      if (problem) throw new RulebookPublishError('fold-refused', problem);
+      const kept = doc.rulebookVersions.find((row) => row.id === previous.id)!;
+      kept.book = structuredClone(foldedBook(latest.book, previous.revision));
+      kept.fingerprint = latest.fingerprint;
+      for (const poll of doc.polls) {
+        const data = poll.data as Record<string, unknown> | null;
+        if (data?.appliedVersionId !== latest.id) continue;
+        poll.data = { ...data, appliedVersionId: previous.id, appliedRevision: previous.revision };
+        poll.updatedAt = new Date().toISOString();
+      }
+      doc.rulebookVersions = doc.rulebookVersions.filter((row) => row.id !== latest.id);
+      this.writeDoc(doc);
+      return {
+        kept: { id: previous.id, revision: previous.revision },
+        removed: { id: latest.id, revision: latest.revision },
+      };
     });
   }
 
@@ -2976,6 +3109,10 @@ export async function saveMockResult(row: MockResultRow, keep: number | null): P
   return getBackend().saveMockResult(row, keep);
 }
 
+export async function listMockFinishes(season: number): Promise<MockFinish[]> {
+  return getBackend().listMockFinishes(season);
+}
+
 export async function deleteMockResult(season: number, owner: string, id: string): Promise<void> {
   return getBackend().deleteMockResult(season, owner, id);
 }
@@ -3129,6 +3266,10 @@ export async function insertRulebookSignature(
 
 export async function deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
   return getBackend().deleteRulebookSignature(versionId, owner);
+}
+
+export async function foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult> {
+  return getBackend().foldLatestRulebookVersion(season, latestId);
 }
 
 export async function listDues(season: number): Promise<DuesRow[]> {

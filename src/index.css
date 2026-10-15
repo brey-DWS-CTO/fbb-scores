@@ -4847,6 +4847,9 @@ html.theme-light {
 .achieve-seen-names { color: var(--text-max); font-size: 0.92rem; font-weight: 800; }
 
 .achieve-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.achieve-group { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.achieve-group-label { color: var(--text-dim); font-size: 0.58rem; font-weight: 900; letter-spacing: 0.1em; }
+.achieve-go { min-width: 44px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
 .achieve-item {
   display: flex;
   align-items: center;
@@ -4907,6 +4910,16 @@ html.theme-light {
 .props-settle { display: flex; gap: 8px; }
 .props-settle .hub-input { flex: 1; }
 .props-settle .tap-btn { min-height: 48px; padding: 0 14px; }
+/* ─── Mock draft, phone: with a card tapped, the corner badge says "Up in 3 picks at 7.9" ─── */
+@media (max-width: 839px) {
+  .room.has-picked .room-mini-clock.is-wait { font-size: 0.66rem; letter-spacing: 0.02em; white-space: nowrap; }
+}
+
+/* ─── Mock draft: a saved mock's board, and everyone's mock counts ─── */
+.saved-mock-board { display: grid; gap: 8px; margin: 10px 0; justify-items: start; }
+.saved-mock-board .room-grid-wrap { width: 100%; }
+.mock-stats-table { margin-top: 8px; }
+.mock-stats-table .mock-grade-letter { font-size: 0.85rem; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

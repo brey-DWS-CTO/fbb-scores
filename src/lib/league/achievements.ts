@@ -1,9 +1,10 @@
 /**
  * Achievements: small jobs around the app that each earn one keeper reveal.
  *
- * Every achievement an owner earns lets them see one other team's keepers,
- * picked at random from the teams that have keepers in. There are ten
- * achievements and nine other teams, so nobody has to do every one.
+ * Every achievement an owner earns shows them one keeper: a random team that
+ * still has a keeper they have not seen, then a random keeper on it. The nine
+ * other teams keep up to eighteen players, and there are more achievements
+ * than that, so nobody has to do every one.
  *
  * Earned is for good. The server works out what each owner has done from the
  * league's own records, then stamps each new one into a ledger. A mock that is
@@ -15,14 +16,26 @@
 
 export type AchievementId =
   | 'signed'
+  | 'hancock'
   | 'first-mock'
   | 'ten-mocks'
+  | 'marathon'
   | 'honor-roll'
+  | 'valedictorian'
+  | 'thief'
+  | 'what-if'
   | 'trade-offer'
-  | 'trade-done'
+  | 'haggler'
+  | 'closer'
+  | 'taker'
   | 'prop-bet'
+  | 'bookmaker'
+  | 'action'
+  | 'all-in'
   | 'voted'
+  | 'lawmaker'
   | 'scout'
+  | 'close-call'
   | 'dues';
 
 export interface AchievementDef {
@@ -32,48 +45,91 @@ export interface AchievementDef {
   how: string;
 }
 
+export const MOCKS_FOR_ADDICT = 10;
+export const MOCKS_FOR_MARATHON = 25;
+/** How far past his ADP a player must fall to you for THIEF. */
+export const STEAL_FOR_THIEF = 15;
+export const PROPS_FOR_BOOKMAKER = 5;
+export const SIDES_FOR_ACTION = 5;
+/** ALL IN needs at least this many props to cover, or one prop would do it. */
+export const PROPS_FOR_ALL_IN = 3;
+
 export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'signed', title: 'SIGNED AND SEALED', how: 'Sign the rule book.' },
+  { id: 'hancock', title: 'JOHN HANCOCK', how: 'Draw your signature when you sign.' },
   { id: 'first-mock', title: 'FIRST MOCK', how: 'Finish a mock draft.' },
-  { id: 'ten-mocks', title: 'MOCK ADDICT', how: 'Finish 10 mock drafts.' },
-  { id: 'honor-roll', title: 'HONOR ROLL', how: 'Get an A grade on a mock draft.' },
+  { id: 'ten-mocks', title: 'MOCK ADDICT', how: `Finish ${MOCKS_FOR_ADDICT} mock drafts.` },
+  { id: 'marathon', title: 'MOCK MARATHON', how: `Finish ${MOCKS_FOR_MARATHON} mock drafts.` },
+  { id: 'honor-roll', title: 'HONOR ROLL', how: 'Get an A on a mock draft.' },
+  { id: 'valedictorian', title: 'VALEDICTORIAN', how: 'Get an A+ on a mock draft.' },
+  { id: 'thief', title: 'THIEF', how: `Draft a player ${STEAL_FOR_THIEF} or more picks after his ADP in a mock.` },
+  { id: 'what-if', title: 'WHAT IF', how: 'Finish a mock with one of your trade offers switched on.' },
   { id: 'trade-offer', title: 'WHEELER DEALER', how: 'Offer a pick trade.' },
-  { id: 'trade-done', title: 'DEAL DONE', how: 'Get a pick trade accepted.' },
+  { id: 'haggler', title: 'HAGGLER', how: 'Change a trade offer after you send it.' },
+  { id: 'closer', title: 'CLOSER', how: 'Get a trade offer of yours accepted.' },
+  { id: 'taker', title: 'TAKER', how: 'Accept a trade someone offered you.' },
   { id: 'prop-bet', title: 'BOOKIE', how: 'Set a prop bet.' },
+  { id: 'bookmaker', title: 'BOOKMAKER', how: `Set ${PROPS_FOR_BOOKMAKER} prop bets.` },
+  { id: 'action', title: 'ACTION', how: `Take a side on ${SIDES_FOR_ACTION} prop bets.` },
+  { id: 'all-in', title: 'ALL IN', how: `Take a side on every prop you can see, ${PROPS_FOR_ALL_IN} at least.` },
   { id: 'voted', title: 'VOTER', how: 'Vote in a league poll.' },
-  { id: 'scout', title: 'SCOUT', how: "Guess a team's exact keepers on your first save." },
+  { id: 'lawmaker', title: 'LAWMAKER', how: 'Start a league vote.' },
+  { id: 'scout', title: 'SCOUT', how: "Name a team's exact keepers on your first saved guess." },
+  { id: 'close-call', title: 'CLOSE CALL', how: "Name one of a team's keepers on your first saved guess." },
   { id: 'dues', title: 'PAID UP', how: 'Pay your dues and get it confirmed.' },
 ];
-
-export const MOCKS_FOR_ADDICT = 10;
 
 /** What one owner has done, read from the league's records. */
 export interface OwnerFacts {
   signedRulebook: boolean;
-  /** Finished mocks, lifetime. See `mocksFinished`. */
+  /** Signed with a drawn signature, not just a tap. */
+  drewSignature: boolean;
+  /** Finished mocks, lifetime, from the log that is never trimmed. */
   mocksFinished: number;
-  /** Best grade on any saved mock, e.g. "A-". Null with none saved. */
+  /** Best grade on any finished mock, e.g. "A-". Null with none. */
   bestMockGrade: string | null;
+  /** Biggest steal on a saved mock, in picks past ADP. */
+  bestSteal: number;
+  /** Finished a mock with a trade offer switched on. */
+  mockedWithTrade: boolean;
   tradesOffered: number;
-  /** Accepted trades this owner was part of, on either side. */
-  tradesDone: number;
+  offersRevised: number;
+  /** Their offers that the other side accepted. */
+  offersClosed: number;
+  /** Offers made to them that they accepted. */
+  offersTaken: number;
   propBetsSet: number;
+  propSidesTaken: number;
+  /** Took a side on every prop they can see, and there were enough of them. */
+  allPropsCovered: boolean;
   votesCast: number;
+  pollsOpened: number;
   /** Teams whose exact keepers this owner guessed on the first save. */
   scoutHits: number;
+  /** Teams where the first guess named at least one real keeper. */
+  closeCalls: number;
   /** Dues the collector has confirmed, not just marked sent. */
   duesPaid: boolean;
 }
 
 export const NO_FACTS: OwnerFacts = {
   signedRulebook: false,
+  drewSignature: false,
   mocksFinished: 0,
   bestMockGrade: null,
+  bestSteal: 0,
+  mockedWithTrade: false,
   tradesOffered: 0,
-  tradesDone: 0,
+  offersRevised: 0,
+  offersClosed: 0,
+  offersTaken: 0,
   propBetsSet: 0,
+  propSidesTaken: 0,
+  allPropsCovered: false,
   votesCast: 0,
+  pollsOpened: 0,
   scoutHits: 0,
+  closeCalls: 0,
   duesPaid: false,
 };
 
@@ -81,63 +137,41 @@ export const NO_FACTS: OwnerFacts = {
 export function earnedFrom(facts: OwnerFacts): AchievementId[] {
   const done: Record<AchievementId, boolean> = {
     signed: facts.signedRulebook,
+    hancock: facts.drewSignature,
     'first-mock': facts.mocksFinished >= 1,
     'ten-mocks': facts.mocksFinished >= MOCKS_FOR_ADDICT,
+    marathon: facts.mocksFinished >= MOCKS_FOR_MARATHON,
     'honor-roll': facts.bestMockGrade !== null && facts.bestMockGrade.startsWith('A'),
+    valedictorian: facts.bestMockGrade === 'A+',
+    thief: facts.bestSteal >= STEAL_FOR_THIEF,
+    'what-if': facts.mockedWithTrade,
     'trade-offer': facts.tradesOffered >= 1,
-    'trade-done': facts.tradesDone >= 1,
+    haggler: facts.offersRevised >= 1,
+    closer: facts.offersClosed >= 1,
+    taker: facts.offersTaken >= 1,
     'prop-bet': facts.propBetsSet >= 1,
+    bookmaker: facts.propBetsSet >= PROPS_FOR_BOOKMAKER,
+    action: facts.propSidesTaken >= SIDES_FOR_ACTION,
+    'all-in': facts.allPropsCovered,
     voted: facts.votesCast >= 1,
+    lawmaker: facts.pollsOpened >= 1,
     scout: facts.scoutHits >= 1,
+    'close-call': facts.closeCalls >= 1,
     dues: facts.duesPaid,
   };
   return ACHIEVEMENTS.filter((a) => done[a.id]).map((a) => a.id);
 }
 
-/**
- * Lifetime finished mocks. Members keep only their latest ten, so the saved
- * rows alone undercount; the ledger keeps a running count from the day this
- * shipped, and the rows cover everything before it.
- */
-export function mocksFinished(counted: number | undefined, savedRows: number): number {
-  return Math.max(counted ?? 0, savedRows);
+/** ALL IN: a side on every prop you can see, with enough of them to mean something. */
+export function coversAllProps(visible: number, taken: number): boolean {
+  return visible >= PROPS_FOR_ALL_IN && taken >= visible;
 }
 
-/** The count after one more mock lands. `savedBefore` is the rows before the save. */
-export function nextMockCount(counted: number | undefined, savedBefore: number): number {
-  return mocksFinished(counted, savedBefore) + 1;
-}
-
-/** One keeper reveal: whose keepers this owner gets to see. */
+/** One keeper reveal: which player on which team. */
 export interface KeeperReveal {
   target: string;
+  playerKey: string;
   at: string;
-}
-
-/** What the server keeps, inside league state. */
-export interface AchievementLedger {
-  /** owner -> achievement -> when it was first seen. */
-  earned: Record<string, Partial<Record<AchievementId, string>>>;
-  /** owner -> the teams they have revealed, oldest first. */
-  reveals: Record<string, KeeperReveal[]>;
-  /** owner -> finished mocks counted since this shipped. */
-  mocks: Record<string, number>;
-  /** viewer -> team -> the first keeper guess they saved for that team. */
-  firstGuesses: Record<string, Record<string, FirstGuess>>;
-}
-
-export function emptyLedger(): AchievementLedger {
-  return { earned: {}, reveals: {}, mocks: {}, firstGuesses: {} };
-}
-
-/** Old state rows have no ledger, or a partial one. */
-export function ledgerOf(raw: Partial<AchievementLedger> | undefined | null): AchievementLedger {
-  return {
-    earned: raw?.earned ?? {},
-    reveals: raw?.reveals ?? {},
-    mocks: raw?.mocks ?? {},
-    firstGuesses: raw?.firstGuesses ?? {},
-  };
 }
 
 /** The first keeper guess a member saved for one team. Later edits never replace it. */
@@ -146,37 +180,35 @@ export interface FirstGuess {
   at: string;
 }
 
-/**
- * What to record as the first guess, or null to leave things alone. A guess
- * already on file wins. A guess saved before this shipped counts as the first.
- * An empty save is not a guess.
- */
-export function firstGuessToRecord(
-  existing: FirstGuess | undefined,
-  saved: readonly string[],
-  next: readonly string[],
-  at: string,
-): FirstGuess | null {
-  if (existing) return null;
-  if (saved.length > 0) return { keys: [...saved], at };
-  if (next.length > 0) return { keys: [...next], at };
-  return null;
+/** What the server keeps, inside league state. */
+export interface AchievementLedger {
+  /** owner -> achievement -> when it was first seen. */
+  earned: Record<string, Partial<Record<AchievementId, string>>>;
+  /** owner -> the keepers they have revealed, oldest first. */
+  reveals: Record<string, KeeperReveal[]>;
+  /** viewer -> team -> the first keeper guess they saved for that team. */
+  firstGuesses: Record<string, Record<string, FirstGuess>>;
+}
+
+export function emptyLedger(): AchievementLedger {
+  return { earned: {}, reveals: {}, firstGuesses: {} };
 }
 
 /**
- * True when the first guess names exactly the team's keepers. A guess made
- * after you revealed that team does not count.
+ * Old state rows have no ledger, or a partial one. Reveals from the first cut
+ * showed a whole team and carry no player; they are dropped, so those owners
+ * get the reveal back under the one-keeper rule.
  */
-export function guessHit(
-  guess: FirstGuess | undefined,
-  actual: readonly string[],
-  revealedAt: string | null,
-): boolean {
-  if (!guess || guess.keys.length === 0 || actual.length === 0) return false;
-  if (revealedAt !== null && revealedAt <= guess.at) return false;
-  if (guess.keys.length !== actual.length) return false;
-  const want = new Set(actual);
-  return guess.keys.every((key) => want.has(key));
+export function ledgerOf(raw: Partial<AchievementLedger> | undefined | null): AchievementLedger {
+  const reveals: Record<string, KeeperReveal[]> = {};
+  for (const [owner, list] of Object.entries(raw?.reveals ?? {})) {
+    reveals[owner] = (list ?? []).filter((r) => typeof r.playerKey === 'string' && r.playerKey !== '');
+  }
+  return {
+    earned: raw?.earned ?? {},
+    reveals,
+    firstGuesses: raw?.firstGuesses ?? {},
+  };
 }
 
 /**
@@ -205,27 +237,45 @@ export function earnedCount(earned: Partial<Record<AchievementId, string>> | und
   return ACHIEVEMENTS.filter((a) => earned[a.id]).length;
 }
 
-/** Reveals still to spend. Capped at the number of other teams. */
-export function revealsLeft(earned: number, used: number, otherTeams: number): number {
-  return Math.max(0, Math.min(earned, otherTeams) - used);
+/** Reveals earned and not yet spent. */
+export function revealsLeft(earned: number, used: number): number {
+  return Math.max(0, earned - used);
 }
 
-/** Teams this owner could still reveal: not them, not seen yet, keepers in. */
-export function revealCandidates(
+/** Keepers this owner could still be shown, by team. Teams with none left are left out. */
+export function hiddenKeepers(
   viewer: string,
   owners: readonly string[],
-  keeperCounts: Readonly<Record<string, number>>,
+  keepers: Readonly<Record<string, ReadonlyArray<{ playerKey: string }>>>,
   already: readonly KeeperReveal[],
-): string[] {
-  const seen = new Set(already.map((r) => r.target));
-  return owners.filter((o) => o !== viewer && !seen.has(o) && (keeperCounts[o] ?? 0) > 0);
+): Array<{ target: string; playerKeys: string[] }> {
+  const seen = new Set(already.map((r) => `${r.target}:${r.playerKey}`));
+  return owners
+    .filter((o) => o !== viewer)
+    .map((target) => ({
+      target,
+      playerKeys: (keepers[target] ?? []).map((k) => k.playerKey).filter((key) => !seen.has(`${target}:${key}`)),
+    }))
+    .filter((team) => team.playerKeys.length > 0);
 }
 
-/** A fair random pick. `random` is Math.random in the app and fixed in tests. */
-export function pickRevealTarget(candidates: readonly string[], random: () => number): string | null {
-  if (candidates.length === 0) return null;
-  const index = Math.min(candidates.length - 1, Math.floor(random() * candidates.length));
-  return candidates[index];
+export function hiddenCount(teams: ReadonlyArray<{ playerKeys: readonly string[] }>): number {
+  return teams.reduce((n, t) => n + t.playerKeys.length, 0);
+}
+
+/**
+ * A random team first, then a random keeper on it, so every team has the same
+ * odds whether it keeps one player or two. `random` is Math.random in the app
+ * and fixed in tests.
+ */
+export function pickReveal(
+  teams: ReadonlyArray<{ target: string; playerKeys: readonly string[] }>,
+  random: () => number,
+): { target: string; playerKey: string } | null {
+  if (teams.length === 0) return null;
+  const at = (n: number) => Math.min(n - 1, Math.floor(random() * n));
+  const team = teams[at(teams.length)];
+  return { target: team.target, playerKey: team.playerKeys[at(team.playerKeys.length)] };
 }
 
 export type RevealBlock = 'public' | 'commish' | 'none-left' | 'nobody-ready';
@@ -241,7 +291,7 @@ export function canReveal(input: {
   keepersPublic: boolean;
   isCommissioner: boolean;
   left: number;
-  candidates: number;
+  hidden: number;
 }): RevealCheck {
   if (input.keepersPublic) {
     return { ok: false, reason: 'public', message: 'Keepers are public now. Everyone can see them.' };
@@ -252,14 +302,19 @@ export function canReveal(input: {
   if (input.left <= 0) {
     return { ok: false, reason: 'none-left', message: 'Each new achievement unlocks one more reveal.' };
   }
-  if (input.candidates <= 0) {
+  if (input.hidden <= 0) {
     return {
       ok: false,
       reason: 'nobody-ready',
-      message: 'No other team has keepers in yet. Your reveal waits until one does.',
+      message: 'No keeper left to show you yet. Your reveal waits until someone saves one.',
     };
   }
   return { ok: true };
+}
+
+/** What a badge should count: reveals you could actually spend now. */
+export function revealsReady(left: number, hidden: number): number {
+  return Math.min(left, hidden);
 }
 
 /** One line per team for the league board. */
@@ -285,15 +340,40 @@ export function standings(
     .map(({ owner, earned, revealed }) => ({ owner, earned, revealed }));
 }
 
-/** Best grade of a set, "A+" over "A" over "B". Unknown grades rank last. */
-const GRADE_ORDER = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'D', 'F'];
+/**
+ * What to record as the first guess, or null to leave things alone. A guess
+ * already on file wins. A guess saved before this shipped counts as the first.
+ * An empty save is not a guess.
+ */
+export function firstGuessToRecord(
+  existing: FirstGuess | undefined,
+  saved: readonly string[],
+  next: readonly string[],
+  at: string,
+): FirstGuess | null {
+  if (existing) return null;
+  if (saved.length > 0) return { keys: [...saved], at };
+  if (next.length > 0) return { keys: [...next], at };
+  return null;
+}
 
-export function bestGrade(grades: readonly string[]): string | null {
-  let best: string | null = null;
-  for (const g of grades) {
-    const rank = GRADE_ORDER.indexOf(g);
-    if (rank === -1) continue;
-    if (best === null || rank < GRADE_ORDER.indexOf(best)) best = g;
-  }
-  return best;
+/** A first guess that counts: made, and made before you revealed any of that team. */
+function guessCounts(guess: FirstGuess | undefined, actual: readonly string[], revealedAt: string | null): guess is FirstGuess {
+  if (!guess || guess.keys.length === 0 || actual.length === 0) return false;
+  return revealedAt === null || revealedAt > guess.at;
+}
+
+/** SCOUT: the first guess names exactly the team's keepers. */
+export function guessHit(guess: FirstGuess | undefined, actual: readonly string[], revealedAt: string | null): boolean {
+  if (!guessCounts(guess, actual, revealedAt)) return false;
+  if (guess.keys.length !== actual.length) return false;
+  const want = new Set(actual);
+  return guess.keys.every((key) => want.has(key));
+}
+
+/** CLOSE CALL: the first guess names at least one of the team's keepers. */
+export function guessNear(guess: FirstGuess | undefined, actual: readonly string[], revealedAt: string | null): boolean {
+  if (!guessCounts(guess, actual, revealedAt)) return false;
+  const want = new Set(actual);
+  return guess.keys.some((key) => want.has(key));
 }

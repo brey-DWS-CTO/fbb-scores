@@ -17,9 +17,11 @@ import {
 } from '../../lib/league/draftRoom.js';
 import NavIcon from './NavIcon.js';
 import MockGradeCard from './MockGradeCard.js';
+import MockBoardGrid, { KeeperChip } from './MockBoardGrid.js';
+import { boardFromGrid, type SavedBoard } from '../../lib/league/mockBoard.js';
 import ShareButton from './ShareButton.js';
 import { gradeMock, mockResultId, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
-import { positionColor, positionTheme } from '../draft/boardUtils.js';
+import { positionColor } from '../draft/boardUtils.js';
 
 /** A position code in the board's own colour for it. */
 function Pos({ positions }: { positions: readonly string[] }) {
@@ -58,7 +60,7 @@ interface Props {
   onProgress: (progress: RoomProgress) => void;
   onNewDraft: () => void;
   /** Called once when the last pick lands, with the draft's grade. */
-  onFinished: (finished: { choices: Record<number, string>; grade: MockGrade }) => void;
+  onFinished: (finished: { choices: Record<number, string>; grade: MockGrade; board: SavedBoard }) => void;
 }
 
 type CenterTab = 'players' | 'teams' | 'results';
@@ -418,8 +420,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   useEffect(() => {
     if (!grade || reported.current) return;
     reported.current = true;
-    onFinished({ choices: { ...choices }, grade });
-  }, [grade, choices, onFinished]);
+    onFinished({ choices: { ...choices }, grade, board: boardFromGrid(draftGrid(slots, live.picks, null)) });
+  }, [grade, choices, onFinished, slots, live.picks]);
   // The link to this finished draft, the same one Past mocks keeps.
   const shareUrl = grade ? `${window.location.origin}/mock/result/${mockResultId(person, seed, mode, choices)}` : null;
 
@@ -476,6 +478,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   };
   const grid = draftGrid(slots, shownPicks, myTurn || !over ? currentOverall : null);
   const owners = grid.owners;
+  const boardView = boardFromGrid(grid);
 
   const sortHead = (key: SortKey, label: string, title?: string, className = '') => (
     <th className={`room-num${sort.key === key ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`} title={title ?? label} data-sort={key}>
@@ -521,9 +524,13 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   // On a phone a tapped card stands where the clock frame was, with the clock
   // small in its corner: the time on your pick, else the pick on the clock.
   const hasPicked = started && !over && selected !== null;
+  // "Up in 3 picks at 7.9": how long until the person picks, and which pick.
+  const upIn = untilTurn === null
+    ? null
+    : `Up in ${untilTurn} pick${untilTurn === 1 ? '' : 's'}${myNext ? ` at ${myNext.pick.round}.${myNext.pick.slot}` : ''}`;
   const miniClock = (
-    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
-      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…'}
+    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${!myTurn && upIn ? ' is-wait' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
+      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : upIn ?? (currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…')}
     </span>
   );
   const cardFor = (key: string, extra: { role: 'keeper' | 'compare' | 'card' }) => (
@@ -657,8 +664,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                 </div>
               ) : (
                 <div className="room-turn">
-                  {untilTurn === null ? 'No picks left for you' : `${untilTurn} pick${untilTurn === 1 ? '' : 's'} until your turn`}
-                  {myNext && <small> ({myNext.pick.round}.{myNext.pick.slot})</small>}
+                  {upIn ?? 'No picks left for you'}
                   {menu}
                 </div>
               )}
@@ -929,59 +935,13 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
               ))}
             </div>
             {resultsView === 'board' ? (
-              <div className="room-grid-wrap">
-                <table className="room-grid">
-                  <thead>
-                    <tr>
-                      <th />
-                      {owners.map((owner) => <th key={owner} className={owner === person ? 'is-mine' : ''}>{owner}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grid.rounds.map((row, index) => (
-                      <tr key={index}>
-                        <th>R{index + 1}<span className="room-grid-arrow" aria-label={index % 2 === 0 ? 'left to right' : 'right to left'}>{index % 2 === 0 ? '→' : '←'}</span></th>
-                        {row.map((cell) => {
-                          const theme = cell.pick?.playerName ? positionTheme([...cell.pick.positions]) : null;
-                          const kept = cell.pick?.how === 'keeper';
-                          const projected = kept && cell.pick?.keeperStatus === 'assumed';
-                          return (
-                            <td
-                              key={cell.overall}
-                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${kept ? ' is-keeper' : ''}${projected ? ' is-projected' : ''}${cell.via ? ' is-traded' : ''}${cell.pick?.playerKey ? ' is-tappable' : ''}`}
-                              onClick={() => look(cell.pick?.playerKey)}
-                              style={theme ? {
-                                background: `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`,
-                                borderColor: cell.via ? undefined : theme.border,
-                                boxShadow: `inset 3px 0 0 ${theme.color}`,
-                              } : undefined}
-                            >
-                              <span className="room-grid-label">
-                                {cell.round}.{cell.slot}
-                                {cell.via && (
-                  <span
-                    className={`board-traded-tag${projectedTrades?.has(cell.overall) ? ' is-projected' : ''}`}
-                    title={projectedTrades?.has(cell.overall)
-                      ? `${cell.owner} holds ${cell.via}'s pick only if the trade you switched on goes through`
-                      : `${cell.owner} holds ${cell.via}'s pick`}
-                  >→ {cell.owner.toUpperCase()}</span>
-                )}
-                                {kept && <KeeperChip projected={projected} early={cell.pick?.keeperEarly ?? null} />}
-                              </span>
-                              {cell.pick?.playerName
-                                ? <>
-                                  <span className="room-grid-name">{cell.pick.playerName}</span>
-                                  <small style={{ color: theme?.color }}>{cell.pick.positions.join('/')}</small>
-                                </>
-                                : cell.current ? <span className="room-grid-name mock-live">on the clock</span> : null}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <MockBoardGrid
+                owners={owners}
+                rounds={boardView.rounds}
+                person={person}
+                projectedTrades={projectedTrades}
+                onPlayer={look}
+              />
             ) : (
               <ol className="room-team-list room-results-list">
                 {/* Newest pick first, so the one that just landed is on top. */}
@@ -1067,19 +1027,6 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
 /** Who has a player, for the list, the card and the roster. */
 type Taken = Pick<MockPick, 'label' | 'owner'> & Partial<Pick<MockPick, 'how' | 'keeperStatus' | 'keeperEarly'>>;
 
-/** A keeper on the board, in the list and in the updates: K, solid when entered, dashed when projected. */
-function KeeperChip({ projected, early }: { projected: boolean; early: string | null }) {
-  return (
-    <>
-      <span
-        className={`room-keeper-chip${projected ? ' is-projected' : ''}`}
-        title={projected ? 'Projected keeper' : 'Keeper'}
-        aria-label={projected ? 'Projected keeper' : 'Keeper'}
-      >K</span>
-      {early && <span className="keeper-early" title={early} aria-label={early}>↑</span>}
-    </>
-  );
-}
 
 interface CardProps {
   playerKey: string;

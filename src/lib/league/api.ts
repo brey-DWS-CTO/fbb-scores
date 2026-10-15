@@ -1,5 +1,6 @@
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockResultRecord } from './mockGrade.js';
+import type { MockStatRow } from './mockStats.js';
 import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
@@ -37,7 +38,6 @@ import type { Poll, PollKind } from './polls.js';
 import type {
   AchievementId,
   AchievementStanding,
-  KeeperReveal,
   OwnerFacts,
   RevealCheck,
 } from './achievements.js';
@@ -656,10 +656,16 @@ export async function fetchNbaWatch(c: Credentials, fresh = false): Promise<NbaW
   return data;
 }
 
+/** Every owner's finished mocks and best grade. */
+export async function fetchMockStats(c: Credentials): Promise<MockStatRow[]> {
+  const { data } = await axios.get('/api/league/mock-stats', { headers: authHeaders(c) });
+  return data.stats as MockStatRow[];
+}
+
 /** Save a finished mock draft. Saving the same draft twice is a no-op. */
 export async function saveMockResult(
   c: Credentials,
-  result: Pick<MockResultRecord, 'id' | 'seed' | 'mode' | 'grade'>,
+  result: Pick<MockResultRecord, 'id' | 'seed' | 'mode' | 'grade' | 'board' | 'tradesOn'>,
 ): Promise<MockResultRecord> {
   const { data } = await axios.post('/api/league/mock-results', result, { headers: authHeaders(c) });
   return data.result as MockResultRecord;
@@ -1089,6 +1095,15 @@ export async function requestRulebookSignatures(
 }
 
 /** The commissioner withdraws one member's signature so they can sign again. */
+/** Fold the newest rule book revision into the one before it (commissioner). */
+export async function foldRulebookVersion(
+  c: Credentials,
+  versionId: string,
+): Promise<{ kept: { id: string; revision: number }; removed: { id: string; revision: number } }> {
+  const { data } = await axios.post('/api/league/rulebook/fold', { versionId }, { headers: authHeaders(c) });
+  return data;
+}
+
 export async function withdrawRulebookSignature(c: Credentials, owner: string): Promise<void> {
   await axios.delete(`/api/league/rulebook/signatures/${encodeURIComponent(owner)}`, {
     headers: authHeaders(c),
@@ -1498,12 +1513,20 @@ export interface AchievementsResponse {
     facts: OwnerFacts;
     left: number;
     check: RevealCheck;
-    reveals: Array<KeeperReveal & { keepers: KeeperSelection[] }>;
+    /** Teams you have seen keepers on, with only the keepers shown to you. */
+    teams: Array<{
+      target: string;
+      /** How many keepers that team has in now. */
+      keeping: number;
+      /** playerName is null when the team has since dropped him. */
+      shown: Array<{ playerKey: string; playerName: string | null; at: string }>;
+      lastAt: string;
+    }>;
   };
   standings: AchievementStanding[];
   keepersPublic: boolean;
-  /** Set on a reveal: the team just shown. */
-  revealed?: string;
+  /** Set on a reveal: the keeper just shown. */
+  revealed?: { target: string; playerKey: string };
 }
 
 export async function fetchAchievements(c: Credentials): Promise<AchievementsResponse> {

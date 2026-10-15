@@ -3,26 +3,30 @@ import test from 'node:test';
 import {
   ACHIEVEMENTS,
   NO_FACTS,
-  bestGrade,
   canReveal,
+  coversAllProps,
   earnedCount,
   earnedFrom,
   firstGuessToRecord,
   guessHit,
+  guessNear,
+  hiddenCount,
+  hiddenKeepers,
   ledgerOf,
-  mocksFinished,
-  nextMockCount,
-  pickRevealTarget,
-  revealCandidates,
+  pickReveal,
   revealsLeft,
+  revealsReady,
   stampEarned,
   standings,
+  type OwnerFacts,
 } from '../src/lib/league/achievements.ts';
 
 const OWNERS = ['Joel', 'Ryan', 'Patrick', 'Bryan', 'Kyle', 'Dustin', 'Aaron', 'Derek', 'Brey', 'Amy'];
 
-test('there are more achievements than other teams, so nobody needs them all', () => {
-  assert.ok(ACHIEVEMENTS.length > OWNERS.length - 1);
+const earns = (facts: Partial<OwnerFacts>) => earnedFrom({ ...NO_FACTS, ...facts });
+
+test('more achievements than the eighteen keepers nine teams can hold', () => {
+  assert.ok(ACHIEVEMENTS.length > 18);
   assert.equal(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
 });
 
@@ -30,39 +34,56 @@ test('nothing done earns nothing', () => {
   assert.deepEqual(earnedFrom(NO_FACTS), []);
 });
 
-test('each fact earns its own achievement', () => {
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, signedRulebook: true }), ['signed']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, mocksFinished: 1 }), ['first-mock']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, mocksFinished: 10 }), ['first-mock', 'ten-mocks']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, mocksFinished: 9 }), ['first-mock']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, tradesOffered: 1 }), ['trade-offer']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, tradesDone: 1 }), ['trade-done']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, propBetsSet: 2 }), ['prop-bet']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, votesCast: 1 }), ['voted']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, scoutHits: 1 }), ['scout']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, duesPaid: true }), ['dues']);
+test('rule book, trades, votes, dues', () => {
+  assert.deepEqual(earns({ signedRulebook: true }), ['signed']);
+  assert.deepEqual(earns({ signedRulebook: true, drewSignature: true }), ['signed', 'hancock']);
+  assert.deepEqual(earns({ tradesOffered: 1 }), ['trade-offer']);
+  assert.deepEqual(earns({ offersRevised: 1 }), ['haggler']);
+  assert.deepEqual(earns({ offersClosed: 1 }), ['closer']);
+  assert.deepEqual(earns({ offersTaken: 1 }), ['taker']);
+  assert.deepEqual(earns({ votesCast: 1 }), ['voted']);
+  assert.deepEqual(earns({ pollsOpened: 1 }), ['lawmaker']);
+  assert.deepEqual(earns({ duesPaid: true }), ['dues']);
 });
 
-test('any A grade makes the honor roll; a B does not', () => {
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, bestMockGrade: 'A-' }), ['honor-roll']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, bestMockGrade: 'A+' }), ['honor-roll']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, bestMockGrade: 'B+' }), []);
+test('mock counts climb through three tiers', () => {
+  assert.deepEqual(earns({ mocksFinished: 1 }), ['first-mock']);
+  assert.deepEqual(earns({ mocksFinished: 9 }), ['first-mock']);
+  assert.deepEqual(earns({ mocksFinished: 10 }), ['first-mock', 'ten-mocks']);
+  assert.deepEqual(earns({ mocksFinished: 25 }), ['first-mock', 'ten-mocks', 'marathon']);
 });
 
-test('best grade picks the top one and skips junk', () => {
-  assert.equal(bestGrade(['B', 'A-', 'C']), 'A-');
-  assert.equal(bestGrade(['A', 'A+']), 'A+');
-  assert.equal(bestGrade(['?', 'F']), 'F');
-  assert.equal(bestGrade([]), null);
+test('grades: any A for the honor roll, A+ for valedictorian', () => {
+  assert.deepEqual(earns({ bestMockGrade: 'A-' }), ['honor-roll']);
+  assert.deepEqual(earns({ bestMockGrade: 'A+' }), ['honor-roll', 'valedictorian']);
+  assert.deepEqual(earns({ bestMockGrade: 'B+' }), []);
 });
 
-test('the mock count never drops below the saved rows', () => {
-  // Before this shipped, only the rows tell us anything.
-  assert.equal(mocksFinished(undefined, 7), 7);
-  // A member who deleted some keeps the running count.
-  assert.equal(mocksFinished(12, 3), 12);
-  assert.equal(nextMockCount(undefined, 10), 11, 'ten kept rows plus the new one');
-  assert.equal(nextMockCount(4, 2), 5);
+test('a steal of 15 picks makes a thief; 14 does not', () => {
+  assert.deepEqual(earns({ bestSteal: 15 }), ['thief']);
+  assert.deepEqual(earns({ bestSteal: 14 }), []);
+});
+
+test('a mock with a trade switched on', () => {
+  assert.deepEqual(earns({ mockedWithTrade: true }), ['what-if']);
+});
+
+test('prop tiers', () => {
+  assert.deepEqual(earns({ propBetsSet: 1 }), ['prop-bet']);
+  assert.deepEqual(earns({ propBetsSet: 5 }), ['prop-bet', 'bookmaker']);
+  assert.deepEqual(earns({ propSidesTaken: 5 }), ['action']);
+  assert.deepEqual(earns({ allPropsCovered: true }), ['all-in']);
+});
+
+test('ALL IN needs a side on every prop, and enough props to mean it', () => {
+  assert.equal(coversAllProps(3, 3), true);
+  assert.equal(coversAllProps(4, 3), false);
+  assert.equal(coversAllProps(2, 2), false, 'two props is too easy');
+});
+
+test('keeper guesses', () => {
+  assert.deepEqual(earns({ scoutHits: 1, closeCalls: 1 }), ['scout', 'close-call']);
+  assert.deepEqual(earns({ closeCalls: 1 }), ['close-call']);
 });
 
 test('earned is for good: stamping keeps the first date and skips repeats', () => {
@@ -71,46 +92,70 @@ test('earned is for good: stamping keeps the first date and skips repeats', () =
   assert.equal(stampEarned(first!, ['signed'], 't2'), null, 'nothing new means no write');
   const next = stampEarned(first!, ['signed', 'voted'], 't3');
   assert.deepEqual(next, { signed: 't1', voted: 't3' });
-  // A fact that stops being true (a deleted mock) does not unstamp it.
   assert.equal(stampEarned(next!, [], 't4'), null);
   assert.equal(earnedCount(next!), 2);
+  assert.equal(earnedCount({ 'trade-done': 'old' } as never), 0, 'retired ids do not count');
 });
 
-test('reveals left: one per achievement, never more than the other teams', () => {
-  assert.equal(revealsLeft(3, 1, 9), 2);
-  assert.equal(revealsLeft(10, 0, 9), 9);
-  assert.equal(revealsLeft(10, 9, 9), 0);
-  assert.equal(revealsLeft(1, 3, 9), 0, 'never negative');
+test('whole-team reveals from the first cut are dropped, so the reveal comes back', () => {
+  const ledger = ledgerOf({
+    reveals: { Joel: [{ target: 'Amy', at: 'x' } as never, { target: 'Kyle', playerKey: 'p1', at: 'y' }] },
+  });
+  assert.deepEqual(ledger.reveals.Joel, [{ target: 'Kyle', playerKey: 'p1', at: 'y' }]);
 });
 
-test('candidates skip yourself, teams already seen, and teams with no keepers', () => {
-  const counts = { Joel: 2, Ryan: 1, Patrick: 0, Amy: 2 };
-  const got = revealCandidates('Joel', OWNERS, counts, [{ target: 'Amy', at: 'x' }]);
-  assert.deepEqual(got, ['Ryan']);
+test('one reveal per achievement, never negative', () => {
+  assert.equal(revealsLeft(3, 1), 2);
+  assert.equal(revealsLeft(1, 3), 0);
 });
 
-test('the random pick spreads over every candidate', () => {
-  const c = ['Ryan', 'Amy', 'Kyle'];
-  assert.equal(pickRevealTarget(c, () => 0), 'Ryan');
-  assert.equal(pickRevealTarget(c, () => 0.5), 'Amy');
-  assert.equal(pickRevealTarget(c, () => 0.9999), 'Kyle');
-  assert.equal(pickRevealTarget(c, () => 1), 'Kyle', 'a 1 from a bad source stays in range');
-  assert.equal(pickRevealTarget([], () => 0.3), null);
+test('hidden keepers skip yourself, keepers already seen, and teams with none', () => {
+  const keepers = {
+    Joel: [{ playerKey: 'j1' }, { playerKey: 'j2' }],
+    Ryan: [{ playerKey: 'r1' }],
+    Amy: [{ playerKey: 'a1' }],
+    Kyle: [],
+  };
+  const teams = hiddenKeepers('Ryan', OWNERS, keepers, [{ target: 'Joel', playerKey: 'j1', at: 'x' }]);
+  assert.deepEqual(teams, [
+    { target: 'Joel', playerKeys: ['j2'] },
+    { target: 'Amy', playerKeys: ['a1'] },
+  ]);
+  assert.equal(hiddenCount(teams), 2);
+});
+
+test('the pick takes a random team, then a random keeper on it', () => {
+  const teams = [
+    { target: 'Joel', playerKeys: ['j1', 'j2'] },
+    { target: 'Amy', playerKeys: ['a1'] },
+  ];
+  assert.deepEqual(pickReveal(teams, () => 0), { target: 'Joel', playerKey: 'j1' });
+  assert.deepEqual(pickReveal(teams, () => 0.75), { target: 'Amy', playerKey: 'a1' });
+  // A team keeping two has the same odds as a team keeping one.
+  let calls = 0;
+  assert.deepEqual(pickReveal(teams, () => (calls++ === 0 ? 0.2 : 0.9)), { target: 'Joel', playerKey: 'j2' });
+  assert.deepEqual(pickReveal(teams, () => 1), { target: 'Amy', playerKey: 'a1' }, 'a 1 stays in range');
+  assert.equal(pickReveal([], () => 0.3), null);
 });
 
 test('reveal checks say why not', () => {
-  const base = { keepersPublic: false, isCommissioner: false, left: 1, candidates: 3 };
+  const base = { keepersPublic: false, isCommissioner: false, left: 1, hidden: 3 };
   assert.equal(canReveal(base).ok, true);
   assert.equal(canReveal({ ...base, keepersPublic: true }).reason, 'public');
   assert.equal(canReveal({ ...base, isCommissioner: true }).reason, 'commish');
   assert.equal(canReveal({ ...base, left: 0 }).reason, 'none-left');
-  assert.equal(canReveal({ ...base, candidates: 0 }).reason, 'nobody-ready');
+  assert.equal(canReveal({ ...base, hidden: 0 }).reason, 'nobody-ready');
+});
+
+test('the badge counts only reveals you could spend now', () => {
+  assert.equal(revealsReady(3, 1), 1);
+  assert.equal(revealsReady(2, 5), 2);
 });
 
 test('standings put the most achievements first and keep league order on ties', () => {
   const ledger = ledgerOf({
     earned: { Ryan: { signed: 'a' }, Amy: { signed: 'a', voted: 'b' }, Joel: { signed: 'a' } },
-    reveals: { Amy: [{ target: 'Joel', at: 'c' }] },
+    reveals: { Amy: [{ target: 'Joel', playerKey: 'j1', at: 'c' }] },
   });
   const rows = standings(['Joel', 'Ryan', 'Amy', 'Kyle'], ledger);
   assert.deepEqual(rows, [
@@ -124,19 +169,21 @@ test('standings put the most achievements first and keep league order on ties', 
 test('the first saved guess sticks; later edits never replace it', () => {
   assert.deepEqual(firstGuessToRecord(undefined, [], ['a'], 't1'), { keys: ['a'], at: 't1' });
   assert.equal(firstGuessToRecord({ keys: ['a'], at: 't1' }, ['a'], ['b'], 't2'), null);
-  // A guess saved before this shipped is the first one.
   assert.deepEqual(firstGuessToRecord(undefined, ['old'], ['new'], 't3'), { keys: ['old'], at: 't3' });
   assert.equal(firstGuessToRecord(undefined, [], [], 't4'), null, 'an empty save is not a guess');
 });
 
-test('a hit names exactly the keepers, in any order, before any reveal', () => {
+test('SCOUT needs the exact keepers; CLOSE CALL needs one', () => {
   const guess = { keys: ['jokic', 'hali'], at: '2026-10-10' };
   assert.equal(guessHit(guess, ['hali', 'jokic'], null), true);
   assert.equal(guessHit(guess, ['jokic'], null), false, 'one too many');
-  assert.equal(guessHit({ keys: ['jokic'], at: 'x' }, ['jokic', 'hali'], null), false, 'one short');
+  assert.equal(guessNear(guess, ['jokic'], null), true);
   assert.equal(guessHit(guess, ['jokic', 'curry'], null), false);
+  assert.equal(guessNear(guess, ['jokic', 'curry'], null), true);
+  assert.equal(guessNear(guess, ['curry'], null), false);
   assert.equal(guessHit(guess, [], null), false, 'no keepers in yet');
   assert.equal(guessHit(undefined, ['jokic'], null), false);
   assert.equal(guessHit(guess, ['hali', 'jokic'], '2026-10-11'), true, 'revealed after guessing');
   assert.equal(guessHit(guess, ['hali', 'jokic'], '2026-10-09'), false, 'revealed before guessing');
+  assert.equal(guessNear(guess, ['jokic'], '2026-10-09'), false);
 });

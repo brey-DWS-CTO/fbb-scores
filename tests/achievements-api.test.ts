@@ -53,10 +53,10 @@ interface AchievementsBody {
     earned: Record<string, string>;
     left: number;
     check: { ok: boolean; reason?: string };
-    reveals: Array<{ target: string; keepers: Array<{ playerName: string }> }>;
+    teams: Array<{ target: string; keeping: number; shown: Array<{ playerKey: string; playerName: string | null }> }>;
   };
   standings: Array<{ owner: string; earned: number; revealed: number }>;
-  revealed?: string;
+  revealed?: { target: string; playerKey: string };
 }
 
 const achievements = async (owner: string) =>
@@ -68,9 +68,17 @@ const reveal = (owner: string) =>
 const setProp = (owner: string, input: Record<string, unknown>) =>
   request('/api/league/prop-bets', { method: 'POST', headers: auth(owner), body: JSON.stringify(input) });
 
-async function saveMock(owner: string, id: string, grade: string) {
+/** A finished mock. Rank 1 of 10 grades A+, 2 grades A, 7 grades C+. */
+async function saveMock(owner: string, id: string, rank: number, extra: Record<string, unknown> = {}) {
+  const { steal, ...rest } = extra;
   await store.saveMockResult(
-    { season: SEASON, owner, id, result: { id, grade: { grade } }, createdAt: new Date().toISOString() },
+    {
+      season: SEASON,
+      owner,
+      id,
+      result: { id, grade: { rank, teams: 10, steal: steal ?? null }, ...rest },
+      createdAt: new Date().toISOString(),
+    },
     10,
   );
 }
@@ -118,7 +126,7 @@ beforeEach(async () => {
     draft.draft.picks = {};
     draft.keepers = {};
     draft.keepersRevealed = false;
-    draft.achievements = { earned: {}, reveals: {}, mocks: {}, firstGuesses: {} };
+    draft.achievements = { earned: {}, reveals: {}, firstGuesses: {} };
     draft.propBets = [];
   });
   for (const owner of Object.keys(pins)) {
@@ -136,48 +144,67 @@ test('signing in is required', async () => {
   assert.equal((await request('/api/league/achievements/reveal', { method: 'POST' })).status, 401);
 });
 
+// The mock log is never trimmed, so each test below uses its own owner.
+
 test('past work counts: a saved A mock earns two achievements', async () => {
-  await saveMock('Joel', 'mock-a-1', 'A');
-  const body = await achievements('Joel');
+  await saveMock('Derek', 'mock-d-1', 2);
+  const body = await achievements('Derek');
   assert.ok(body.you.earned['first-mock']);
   assert.ok(body.you.earned['honor-roll']);
+  assert.equal(body.you.earned.valedictorian, undefined);
   assert.equal(body.you.left, 2);
-  assert.equal(body.standings[0].owner, 'Joel');
+  assert.equal(body.standings[0].owner, 'Derek');
 });
 
 test('earned sticks after the mock that earned it is deleted', async () => {
-  await saveMock('Joel', 'mock-a-1', 'B');
-  assert.ok((await achievements('Joel')).you.earned['first-mock']);
-  await store.deleteMockResult(SEASON, 'Joel', 'mock-a-1');
-  assert.ok((await achievements('Joel')).you.earned['first-mock']);
+  await saveMock('Dustin', 'mock-u-1', 5);
+  assert.ok((await achievements('Dustin')).you.earned['first-mock']);
+  await store.deleteMockResult(SEASON, 'Dustin', 'mock-u-1');
+  assert.ok((await achievements('Dustin')).you.earned['first-mock']);
 });
 
-test('the running mock count earns MOCK ADDICT past the ten kept rows', async () => {
-  await store.mutateState((draft) => {
-    draft.achievements = { earned: {}, reveals: {}, mocks: { Kyle: 12 }, firstGuesses: {} };
-  });
+test('the never-trimmed mock log earns MOCK ADDICT past the ten kept rows', async () => {
+  for (let i = 1; i <= 12; i += 1) await saveMock('Kyle', `mock-k-${i}`, 6);
+  assert.equal((await store.listMockResults(SEASON, 'Kyle')).length, 10);
   const body = await achievements('Kyle');
   assert.ok(body.you.earned['ten-mocks']);
+  assert.equal(body.you.earned.marathon, undefined);
+});
+
+test('THIEF and WHAT IF read the saved mock', async () => {
+  await saveMock('Aaron', 'mock-r-1', 1, { steal: { name: 'X', label: '3.4', by: 16 }, tradesOn: ['pt-1'] });
+  const earned = (await achievements('Aaron')).you.earned;
+  assert.ok(earned.thief);
+  assert.ok(earned['what-if']);
+  assert.ok(earned.valedictorian, 'rank 1 of 10 is an A+');
 });
 
 test('a reveal waits until another team has keepers in', async () => {
-  await saveMock('Joel', 'mock-a-1', 'C');
-  const body = await achievements('Joel');
+  await saveMock('Patrick', 'mock-p-1', 7);
+  const body = await achievements('Patrick');
   assert.equal(body.you.check.reason, 'nobody-ready');
-  assert.equal((await reveal('Joel')).status, 409);
+  assert.equal((await reveal('Patrick')).status, 409);
 });
 
-test('a reveal shows one random team, once, and only to the owner who spent it', async () => {
-  await saveMock('Joel', 'mock-a-1', 'C');
+test('a reveal shows one keeper, once, and only to the owner who spent it', async () => {
+  await saveMock('Joel', 'mock-j-1', 7);
   await store.mutateState((draft) => {
-    draft.keepers = { Amy: [{ playerKey: 'p1', playerName: 'N. Jokic' }] };
+    draft.keepers = {
+      Amy: [
+        { playerKey: 'p1', playerName: 'N. Jokic' },
+        { playerKey: 'p2', playerName: 'S. Curry' },
+      ],
+    };
   });
 
   const spent = await reveal('Joel');
   assert.equal(spent.status, 200);
   const body = spent.body as unknown as AchievementsBody;
-  assert.equal(body.revealed, 'Amy');
-  assert.equal(body.you.reveals[0].keepers[0].playerName, 'N. Jokic');
+  assert.equal(body.revealed?.target, 'Amy');
+  assert.equal(body.you.teams.length, 1);
+  assert.equal(body.you.teams[0].keeping, 2);
+  assert.equal(body.you.teams[0].shown.length, 1, 'one keeper, not the team');
+  assert.ok(['N. Jokic', 'S. Curry'].includes(body.you.teams[0].shown[0].playerName ?? ''));
   assert.equal(body.you.left, 0);
 
   // Spent, so no second look.
@@ -191,11 +218,24 @@ test('a reveal shows one random team, once, and only to the owner who spent it',
   assert.equal(state.state.keepers.Amy, undefined);
 
   // Nobody else sees Joel's reveal.
-  assert.equal((await achievements('Ryan')).you.reveals.length, 0);
+  assert.equal((await achievements('Ryan')).you.teams.length, 0);
+});
+
+test('a whole-team reveal from the first cut gives the reveal back', async () => {
+  await saveMock('Bryan', 'mock-y-1', 7);
+  await store.mutateState((draft) => {
+    draft.keepers = { Amy: [{ playerKey: 'p1', playerName: 'N. Jokic' }] };
+    draft.achievements = {
+      earned: {},
+      reveals: { Bryan: [{ target: 'Amy', at: '2026-10-14T00:00:00.000Z' } as never] },
+      firstGuesses: {},
+    };
+  });
+  assert.equal((await achievements('Bryan')).you.left, 1);
 });
 
 test('the commissioner has nothing to reveal', async () => {
-  await saveMock('Brey', 'mock-b-1', 'C');
+  await saveMock('Brey', 'mock-b-1', 7);
   await store.mutateState((draft) => {
     draft.keepers = { Amy: [{ playerKey: 'p1', playerName: 'N. Jokic' }] };
   });
@@ -204,12 +244,11 @@ test('the commissioner has nothing to reveal', async () => {
 });
 
 test('no reveals once keepers are public', async () => {
-  await saveMock('Joel', 'mock-a-1', 'C');
   await store.mutateState((draft) => {
     draft.keepers = { Amy: [{ playerKey: 'p1', playerName: 'N. Jokic' }] };
     draft.keepersRevealed = true;
   });
-  assert.equal((await reveal('Joel')).status, 409);
+  assert.equal((await reveal('Derek')).status, 409);
 });
 
 // ─── SCOUT and dues ────────────────────────────────────────────────────────
@@ -275,13 +314,30 @@ test('PAID UP waits for the collector to confirm', async () => {
   assert.ok((await achievements('Amy')).you.earned.dues);
 });
 
-test('the LEAGUE badge counts unspent reveals, for the viewer only', async () => {
-  await saveMock('Joel', 'mock-a-1', 'A');
-  await achievements('Joel');
-  const joel = (await request('/api/league/state', { headers: auth('Joel') })).body as unknown as { meta: { revealsReady: number } };
-  assert.equal(joel.meta.revealsReady, 2);
-  const ryan = (await request('/api/league/state', { headers: auth('Ryan') })).body as unknown as { meta: { revealsReady: number } };
-  assert.equal(ryan.meta.revealsReady, 0);
+test('the LEAGUE badge counts reveals you could spend now, for the viewer only', async () => {
+  await saveMock('Derek', 'mock-d-1', 2);
+  await store.mutateState((draft) => {
+    draft.keepers = {
+      Amy: [
+        { playerKey: 'p1', playerName: 'N. Jokic' },
+        { playerKey: 'p2', playerName: 'S. Curry' },
+      ],
+    };
+  });
+  await achievements('Derek');
+  const meta = async (owner: string) =>
+    ((await request('/api/league/state', { headers: auth(owner) })).body as unknown as { meta: { revealsReady: number } }).meta;
+  assert.equal((await meta('Derek')).revealsReady, 2);
+  assert.equal((await meta('Ryan')).revealsReady, 0);
+});
+
+test('CLOSE CALL: one keeper right on the first guess', async () => {
+  const [a, b] = kylePlayers;
+  assert.equal((await guess('Amy', 'Kyle', [a])).status, 200);
+  await setKyleKeepers([a, b]);
+  const earned = (await achievements('Amy')).you.earned;
+  assert.ok(earned['close-call']);
+  assert.equal(earned.scout, undefined);
 });
 
 // ─── Prop bets ─────────────────────────────────────────────────────────────

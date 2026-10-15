@@ -13,6 +13,9 @@ import {
 import {
   ACHIEVEMENTS,
   MOCKS_FOR_ADDICT,
+  MOCKS_FOR_MARATHON,
+  PROPS_FOR_BOOKMAKER,
+  SIDES_FOR_ACTION,
   type AchievementId,
   type OwnerFacts,
 } from '../../lib/league/achievements.js';
@@ -20,30 +23,37 @@ import {
 const formatDay = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-/** Where to go to earn each one. */
-const WHERE: Record<AchievementId, { to: string; label: string }> = {
-  signed: { to: '/rules', label: 'RULE BOOK' },
-  'first-mock': { to: '/mock', label: 'MOCK DRAFT' },
-  'ten-mocks': { to: '/mock', label: 'MOCK DRAFT' },
-  'honor-roll': { to: '/mock', label: 'MOCK DRAFT' },
-  'trade-offer': { to: '/trades', label: 'TRADES' },
-  'trade-done': { to: '/trades', label: 'TRADES' },
-  'prop-bet': { to: '/props', label: 'PROP BETS' },
-  voted: { to: '/votes', label: 'VOTES' },
-  scout: { to: '/keepers', label: 'KEEPERS' },
-  dues: { to: '/dues', label: 'DUES' },
-};
+/** The list in groups, each with where to go to earn them. */
+const GROUPS: ReadonlyArray<{ label: string; to: string; ids: AchievementId[] }> = [
+  { label: 'RULE BOOK', to: '/rules', ids: ['signed', 'hancock'] },
+  {
+    label: 'MOCK DRAFTS',
+    to: '/mock',
+    ids: ['first-mock', 'ten-mocks', 'marathon', 'honor-roll', 'valedictorian', 'thief', 'what-if'],
+  },
+  { label: 'TRADES', to: '/trades', ids: ['trade-offer', 'haggler', 'closer', 'taker'] },
+  { label: 'PROP BETS', to: '/props', ids: ['prop-bet', 'bookmaker', 'action', 'all-in'] },
+  { label: 'VOTES', to: '/votes', ids: ['voted', 'lawmaker'] },
+  { label: 'KEEPER GUESSES', to: '/keepers', ids: ['scout', 'close-call'] },
+  { label: 'DUES', to: '/dues', ids: ['dues'] },
+];
+
+const BY_ID = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));
 
 /** A progress line for the ones that take more than one go. */
 function progress(id: AchievementId, facts: OwnerFacts): string | null {
-  if (id === 'ten-mocks') return `${Math.min(facts.mocksFinished, MOCKS_FOR_ADDICT)} of ${MOCKS_FOR_ADDICT} done`;
-  if (id === 'honor-roll' && facts.bestMockGrade) return `Best so far: ${facts.bestMockGrade}`;
+  const of = (n: number, goal: number) => `${Math.min(n, goal)} of ${goal} done`;
+  if (id === 'ten-mocks') return of(facts.mocksFinished, MOCKS_FOR_ADDICT);
+  if (id === 'marathon') return of(facts.mocksFinished, MOCKS_FOR_MARATHON);
+  if ((id === 'honor-roll' || id === 'valedictorian') && facts.bestMockGrade) return `Best so far: ${facts.bestMockGrade}`;
+  if (id === 'thief' && facts.bestSteal > 0) return `Best steal so far: ${facts.bestSteal} picks`;
+  if (id === 'bookmaker') return of(facts.propBetsSet, PROPS_FOR_BOOKMAKER);
+  if (id === 'action') return of(facts.propSidesTaken, SIDES_FOR_ACTION);
   return null;
 }
 
 /**
- * Achievements. Each one earns a look at one other team's keepers, picked at
- * random from the teams that have keepers in.
+ * Achievements. Each one shows one keeper, from a random team.
  */
 export default function AchievementsPage() {
   const { identity } = useIdentity();
@@ -79,7 +89,7 @@ export default function AchievementsPage() {
     try {
       const next = await revealKeeper(identity);
       setData(next);
-      setFresh(next.revealed ?? null);
+      setFresh(next.revealed ? `${next.revealed.target}:${next.revealed.playerKey}` : null);
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
@@ -90,7 +100,7 @@ export default function AchievementsPage() {
   const you = data?.you;
   const earnedTotal = you ? ACHIEVEMENTS.filter((a) => you.earned[a.id]).length : 0;
   // Newest first, so a fresh reveal lands on top.
-  const reveals = you ? [...you.reveals].reverse() : [];
+  const teams = you ? [...you.teams].sort((a, b) => b.lastAt.localeCompare(a.lastAt)) : [];
 
   return (
     <main className="rules-page achieve-page">
@@ -100,10 +110,7 @@ export default function AchievementsPage() {
             <NavIcon name="trophy" size={18} className="icon-in-heading" />
             ACHIEVEMENTS
           </h1>
-          <p>
-            Each achievement lets you see one other team's keepers, picked at random. There are{' '}
-            {ACHIEVEMENTS.length} to earn and 9 teams to see.
-          </p>
+          <p>Each one shows you one keeper from a random team.</p>
         </div>
         <IdentityChip />
       </header>
@@ -128,19 +135,25 @@ export default function AchievementsPage() {
               <p className="rule-edit-hint">{you.check.message}</p>
             )}
 
-            {reveals.length > 0 && (
+            {teams.length > 0 && (
               <ul className="achieve-seen">
-                {reveals.map((r) => (
-                  <li key={r.target} className={r.target === fresh ? 'achieve-seen-card achieve-seen-new' : 'achieve-seen-card'}>
-                    <span className="achieve-seen-team">{r.target.toUpperCase()} KEPT</span>
-                    {r.keepers.length > 0 ? (
-                      <span className="achieve-seen-names">{r.keepers.map((k) => k.playerName).join(' and ')}</span>
-                    ) : (
-                      <span className="achieve-seen-names achieve-muted">No keepers in right now.</span>
-                    )}
-                    <span className="achieve-muted">Seen {formatDay(r.at)}. This updates if they change.</span>
-                  </li>
-                ))}
+                {teams.map((team) => {
+                  const isNew = team.shown.some((s) => `${team.target}:${s.playerKey}` === fresh);
+                  return (
+                    <li key={team.target} className={isNew ? 'achieve-seen-card achieve-seen-new' : 'achieve-seen-card'}>
+                      <span className="achieve-seen-team">
+                        {team.target.toUpperCase()} KEEPS · {team.shown.length} OF {Math.max(team.keeping, team.shown.length)} SHOWN
+                      </span>
+                      {team.shown.map((s) =>
+                        s.playerName ? (
+                          <span key={s.playerKey} className="achieve-seen-names">{s.playerName}</span>
+                        ) : (
+                          <span key={s.playerKey} className="achieve-seen-names achieve-muted">A player they have since dropped</span>
+                        ),
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -149,30 +162,34 @@ export default function AchievementsPage() {
             <span className="hub-heading achieve-title">
               YOUR ACHIEVEMENTS · {earnedTotal} OF {ACHIEVEMENTS.length}
             </span>
-            <ul className="achieve-list">
-              {ACHIEVEMENTS.map((a) => {
-                const at = you.earned[a.id];
-                const where = WHERE[a.id];
-                const line = at ? null : progress(a.id, you.facts);
-                return (
-                  <li key={a.id} className={at ? 'achieve-item achieve-done' : 'achieve-item'}>
-                    <NavIcon name={at ? 'star' : 'lock'} size={20} className="achieve-icon" />
-                    <span className="achieve-body">
-                      <span className="achieve-name">{a.title}</span>
-                      <span className="achieve-how">{a.how}</span>
-                      {line && <span className="achieve-muted">{line}</span>}
-                    </span>
-                    {at ? (
-                      <span className="achieve-when">{formatDay(at)}</span>
-                    ) : (
-                      <Link className="achieve-go tap-btn" to={where.to}>
-                        {where.label}
-                      </Link>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            {GROUPS.map((group) => (
+              <div key={group.label} className="achieve-group">
+                <span className="achieve-group-label">{group.label}</span>
+                <ul className="achieve-list">
+                  {group.ids.map((id) => {
+                    const a = BY_ID.get(id);
+                    if (!a) return null;
+                    const at = you.earned[id];
+                    const line = at ? null : progress(id, you.facts);
+                    return (
+                      <li key={id} className={at ? 'achieve-item achieve-done' : 'achieve-item'}>
+                        <NavIcon name={at ? 'star' : 'lock'} size={20} className="achieve-icon" />
+                        <span className="achieve-body">
+                          <span className="achieve-name">{a.title}</span>
+                          <span className="achieve-how">{a.how}</span>
+                          {line && <span className="achieve-muted">{line}</span>}
+                        </span>
+                        {at ? (
+                          <span className="achieve-when">{formatDay(at)}</span>
+                        ) : (
+                          <Link className="achieve-go tap-btn" to={group.to}>GO</Link>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </section>
 
           <section className="panel">
@@ -188,12 +205,12 @@ export default function AchievementsPage() {
                     {row.earned}/{ACHIEVEMENTS.length}
                   </span>
                   <span className="achieve-muted achieve-row-seen">
-                    {row.revealed} {row.revealed === 1 ? 'team' : 'teams'} seen
+                    {row.revealed} {row.revealed === 1 ? 'keeper' : 'keepers'} seen
                   </span>
                 </li>
               ))}
             </ol>
-            <p className="rule-edit-hint">Only you see whose keepers you have seen.</p>
+            <p className="rule-edit-hint">Only you see which keepers you have seen.</p>
           </section>
         </>
       )}
