@@ -109,13 +109,13 @@ function MockDraftScreen() {
   const onFinished = useCallback((finished: { choices: Record<number, string>; grade: MockGrade; board: SavedBoard }) => {
     if (!identity) return;
     const id = mockResultId(identity.owner, seed, mode, finished.choices);
-    void saveMockResult(identity, { id, seed, mode, grade: finished.grade, board: finished.board })
+    void saveMockResult(identity, { id, seed, mode, grade: finished.grade, board: finished.board, tradesOn })
       .then(() => Promise.all([
         queryClient.invalidateQueries({ queryKey: ['mock-results'] }),
         queryClient.invalidateQueries({ queryKey: ['mock-stats'] }),
       ]))
       .catch(() => { /* the grade still shows; it just is not kept */ });
-  }, [identity, seed, mode, queryClient]);
+  }, [identity, seed, mode, tradesOn, queryClient]);
   const forget = (id: string) => {
     if (!identity) return;
     void deleteMockResult(identity, id).then(() => queryClient.invalidateQueries({ queryKey: ['mock-results'] }));
@@ -200,12 +200,12 @@ function MockDraftScreen() {
   }, [ownCandidates, tryKeepers, tryPicks]);
 
   const now = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [], useEntered, guessInstead }),
-    [dataset, viewer, state, scenario, proposals, useEntered, guessInstead],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [], useEntered, guessInstead, keeperCounts: meta?.keeperStatus }),
+    [dataset, viewer, state, scenario, proposals, useEntered, guessInstead, meta?.keeperStatus],
   );
   const whatIf = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead }),
-    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead, keeperCounts: meta?.keeperStatus }),
+    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead, meta?.keeperStatus],
   );
 
   // Picks a switched-on trade moves: traded only if that offer goes through.
@@ -299,7 +299,7 @@ function MockDraftScreen() {
         <section className="panel mock-assumptions">
         <div className="hub-heading mock-sub">THEIR KEEPERS</div>
         {/* Members never see others' entered keepers before the reveal. */}
-        {!revealed && isCommish && (
+        {!revealed && isCommish && meta?.commishBlind !== true && (
           <>
             <label className="mock-use-entered">
               <input type="checkbox" checked={useEntered} onChange={(event) => setUseEntered(event.target.checked)} />

@@ -226,8 +226,8 @@ export default function DraftPage() {
   const scenarioActive = Object.keys(scenario).length > 0;
   const projectedKeys = useMemo(() => projectedPlayerKeys(scenario), [scenario]);
   const boardState = useMemo(
-    () => scenarioActive ? stateWithKeeperScenario(state, scenario) : state,
-    [scenario, scenarioActive, state],
+    () => scenarioActive ? stateWithKeeperScenario(state, scenario, meta?.keeperStatus) : state,
+    [scenario, scenarioActive, state, meta?.keeperStatus],
   );
 
   const clearScenario = async () => {

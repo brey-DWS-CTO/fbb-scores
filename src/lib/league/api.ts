@@ -37,6 +37,13 @@ import type { RulebookSignature } from './rulebookSignatures.js';
 import type { DuesAction, DuesBoard } from './dues.js';
 import type { Poll, PollKind } from './polls.js';
 import type {
+  AchievementId,
+  AchievementStanding,
+  OwnerFacts,
+  RevealCheck,
+} from './achievements.js';
+import type { PropBet, PropInput, PropSide } from './propBets.js';
+import type {
   LeagueScheduleMapping,
   RawScheduleSource,
   ScheduleRefreshPreview,
@@ -48,6 +55,10 @@ import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
   pendingTrades?: number;
+  /** Keeper reveals this viewer has earned and not spent. Drives the VAULT badge. */
+  revealsReady?: number;
+  /** The commissioner turned off his view of other teams' keepers. */
+  commishBlind?: boolean;
   draftAt: string;
   revealed: boolean;
   /** Keeper counts per owner — always visible even while selections are secret. */
@@ -560,6 +571,12 @@ export async function setLocks(c: Credentials, keepersLocked: boolean): Promise<
   return data;
 }
 
+/** Commissioner: stop (or start) seeing other teams' keepers, so reveals work for you. */
+export async function setCommishBlind(c: Credentials, blind: boolean): Promise<StateResponse> {
+  const { data } = await axios.post('/api/league/commish-blind', { blind }, { headers: authHeaders(c) });
+  return data;
+}
+
 export async function setOverrides(
   c: Credentials,
   overrides: { cap?: number | null; playerRounds?: Record<string, number | null> },
@@ -657,7 +674,7 @@ export async function fetchMockStats(c: Credentials): Promise<MockStatRow[]> {
 /** Save a finished mock draft. Saving the same draft twice is a no-op. */
 export async function saveMockResult(
   c: Credentials,
-  result: Pick<MockResultRecord, 'id' | 'seed' | 'mode' | 'grade' | 'board'>,
+  result: Pick<MockResultRecord, 'id' | 'seed' | 'mode' | 'grade' | 'board' | 'tradesOn'>,
 ): Promise<MockResultRecord> {
   const { data } = await axios.post('/api/league/mock-results', result, { headers: authHeaders(c) });
   return data.result as MockResultRecord;
@@ -1513,4 +1530,101 @@ export function apiErrorMessage(e: unknown): string {
     return data?.error ?? e.message;
   }
   return e instanceof Error ? e.message : 'Something went wrong';
+}
+
+/* ── Achievements and prop bets ─────────────────────────────────────────── */
+
+export interface AchievementsResponse {
+  you: {
+    owner: string;
+    earned: Partial<Record<AchievementId, string>>;
+    facts: OwnerFacts;
+    left: number;
+    check: RevealCheck;
+    /** Teams you have seen keepers on, with only the keepers shown to you. */
+    teams: Array<{
+      target: string;
+      /** How many keepers that team has in now. */
+      keeping: number;
+      /** playerName is null when the team has since dropped him. */
+      shown: Array<{ playerKey: string; playerName: string | null; at: string }>;
+      lastAt: string;
+    }>;
+  };
+  standings: AchievementStanding[];
+  keepersPublic: boolean;
+  /** Set on a reveal: the keeper just shown. */
+  revealed?: { target: string; playerKey: string };
+}
+
+export async function fetchAchievements(c: Credentials): Promise<AchievementsResponse> {
+  const { data } = await axios.get<AchievementsResponse>('/api/league/achievements', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Spend one reveal. The server picks the team. */
+export async function revealKeeper(c: Credentials): Promise<AchievementsResponse> {
+  const { data } = await axios.post<AchievementsResponse>('/api/league/achievements/reveal', {}, { headers: authHeaders(c) });
+  return data;
+}
+
+export interface PropBetsResponse {
+  /** Never one about the viewer. The server filters them out. */
+  props: PropBet[];
+  locked: boolean;
+  owners: string[];
+}
+
+export async function fetchPropBets(c: Credentials): Promise<PropBetsResponse> {
+  const { data } = await axios.get<PropBetsResponse>('/api/league/prop-bets', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Enter the final count, or null to clear it. */
+export async function settlePropBet(c: Credentials, id: string, result: number | null): Promise<PropBetsResponse> {
+  const { data } = await axios.post<PropBetsResponse>(
+    `/api/league/prop-bets/${encodeURIComponent(id)}/result`,
+    { result },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function createPropBet(c: Credentials, input: PropInput): Promise<PropBetsResponse> {
+  const { data } = await axios.post<PropBetsResponse>('/api/league/prop-bets', input, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function takePropSide(c: Credentials, id: string, side: PropSide | null): Promise<PropBetsResponse> {
+  const { data } = await axios.post<PropBetsResponse>(
+    `/api/league/prop-bets/${encodeURIComponent(id)}/take`,
+    { side },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function removePropBet(c: Credentials, id: string): Promise<PropBetsResponse> {
+  const { data } = await axios.delete<PropBetsResponse>(`/api/league/prop-bets/${encodeURIComponent(id)}`, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
+export interface AchievementNews {
+  /** Earned and not yet shown in a toast, in list order. */
+  fresh: AchievementId[];
+  left: number;
+  canReveal: boolean;
+}
+
+/** Anything new since the last toast. Checks only the signed-in member. */
+export async function fetchAchievementNews(c: Credentials): Promise<AchievementNews> {
+  const { data } = await axios.get<AchievementNews>('/api/league/achievements/news', { headers: authHeaders(c) });
+  return data;
+}
+
+/** The toast for these went up; do not show them again. */
+export async function markAchievementsSeen(c: Credentials, ids: AchievementId[]): Promise<void> {
+  await axios.post('/api/league/achievements/seen', { ids }, { headers: authHeaders(c) });
 }

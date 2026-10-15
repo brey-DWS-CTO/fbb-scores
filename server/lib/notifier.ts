@@ -33,6 +33,7 @@ import {
 } from './leagueStore.js';
 import { sendMail, type MailContent } from './mailer.js';
 import { shameEmailCopy, type DuesBoard } from '../../src/lib/league/dues.js';
+import { dueAnnouncements } from '../../src/lib/league/announcements.js';
 
 const leagueDataset = rawDataset as unknown as LeagueDataset;
 
@@ -418,6 +419,37 @@ export interface ReminderRun {
   due: number;
   /** How many actually went out on this run. */
   sent: number;
+  /** One-time announcements that went out on this run. */
+  announced?: number;
+}
+
+// ─── Announcements ───────────────────────────────────────────────────────────
+
+/**
+ * One-time league news, each member once. Claimed before sending, like the
+ * reminders: a failed send is not retried, so nobody ever gets it twice.
+ */
+export async function runAnnouncements(now: Date, origin: string): Promise<number> {
+  const season = leagueDataset.season;
+  const book = await addressBook();
+  const due = dueAnnouncements({ now, owners: [...book.keys()], alreadySent: await listSentNotices(season) });
+  let sent = 0;
+  for (const item of due) {
+    const address = book.get(item.owner);
+    if (!address) continue;
+    if (!(await claimSentNotice(item.key, season))) continue;
+    const a = item.announcement;
+    const content: MailContent = {
+      subject: a.subject,
+      preheader: a.preheader,
+      heading: a.heading,
+      lines: a.lines,
+      action: { label: a.actionLabel, href: `${origin}${a.actionPath}` },
+    };
+    const result = await sendMail(address, content, origin, 'notify');
+    if (result.ok) sent += 1;
+  }
+  return sent;
 }
 
 /**
@@ -428,9 +460,10 @@ export interface ReminderRun {
  * worse than missing one, and the app itself still shows the deadline.
  */
 export async function runDueReminders(now: Date, origin: string): Promise<ReminderRun> {
+  const announced = await runAnnouncements(now, origin);
   // Most hours of the year nothing can be due. Say so without a query, so
   // the database can stay asleep.
-  if (!anyReminderWindowOpen(now, new Date(DRAFT_AT_ISO))) return { due: 0, sent: 0 };
+  if (!anyReminderWindowOpen(now, new Date(DRAFT_AT_ISO))) return { due: 0, sent: 0, announced };
   const { state } = await getState();
   const book = await addressBook();
   const withKeepers = Object.entries(state.keepers)
@@ -455,5 +488,5 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
     const result = await sendMail(address, reminderContent(reminder, origin), origin, 'notify');
     if (result.ok) sent += 1;
   }
-  return { due: due.length, sent };
+  return { due: due.length, sent, announced };
 }

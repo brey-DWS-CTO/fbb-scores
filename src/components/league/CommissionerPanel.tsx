@@ -5,6 +5,7 @@ import {
   closeDraft,
   reopenDraft,
   resetDraft,
+  setCommishBlind,
   setKeeperVisibility,
   setLocks,
 } from '../../lib/league/api.js';
@@ -39,6 +40,7 @@ export default function CommissionerPanel() {
   const locked = state.locks.keepersLocked;
   const closed = Boolean(state.draft.closedAt);
   const revealed = meta?.revealed ?? (state.keepersRevealed === true);
+  const blind = meta?.commishBlind === true;
   if (!identity?.isCommissioner) return null;
 
   const run = async (key: string, fn: () => Promise<void>) => {
@@ -64,6 +66,11 @@ export default function CommissionerPanel() {
       applyState(await setKeeperVisibility(identity, next));
     });
   };
+
+  const toggleBlind = () =>
+    void run('blind', async () => {
+      applyState(await setCommishBlind(identity, !blind));
+    });
 
   const doResetDraft = () => {
     setResetArmed(false);
@@ -117,6 +124,30 @@ export default function CommissionerPanel() {
         >
           {busy === 'lock' ? '…' : locked ? 'UNLOCK' : 'LOCK'}
         </button>
+      </div>
+
+      {/* Your own view of keepers */}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--panel-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: blind ? 'var(--neon-yellow)' : 'var(--neon-teal)' }}>
+              You {blind ? 'are BLIND to' : 'SEE'} other teams' keepers
+            </div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
+              {blind
+                ? "You play like a member: achievement reveals work for you. You can't edit other teams' keepers."
+                : 'Go blind to earn keeper reveals like everyone else.'}
+            </div>
+          </div>
+          <button
+            className="tap-btn"
+            onClick={toggleBlind}
+            disabled={busy !== null || revealed}
+            style={{ ...btnOutline(blind ? 'var(--neon-teal)' : 'var(--neon-yellow)'), flexShrink: 0 }}
+          >
+            {busy === 'blind' ? '…' : blind ? 'SEE ALL' : 'GO BLIND'}
+          </button>
+        </div>
       </div>
 
       {/* Keeper visibility */}

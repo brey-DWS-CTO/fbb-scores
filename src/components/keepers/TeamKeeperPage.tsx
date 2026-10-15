@@ -483,7 +483,8 @@ export default function TeamKeeperPage() {
   const postseasonGames = usePostseasonGames();
 
   const serverSelections = useMemo(() => state.keepers[owner] ?? [], [state.keepers, owner]);
-  const isCommish = identity?.isCommissioner ?? false;
+  // Blind, the commish is a member here: he sees and edits only his own keepers.
+  const isCommish = (identity?.isCommissioner ?? false) && meta?.commishBlind !== true;
   const [commissionerRealEdit, setCommissionerRealEdit] = useState(false);
   const projectionMode = !!identity
     && identity.owner !== owner
@@ -881,6 +882,7 @@ export default function TeamKeeperPage() {
               </div>
               <div style={{ color: 'var(--text-body)', fontSize: '0.76rem', marginTop: 5, lineHeight: 1.45 }}>
                 These picks are private to {identity?.owner}. They do not change {owner}'s real submission.
+                {' '}Only your first save counts for SCOUT.
               </div>
             </div>
             <button

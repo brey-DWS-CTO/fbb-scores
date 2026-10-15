@@ -5,9 +5,9 @@ import { onLanding, onPath, sectionFor, sectionHome, visibleSections } from '../
 const member = visibleSections(false);
 const commish = visibleSections(true);
 
-test('members see five sections, the commish six', () => {
-  assert.deepEqual(member.map((section) => section.label), ['KEEPERS', 'DRAFT', 'TRADES', 'LEAGUE', 'RULES']);
-  assert.deepEqual(commish.map((section) => section.label), ['KEEPERS', 'DRAFT', 'TRADES', 'LEAGUE', 'RULES', 'COMMISH']);
+test('members see six sections, the commish seven', () => {
+  assert.deepEqual(member.map((section) => section.label), ['KEEPERS', 'DRAFT', 'TRADES', 'LEAGUE', 'VAULT', 'RULES']);
+  assert.deepEqual(commish.map((section) => section.label), ['KEEPERS', 'DRAFT', 'TRADES', 'LEAGUE', 'VAULT', 'RULES', 'COMMISH']);
 });
 
 test('everyone sees the mock draft, projections and tiers', () => {
@@ -16,8 +16,11 @@ test('everyone sees the mock draft, projections and tiers', () => {
   assert.deepEqual(draft(commish), ['/draft', '/mock', '/projections', '/tiers']);
 });
 
-test('the phone bar holds four sections', () => {
-  assert.deepEqual(member.filter((section) => section.primary).map((section) => section.id), ['keepers', 'draft', 'trades', 'league']);
+test('the phone bar holds five sections until keepers go public, then four', () => {
+  assert.deepEqual(member.filter((section) => section.primary).map((section) => section.id), ['keepers', 'draft', 'trades', 'league', 'vault']);
+  const draftDay = visibleSections(false, true);
+  assert.deepEqual(draftDay.filter((section) => section.primary).map((section) => section.id), ['keepers', 'draft', 'trades', 'league']);
+  assert.ok(draftDay.some((section) => section.id === 'vault'), 'VAULT moves behind MORE, it does not vanish');
 });
 
 test('every old page address finds its section', () => {
@@ -31,6 +34,11 @@ test('every old page address finds its section', () => {
     ['/teams', 'league'],
     ['/history', 'league'],
     ['/league', 'league'],
+    ['/dues', 'league'],
+    ['/achievements', 'vault'],
+    ['/revealed', 'vault'],
+    ['/achievements/reveal', 'vault'],
+    ['/props', 'vault'],
     ['/votes', 'rules'],
     ['/rules', 'rules'],
     ['/schedule', 'commish'],
