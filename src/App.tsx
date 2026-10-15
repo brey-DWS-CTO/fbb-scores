@@ -26,6 +26,8 @@ import ProjectionsPage from './components/league/ProjectionsPage.js'
 import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
+import AchievementsPage from './components/league/AchievementsPage.js'
+import PropBetsPage from './components/league/PropBetsPage.js'
 
 function App() {
   const location = useLocation()
@@ -77,6 +79,8 @@ function App() {
         <Route path="/league" element={<LeaguePage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/dues" element={<DuesPage />} />
+        <Route path="/achievements" element={<AchievementsPage />} />
+        <Route path="/props" element={<PropBetsPage />} />
         <Route path="/rules" element={<RulesPage />} />
         <Route path="/rules/paper" element={<PaperPage />} />
         <Route path="/votes" element={<VotesPage />} />

@@ -130,6 +130,35 @@ import {
 } from '../lib/leagueStore.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
+import {
+  NO_FACTS,
+  bestGrade,
+  canReveal,
+  earnedCount,
+  earnedFrom,
+  ledgerOf,
+  mocksFinished,
+  nextMockCount,
+  pickRevealTarget,
+  revealCandidates,
+  revealsLeft,
+  stampEarned,
+  standings,
+  type AchievementLedger,
+  type OwnerFacts,
+} from '../../src/lib/league/achievements.js';
+import {
+  canRemoveProp,
+  parsePropInput,
+  propCount,
+  propResult,
+  propsLocked,
+  sameProp,
+  takeSide,
+  type DraftedPlayer,
+  type PropBet,
+  type PropSide,
+} from '../../src/lib/league/propBets.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import {
   DUES_ACTIONS,
@@ -449,16 +478,17 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
   // Pending offers are between two members. Accepted trades are league news,
   // so the ledger itself is never redacted.
   const proposals = expireStale(proposalsOf(result.state), new Date().toISOString()).proposals;
-  return {
-    ...result,
-    state: {
-      ...result.state,
-      keepers,
-      pickTransfers: transfersOf(result.state),
-      pickTradeProposals: visibleProposals(proposals, viewer.owner, viewer.isCommissioner),
-    },
-    meta,
+  const state: LeagueDynamicState = {
+    ...result.state,
+    keepers,
+    pickTransfers: transfersOf(result.state),
+    pickTradeProposals: visibleProposals(proposals, viewer.owner, viewer.isCommissioner),
   };
+  // Whose keepers each owner has revealed is theirs alone. Prop bets have
+  // their own route, so they stay out of the poll payload.
+  delete state.achievements;
+  delete state.propBets;
+  return { ...result, state, meta };
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -776,7 +806,17 @@ router.post('/mock-results', requireAuth, async (req, res) => {
     return;
   }
   const keep = res.locals.isCommissioner === true ? null : MEMBER_MOCK_LIMIT;
+  const before = await listMockResults(leagueDataset.season, owner);
   await saveMockResult({ season: leagueDataset.season, owner, id: record.id, result: record, createdAt: record.finishedAt }, keep);
+  // Members keep ten, so the rows alone cannot count to MOCK ADDICT honestly.
+  // Keep a running total beside them.
+  if (!before.some((row) => row.id === record.id)) {
+    await mutateState((draft) => {
+      const ledger = ledgerOf(draft.achievements);
+      ledger.mocks[owner] = nextMockCount(ledger.mocks[owner], before.length);
+      draft.achievements = ledger;
+    });
+  }
   res.json({ result: record });
 });
 
@@ -3437,6 +3477,260 @@ router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, 
   } catch (err) {
     next(err);
   }
+});
+
+// ─── Achievements ────────────────────────────────────────────────────────────
+//
+// Each achievement buys one look at another team's keepers. What an owner has
+// done is read from the league's own records every time, then stamped into
+// the ledger so it sticks. See src/lib/league/achievements.ts.
+
+/** What every owner has done, from the records. */
+async function achievementFacts(state: LeagueDynamicState): Promise<Record<string, OwnerFacts>> {
+  const season = leagueDataset.season;
+  const [signatures, polls, dues, mocks, guesses] = await Promise.all([
+    listRulebookSignatures(RULEBOOK_SEASON),
+    seasonPolls(),
+    listDues(DUES_SEASON),
+    Promise.all(OWNERS.map((owner) => listMockResults(season, owner))),
+    Promise.all(OWNERS.map((owner) => getKeeperScenario(state.season, owner))),
+  ]);
+  const ledger = ledgerOf(state.achievements);
+  const proposals = proposalsOf(state);
+  const props = state.propBets ?? [];
+  const facts: Record<string, OwnerFacts> = {};
+  OWNERS.forEach((owner, i) => {
+    const grades = mocks[i]
+      .map((row) => (row.result as { grade?: { grade?: unknown } } | null)?.grade?.grade)
+      .filter((g): g is string => typeof g === 'string');
+    facts[owner] = {
+      ...NO_FACTS,
+      signedRulebook: signatures.some((sig) => sig.owner === owner),
+      mocksFinished: mocksFinished(ledger.mocks[owner], mocks[i].length),
+      bestMockGrade: bestGrade(grades),
+      tradesOffered: proposals.filter((p) => p.proposer === owner).length,
+      tradesDone: proposals.filter(
+        (p) => p.status === 'accepted' && (p.proposer === owner || p.recipient === owner),
+      ).length,
+      propBetsSet: props.filter((p) => p.createdBy === owner).length,
+      votesCast: polls.filter((poll) => poll.votes.some((v) => v.owner === owner)).length,
+      keeperGuesses: Object.entries(guesses[i]).filter(
+        ([target, sels]) => target !== owner && sels.length > 0,
+      ).length,
+      duesPaid: dues.some((row) => row.owner === owner && (row.paidAt !== null || row.verifiedAt !== null)),
+    };
+  });
+  return facts;
+}
+
+/** Stamp anything new for every owner. Writes only when something changed. */
+async function syncAchievements(): Promise<{ state: LeagueDynamicState; facts: Record<string, OwnerFacts> }> {
+  const current = await getState();
+  const facts = await achievementFacts(current.state);
+  const at = new Date().toISOString();
+  const before = ledgerOf(current.state.achievements);
+  const changed = OWNERS.some((owner) => stampEarned(before.earned[owner], earnedFrom(facts[owner]), at) !== null);
+  if (!changed) return { state: current.state, facts };
+  const result = await mutateState((draft) => {
+    const ledger = ledgerOf(draft.achievements);
+    for (const owner of OWNERS) {
+      const next = stampEarned(ledger.earned[owner], earnedFrom(facts[owner]), at);
+      if (next) ledger.earned[owner] = next;
+    }
+    draft.achievements = ledger;
+  });
+  return { state: result.state, facts };
+}
+
+function keeperCounts(state: LeagueDynamicState): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const [owner, sels] of Object.entries(state.keepers)) counts[owner] = sels.length;
+  return counts;
+}
+
+function revealState(state: LeagueDynamicState, ledger: AchievementLedger, owner: string, isCommissioner: boolean) {
+  const earned = ledger.earned[owner] ?? {};
+  const reveals = ledger.reveals[owner] ?? [];
+  const left = revealsLeft(earnedCount(earned), reveals.length, OWNERS.length - 1);
+  const candidates = revealCandidates(owner, OWNERS, keeperCounts(state), reveals);
+  const check = canReveal({
+    keepersPublic: state.keepersRevealed === true,
+    isCommissioner,
+    left,
+    candidates: candidates.length,
+  });
+  return { earned, reveals, left, candidates, check };
+}
+
+function achievementsPayload(
+  state: LeagueDynamicState,
+  facts: Record<string, OwnerFacts>,
+  owner: string,
+  isCommissioner: boolean,
+) {
+  const ledger = ledgerOf(state.achievements);
+  const mine = revealState(state, ledger, owner, isCommissioner);
+  return {
+    you: {
+      owner,
+      earned: mine.earned,
+      facts: facts[owner] ?? NO_FACTS,
+      left: mine.left,
+      check: mine.check,
+      // Live, so a team that changes its keepers after the reveal shows the change.
+      reveals: mine.reveals.map((r) => ({ ...r, keepers: state.keepers[r.target] ?? [] })),
+    },
+    standings: standings(OWNERS, ledger),
+    keepersPublic: state.keepersRevealed === true,
+  };
+}
+
+/** GET /api/league/achievements — what you have earned, your reveals, and the league board. */
+router.get('/achievements', requireAuth, async (_req, res) => {
+  const { state, facts } = await syncAchievements();
+  res.json(achievementsPayload(state, facts, res.locals.owner as string, res.locals.isCommissioner === true));
+});
+
+/** POST /api/league/achievements/reveal — spend one reveal on a random team with keepers in. */
+router.post('/achievements/reveal', requireAuth, async (_req, res) => {
+  const owner = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner === true;
+  const { facts } = await syncAchievements();
+  let target: string | null = null;
+  const result = await mutateState((draft) => {
+    const ledger = ledgerOf(draft.achievements);
+    const mine = revealState(draft, ledger, owner, isCommissioner);
+    if (!mine.check.ok) throw new HttpError(409, mine.check.message ?? 'No reveal to spend');
+    target = pickRevealTarget(mine.candidates, Math.random);
+    if (!target) throw new HttpError(409, 'No team to reveal');
+    ledger.reveals[owner] = [...mine.reveals, { target, at: new Date().toISOString() }];
+    draft.achievements = ledger;
+  });
+  await appendAudit(actor(res), 'achievement.reveal', { target });
+  res.json({ ...achievementsPayload(result.state, facts, owner, isCommissioner), revealed: target });
+});
+
+// ─── Prop bets ───────────────────────────────────────────────────────────────
+//
+// Lines on each team's draft. Open to every member; they lock when the draft
+// starts. See src/lib/league/propBets.ts.
+
+/** Most props one member may set, so the page stays readable. */
+const MAX_PROPS_PER_MEMBER = 30;
+
+/** Every player on the board, by the team holding the pick. Keepers only once public. */
+async function draftedPlayers(state: LeagueDynamicState): Promise<DraftedPlayer[]> {
+  const dataset = currentDataset(state, await resolveDraftDataset(state));
+  const players = new Map(dataset.players.map((p) => [p.key, p]));
+  const out: DraftedPlayer[] = [];
+  for (const cell of buildDraftBoard(dataset, state)) {
+    const owner = cell.pick.currentOwner;
+    if (cell.selection?.playerKey) {
+      const known = players.get(cell.selection.playerKey);
+      out.push({
+        owner,
+        proTeam: cell.selection.proTeam ?? known?.proTeam ?? '',
+        positions: cell.selection.positions ?? known?.positions ?? [],
+      });
+    } else if (cell.keeper?.player && state.keepersRevealed === true) {
+      out.push({ owner, proTeam: cell.keeper.player.proTeam, positions: cell.keeper.player.positions });
+    }
+  }
+  return out;
+}
+
+async function propPayload(state: LeagueDynamicState) {
+  const props = state.propBets ?? [];
+  const started = propsLocked(state.draft.startedAt);
+  const done = Boolean(state.draft.closedAt);
+  const tallies: Record<string, { count: number | null; result: PropSide | null }> = {};
+  if (started && props.length > 0) {
+    const drafted = await draftedPlayers(state);
+    for (const prop of props) {
+      const count = propCount(prop, drafted);
+      tallies[prop.id] = { count, result: propResult(prop.line, count, done) };
+    }
+  }
+  return { props, tallies, locked: started, draftDone: done, owners: OWNERS };
+}
+
+/** GET /api/league/prop-bets — every prop, open to anyone. */
+router.get('/prop-bets', async (_req, res) => {
+  const { state } = await getState();
+  res.json(await propPayload(state));
+});
+
+/** POST /api/league/prop-bets — set a new line. */
+router.post('/prop-bets', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const parsed = parsePropInput((req.body ?? {}) as Record<string, unknown>, OWNERS);
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.message, field: parsed.field });
+    return;
+  }
+  const at = new Date().toISOString();
+  const id = `pb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const result = await mutateState((draft) => {
+    if (propsLocked(draft.draft.startedAt)) throw new HttpError(409, 'The draft has started. Props are locked.');
+    const props = draft.propBets ?? [];
+    if (props.some((p) => sameProp(p, parsed.input))) throw new HttpError(409, 'That prop is already up.');
+    if (props.filter((p) => p.createdBy === owner).length >= MAX_PROPS_PER_MEMBER) {
+      throw new HttpError(409, `You have set ${MAX_PROPS_PER_MEMBER} props. Take one down first.`);
+    }
+    draft.propBets = [...props, { id, ...parsed.input, createdBy: owner, createdAt: at, takes: [] }];
+    // Stamp BOOKIE now, so taking the prop down later cannot lose it.
+    const ledger = ledgerOf(draft.achievements);
+    const next = stampEarned(ledger.earned[owner], ['prop-bet'], at);
+    if (next) ledger.earned[owner] = next;
+    draft.achievements = ledger;
+  });
+  await appendAudit(actor(res), 'prop-bet.set', { id, ...parsed.input });
+  res.json(await propPayload(result.state));
+});
+
+function findProp(state: LeagueDynamicState, id: string): PropBet {
+  const prop = (state.propBets ?? []).find((p) => p.id === id);
+  if (!prop) throw new HttpError(404, 'No such prop');
+  return prop;
+}
+
+/** POST /api/league/prop-bets/:id/take — take the over or the under, or `null` to step off. */
+router.post('/prop-bets/:id/take', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const raw = (req.body as { side?: unknown } | undefined)?.side;
+  if (raw !== 'over' && raw !== 'under' && raw !== null) {
+    res.status(400).json({ error: 'Pick over or under' });
+    return;
+  }
+  const side: PropSide | null = raw;
+  const id = String(req.params.id);
+  const result = await mutateState((draft) => {
+    if (propsLocked(draft.draft.startedAt)) throw new HttpError(409, 'The draft has started. Sides are locked.');
+    const prop = findProp(draft, id);
+    const next = takeSide(prop, owner, side, new Date().toISOString());
+    draft.propBets = (draft.propBets ?? []).map((p) => (p.id === id ? next : p));
+  });
+  await appendAudit(actor(res), 'prop-bet.take', { id, side });
+  res.json(await propPayload(result.state));
+});
+
+/** DELETE /api/league/prop-bets/:id — the setter or a commissioner takes it down. */
+router.delete('/prop-bets/:id', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner === true;
+  const id = String(req.params.id);
+  const result = await mutateState((draft) => {
+    const prop = findProp(draft, id);
+    if (!canRemoveProp(prop, owner, isCommissioner)) {
+      throw new HttpError(403, 'Only whoever set it, or the commissioner, can take it down');
+    }
+    if (propsLocked(draft.draft.startedAt) && !isCommissioner) {
+      throw new HttpError(409, 'The draft has started. Props are locked.');
+    }
+    draft.propBets = (draft.propBets ?? []).filter((p) => p.id !== id);
+  });
+  await appendAudit(actor(res), 'prop-bet.removed', { id });
+  res.json(await propPayload(result.state));
 });
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

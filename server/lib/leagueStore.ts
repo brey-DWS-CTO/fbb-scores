@@ -38,6 +38,8 @@ import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
+import type { AchievementLedger } from '../../src/lib/league/achievements.js';
+import type { PropBet } from '../../src/lib/league/propBets.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -117,6 +119,13 @@ export interface LeagueDynamicState {
    */
   pickTransfers?: PickTransfer[];
   pickTradeProposals?: PickTradeProposal[];
+  /**
+   * Who earned what, and whose keepers each owner has revealed. Private to
+   * each owner: redactState strips it from every state response.
+   */
+  achievements?: AchievementLedger;
+  /** Draft prop bets. Public, but served by their own route. */
+  propBets?: PropBet[];
 }
 
 export interface AuditRow {

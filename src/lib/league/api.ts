@@ -35,6 +35,14 @@ import type { RulebookSignature } from './rulebookSignatures.js';
 import type { DuesAction, DuesBoard } from './dues.js';
 import type { Poll, PollKind } from './polls.js';
 import type {
+  AchievementId,
+  AchievementStanding,
+  KeeperReveal,
+  OwnerFacts,
+  RevealCheck,
+} from './achievements.js';
+import type { PropBet, PropInput, PropSide } from './propBets.js';
+import type {
   LeagueScheduleMapping,
   RawScheduleSource,
   ScheduleRefreshPreview,
@@ -1477,4 +1485,67 @@ export function apiErrorMessage(e: unknown): string {
     return data?.error ?? e.message;
   }
   return e instanceof Error ? e.message : 'Something went wrong';
+}
+
+/* ── Achievements and prop bets ─────────────────────────────────────────── */
+
+export interface AchievementsResponse {
+  you: {
+    owner: string;
+    earned: Partial<Record<AchievementId, string>>;
+    facts: OwnerFacts;
+    left: number;
+    check: RevealCheck;
+    reveals: Array<KeeperReveal & { keepers: KeeperSelection[] }>;
+  };
+  standings: AchievementStanding[];
+  keepersPublic: boolean;
+  /** Set on a reveal: the team just shown. */
+  revealed?: string;
+}
+
+export async function fetchAchievements(c: Credentials): Promise<AchievementsResponse> {
+  const { data } = await axios.get<AchievementsResponse>('/api/league/achievements', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Spend one reveal. The server picks the team. */
+export async function revealKeeper(c: Credentials): Promise<AchievementsResponse> {
+  const { data } = await axios.post<AchievementsResponse>('/api/league/achievements/reveal', {}, { headers: authHeaders(c) });
+  return data;
+}
+
+export interface PropBetsResponse {
+  props: PropBet[];
+  /** Counts from the board, once the draft starts. */
+  tallies: Record<string, { count: number | null; result: PropSide | null }>;
+  locked: boolean;
+  draftDone: boolean;
+  owners: string[];
+}
+
+export async function fetchPropBets(): Promise<PropBetsResponse> {
+  const { data } = await axios.get<PropBetsResponse>('/api/league/prop-bets');
+  return data;
+}
+
+export async function createPropBet(c: Credentials, input: PropInput): Promise<PropBetsResponse> {
+  const { data } = await axios.post<PropBetsResponse>('/api/league/prop-bets', input, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function takePropSide(c: Credentials, id: string, side: PropSide | null): Promise<PropBetsResponse> {
+  const { data } = await axios.post<PropBetsResponse>(
+    `/api/league/prop-bets/${encodeURIComponent(id)}/take`,
+    { side },
+    { headers: authHeaders(c) },
+  );
+  return data;
+}
+
+export async function removePropBet(c: Credentials, id: string): Promise<PropBetsResponse> {
+  const { data } = await axios.delete<PropBetsResponse>(`/api/league/prop-bets/${encodeURIComponent(id)}`, {
+    headers: authHeaders(c),
+  });
+  return data;
 }

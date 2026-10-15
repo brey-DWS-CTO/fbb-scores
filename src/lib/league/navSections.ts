@@ -55,6 +55,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { to: '/league', label: 'LEAGUE HQ' },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
+      { to: '/achievements', label: 'ACHIEVEMENTS' },
+      { to: '/props', label: 'PROP BETS' },
       { to: '/history', label: 'HISTORY' },
     ],
   },
