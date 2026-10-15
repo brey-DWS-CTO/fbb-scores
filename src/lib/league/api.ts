@@ -1,6 +1,7 @@
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockResultRecord } from './mockGrade.js';
 import type { MockStatRow } from './mockStats.js';
+import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
@@ -1427,6 +1428,25 @@ export async function rejectPickTrade(
     { headers: authHeaders(c) },
   );
   return data;
+}
+
+/** Your mock trades: built on the trade page, never sent. */
+export async function fetchMockTrades(c: Credentials): Promise<MockTrade[]> {
+  const { data } = await axios.get('/api/league/pick-trades/mock', { headers: authHeaders(c) });
+  return data.trades as MockTrade[];
+}
+
+/** Keep a trade as a mock. Nobody else sees it and nothing is sent. */
+export async function saveMockTrade(
+  c: Credentials,
+  input: { recipient: string; offer: PickRef[]; request: PickRef[]; note: string },
+): Promise<MockTrade> {
+  const { data } = await axios.post('/api/league/pick-trades/mock', input, { headers: authHeaders(c) });
+  return data.trade as MockTrade;
+}
+
+export async function deleteMockTrade(c: Credentials, id: string): Promise<void> {
+  await axios.delete(`/api/league/pick-trades/mock/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
 }
 
 /** Change an offer you sent and send it again. `version` is the one you saw. */

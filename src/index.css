@@ -4827,6 +4827,13 @@ html.theme-light {
 .mock-stats-table { margin-top: 8px; }
 .mock-stats-table .mock-grade-letter { font-size: 0.85rem; }
 
+/* ─── Mock trades: tagged in the mock draft setup and on the trade page ─── */
+.mock-tag.mock-tag-mock { border: 1px dashed var(--neon-yellow); color: var(--neon-yellow); background: transparent; }
+.trade-card.trade-mock { border-style: dashed; }
+
+/* ─── Mock draft: on your pick, where your next one is ─── */
+.room-turn.is-mine .room-turn-next { color: var(--text-mid); font-weight: 700; letter-spacing: 0; white-space: nowrap; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

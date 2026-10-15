@@ -37,6 +37,7 @@ import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
 import { foldProblem, foldedBook } from '../../src/lib/league/rulebookFold.js';
 import type { MockFinish } from '../../src/lib/league/mockStats.js';
+import { parseMockTrade, type MockTrade } from '../../src/lib/league/mockTrades.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
@@ -493,6 +494,10 @@ interface StoreBackend {
   saveMockResult(row: MockResultRow, keep: number | null): Promise<void>;
   /** Every finished mock this season, each owner's saved ones and the never-trimmed log. */
   listMockFinishes(season: number): Promise<MockFinish[]>;
+  /** One owner's mock trades, oldest first. Nobody else ever reads them. */
+  listMockTrades(season: number, owner: string): Promise<MockTrade[]>;
+  saveMockTrade(trade: MockTrade): Promise<void>;
+  deleteMockTrade(season: number, owner: string, id: string): Promise<void>;
   deleteMockResult(season: number, owner: string, id: string): Promise<void>;
   listProjectionEdits(season: number): Promise<ProjectionEditRow[]>;
   saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow>;
@@ -800,6 +805,15 @@ class NeonBackend implements StoreBackend {
       reason text not null,
       published_at timestamptz not null,
       published_by text not null
+    )`;
+    // Trades an owner built and kept for themselves. Never sent, never mailed.
+    await this.sql`CREATE TABLE IF NOT EXISTS mock_trades (
+      season int not null,
+      owner text not null,
+      id text not null,
+      data jsonb not null,
+      created_at timestamptz not null,
+      primary key (season, owner, id)
     )`;
     // One row per finished mock, never trimmed, so counts outlive the last ten.
     await this.sql`CREATE TABLE IF NOT EXISTS mock_finishes (
@@ -1317,6 +1331,25 @@ class NeonBackend implements StoreBackend {
           ORDER BY created_at DESC LIMIT ${keep}
         )`;
     }
+  }
+
+  async listMockTrades(season: number, owner: string): Promise<MockTrade[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data FROM mock_trades WHERE season = ${season} AND owner = ${owner}
+      ORDER BY created_at ASC`) as Array<{ data: unknown }>;
+    return rows.map((row) => parseMockTrade(row.data)).filter((trade): trade is MockTrade => trade !== null);
+  }
+
+  async saveMockTrade(trade: MockTrade): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO mock_trades (season, owner, id, data, created_at)
+      VALUES (${trade.season}, ${trade.owner}, ${trade.id}, ${JSON.stringify(trade)}::jsonb, ${trade.createdAt})
+      ON CONFLICT (season, owner, id) DO UPDATE SET data = EXCLUDED.data`;
+  }
+
+  async deleteMockTrade(season: number, owner: string, id: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM mock_trades WHERE season = ${season} AND owner = ${owner} AND id = ${id}`;
   }
 
   async listMockFinishes(season: number): Promise<MockFinish[]> {
@@ -1838,6 +1871,7 @@ interface FileDoc {
   projectionEdits: ProjectionEditRow[];
   mockResults: MockResultRow[];
   mockFinishes: Array<MockFinish & { season: number }>;
+  mockTrades: MockTrade[];
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
@@ -1867,6 +1901,7 @@ function emptyDoc(): FileDoc {
     projectionEdits: [],
     mockResults: [],
     mockFinishes: [],
+    mockTrades: [],
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
@@ -1927,6 +1962,7 @@ class FileBackend implements StoreBackend {
         projectionEdits: Array.isArray(doc.projectionEdits) ? doc.projectionEdits : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
         mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
+        mockTrades: Array.isArray(doc.mockTrades) ? doc.mockTrades : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
@@ -2300,6 +2336,34 @@ class FileBackend implements StoreBackend {
         const newest = doc.mockResults.filter(mine).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, keep);
         doc.mockResults = doc.mockResults.filter((entry) => !mine(entry) || newest.includes(entry));
       }
+      this.writeDoc(doc);
+    });
+  }
+
+  async listMockTrades(season: number, owner: string): Promise<MockTrade[]> {
+    await this.ensureInit();
+    return this.readDoc().mockTrades
+      .filter((trade) => trade.season === season && trade.owner === owner)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async saveMockTrade(trade: MockTrade): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.mockTrades = [
+        ...doc.mockTrades.filter((entry) => !(entry.season === trade.season && entry.owner === trade.owner && entry.id === trade.id)),
+        structuredClone(trade),
+      ];
+      this.writeDoc(doc);
+    });
+  }
+
+  async deleteMockTrade(season: number, owner: string, id: string): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.mockTrades = doc.mockTrades.filter((entry) => !(entry.season === season && entry.owner === owner && entry.id === id));
       this.writeDoc(doc);
     });
   }
@@ -3102,6 +3166,18 @@ export async function saveMockResult(row: MockResultRow, keep: number | null): P
 
 export async function listMockFinishes(season: number): Promise<MockFinish[]> {
   return getBackend().listMockFinishes(season);
+}
+
+export async function listMockTrades(season: number, owner: string): Promise<MockTrade[]> {
+  return getBackend().listMockTrades(season, owner);
+}
+
+export async function saveMockTrade(trade: MockTrade): Promise<void> {
+  return getBackend().saveMockTrade(trade);
+}
+
+export async function deleteMockTrade(season: number, owner: string, id: string): Promise<void> {
+  return getBackend().deleteMockTrade(season, owner, id);
 }
 
 export async function deleteMockResult(season: number, owner: string, id: string): Promise<void> {
