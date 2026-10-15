@@ -4816,6 +4816,11 @@ html.theme-light {
 .room-grid td[style] .room-grid-name { color: #f4f4fb; }
 .room-grid td[style] .room-grid-label { color: rgba(244, 244, 251, 0.72); }
 
+/* ─── Mock draft, phone: with a card tapped, the corner badge says "Up in 3 picks at 7.9" ─── */
+@media (max-width: 839px) {
+  .room.has-picked .room-mini-clock.is-wait { font-size: 0.66rem; letter-spacing: 0.02em; white-space: nowrap; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

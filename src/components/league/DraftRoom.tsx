@@ -521,9 +521,13 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   // On a phone a tapped card stands where the clock frame was, with the clock
   // small in its corner: the time on your pick, else the pick on the clock.
   const hasPicked = started && !over && selected !== null;
+  // "Up in 3 picks at 7.9": how long until the person picks, and which pick.
+  const upIn = untilTurn === null
+    ? null
+    : `Up in ${untilTurn} pick${untilTurn === 1 ? '' : 's'}${myNext ? ` at ${myNext.pick.round}.${myNext.pick.slot}` : ''}`;
   const miniClock = (
-    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
-      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…'}
+    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${!myTurn && upIn ? ' is-wait' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
+      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : upIn ?? (currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…')}
     </span>
   );
   const cardFor = (key: string, extra: { role: 'keeper' | 'compare' | 'card' }) => (
@@ -657,8 +661,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                 </div>
               ) : (
                 <div className="room-turn">
-                  {untilTurn === null ? 'No picks left for you' : `${untilTurn} pick${untilTurn === 1 ? '' : 's'} until your turn`}
-                  {myNext && <small> ({myNext.pick.round}.{myNext.pick.slot})</small>}
+                  {upIn ?? 'No picks left for you'}
                   {menu}
                 </div>
               )}
