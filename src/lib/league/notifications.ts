@@ -36,8 +36,8 @@ export interface ReminderWindow {
  *
  * The keeper ones count down to the deadline, which is a day earlier than the
  * draft. With the deadline at Saturday 2pm Pacific they land Monday 2pm,
- * Thursday 2pm, Friday 2pm and Saturday 8am. Every owner gets them, saved or
- * not; the words change with whether they have saved.
+ * Thursday 2pm, Friday 2pm and Saturday 8am. They go only to owners with no
+ * keepers saved. An owner who has saved is done and hears nothing more.
  *
  * A window stays open until the next one for the same deadline opens. So a
  * server that slept, or an address added late, sends the newest warning once
@@ -89,8 +89,6 @@ export interface DueReminder {
   /** Whole hours left until the thing being warned about. Never negative. */
   hoursLeft: number;
   deadlineAt: string;
-  /** The keepers this owner has saved, by name. Empty when none. */
-  keeperNames: string[];
 }
 
 export function reminderKey(kind: ReminderKind, owner: string, season: number): string {
@@ -103,10 +101,8 @@ export interface ReminderInput {
   season: number;
   /** Everyone who could be mailed. An owner with no address is left out here. */
   owners: string[];
-  /** Owners with at least one keeper saved. */
+  /** Owners with at least one keeper saved. Keeper reminders skip them. */
   ownersWithKeepers: string[];
-  /** Saved keeper names by owner, so the mail can name them. */
-  keeperNames?: Record<string, string[]>;
   /** Keys already sent, from the store. */
   alreadySent: string[];
 }
@@ -133,6 +129,7 @@ export function dueReminders(input: ReminderInput): DueReminder[] {
     if (input.now.getTime() >= closesAt(window, input.draftAt)) continue;
 
     for (const owner of input.owners) {
+      if (isKeeperKind(window.kind) && withKeepers.has(owner)) continue;
       const key = reminderKey(window.kind, owner, input.season);
       if (sent.has(key)) continue;
       due.push({
@@ -143,7 +140,6 @@ export function dueReminders(input: ReminderInput): DueReminder[] {
         // say "1 day", not "23 hours".
         hoursLeft: Math.max(0, Math.round(msLeft / HOUR)),
         deadlineAt: target.toISOString(),
-        keeperNames: withKeepers.has(owner) ? (input.keeperNames?.[owner] ?? []) : [],
       });
     }
   }
@@ -205,21 +201,10 @@ export function pacificLabel(iso: string): string {
 export function reminderCopy(reminder: DueReminder): ReminderCopy {
   const left = humanCountdown(reminder.hoursLeft);
   if (isKeeperKind(reminder.kind)) {
-    // Owners asked "is mine locked in or do I lock it again?" So the subject
-    // alone says whether you are done, and nothing here says "lock" as if it
-    // were the owner's job. Saving is all an owner does; the commish locks.
+    // Only owners with nothing saved get these. Nothing here says "lock" as
+    // if it were the owner's job. Saving is all an owner does; the commish locks.
     const lastCall = reminder.kind === 'keepers-last-call' ? 'Last call: ' : '';
     const due = pacificLabel(reminder.deadlineAt);
-    if (reminder.keeperNames.length > 0) {
-      return {
-        subject: `${lastCall}Your keepers are saved. You are done.`,
-        heading: 'Your keepers are saved',
-        lines: [
-          `You saved ${nameList(reminder.keeperNames)}. You are done. There is nothing else to lock or send.`,
-          `Want a change? You have until ${due}, ${left} from now. After that the commish locks every team.`,
-        ],
-      };
-    }
     return {
       subject: `${lastCall}You have no keepers saved. Due in ${left}.`,
       heading: 'No keepers saved yet',
