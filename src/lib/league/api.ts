@@ -1,5 +1,6 @@
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockResultRecord } from './mockGrade.js';
+import type { MockStatRow } from './mockStats.js';
 import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
@@ -646,10 +647,16 @@ export async function fetchNbaWatch(c: Credentials, fresh = false): Promise<NbaW
   return data;
 }
 
+/** Every owner's finished mocks and best grade. */
+export async function fetchMockStats(c: Credentials): Promise<MockStatRow[]> {
+  const { data } = await axios.get('/api/league/mock-stats', { headers: authHeaders(c) });
+  return data.stats as MockStatRow[];
+}
+
 /** Save a finished mock draft. Saving the same draft twice is a no-op. */
 export async function saveMockResult(
   c: Credentials,
-  result: Pick<MockResultRecord, 'id' | 'seed' | 'mode' | 'grade'>,
+  result: Pick<MockResultRecord, 'id' | 'seed' | 'mode' | 'grade' | 'board'>,
 ): Promise<MockResultRecord> {
   const { data } = await axios.post('/api/league/mock-results', result, { headers: authHeaders(c) });
   return data.result as MockResultRecord;

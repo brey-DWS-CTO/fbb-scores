@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import { deleteMockResult, fetchMockResults, fetchPickTrades, saveMockResult } from '../../lib/league/api.js';
+import { deleteMockResult, fetchMockResults, fetchMockStats, fetchPickTrades, saveMockResult } from '../../lib/league/api.js';
+import type { SavedBoard } from '../../lib/league/mockBoard.js';
+import SavedMockBoard from './SavedMockBoard.js';
 import { gradeSummary, mockResultId } from '../../lib/league/mockGrade.js';
 import MockGradeCard from './MockGradeCard.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
@@ -103,11 +105,14 @@ function MockDraftScreen() {
     enabled: identity !== null,
     staleTime: 30_000,
   });
-  const onFinished = useCallback((finished: { choices: Record<number, string>; grade: MockGrade }) => {
+  const onFinished = useCallback((finished: { choices: Record<number, string>; grade: MockGrade; board: SavedBoard }) => {
     if (!identity) return;
     const id = mockResultId(identity.owner, seed, mode, finished.choices);
-    void saveMockResult(identity, { id, seed, mode, grade: finished.grade })
-      .then(() => queryClient.invalidateQueries({ queryKey: ['mock-results'] }))
+    void saveMockResult(identity, { id, seed, mode, grade: finished.grade, board: finished.board })
+      .then(() => Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['mock-results'] }),
+        queryClient.invalidateQueries({ queryKey: ['mock-stats'] }),
+      ]))
       .catch(() => { /* the grade still shows; it just is not kept */ });
   }, [identity, seed, mode, queryClient]);
   const forget = (id: string) => {
@@ -115,6 +120,13 @@ function MockDraftScreen() {
     void deleteMockResult(identity, id).then(() => queryClient.invalidateQueries({ queryKey: ['mock-results'] }));
   };
   const [openResult, setOpenResult] = useState<string | null>(null);
+  // Everyone's count of finished mocks and best grade.
+  const statsQuery = useQuery({
+    queryKey: ['mock-stats'],
+    queryFn: () => fetchMockStats(identity as NonNullable<typeof identity>),
+    enabled: identity !== null,
+    staleTime: 30_000,
+  });
   useEffect(() => {
     if (!viewer || acting) return;
     const save: MockSave = {
@@ -496,6 +508,7 @@ function MockDraftScreen() {
                 {openResult === record.id && (
                   <>
                     <MockGradeCard grade={record.grade} person={record.owner} />
+                    <SavedMockBoard board={record.board} person={record.owner} />
                     <button type="button" className="tap-btn mock-mini-btn" onClick={() => forget(record.id)}>FORGET THIS ONE</button>
                   </>
                 )}
@@ -503,6 +516,29 @@ function MockDraftScreen() {
             ))}
           </ol>
         )}
+      </details>
+
+      <details className="commish-fold mock-history mock-stats">
+        <summary className="hub-heading">
+          MOCKS DONE
+          <small>Every owner&apos;s finished mocks and best grade.</small>
+        </summary>
+        <table className="mock-grade-table mock-stats-table">
+          <thead><tr><th>Team</th><th className="room-num">Mocks</th><th className="room-num">Best</th></tr></thead>
+          <tbody>
+            {(statsQuery.data ?? []).map((row) => (
+              <tr key={row.owner} className={row.owner === viewer ? 'is-mine' : ''}>
+                <td>{row.owner}</td>
+                <td className="room-num">{row.mocks}</td>
+                <td className="room-num">
+                  {row.bestGrade
+                    ? <span className={`mock-grade-letter grade-${row.bestGrade[0].toLowerCase()}`}>{row.bestGrade}</span>
+                    : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </details>
     </div>
   );
