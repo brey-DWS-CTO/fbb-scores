@@ -1079,6 +1079,15 @@ export async function requestRulebookSignatures(
 }
 
 /** The commissioner withdraws one member's signature so they can sign again. */
+/** Fold the newest rule book revision into the one before it (commissioner). */
+export async function foldRulebookVersion(
+  c: Credentials,
+  versionId: string,
+): Promise<{ kept: { id: string; revision: number }; removed: { id: string; revision: number } }> {
+  const { data } = await axios.post('/api/league/rulebook/fold', { versionId }, { headers: authHeaders(c) });
+  return data;
+}
+
 export async function withdrawRulebookSignature(c: Credentials, owner: string): Promise<void> {
   await axios.delete(`/api/league/rulebook/signatures/${encodeURIComponent(owner)}`, {
     headers: authHeaders(c),

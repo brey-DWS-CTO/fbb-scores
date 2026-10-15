@@ -35,6 +35,7 @@ import type { DraftClockState, SkippedPick } from '../../src/lib/keeper/types.js
 import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
+import { foldProblem, foldedBook } from '../../src/lib/league/rulebookFold.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
@@ -326,6 +327,11 @@ export class HistoryPublishError extends Error {
   }
 }
 
+export interface RulebookFoldResult {
+  kept: { id: string; revision: number };
+  removed: { id: string; revision: number };
+}
+
 export class RulebookPublishError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -498,6 +504,12 @@ interface StoreBackend {
   insertRulebookSignature(row: RulebookSignature): Promise<RulebookSignature>;
   /** Removes one signature. True when there was one to remove. */
   deleteRulebookSignature(versionId: string, owner: string): Promise<boolean>;
+  /**
+   * Fold the newest published revision into the one before it: the older one
+   * takes the newer one's book and fingerprint and keeps its id, number, date
+   * and signatures; the newer one is deleted. See rulebookFold.ts.
+   */
+  foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult>;
   listDues(season: number): Promise<DuesRow[]>;
   /**
    * Writes one team's dues row only if nobody changed it since `expected` was
@@ -1466,6 +1478,46 @@ class NeonBackend implements StoreBackend {
     return row;
   }
 
+  async foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, revision, fingerprint, data, notes,
+        published_at, published_by
+      FROM rulebook_versions WHERE season = ${season}
+      ORDER BY published_at DESC, id DESC LIMIT 2`) as RawVersionRow[];
+    const [latest, previous] = rows.map(toVersionRow);
+    const signed = latest
+      ? (await this.sql`SELECT owner FROM rulebook_signatures WHERE version_id = ${latest.id}`) as unknown[]
+      : [];
+    const problem = foldProblem(latest ?? null, previous ?? null, latestId, signed.length);
+    if (problem) throw new RulebookPublishError('fold-refused', problem);
+    const polls = (await this.sql`SELECT id, data FROM polls
+      WHERE data->>'appliedVersionId' = ${latest.id}`) as Array<{ id: string; data: Record<string, unknown> }>;
+    const book = foldedBook(latest.book, previous.revision);
+    // Every write checks nobody signed the newest meanwhile, so a late
+    // signature leaves both revisions exactly as they were.
+    await this.sql.transaction([
+      this.sql`UPDATE rulebook_versions
+        SET data = ${JSON.stringify(book)}::jsonb, fingerprint = ${latest.fingerprint}
+        WHERE id = ${previous.id}
+          AND NOT EXISTS (SELECT 1 FROM rulebook_signatures WHERE version_id = ${latest.id})`,
+      ...polls.map((poll) => this.sql`UPDATE polls
+        SET data = ${JSON.stringify({ ...poll.data, appliedVersionId: previous.id, appliedRevision: previous.revision })}::jsonb,
+          updated_at = now()
+        WHERE id = ${poll.id}
+          AND NOT EXISTS (SELECT 1 FROM rulebook_signatures WHERE version_id = ${latest.id})`),
+      this.sql`DELETE FROM rulebook_versions WHERE id = ${latest.id}
+        AND NOT EXISTS (SELECT 1 FROM rulebook_signatures WHERE version_id = ${latest.id})`,
+    ]);
+    const after = (await this.sql`SELECT id FROM rulebook_versions WHERE id = ${latest.id}`) as unknown[];
+    if (after.length > 0) {
+      throw new RulebookPublishError('fold-refused', `Someone signed revision ${latest.revision} just now, so it stands.`);
+    }
+    return {
+      kept: { id: previous.id, revision: previous.revision },
+      removed: { id: latest.id, revision: latest.revision },
+    };
+  }
+
   async deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
     await this.ensureInit();
     const gone = (await this.sql`DELETE FROM rulebook_signatures
@@ -2348,6 +2400,32 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const [latest, previous] = this.sortedVersions(season);
+      const signed = latest ? doc.rulebookSignatures.filter((row) => row.versionId === latest.id).length : 0;
+      const problem = foldProblem(latest ?? null, previous ?? null, latestId, signed);
+      if (problem) throw new RulebookPublishError('fold-refused', problem);
+      const kept = doc.rulebookVersions.find((row) => row.id === previous.id)!;
+      kept.book = structuredClone(foldedBook(latest.book, previous.revision));
+      kept.fingerprint = latest.fingerprint;
+      for (const poll of doc.polls) {
+        const data = poll.data as Record<string, unknown> | null;
+        if (data?.appliedVersionId !== latest.id) continue;
+        poll.data = { ...data, appliedVersionId: previous.id, appliedRevision: previous.revision };
+        poll.updatedAt = new Date().toISOString();
+      }
+      doc.rulebookVersions = doc.rulebookVersions.filter((row) => row.id !== latest.id);
+      this.writeDoc(doc);
+      return {
+        kept: { id: previous.id, revision: previous.revision },
+        removed: { id: latest.id, revision: latest.revision },
+      };
+    });
+  }
+
   async deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
     await this.ensureInit();
     return this.enqueueWrite(() => {
@@ -3120,6 +3198,10 @@ export async function insertRulebookSignature(
 
 export async function deleteRulebookSignature(versionId: string, owner: string): Promise<boolean> {
   return getBackend().deleteRulebookSignature(versionId, owner);
+}
+
+export async function foldLatestRulebookVersion(season: number, latestId: string): Promise<RulebookFoldResult> {
+  return getBackend().foldLatestRulebookVersion(season, latestId);
 }
 
 export async function listDues(season: number): Promise<DuesRow[]> {

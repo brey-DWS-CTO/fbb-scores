@@ -252,3 +252,48 @@ test('a stored signature is never updated in place', async () => {
   assert.equal(second.length, 1, 'one row per member per revision');
   assert.equal(second[0].signedAt, first.signedAt, 'the original time stands');
 });
+
+// ─── Folding a fix into the revision before it ─────────────────────────────
+
+test('folding the newest revision keeps the older one, its signatures and the new wording', async () => {
+  const older = await publishRevision('fold-older');
+  assert.equal((await sign('Joel', older.versionId, older.fingerprint)).status, 200);
+  const newer = await publishRevision('fold-newer');
+  assert.equal(asRecord((await readSignatures()).body).versionId, newer.versionId);
+
+  // Members cannot fold.
+  const member = await request('/api/league/rulebook/fold', {
+    method: 'POST', headers: auth('Joel'), body: JSON.stringify({ versionId: newer.versionId }),
+  });
+  assert.equal(member.status, 403);
+
+  const folded = await request('/api/league/rulebook/fold', {
+    method: 'POST', headers: auth(commissioner), body: JSON.stringify({ versionId: newer.versionId }),
+  });
+  assert.equal(folded.status, 200, JSON.stringify(folded.body));
+
+  const now = asRecord((await readSignatures()).body);
+  assert.equal(now.versionId, older.versionId, 'the older revision is in force again');
+  assert.deepEqual((now.signed as Array<{ owner: string }>).map((row) => row.owner), ['Joel']);
+  const book = asRecord((await request('/api/league/rulebook')).body);
+  assert.match(JSON.stringify(book.book), /fold-newer/, 'with the newer wording');
+  assert.equal(await store.getRulebookVersion(newer.versionId), null, 'the newer revision is gone');
+
+  // A stale page cannot fold the wrong one.
+  const stale = await request('/api/league/rulebook/fold', {
+    method: 'POST', headers: auth(commissioner), body: JSON.stringify({ versionId: newer.versionId }),
+  });
+  assert.equal(stale.status, 409);
+});
+
+test('a revision someone has signed cannot be folded', async () => {
+  await publishRevision('fold-base');
+  const signedOne = await publishRevision('fold-signed');
+  assert.equal((await sign('Amy', signedOne.versionId, signedOne.fingerprint)).status, 200);
+  const refused = await request('/api/league/rulebook/fold', {
+    method: 'POST', headers: auth(commissioner), body: JSON.stringify({ versionId: signedOne.versionId }),
+  });
+  assert.equal(refused.status, 409);
+  assert.match(String(asRecord(refused.body).error), /signed revision/);
+  assert.equal(asRecord((await readSignatures()).body).versionId, signedOne.versionId);
+});

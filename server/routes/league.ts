@@ -106,6 +106,7 @@ import {
   RulebookSignError,
   CONFIG_TEAMS,
   deleteRulebookSignature,
+  foldLatestRulebookVersion,
   listRulebookSignatures,
   insertRulebookSignature,
   listDues,
@@ -1935,6 +1936,28 @@ router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (r
  * one member's signature on the revision in force, so they can sign again.
  * Audited, since a signature is otherwise never touched.
  */
+/**
+ * POST /api/league/rulebook/fold — fold the newest revision into the one
+ * before it, so a fix everyone already understands costs nobody a second
+ * signature (commissioner only). Body: { versionId } of the newest, as the
+ * page showed it. Refused once anyone has signed the newest.
+ */
+router.post('/rulebook/fold', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const versionId = (req.body as { versionId?: unknown }).versionId;
+    if (typeof versionId !== 'string' || !versionId) throw new HttpError(400, 'versionId is required');
+    const result = await foldLatestRulebookVersion(RULEBOOK_SEASON, versionId);
+    await appendAudit(actor(res), 'rulebook-fold', result);
+    res.json(result);
+  } catch (err) {
+    if (err instanceof RulebookPublishError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
 router.delete('/rulebook/signatures/:owner', requireAuth, requireCommissioner, async (req, res, next) => {
   try {
     const owner = String(req.params.owner);
