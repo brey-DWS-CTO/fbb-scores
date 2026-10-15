@@ -6,10 +6,10 @@ import NavIcon from './NavIcon.js';
 import { readSidebarCollapsed, writeSidebarCollapsed } from '../../lib/league/sidebar.js';
 import { onPath, sectionFor, sectionHome, visibleSections } from '../../lib/league/navSections.js';
 
-function TradeBadge({ count }: { count: number }) {
+function NavBadge({ count, label }: { count: number; label: string }) {
   if (count <= 0) return null;
   return (
-    <span className="nav-badge" aria-label={`${count} offers waiting`}>
+    <span className="nav-badge" aria-label={`${count} ${label}`}>
       {count}
     </span>
   );
@@ -28,6 +28,8 @@ export default function AppNav() {
   // Offers waiting on this member. The server counts them, so the badge cannot
   // give away an offer between two other teams.
   const pendingTrades = meta?.pendingTrades ?? 0;
+  // Keeper reveals earned and not spent. Only ever the viewer's own count.
+  const revealsReady = meta?.revealsReady ?? 0;
 
   // Desktop only: the sidebar shrinks to icons so wide pages get the room.
   // The class sits on <html> because the page shell that must widen with it
@@ -103,6 +105,11 @@ export default function AppNav() {
                     {pendingTrades}
                   </span>
                 )}
+                {t.id === 'league' && revealsReady > 0 && (
+                  <span className="nav-pill" aria-label={`${revealsReady} keeper reveals ready`}>
+                    {revealsReady}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -122,7 +129,8 @@ export default function AppNav() {
           >
             <span className="bottom-nav-icon" aria-hidden="true">
               <NavIcon name={t.icon} />
-              {t.id === 'trades' && <TradeBadge count={pendingTrades} />}
+              {t.id === 'trades' && <NavBadge count={pendingTrades} label="offers waiting" />}
+              {t.id === 'league' && <NavBadge count={revealsReady} label="keeper reveals ready" />}
             </span>
             <span className="hub-heading bottom-nav-label">{t.label}</span>
           </NavLink>

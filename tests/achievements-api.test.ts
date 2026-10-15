@@ -6,7 +6,11 @@ import process from 'node:process';
 import test, { after, before, beforeEach } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import type { AddressInfo } from 'node:net';
+import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
+import type { LeagueDataset } from '../src/lib/keeper/types.ts';
 import type { PropBet } from '../src/lib/league/propBets.ts';
+
+const dataset = rawDataset as unknown as LeagueDataset;
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const tempParent = path.join(repoRoot, 'node_modules', '.tmp');
@@ -114,13 +118,14 @@ beforeEach(async () => {
     draft.draft.picks = {};
     draft.keepers = {};
     draft.keepersRevealed = false;
-    draft.achievements = { earned: {}, reveals: {}, mocks: {} };
+    draft.achievements = { earned: {}, reveals: {}, mocks: {}, firstGuesses: {} };
     draft.propBets = [];
   });
   for (const owner of Object.keys(pins)) {
     for (const row of await store.listMockResults(SEASON, owner)) {
       await store.deleteMockResult(SEASON, owner, row.id);
     }
+    await store.clearKeeperScenario(SEASON, owner);
   }
 });
 
@@ -149,7 +154,7 @@ test('earned sticks after the mock that earned it is deleted', async () => {
 
 test('the running mock count earns MOCK ADDICT past the ten kept rows', async () => {
   await store.mutateState((draft) => {
-    draft.achievements = { earned: {}, reveals: {}, mocks: { Kyle: 12 } };
+    draft.achievements = { earned: {}, reveals: {}, mocks: { Kyle: 12 }, firstGuesses: {} };
   });
   const body = await achievements('Kyle');
   assert.ok(body.you.earned['ten-mocks']);
@@ -207,36 +212,136 @@ test('no reveals once keepers are public', async () => {
   assert.equal((await reveal('Joel')).status, 409);
 });
 
+// ─── SCOUT and dues ────────────────────────────────────────────────────────
+
+const kylePlayers = dataset.players.filter((p) => p.fantasyTeam === 'Kyle').slice(0, 2);
+
+const guess = (owner: string, target: string, players: Array<{ key: string; name: string }>) =>
+  request(`/api/league/keeper-scenario/${target}`, {
+    method: 'PUT',
+    headers: auth(owner),
+    body: JSON.stringify({ selections: players.map((p) => ({ playerKey: p.key, playerName: p.name })) }),
+  });
+
+async function setKyleKeepers(players: Array<{ key: string; name: string }>) {
+  await store.mutateState((draft) => {
+    draft.keepers = { Kyle: players.map((p) => ({ playerKey: p.key, playerName: p.name })) };
+  });
+}
+
+test('SCOUT: a right first guess counts', async () => {
+  const [a] = kylePlayers;
+  assert.equal((await guess('Joel', 'Kyle', [a])).status, 200);
+  await setKyleKeepers([a]);
+  assert.ok((await achievements('Joel')).you.earned.scout);
+});
+
+test('SCOUT: fixing a wrong guess later does not count', async () => {
+  const [a, b] = kylePlayers;
+  assert.equal((await guess('Joel', 'Kyle', [b])).status, 200);
+  assert.equal((await guess('Joel', 'Kyle', [a])).status, 200, 'the fix still saves');
+  await setKyleKeepers([a]);
+  assert.equal((await achievements('Joel')).you.earned.scout, undefined);
+});
+
+test('SCOUT: a guess saved before tracking began counts as the first', async () => {
+  const [a] = kylePlayers;
+  await store.setKeeperScenarioTarget(SEASON, 'Ryan', 'Kyle', [{ playerKey: a.key, playerName: a.name }]);
+  await setKyleKeepers([a]);
+  assert.ok((await achievements('Ryan')).you.earned.scout);
+});
+
+test('SCOUT: the commissioner sees every keeper, so it never counts for him', async () => {
+  const [a] = kylePlayers;
+  assert.equal((await guess('Brey', 'Kyle', [a])).status, 200);
+  await setKyleKeepers([a]);
+  assert.equal((await achievements('Brey')).you.earned.scout, undefined);
+});
+
+test('PAID UP waits for the collector to confirm', async () => {
+  const paid = await request('/api/league/dues/Amy', {
+    method: 'POST',
+    headers: auth('Amy'),
+    body: JSON.stringify({ action: 'paid' }),
+  });
+  assert.equal(paid.status, 200);
+  assert.equal((await achievements('Amy')).you.earned.dues, undefined);
+  const confirmed = await request('/api/league/dues/Amy', {
+    method: 'POST',
+    headers: auth('Brey'),
+    body: JSON.stringify({ action: 'verify' }),
+  });
+  assert.equal(confirmed.status, 200);
+  assert.ok((await achievements('Amy')).you.earned.dues);
+});
+
+test('the LEAGUE badge counts unspent reveals, for the viewer only', async () => {
+  await saveMock('Joel', 'mock-a-1', 'A');
+  await achievements('Joel');
+  const joel = (await request('/api/league/state', { headers: auth('Joel') })).body as unknown as { meta: { revealsReady: number } };
+  assert.equal(joel.meta.revealsReady, 2);
+  const ryan = (await request('/api/league/state', { headers: auth('Ryan') })).body as unknown as { meta: { revealsReady: number } };
+  assert.equal(ryan.meta.revealsReady, 0);
+});
+
 // ─── Prop bets ─────────────────────────────────────────────────────────────
 
-const warriors = { subject: 'Amy', kind: 'team', target: 'GS', line: 1.5 };
+const rules = { subject: 'Kyle', text: 'times he asks about the rules', line: 3.5 };
 
-test('anyone can read props; setting one needs a sign-in', async () => {
-  assert.equal((await request('/api/league/prop-bets')).status, 200);
+const propsFor = async (owner: string) =>
+  (await request('/api/league/prop-bets', { headers: auth(owner) })).body.props as PropBet[];
+
+test('props need a sign-in, even to read', async () => {
+  assert.equal((await request('/api/league/prop-bets')).status, 401);
   const anon = await request('/api/league/prop-bets', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(warriors),
+    body: JSON.stringify(rules),
   });
   assert.equal(anon.status, 401);
 });
 
+test('nobody sees a prop about themselves, the commissioner included', async () => {
+  assert.equal((await setProp('Ryan', rules)).status, 200);
+  assert.equal((await setProp('Ryan', { ...rules, subject: 'Brey', text: 'mid draft trades he offers' })).status, 200);
+
+  assert.equal((await propsFor('Joel')).length, 2);
+  assert.deepEqual((await propsFor('Kyle')).map((p) => p.subject), ['Brey']);
+  assert.deepEqual((await propsFor('Brey')).map((p) => p.subject), ['Kyle']);
+
+  // Nor can he reach one by id, or read its words in the audit log.
+  const hidden = (await propsFor('Joel')).find((p) => p.subject === 'Brey')!;
+  const take = await request(`/api/league/prop-bets/${hidden.id}/take`, {
+    method: 'POST',
+    headers: auth('Brey'),
+    body: JSON.stringify({ side: 'over' }),
+  });
+  assert.equal(take.status, 404);
+  const audit = JSON.stringify(await store.readAudit(50));
+  assert.ok(!audit.includes('mid draft trades'));
+});
+
+test('you cannot set a prop on yourself', async () => {
+  assert.equal((await setProp('Kyle', rules)).status, 400);
+});
+
+test('lines have no default and must end in .5', async () => {
+  assert.equal((await setProp('Joel', { ...rules, line: '' })).status, 400);
+  assert.equal((await setProp('Joel', { ...rules, line: 2 })).status, 400);
+});
+
 test('setting a prop earns BOOKIE, and taking it down keeps it', async () => {
-  const set = await setProp('Ryan', warriors);
+  const set = await setProp('Ryan', rules);
   assert.equal(set.status, 200);
   const prop = (set.body.props as PropBet[])[0];
-  assert.equal(prop.createdBy, 'Ryan');
-
-  assert.equal((await setProp('Joel', warriors)).status, 409, 'the same prop twice');
-  assert.equal((await setProp('Joel', { ...warriors, line: 2 })).status, 400, 'lines end in .5');
-
+  assert.equal((await setProp('Joel', rules)).status, 409, 'the same prop twice');
   const gone = await request(`/api/league/prop-bets/${prop.id}`, { method: 'DELETE', headers: auth('Ryan') });
   assert.equal(gone.status, 200);
   assert.ok((await achievements('Ryan')).you.earned['prop-bet']);
 });
 
 test('members take sides; only the setter or commissioner takes a prop down', async () => {
-  const prop = ((await setProp('Ryan', warriors)).body.props as PropBet[])[0];
+  const prop = ((await setProp('Ryan', rules)).body.props as PropBet[])[0];
   const take = await request(`/api/league/prop-bets/${prop.id}/take`, {
     method: 'POST',
     headers: auth('Amy'),
@@ -244,36 +349,32 @@ test('members take sides; only the setter or commissioner takes a prop down', as
   });
   assert.equal(take.status, 200);
   assert.deepEqual((take.body.props as PropBet[])[0].takes.map((t) => [t.owner, t.side]), [['Amy', 'under']]);
-
-  const bad = await request(`/api/league/prop-bets/${prop.id}/take`, {
-    method: 'POST',
-    headers: auth('Amy'),
-    body: JSON.stringify({ side: 'sideways' }),
-  });
-  assert.equal(bad.status, 400);
-
   assert.equal((await request(`/api/league/prop-bets/${prop.id}`, { method: 'DELETE', headers: auth('Amy') })).status, 403);
   assert.equal((await request(`/api/league/prop-bets/${prop.id}`, { method: 'DELETE', headers: auth('Brey') })).status, 200);
 });
 
-test('props lock at the draft and the board settles them', async () => {
-  // One Warriors prop on every team, so whoever holds pick 1 has one.
-  for (const subject of Object.keys(pins)) {
-    assert.equal((await setProp('Ryan', { ...warriors, subject, line: 0.5 })).status, 200);
-  }
+test('sides lock at the draft; the setter or commissioner enters the result', async () => {
+  const prop = ((await setProp('Ryan', rules)).body.props as PropBet[])[0];
   await store.mutateState((draft) => {
     draft.draft.startedAt = new Date().toISOString();
-    draft.draft.picks = { '1': { playerKey: 'x', playerName: 'S. Curry', proTeam: 'GS', positions: ['PG'] } };
   });
+  assert.equal((await setProp('Joel', { ...rules, line: 1.5 })).status, 409);
+  const take = await request(`/api/league/prop-bets/${prop.id}/take`, {
+    method: 'POST',
+    headers: auth('Amy'),
+    body: JSON.stringify({ side: 'over' }),
+  });
+  assert.equal(take.status, 409);
 
-  assert.equal((await setProp('Joel', { ...warriors, line: 3.5 })).status, 409);
-  const body = (await request('/api/league/prop-bets')).body as {
-    locked: boolean;
-    tallies: Record<string, { count: number; result: string | null }>;
-  };
-  assert.equal(body.locked, true);
-  const tallies = Object.values(body.tallies);
-  assert.equal(tallies.reduce((n, t) => n + t.count, 0), 1);
-  assert.deepEqual(tallies.filter((t) => t.result === 'over').length, 1);
-  assert.equal(tallies.filter((t) => t.result === 'under').length, 0, 'unders wait for the draft to end');
+  const settle = (owner: string, result: unknown) =>
+    request(`/api/league/prop-bets/${prop.id}/result`, {
+      method: 'POST',
+      headers: auth(owner),
+      body: JSON.stringify({ result }),
+    });
+  assert.equal((await settle('Amy', 4)).status, 403);
+  assert.equal((await settle('Ryan', 2.5)).status, 400);
+  const done = await settle('Brey', 4);
+  assert.equal(done.status, 200);
+  assert.equal((done.body.props as PropBet[])[0].result, 4);
 });

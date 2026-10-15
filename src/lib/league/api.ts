@@ -54,6 +54,8 @@ import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
   pendingTrades?: number;
+  /** Keeper reveals this viewer has earned and not spent. Drives the LEAGUE badge. */
+  revealsReady?: number;
   draftAt: string;
   revealed: boolean;
   /** Keeper counts per owner — always visible even while selections are secret. */
@@ -1516,16 +1518,24 @@ export async function revealKeeper(c: Credentials): Promise<AchievementsResponse
 }
 
 export interface PropBetsResponse {
+  /** Never one about the viewer. The server filters them out. */
   props: PropBet[];
-  /** Counts from the board, once the draft starts. */
-  tallies: Record<string, { count: number | null; result: PropSide | null }>;
   locked: boolean;
-  draftDone: boolean;
   owners: string[];
 }
 
-export async function fetchPropBets(): Promise<PropBetsResponse> {
-  const { data } = await axios.get<PropBetsResponse>('/api/league/prop-bets');
+export async function fetchPropBets(c: Credentials): Promise<PropBetsResponse> {
+  const { data } = await axios.get<PropBetsResponse>('/api/league/prop-bets', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Enter the final count, or null to clear it. */
+export async function settlePropBet(c: Credentials, id: string, result: number | null): Promise<PropBetsResponse> {
+  const { data } = await axios.post<PropBetsResponse>(
+    `/api/league/prop-bets/${encodeURIComponent(id)}/result`,
+    { result },
+    { headers: authHeaders(c) },
+  );
   return data;
 }
 

@@ -51,12 +51,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: 'LEAGUE',
     icon: 'home',
     primary: true,
+    // Achievements lead the tabs, but tapping LEAGUE still opens League HQ.
+    home: '/league',
     tabs: [
+      { to: '/achievements', label: 'ACHIEVEMENTS' },
       { to: '/league', label: 'LEAGUE HQ' },
+      { to: '/props', label: 'PROP BETS' },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
-      { to: '/achievements', label: 'ACHIEVEMENTS' },
-      { to: '/props', label: 'PROP BETS' },
       { to: '/history', label: 'HISTORY' },
     ],
   },

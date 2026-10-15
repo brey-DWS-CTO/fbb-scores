@@ -1,18 +1,17 @@
 /**
- * Prop bets on the draft: "Amy drafts over or under 1.5 Warriors."
+ * Prop bets: "Kyle, over/under 3.5 times he asks about the rules."
  *
- * Any member sets a line on any team's draft, and any member takes the over or
- * the under. Lines always end in .5, so a prop can never push. Props and sides
- * lock when the draft starts. After that the board settles them: an over wins
- * the moment the count passes the line, an under only once the draft is done.
+ * Any member sets a line on anyone else, and any member takes the over or the
+ * under. Lines always end in .5, so a prop can never push. Setting and taking
+ * sides lock when the draft starts. The app cannot count these, so after the
+ * draft a person enters the final number and the line settles itself.
  *
- * Keepers count, because a kept player is on the team's draft board. But a
- * keeper only counts once keepers are public, or the tally would leak them.
+ * Nobody ever sees a prop about themselves: not the member, not the
+ * commissioner, and not the commissioner acting as someone else.
  *
  * Pure and shared by client and server. No server, no browser.
  */
 
-export type PropKind = 'team' | 'position' | 'custom';
 export type PropSide = 'over' | 'under';
 
 export interface PropTake {
@@ -23,164 +22,96 @@ export interface PropTake {
 
 export interface PropBet {
   id: string;
-  /** The team whose draft this is about. */
+  /** Who the prop is about. They never see it. */
   subject: string;
-  kind: PropKind;
-  /** An NBA team code, a position, or the setter's own words. */
-  target: string;
+  /** What is counted, in the setter's words: "times he asks about the rules". */
+  text: string;
   line: number;
   createdBy: string;
   createdAt: string;
   takes: PropTake[];
+  /** The final count, once someone enters it. */
+  result?: number | null;
+  settledBy?: string;
+  settledAt?: string;
 }
 
 export interface PropInput {
   subject: string;
-  kind: PropKind;
-  target: string;
+  text: string;
   line: number;
 }
 
-/** Codes match ESPN's proTeam field, which is what the draft board stores. */
-export const NBA_TEAMS: ReadonlyArray<{ code: string; name: string }> = [
-  { code: 'Atl', name: 'Hawks' },
-  { code: 'Bos', name: 'Celtics' },
-  { code: 'Bkn', name: 'Nets' },
-  { code: 'Cha', name: 'Hornets' },
-  { code: 'Chi', name: 'Bulls' },
-  { code: 'Cle', name: 'Cavaliers' },
-  { code: 'Dal', name: 'Mavericks' },
-  { code: 'Den', name: 'Nuggets' },
-  { code: 'Det', name: 'Pistons' },
-  { code: 'GS', name: 'Warriors' },
-  { code: 'Hou', name: 'Rockets' },
-  { code: 'Ind', name: 'Pacers' },
-  { code: 'LAC', name: 'Clippers' },
-  { code: 'LAL', name: 'Lakers' },
-  { code: 'Mem', name: 'Grizzlies' },
-  { code: 'Mia', name: 'Heat' },
-  { code: 'Mil', name: 'Bucks' },
-  { code: 'Min', name: 'Timberwolves' },
-  { code: 'Nor', name: 'Pelicans' },
-  { code: 'NY', name: 'Knicks' },
-  { code: 'OKC', name: 'Thunder' },
-  { code: 'Orl', name: 'Magic' },
-  { code: 'Phi', name: '76ers' },
-  { code: 'Pho', name: 'Suns' },
-  { code: 'Por', name: 'Trail Blazers' },
-  { code: 'Sac', name: 'Kings' },
-  { code: 'SA', name: 'Spurs' },
-  { code: 'Tor', name: 'Raptors' },
-  { code: 'Utah', name: 'Jazz' },
-  { code: 'Wsh', name: 'Wizards' },
-];
-
-export const PROP_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-
 export const MIN_LINE = 0.5;
-export const MAX_LINE = 15.5;
-export const MAX_CUSTOM_LENGTH = 80;
+export const MAX_LINE = 99.5;
+export const MAX_TEXT_LENGTH = 100;
+export const MAX_RESULT = 999;
 
-/** Other spellings of a team code that turn up in ESPN data. */
-const TEAM_ALIASES: Record<string, string> = {
-  gsw: 'gs',
-  nyk: 'ny',
-  no: 'nor',
-  nop: 'nor',
-  phx: 'pho',
-  sas: 'sa',
-  uta: 'utah',
-  was: 'wsh',
-  bk: 'bkn',
-  brk: 'bkn',
-};
-
-function teamKey(code: string): string {
-  const lower = code.trim().toLowerCase();
-  return TEAM_ALIASES[lower] ?? lower;
+/** How the prop reads under the person's name: "Over/under 3.5 times he asks about the rules". */
+export function propLabel(prop: Pick<PropBet, 'text' | 'line'>): string {
+  return `Over/under ${prop.line} ${prop.text}`;
 }
 
-export function teamName(code: string): string | null {
-  const key = teamKey(code);
-  return NBA_TEAMS.find((t) => t.code.toLowerCase() === key)?.name ?? null;
+/** The whole line, name included, for confirm boxes. */
+export function propSentence(prop: Pick<PropBet, 'subject' | 'text' | 'line'>): string {
+  return `${prop.subject}: ${propLabel(prop)}`;
 }
 
-/** How the prop reads: "Amy drafts over/under 1.5 Warriors". */
-export function propLabel(prop: Pick<PropBet, 'subject' | 'kind' | 'target' | 'line'>): string {
-  return `${prop.subject} drafts over/under ${prop.line} ${propThing(prop)}`;
-}
-
-/** Just the thing being counted: "Warriors", "centers", or the setter's words. */
-export function propThing(prop: Pick<PropBet, 'kind' | 'target'>): string {
-  if (prop.kind === 'team') return teamName(prop.target) ?? prop.target;
-  if (prop.kind === 'position') return POSITION_NAMES[prop.target] ?? prop.target;
-  return prop.target;
-}
-
-export const POSITION_NAMES: Record<string, string> = {
-  PG: 'point guards',
-  SG: 'shooting guards',
-  SF: 'small forwards',
-  PF: 'power forwards',
-  C: 'centers',
-};
-
-export type PropInputError =
-  | 'subject'
-  | 'kind'
-  | 'target'
-  | 'line';
+export type PropInputError = 'subject' | 'text' | 'line';
 
 export type ParseResult =
   | { ok: true; input: PropInput }
   | { ok: false; field: PropInputError; message: string };
 
-/** Check and tidy what the form sent. */
-export function parsePropInput(raw: Record<string, unknown>, owners: readonly string[]): ParseResult {
+/**
+ * Check and tidy what the form sent. `hidden` names who may not be the
+ * subject: the member setting it, and anyone acting through them.
+ */
+export function parsePropInput(
+  raw: Record<string, unknown>,
+  owners: readonly string[],
+  hidden: readonly string[],
+): ParseResult {
   const subject = typeof raw.subject === 'string' ? raw.subject : '';
   if (!owners.includes(subject)) {
-    return { ok: false, field: 'subject', message: 'Pick whose draft this is about.' };
+    return { ok: false, field: 'subject', message: 'Pick who this is about.' };
   }
-  const kind = raw.kind;
-  if (kind !== 'team' && kind !== 'position' && kind !== 'custom') {
-    return { ok: false, field: 'kind', message: 'Pick what to count.' };
-  }
-  let target = typeof raw.target === 'string' ? raw.target.trim() : '';
-  if (kind === 'team') {
-    const team = NBA_TEAMS.find((t) => t.code.toLowerCase() === teamKey(target));
-    if (!team) return { ok: false, field: 'target', message: 'Pick an NBA team.' };
-    target = team.code;
-  } else if (kind === 'position') {
-    target = target.toUpperCase();
-    if (!(PROP_POSITIONS as readonly string[]).includes(target)) {
-      return { ok: false, field: 'target', message: 'Pick a position.' };
-    }
-  } else {
-    target = target.replace(/\s+/g, ' ');
-    if (!target) return { ok: false, field: 'target', message: 'Say what to count.' };
-    if (target.length > MAX_CUSTOM_LENGTH) {
-      return { ok: false, field: 'target', message: `Keep it under ${MAX_CUSTOM_LENGTH} letters.` };
-    }
+  if (hidden.includes(subject)) {
+    return { ok: false, field: 'subject', message: 'You cannot set a prop on yourself.' };
   }
   const line = typeof raw.line === 'number' ? raw.line : Number(raw.line);
-  if (!Number.isFinite(line) || line < MIN_LINE || line > MAX_LINE || !isHalf(line)) {
-    return { ok: false, field: 'line', message: `The line must end in .5, from ${MIN_LINE} to ${MAX_LINE}.` };
+  if (raw.line === '' || raw.line === undefined || !Number.isFinite(line) || line < MIN_LINE || line > MAX_LINE || !isHalf(line)) {
+    return { ok: false, field: 'line', message: 'Set a line that ends in .5.' };
   }
-  return { ok: true, input: { subject, kind, target, line } };
+  const text = typeof raw.text === 'string' ? raw.text.trim().replace(/\s+/g, ' ') : '';
+  if (!text) return { ok: false, field: 'text', message: 'Say what gets counted.' };
+  if (text.length > MAX_TEXT_LENGTH) {
+    return { ok: false, field: 'text', message: `Keep it under ${MAX_TEXT_LENGTH} letters.` };
+  }
+  return { ok: true, input: { subject, text, line } };
 }
 
 function isHalf(n: number): boolean {
   return Math.abs(n * 2 - Math.round(n * 2)) < 1e-9 && Math.round(n * 2) % 2 === 1;
 }
 
-/** Same team, same thing, same line. Case does not matter for custom words. */
+/** Same person, same line, same words. Case does not matter. */
 export function sameProp(a: PropInput, b: PropInput): boolean {
-  return (
-    a.subject === b.subject &&
-    a.kind === b.kind &&
-    a.line === b.line &&
-    a.target.toLowerCase() === b.target.toLowerCase()
-  );
+  return a.subject === b.subject && a.line === b.line && a.text.toLowerCase() === b.text.toLowerCase();
+}
+
+/**
+ * Old rows from the first cut counted NBA teams and positions. Read them as
+ * plain words so nothing breaks.
+ */
+export function normalizeProp(raw: PropBet & { kind?: string; target?: string }): PropBet {
+  if (typeof raw.text === 'string' && raw.text) return raw;
+  return { ...raw, text: raw.target ?? '' };
+}
+
+/** The props one member may see: never one about themselves, or about whoever is acting through them. */
+export function visibleProps(props: readonly PropBet[], hidden: readonly string[]): PropBet[] {
+  return props.filter((p) => !hidden.includes(p.subject));
 }
 
 /** True once the draft has started, which freezes every prop and every side. */
@@ -203,32 +134,32 @@ export function canRemoveProp(prop: PropBet, owner: string, isCommissioner: bool
   return isCommissioner || prop.createdBy === owner;
 }
 
-/** One player on a team's draft board, for counting. */
-export interface DraftedPlayer {
-  owner: string;
-  proTeam: string;
-  positions: readonly string[];
+/**
+ * Who may enter the final count: the commissioner, or whoever set it. The
+ * setter matters for props about the commissioner, which he never sees.
+ */
+export function canSettleProp(prop: PropBet, owner: string, isCommissioner: boolean): boolean {
+  if (prop.subject === owner) return false;
+  return isCommissioner || prop.createdBy === owner;
 }
 
-/** How many of the thing the team has drafted. Null for custom words, which a person settles. */
-export function propCount(prop: PropBet, drafted: readonly DraftedPlayer[]): number | null {
-  if (prop.kind === 'custom') return null;
-  const mine = drafted.filter((p) => p.owner === prop.subject);
-  if (prop.kind === 'team') {
-    const key = teamKey(prop.target);
-    return mine.filter((p) => teamKey(p.proTeam) === key).length;
+/** A final count: a whole number from 0 up, or null to clear it. */
+export function parseResult(raw: unknown): { ok: true; value: number | null } | { ok: false; message: string } {
+  if (raw === null) return { ok: true, value: null };
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (raw === '' || !Number.isInteger(n) || n < 0 || n > MAX_RESULT) {
+    return { ok: false, message: 'The final count is a whole number.' };
   }
-  return mine.filter((p) => p.positions.includes(prop.target)).length;
+  return { ok: true, value: n };
 }
 
-/** Which side won. Over can win mid-draft; under has to wait for the end. */
-export function propResult(line: number, count: number | null, draftDone: boolean): PropSide | null {
-  if (count === null) return null;
-  if (count > line) return 'over';
-  return draftDone ? 'under' : null;
+/** Which side won, once the count is in. */
+export function propResult(prop: Pick<PropBet, 'line' | 'result'>): PropSide | null {
+  if (prop.result === null || prop.result === undefined) return null;
+  return prop.result > prop.line ? 'over' : 'under';
 }
 
-/** Props grouped by the team they are about, in league order. */
+/** Props grouped by who they are about, in league order. */
 export function propsBySubject(props: readonly PropBet[], owners: readonly string[]): Array<{ owner: string; props: PropBet[] }> {
   return owners
     .map((owner) => ({

@@ -80,6 +80,7 @@ import {
   getKeeperScenario,
   readAudit,
   isKnownOwner,
+  isCommissionerOwner,
   setKeeperScenarioTarget,
   DRAFT_AT_ISO,
   PlayerPoolAcceptError,
@@ -136,6 +137,8 @@ import {
   canReveal,
   earnedCount,
   earnedFrom,
+  firstGuessToRecord,
+  guessHit,
   ledgerOf,
   mocksFinished,
   nextMockCount,
@@ -149,13 +152,14 @@ import {
 } from '../../src/lib/league/achievements.js';
 import {
   canRemoveProp,
+  canSettleProp,
+  normalizeProp,
   parsePropInput,
-  propCount,
-  propResult,
+  parseResult,
   propsLocked,
   sameProp,
   takeSide,
-  type DraftedPlayer,
+  visibleProps,
   type PropBet,
   type PropSide,
 } from '../../src/lib/league/propBets.js';
@@ -463,7 +467,19 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
     },
     viewer: viewer.owner,
     isCommissioner: viewer.isCommissioner,
+    revealsReady: revealsReadyFor(state, viewer),
   };
+}
+
+/** Keeper reveals waiting for this viewer. Drives the LEAGUE badge. */
+function revealsReadyFor(state: LeagueDynamicState, viewer: Viewer): number {
+  if (!viewer.owner || viewer.isCommissioner || state.keepersRevealed === true) return 0;
+  const ledger = ledgerOf(state.achievements);
+  return revealsLeft(
+    earnedCount(ledger.earned[viewer.owner]),
+    (ledger.reveals[viewer.owner] ?? []).length,
+    OWNERS.length - 1,
+  );
 }
 
 function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer: Viewer) {
@@ -1072,6 +1088,23 @@ router.put('/keeper-scenario/:target', requireAuth, async (req, res) => {
     (req.body as { selections?: unknown } | undefined)?.selections,
   );
   validateKeeperSelections(current.state, target, selections);
+  // SCOUT counts the first guess only, so keep it before this save can replace it.
+  if (!ledgerOf(current.state.achievements).firstGuesses[viewer]?.[target]) {
+    const saved = (await getKeeperScenario(current.state.season, viewer))[target] ?? [];
+    const at = new Date().toISOString();
+    await mutateState((draft) => {
+      const ledger = ledgerOf(draft.achievements);
+      const guess = firstGuessToRecord(
+        ledger.firstGuesses[viewer]?.[target],
+        saved.map((sel) => sel.playerKey),
+        selections.map((sel) => sel.playerKey),
+        at,
+      );
+      if (!guess) return;
+      ledger.firstGuesses[viewer] = { ...(ledger.firstGuesses[viewer] ?? {}), [target]: guess };
+      draft.achievements = ledger;
+    });
+  }
   const scenario = await setKeeperScenarioTarget(
     current.state.season,
     viewer,
@@ -3488,16 +3521,15 @@ router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, 
 /** What every owner has done, from the records. */
 async function achievementFacts(state: LeagueDynamicState): Promise<Record<string, OwnerFacts>> {
   const season = leagueDataset.season;
-  const [signatures, polls, dues, mocks, guesses] = await Promise.all([
+  const [signatures, polls, dues, mocks] = await Promise.all([
     listRulebookSignatures(RULEBOOK_SEASON),
     seasonPolls(),
     listDues(DUES_SEASON),
     Promise.all(OWNERS.map((owner) => listMockResults(season, owner))),
-    Promise.all(OWNERS.map((owner) => getKeeperScenario(state.season, owner))),
   ]);
   const ledger = ledgerOf(state.achievements);
   const proposals = proposalsOf(state);
-  const props = state.propBets ?? [];
+  const props = allProps(state);
   const facts: Record<string, OwnerFacts> = {};
   OWNERS.forEach((owner, i) => {
     const grades = mocks[i]
@@ -3514,18 +3546,58 @@ async function achievementFacts(state: LeagueDynamicState): Promise<Record<strin
       ).length,
       propBetsSet: props.filter((p) => p.createdBy === owner).length,
       votesCast: polls.filter((poll) => poll.votes.some((v) => v.owner === owner)).length,
-      keeperGuesses: Object.entries(guesses[i]).filter(
-        ([target, sels]) => target !== owner && sels.length > 0,
-      ).length,
-      duesPaid: dues.some((row) => row.owner === owner && (row.paidAt !== null || row.verifiedAt !== null)),
+      // The commissioner sees every keeper, so a guess proves nothing.
+      scoutHits: isCommissionerOwner(owner) ? 0 : scoutHits(state, ledger, owner),
+      // Marking it sent is not enough; the collector has to confirm it.
+      duesPaid: dues.some((row) => row.owner === owner && row.verifiedAt !== null),
     };
   });
   return facts;
 }
 
+/** Teams whose exact keepers this owner named on their first saved guess. */
+function scoutHits(state: LeagueDynamicState, ledger: AchievementLedger, owner: string): number {
+  const guesses = ledger.firstGuesses[owner] ?? {};
+  const reveals = ledger.reveals[owner] ?? [];
+  return Object.entries(guesses).filter(([target, guess]) => {
+    const actual = (state.keepers[target] ?? []).map((k) => k.playerKey);
+    const revealedAt = reveals.find((r) => r.target === target)?.at ?? null;
+    return target !== owner && guessHit(guess, actual, revealedAt);
+  }).length;
+}
+
+/**
+ * Guesses saved before first-guess tracking shipped count as the first. Copy
+ * them into the ledger once, so a later edit cannot replace them.
+ */
+async function seedFirstGuesses(state: LeagueDynamicState): Promise<boolean> {
+  if (state.keepersRevealed === true) return false;
+  const ledger = ledgerOf(state.achievements);
+  const scenarios = await Promise.all(OWNERS.map((owner) => getKeeperScenario(state.season, owner)));
+  const at = new Date().toISOString();
+  const missing: Array<{ owner: string; target: string; keys: string[] }> = [];
+  OWNERS.forEach((owner, i) => {
+    for (const [target, sels] of Object.entries(scenarios[i])) {
+      if (target === owner || sels.length === 0 || ledger.firstGuesses[owner]?.[target]) continue;
+      missing.push({ owner, target, keys: sels.map((s) => s.playerKey) });
+    }
+  });
+  if (missing.length === 0) return false;
+  await mutateState((draft) => {
+    const next = ledgerOf(draft.achievements);
+    for (const m of missing) {
+      const guess = firstGuessToRecord(next.firstGuesses[m.owner]?.[m.target], m.keys, [], at);
+      if (guess) next.firstGuesses[m.owner] = { ...(next.firstGuesses[m.owner] ?? {}), [m.target]: guess };
+    }
+    draft.achievements = next;
+  });
+  return true;
+}
+
 /** Stamp anything new for every owner. Writes only when something changed. */
 async function syncAchievements(): Promise<{ state: LeagueDynamicState; facts: Record<string, OwnerFacts> }> {
-  const current = await getState();
+  let current = await getState();
+  if (await seedFirstGuesses(current.state)) current = await getState();
   const facts = await achievementFacts(current.state);
   const at = new Date().toISOString();
   const before = ledgerOf(current.state.achievements);
@@ -3612,58 +3684,43 @@ router.post('/achievements/reveal', requireAuth, async (_req, res) => {
 
 // ─── Prop bets ───────────────────────────────────────────────────────────────
 //
-// Lines on each team's draft. Open to every member; they lock when the draft
-// starts. See src/lib/league/propBets.ts.
+// Over/unders on league members. Open to every member; setting and taking
+// sides lock when the draft starts. Nobody ever sees a prop about themselves,
+// so every read and write here filters by the viewer and anyone acting
+// through them. See src/lib/league/propBets.ts.
 
 /** Most props one member may set, so the page stays readable. */
 const MAX_PROPS_PER_MEMBER = 30;
 
-/** Every player on the board, by the team holding the pick. Keepers only once public. */
-async function draftedPlayers(state: LeagueDynamicState): Promise<DraftedPlayer[]> {
-  const dataset = currentDataset(state, await resolveDraftDataset(state));
-  const players = new Map(dataset.players.map((p) => [p.key, p]));
-  const out: DraftedPlayer[] = [];
-  for (const cell of buildDraftBoard(dataset, state)) {
-    const owner = cell.pick.currentOwner;
-    if (cell.selection?.playerKey) {
-      const known = players.get(cell.selection.playerKey);
-      out.push({
-        owner,
-        proTeam: cell.selection.proTeam ?? known?.proTeam ?? '',
-        positions: cell.selection.positions ?? known?.positions ?? [],
-      });
-    } else if (cell.keeper?.player && state.keepersRevealed === true) {
-      out.push({ owner, proTeam: cell.keeper.player.proTeam, positions: cell.keeper.player.positions });
-    }
-  }
-  return out;
+/** Who must not see a prop: the member, and the commissioner acting as them. */
+function propBlind(res: Response): string[] {
+  const owner = res.locals.owner as string;
+  const by = res.locals.actingBy as string | null | undefined;
+  return by ? [owner, by] : [owner];
 }
 
-async function propPayload(state: LeagueDynamicState) {
-  const props = state.propBets ?? [];
-  const started = propsLocked(state.draft.startedAt);
-  const done = Boolean(state.draft.closedAt);
-  const tallies: Record<string, { count: number | null; result: PropSide | null }> = {};
-  if (started && props.length > 0) {
-    const drafted = await draftedPlayers(state);
-    for (const prop of props) {
-      const count = propCount(prop, drafted);
-      tallies[prop.id] = { count, result: propResult(prop.line, count, done) };
-    }
-  }
-  return { props, tallies, locked: started, draftDone: done, owners: OWNERS };
+function allProps(state: LeagueDynamicState): PropBet[] {
+  return (state.propBets ?? []).map(normalizeProp);
 }
 
-/** GET /api/league/prop-bets — every prop, open to anyone. */
-router.get('/prop-bets', async (_req, res) => {
+function propPayload(state: LeagueDynamicState, res: Response) {
+  return {
+    props: visibleProps(allProps(state), propBlind(res)),
+    locked: propsLocked(state.draft.startedAt),
+    owners: OWNERS,
+  };
+}
+
+/** GET /api/league/prop-bets — every prop you are allowed to see. */
+router.get('/prop-bets', requireAuth, async (_req, res) => {
   const { state } = await getState();
-  res.json(await propPayload(state));
+  res.json(propPayload(state, res));
 });
 
 /** POST /api/league/prop-bets — set a new line. */
 router.post('/prop-bets', requireAuth, async (req, res) => {
   const owner = res.locals.owner as string;
-  const parsed = parsePropInput((req.body ?? {}) as Record<string, unknown>, OWNERS);
+  const parsed = parsePropInput((req.body ?? {}) as Record<string, unknown>, OWNERS, propBlind(res));
   if (!parsed.ok) {
     res.status(400).json({ error: parsed.message, field: parsed.field });
     return;
@@ -3672,7 +3729,7 @@ router.post('/prop-bets', requireAuth, async (req, res) => {
   const id = `pb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   const result = await mutateState((draft) => {
     if (propsLocked(draft.draft.startedAt)) throw new HttpError(409, 'The draft has started. Props are locked.');
-    const props = draft.propBets ?? [];
+    const props = allProps(draft);
     if (props.some((p) => sameProp(p, parsed.input))) throw new HttpError(409, 'That prop is already up.');
     if (props.filter((p) => p.createdBy === owner).length >= MAX_PROPS_PER_MEMBER) {
       throw new HttpError(409, `You have set ${MAX_PROPS_PER_MEMBER} props. Take one down first.`);
@@ -3684,14 +3741,20 @@ router.post('/prop-bets', requireAuth, async (req, res) => {
     if (next) ledger.earned[owner] = next;
     draft.achievements = ledger;
   });
-  await appendAudit(actor(res), 'prop-bet.set', { id, ...parsed.input });
-  res.json(await propPayload(result.state));
+  // The words stay out of the log. The commissioner reads it, and some props are about him.
+  await appendAudit(actor(res), 'prop-bet.set', { id });
+  res.json(propPayload(result.state, res));
 });
 
-function findProp(state: LeagueDynamicState, id: string): PropBet {
-  const prop = (state.propBets ?? []).find((p) => p.id === id);
+/** A prop the caller may see. One about them answers 404, as if it did not exist. */
+function findProp(state: LeagueDynamicState, id: string, res: Response): PropBet {
+  const prop = visibleProps(allProps(state), propBlind(res)).find((p) => p.id === id);
   if (!prop) throw new HttpError(404, 'No such prop');
   return prop;
+}
+
+function replaceProp(state: LeagueDynamicState, next: PropBet): void {
+  state.propBets = allProps(state).map((p) => (p.id === next.id ? next : p));
 }
 
 /** POST /api/league/prop-bets/:id/take — take the over or the under, or `null` to step off. */
@@ -3706,12 +3769,31 @@ router.post('/prop-bets/:id/take', requireAuth, async (req, res) => {
   const id = String(req.params.id);
   const result = await mutateState((draft) => {
     if (propsLocked(draft.draft.startedAt)) throw new HttpError(409, 'The draft has started. Sides are locked.');
-    const prop = findProp(draft, id);
-    const next = takeSide(prop, owner, side, new Date().toISOString());
-    draft.propBets = (draft.propBets ?? []).map((p) => (p.id === id ? next : p));
+    replaceProp(draft, takeSide(findProp(draft, id, res), owner, side, new Date().toISOString()));
   });
   await appendAudit(actor(res), 'prop-bet.take', { id, side });
-  res.json(await propPayload(result.state));
+  res.json(propPayload(result.state, res));
+});
+
+/** POST /api/league/prop-bets/:id/result — enter the final count, or `null` to clear it. */
+router.post('/prop-bets/:id/result', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner === true;
+  const parsed = parseResult((req.body as { result?: unknown } | undefined)?.result);
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.message });
+    return;
+  }
+  const id = String(req.params.id);
+  const result = await mutateState((draft) => {
+    const prop = findProp(draft, id, res);
+    if (!canSettleProp(prop, owner, isCommissioner)) {
+      throw new HttpError(403, 'Only whoever set it, or the commissioner, enters the result');
+    }
+    replaceProp(draft, { ...prop, result: parsed.value, settledBy: owner, settledAt: new Date().toISOString() });
+  });
+  await appendAudit(actor(res), 'prop-bet.result', { id, result: parsed.value });
+  res.json(propPayload(result.state, res));
 });
 
 /** DELETE /api/league/prop-bets/:id — the setter or a commissioner takes it down. */
@@ -3720,18 +3802,19 @@ router.delete('/prop-bets/:id', requireAuth, async (req, res) => {
   const isCommissioner = res.locals.isCommissioner === true;
   const id = String(req.params.id);
   const result = await mutateState((draft) => {
-    const prop = findProp(draft, id);
+    const prop = findProp(draft, id, res);
     if (!canRemoveProp(prop, owner, isCommissioner)) {
       throw new HttpError(403, 'Only whoever set it, or the commissioner, can take it down');
     }
     if (propsLocked(draft.draft.startedAt) && !isCommissioner) {
       throw new HttpError(409, 'The draft has started. Props are locked.');
     }
-    draft.propBets = (draft.propBets ?? []).filter((p) => p.id !== id);
+    draft.propBets = allProps(draft).filter((p) => p.id !== id);
   });
   await appendAudit(actor(res), 'prop-bet.removed', { id });
-  res.json(await propPayload(result.state));
+  res.json(propPayload(result.state, res));
 });
+
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;

@@ -2,27 +2,30 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   canRemoveProp,
+  canSettleProp,
+  normalizeProp,
   parsePropInput,
-  propCount,
+  parseResult,
   propLabel,
   propResult,
+  propSentence,
   propsBySubject,
   propsLocked,
   sameProp,
   sideOf,
   takeSide,
+  visibleProps,
   type PropBet,
 } from '../src/lib/league/propBets.ts';
 
-const OWNERS = ['Joel', 'Ryan', 'Amy'];
+const OWNERS = ['Joel', 'Ryan', 'Kyle', 'Brey'];
 
 function prop(overrides: Partial<PropBet> = {}): PropBet {
   return {
     id: 'pb1',
-    subject: 'Amy',
-    kind: 'team',
-    target: 'GS',
-    line: 1.5,
+    subject: 'Kyle',
+    text: 'times he asks about the rules',
+    line: 3.5,
     createdBy: 'Ryan',
     createdAt: '2026-10-14T00:00:00.000Z',
     takes: [],
@@ -30,53 +33,54 @@ function prop(overrides: Partial<PropBet> = {}): PropBet {
   };
 }
 
-test('a team prop reads the way you would say it', () => {
-  assert.equal(propLabel(prop()), 'Amy drafts over/under 1.5 Warriors');
-  assert.equal(propLabel(prop({ kind: 'position', target: 'C', line: 2.5 })), 'Amy drafts over/under 2.5 centers');
-  assert.equal(propLabel(prop({ kind: 'custom', target: 'rookies' })), 'Amy drafts over/under 1.5 rookies');
+test('a prop reads the way you would say it', () => {
+  assert.equal(propLabel(prop()), 'Over/under 3.5 times he asks about the rules');
+  assert.equal(propSentence(prop()), 'Kyle: Over/under 3.5 times he asks about the rules');
 });
 
 test('the form input is checked and tidied', () => {
-  const ok = parsePropInput({ subject: 'Amy', kind: 'team', target: 'gsw', line: '2.5' }, OWNERS);
-  assert.deepEqual(ok, { ok: true, input: { subject: 'Amy', kind: 'team', target: 'GS', line: 2.5 } });
-
-  const pos = parsePropInput({ subject: 'Joel', kind: 'position', target: 'pg', line: 0.5 }, OWNERS);
-  assert.ok(pos.ok && pos.input.target === 'PG');
-
-  const custom = parsePropInput({ subject: 'Joel', kind: 'custom', target: '  guys   over 30 ', line: 1.5 }, OWNERS);
-  assert.ok(custom.ok && custom.input.target === 'guys over 30');
+  const ok = parsePropInput({ subject: 'Kyle', text: '  mid draft   trades ', line: '2.5' }, OWNERS, ['Ryan']);
+  assert.deepEqual(ok, { ok: true, input: { subject: 'Kyle', text: 'mid draft trades', line: 2.5 } });
 });
 
 test('bad input says which field is wrong', () => {
   const field = (raw: Record<string, unknown>) => {
-    const r = parsePropInput(raw, OWNERS);
+    const r = parsePropInput(raw, OWNERS, ['Ryan']);
     return r.ok ? null : r.field;
   };
-  const good = { subject: 'Amy', kind: 'team', target: 'GS', line: 1.5 };
+  const good = { subject: 'Kyle', text: 'trades', line: 1.5 };
+  assert.equal(field(good), null);
   assert.equal(field({ ...good, subject: 'Nobody' }), 'subject');
-  assert.equal(field({ ...good, kind: 'vibes' }), 'kind');
-  assert.equal(field({ ...good, target: 'Seattle' }), 'target');
-  assert.equal(field({ ...good, kind: 'position', target: 'G' }), 'target');
-  assert.equal(field({ ...good, kind: 'custom', target: '   ' }), 'target');
-  assert.equal(field({ ...good, kind: 'custom', target: 'x'.repeat(81) }), 'target');
+  assert.equal(field({ ...good, subject: 'Ryan' }), 'subject', 'never on yourself');
+  assert.equal(field({ ...good, text: '   ' }), 'text');
+  assert.equal(field({ ...good, text: 'x'.repeat(101) }), 'text');
+  assert.equal(field({ ...good, line: '' }), 'line', 'no default line');
+  assert.equal(field({ ...good, line: 2 }), 'line');
+  assert.equal(field({ ...good, line: 1.25 }), 'line');
+  assert.equal(field({ ...good, line: 0 }), 'line');
 });
 
-test('a line must end in .5 so nothing pushes', () => {
-  const line = (n: unknown) => parsePropInput({ subject: 'Amy', kind: 'team', target: 'GS', line: n }, OWNERS).ok;
-  assert.equal(line(1.5), true);
-  assert.equal(line(0.5), true);
-  assert.equal(line(15.5), true);
-  assert.equal(line(2), false);
-  assert.equal(line(1.25), false);
-  assert.equal(line(0), false);
-  assert.equal(line(16.5), false);
-  assert.equal(line('abc'), false);
+test('the commissioner acting as someone cannot set a prop on himself either', () => {
+  const r = parsePropInput({ subject: 'Brey', text: 'trades offered', line: 1.5 }, OWNERS, ['Joel', 'Brey']);
+  assert.equal(r.ok, false);
+});
+
+test('nobody sees props about themselves, or about whoever acts through them', () => {
+  const props = [prop({ id: 'k', subject: 'Kyle' }), prop({ id: 'b', subject: 'Brey' }), prop({ id: 'j', subject: 'Joel' })];
+  assert.deepEqual(visibleProps(props, ['Brey']).map((p) => p.id), ['k', 'j']);
+  assert.deepEqual(visibleProps(props, ['Joel', 'Brey']).map((p) => p.id), ['k']);
 });
 
 test('the same prop twice is caught, whatever the case', () => {
-  const a = { subject: 'Amy', kind: 'custom' as const, target: 'Rookies', line: 1.5 };
-  assert.ok(sameProp(a, { ...a, target: 'rookies' }));
+  const a = { subject: 'Kyle', text: 'Trades', line: 1.5 };
+  assert.ok(sameProp(a, { ...a, text: 'trades' }));
   assert.ok(!sameProp(a, { ...a, line: 2.5 }));
+});
+
+test('first-cut rows read as plain words', () => {
+  const old = { ...prop(), text: undefined as unknown as string, kind: 'team', target: 'GS' };
+  assert.equal(normalizeProp(old).text, 'GS');
+  assert.equal(normalizeProp(prop()).text, 'times he asks about the rules');
 });
 
 test('taking a side, switching, and stepping off', () => {
@@ -91,42 +95,41 @@ test('taking a side, switching, and stepping off', () => {
 
 test('props lock when the draft starts', () => {
   assert.equal(propsLocked(null), false);
-  assert.equal(propsLocked(undefined), false);
   assert.equal(propsLocked('2026-10-18T21:00:00.000Z'), true);
 });
 
-test('only the setter or the commissioner can take one down', () => {
+test('who may take one down, and who may settle it', () => {
   assert.ok(canRemoveProp(prop(), 'Ryan', false));
-  assert.ok(!canRemoveProp(prop(), 'Amy', false));
-  assert.ok(canRemoveProp(prop(), 'Amy', true));
+  assert.ok(!canRemoveProp(prop(), 'Joel', false));
+  assert.ok(canRemoveProp(prop(), 'Joel', true));
+
+  assert.ok(canSettleProp(prop(), 'Ryan', false), 'the setter');
+  assert.ok(canSettleProp(prop(), 'Brey', true), 'the commissioner');
+  assert.ok(!canSettleProp(prop(), 'Joel', false));
+  assert.ok(!canSettleProp(prop({ subject: 'Brey' }), 'Brey', true), 'never your own');
 });
 
-test('counting the board: team and position, only the subject team', () => {
-  const drafted = [
-    { owner: 'Amy', proTeam: 'GS', positions: ['PG', 'SG'] },
-    { owner: 'Amy', proTeam: 'GSW', positions: ['C'] },
-    { owner: 'Amy', proTeam: 'LAL', positions: ['C', 'PF'] },
-    { owner: 'Joel', proTeam: 'GS', positions: ['C'] },
-  ];
-  assert.equal(propCount(prop(), drafted), 2, 'alias GSW counts as GS');
-  assert.equal(propCount(prop({ kind: 'position', target: 'C' }), drafted), 2);
-  assert.equal(propCount(prop({ kind: 'custom', target: 'rookies' }), drafted), null);
+test('final counts are whole numbers; the line settles itself', () => {
+  assert.deepEqual(parseResult(4), { ok: true, value: 4 });
+  assert.deepEqual(parseResult('0'), { ok: true, value: 0 });
+  assert.deepEqual(parseResult(null), { ok: true, value: null });
+  assert.equal(parseResult(2.5).ok, false);
+  assert.equal(parseResult(-1).ok, false);
+  assert.equal(parseResult('').ok, false);
+
+  assert.equal(propResult(prop({ result: 4 })), 'over');
+  assert.equal(propResult(prop({ result: 3 })), 'under');
+  assert.equal(propResult(prop({ result: null })), null);
+  assert.equal(propResult(prop()), null);
 });
 
-test('over wins as soon as it passes; under waits for the end', () => {
-  assert.equal(propResult(1.5, 2, false), 'over');
-  assert.equal(propResult(1.5, 1, false), null);
-  assert.equal(propResult(1.5, 1, true), 'under');
-  assert.equal(propResult(1.5, null, true), null, 'custom props are settled by people');
-});
-
-test('grouping keeps league order and drops teams with no props', () => {
+test('grouping keeps league order and drops people with no props', () => {
   const groups = propsBySubject(
     [prop({ id: 'b', subject: 'Joel', createdAt: '2' }), prop({ id: 'a', subject: 'Joel', createdAt: '1' }), prop({ id: 'c' })],
     OWNERS,
   );
   assert.deepEqual(groups.map((g) => [g.owner, g.props.map((p) => p.id)]), [
     ['Joel', ['a', 'b']],
-    ['Amy', ['c']],
+    ['Kyle', ['c']],
   ]);
 });

@@ -41,8 +41,8 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'trade-done', title: 'DEAL DONE', how: 'Get a pick trade accepted.' },
   { id: 'prop-bet', title: 'BOOKIE', how: 'Set a prop bet.' },
   { id: 'voted', title: 'VOTER', how: 'Vote in a league poll.' },
-  { id: 'scout', title: 'SCOUT', how: "Guess another team's keepers on their keeper page." },
-  { id: 'dues', title: 'PAID UP', how: 'Pay your dues.' },
+  { id: 'scout', title: 'SCOUT', how: "Guess a team's exact keepers on your first save." },
+  { id: 'dues', title: 'PAID UP', how: 'Pay your dues and get it confirmed.' },
 ];
 
 export const MOCKS_FOR_ADDICT = 10;
@@ -59,8 +59,9 @@ export interface OwnerFacts {
   tradesDone: number;
   propBetsSet: number;
   votesCast: number;
-  /** Other teams this owner has guessed keepers for. */
-  keeperGuesses: number;
+  /** Teams whose exact keepers this owner guessed on the first save. */
+  scoutHits: number;
+  /** Dues the collector has confirmed, not just marked sent. */
   duesPaid: boolean;
 }
 
@@ -72,7 +73,7 @@ export const NO_FACTS: OwnerFacts = {
   tradesDone: 0,
   propBetsSet: 0,
   votesCast: 0,
-  keeperGuesses: 0,
+  scoutHits: 0,
   duesPaid: false,
 };
 
@@ -87,7 +88,7 @@ export function earnedFrom(facts: OwnerFacts): AchievementId[] {
     'trade-done': facts.tradesDone >= 1,
     'prop-bet': facts.propBetsSet >= 1,
     voted: facts.votesCast >= 1,
-    scout: facts.keeperGuesses >= 1,
+    scout: facts.scoutHits >= 1,
     dues: facts.duesPaid,
   };
   return ACHIEVEMENTS.filter((a) => done[a.id]).map((a) => a.id);
@@ -121,10 +122,12 @@ export interface AchievementLedger {
   reveals: Record<string, KeeperReveal[]>;
   /** owner -> finished mocks counted since this shipped. */
   mocks: Record<string, number>;
+  /** viewer -> team -> the first keeper guess they saved for that team. */
+  firstGuesses: Record<string, Record<string, FirstGuess>>;
 }
 
 export function emptyLedger(): AchievementLedger {
-  return { earned: {}, reveals: {}, mocks: {} };
+  return { earned: {}, reveals: {}, mocks: {}, firstGuesses: {} };
 }
 
 /** Old state rows have no ledger, or a partial one. */
@@ -133,7 +136,47 @@ export function ledgerOf(raw: Partial<AchievementLedger> | undefined | null): Ac
     earned: raw?.earned ?? {},
     reveals: raw?.reveals ?? {},
     mocks: raw?.mocks ?? {},
+    firstGuesses: raw?.firstGuesses ?? {},
   };
+}
+
+/** The first keeper guess a member saved for one team. Later edits never replace it. */
+export interface FirstGuess {
+  keys: string[];
+  at: string;
+}
+
+/**
+ * What to record as the first guess, or null to leave things alone. A guess
+ * already on file wins. A guess saved before this shipped counts as the first.
+ * An empty save is not a guess.
+ */
+export function firstGuessToRecord(
+  existing: FirstGuess | undefined,
+  saved: readonly string[],
+  next: readonly string[],
+  at: string,
+): FirstGuess | null {
+  if (existing) return null;
+  if (saved.length > 0) return { keys: [...saved], at };
+  if (next.length > 0) return { keys: [...next], at };
+  return null;
+}
+
+/**
+ * True when the first guess names exactly the team's keepers. A guess made
+ * after you revealed that team does not count.
+ */
+export function guessHit(
+  guess: FirstGuess | undefined,
+  actual: readonly string[],
+  revealedAt: string | null,
+): boolean {
+  if (!guess || guess.keys.length === 0 || actual.length === 0) return false;
+  if (revealedAt !== null && revealedAt <= guess.at) return false;
+  if (guess.keys.length !== actual.length) return false;
+  const want = new Set(actual);
+  return guess.keys.every((key) => want.has(key));
 }
 
 /**

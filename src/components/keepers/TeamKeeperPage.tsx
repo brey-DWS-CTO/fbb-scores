@@ -881,6 +881,7 @@ export default function TeamKeeperPage() {
               </div>
               <div style={{ color: 'var(--text-body)', fontSize: '0.76rem', marginTop: 5, lineHeight: 1.45 }}>
                 These picks are private to {identity?.owner}. They do not change {owner}'s real submission.
+                {' '}Only your first save counts for SCOUT.
               </div>
             </div>
             <button

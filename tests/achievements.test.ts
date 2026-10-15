@@ -7,6 +7,8 @@ import {
   canReveal,
   earnedCount,
   earnedFrom,
+  firstGuessToRecord,
+  guessHit,
   ledgerOf,
   mocksFinished,
   nextMockCount,
@@ -37,7 +39,7 @@ test('each fact earns its own achievement', () => {
   assert.deepEqual(earnedFrom({ ...NO_FACTS, tradesDone: 1 }), ['trade-done']);
   assert.deepEqual(earnedFrom({ ...NO_FACTS, propBetsSet: 2 }), ['prop-bet']);
   assert.deepEqual(earnedFrom({ ...NO_FACTS, votesCast: 1 }), ['voted']);
-  assert.deepEqual(earnedFrom({ ...NO_FACTS, keeperGuesses: 3 }), ['scout']);
+  assert.deepEqual(earnedFrom({ ...NO_FACTS, scoutHits: 1 }), ['scout']);
   assert.deepEqual(earnedFrom({ ...NO_FACTS, duesPaid: true }), ['dues']);
 });
 
@@ -117,4 +119,24 @@ test('standings put the most achievements first and keep league order on ties', 
     { owner: 'Ryan', earned: 1, revealed: 0 },
     { owner: 'Kyle', earned: 0, revealed: 0 },
   ]);
+});
+
+test('the first saved guess sticks; later edits never replace it', () => {
+  assert.deepEqual(firstGuessToRecord(undefined, [], ['a'], 't1'), { keys: ['a'], at: 't1' });
+  assert.equal(firstGuessToRecord({ keys: ['a'], at: 't1' }, ['a'], ['b'], 't2'), null);
+  // A guess saved before this shipped is the first one.
+  assert.deepEqual(firstGuessToRecord(undefined, ['old'], ['new'], 't3'), { keys: ['old'], at: 't3' });
+  assert.equal(firstGuessToRecord(undefined, [], [], 't4'), null, 'an empty save is not a guess');
+});
+
+test('a hit names exactly the keepers, in any order, before any reveal', () => {
+  const guess = { keys: ['jokic', 'hali'], at: '2026-10-10' };
+  assert.equal(guessHit(guess, ['hali', 'jokic'], null), true);
+  assert.equal(guessHit(guess, ['jokic'], null), false, 'one too many');
+  assert.equal(guessHit({ keys: ['jokic'], at: 'x' }, ['jokic', 'hali'], null), false, 'one short');
+  assert.equal(guessHit(guess, ['jokic', 'curry'], null), false);
+  assert.equal(guessHit(guess, [], null), false, 'no keepers in yet');
+  assert.equal(guessHit(undefined, ['jokic'], null), false);
+  assert.equal(guessHit(guess, ['hali', 'jokic'], '2026-10-11'), true, 'revealed after guessing');
+  assert.equal(guessHit(guess, ['hali', 'jokic'], '2026-10-09'), false, 'revealed before guessing');
 });

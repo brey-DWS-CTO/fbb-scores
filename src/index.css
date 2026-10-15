@@ -4892,11 +4892,21 @@ html.theme-light {
 .achieve-row-count { grid-area: count; text-align: right; font-weight: 800; color: var(--text-hi); }
 .achieve-row-seen { grid-area: seen; font-size: 0.6rem; }
 
-.props-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.props-fields .hub-input { width: 100%; box-sizing: border-box; }
-.props-preview { margin: 0; color: var(--text-max); font-size: 0.86rem; font-weight: 800; }
+.props-fields { display: grid; grid-template-columns: 1fr 7.5em; gap: 10px; }
+.props-what { grid-column: 1 / -1; }
+/* 16px text keeps phones from zooming in on tap; 48px is a thumb. */
+.props-page .hub-input { width: 100%; box-sizing: border-box; min-height: 48px; font-size: 16px; padding: 0 12px; }
+.props-preview { margin: 0; color: var(--text-max); font-size: 0.9rem; font-weight: 800; }
+.props-problem { margin: 0; }
+.props-add { min-height: 52px; font-size: 0.85rem; }
 .props-group { margin-bottom: 14px; }
 .props-result { margin-left: auto; color: var(--neon-yellow); font-size: 0.6rem; }
+.props-final { margin: 0; color: var(--text-hi); font-size: 0.8rem; font-weight: 800; }
+.props-page .vote-btn { min-height: 52px; font-size: 0.85rem; }
+.props-page .vote-close { min-height: 44px; font-size: 0.66rem; }
+.props-settle { display: flex; gap: 8px; }
+.props-settle .hub-input { flex: 1; }
+.props-settle .tap-btn { min-height: 48px; padding: 0 14px; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
