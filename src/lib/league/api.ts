@@ -56,6 +56,8 @@ export interface StateMeta {
   pendingTrades?: number;
   /** Keeper reveals this viewer has earned and not spent. Drives the VAULT badge. */
   revealsReady?: number;
+  /** The commissioner turned off his view of other teams' keepers. */
+  commishBlind?: boolean;
   draftAt: string;
   revealed: boolean;
   /** Keeper counts per owner — always visible even while selections are secret. */
@@ -565,6 +567,12 @@ export async function setLocks(c: Credentials, keepersLocked: boolean): Promise<
     });
   }
   const { data } = await axios.post('/api/league/locks', { keepersLocked }, { headers: authHeaders(c) });
+  return data;
+}
+
+/** Commissioner: stop (or start) seeing other teams' keepers, so reveals work for you. */
+export async function setCommishBlind(c: Credentials, blind: boolean): Promise<StateResponse> {
+  const { data } = await axios.post('/api/league/commish-blind', { blind }, { headers: authHeaders(c) });
   return data;
 }
 

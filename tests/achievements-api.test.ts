@@ -128,6 +128,7 @@ beforeEach(async () => {
     draft.keepersRevealed = false;
     draft.achievements = { earned: {}, reveals: {}, firstGuesses: {}, seen: {} };
     draft.propBets = [];
+    draft.commishBlind = false;
   });
   for (const owner of Object.keys(pins)) {
     for (const row of await store.listMockResults(SEASON, owner)) {
@@ -369,6 +370,77 @@ test('news: fresh unlocks show once, then never again', async () => {
 test('news needs a sign-in', async () => {
   assert.equal((await request('/api/league/achievements/news')).status, 401);
   assert.equal((await request('/api/league/achievements/seen', { method: 'POST' })).status, 401);
+});
+
+// ─── Commish blind mode ────────────────────────────────────────────────────
+
+const goBlind = (owner: string, blind: boolean) =>
+  request('/api/league/commish-blind', { method: 'POST', headers: auth(owner), body: JSON.stringify({ blind }) });
+
+test('blind: only the commish can flip it', async () => {
+  assert.equal((await goBlind('Joel', true)).status, 403);
+  assert.equal((await goBlind('Brey', 'yes' as never)).status, 400);
+});
+
+test('blind: the commish stops seeing other keepers, and reveals work for him', async () => {
+  const [a] = kylePlayers;
+  await saveMock('Brey', 'mock-b-1', 7);
+  await store.mutateState((draft) => {
+    draft.keepers = {
+      Brey: [],
+      Amy: [{ playerKey: 'p1', playerName: 'N. Jokic' }],
+    };
+  });
+
+  // Seeing all: Amy's keeper is right there, and no reveal.
+  const before = (await request('/api/league/state', { headers: auth('Brey') })).body as {
+    state: { keepers: Record<string, unknown> };
+  };
+  assert.ok(before.state.keepers.Amy);
+  assert.equal((await reveal('Brey')).status, 409);
+
+  assert.equal((await goBlind('Brey', true)).status, 200);
+  const after = (await request('/api/league/state', { headers: auth('Brey') })).body as {
+    state: { keepers: Record<string, unknown> };
+    meta: { commishBlind: boolean; isCommissioner: boolean };
+  };
+  assert.equal(after.state.keepers.Amy, undefined);
+  assert.equal(after.meta.commishBlind, true);
+  assert.equal(after.meta.isCommissioner, true, 'still the commish for everything else');
+
+  // Members never learn he went blind.
+  const joel = (await request('/api/league/state', { headers: auth('Joel') })).body as { meta: { commishBlind: boolean } };
+  assert.equal(joel.meta.commishBlind, false);
+
+  const spent = await reveal('Brey');
+  assert.equal(spent.status, 200);
+  assert.equal((spent.body as unknown as AchievementsBody).revealed?.target, 'Amy');
+
+  // He cannot overwrite a team he cannot see.
+  const edit = await request('/api/league/keepers/Kyle', {
+    method: 'PUT',
+    headers: auth('Brey'),
+    body: JSON.stringify({ selections: [{ playerKey: a.key, playerName: a.name }] }),
+  });
+  assert.equal(edit.status, 409);
+
+  // And the log does not name anyone's keepers.
+  await store.appendAudit('Amy', 'keepers.set', { target: 'Amy', selections: [{ playerKey: 'p1', playerName: 'N. Jokic' }] });
+  const audit = JSON.stringify((await request('/api/league/audit', { headers: auth('Brey') })).body);
+  assert.ok(!audit.includes('N. Jokic'));
+
+  assert.equal((await goBlind('Brey', false)).status, 200);
+  const back = JSON.stringify((await request('/api/league/audit', { headers: auth('Brey') })).body);
+  assert.ok(back.includes('N. Jokic'), 'seeing again restores the log');
+});
+
+test('blind: SCOUT counts for the commish', async () => {
+  const [a] = kylePlayers;
+  assert.equal((await goBlind('Brey', true)).status, 200);
+  assert.equal((await guess('Brey', 'Kyle', [a])).status, 200);
+  await setKyleKeepers([a]);
+  assert.ok((await achievements('Brey')).you.earned.scout);
+  assert.equal((await goBlind('Brey', false)).status, 200);
 });
 
 // ─── Prop bets ─────────────────────────────────────────────────────────────

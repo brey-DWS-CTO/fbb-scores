@@ -412,6 +412,15 @@ function requireCommissioner(_req: Request, res: Response, next: NextFunction): 
 
 // ─── Keeper secrecy ──────────────────────────────────────────────────────────
 //
+// The commissioner sees every keeper unless he has gone blind (Commish Mode),
+// which makes him a member for keeper secrecy so achievement reveals work for
+// him too. Every check below asks this, never isCommissioner alone.
+
+function seesAllKeepers(state: LeagueDynamicState, isCommissioner: boolean): boolean {
+  return isCommissioner && state.commishBlind !== true;
+}
+
+//
 // Until draft day (DRAFT_AT), each owner may see only their OWN keepers; the
 // commissioner sees everything. Enforced here — every response that carries
 // league state passes through redactState() so the raw payload never leaks.
@@ -474,12 +483,14 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
     viewer: viewer.owner,
     isCommissioner: viewer.isCommissioner,
     revealsReady: revealsReadyFor(state, viewer),
+    /** The commissioner chose not to see other teams' keepers. Only ever true for him. */
+    commishBlind: viewer.isCommissioner && state.commishBlind === true,
   };
 }
 
 /** Keeper reveals this viewer could spend now. Drives the VAULT badge. */
 function revealsReadyFor(state: LeagueDynamicState, viewer: Viewer): number {
-  if (!viewer.owner || viewer.isCommissioner || state.keepersRevealed === true) return 0;
+  if (!viewer.owner || seesAllKeepers(state, viewer.isCommissioner) || state.keepersRevealed === true) return 0;
   const ledger = ledgerOf(state.achievements);
   const reveals = ledger.reveals[viewer.owner] ?? [];
   const left = revealsLeft(earnedCount(ledger.earned[viewer.owner]), reveals.length);
@@ -489,7 +500,7 @@ function revealsReadyFor(state: LeagueDynamicState, viewer: Viewer): number {
 function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer: Viewer) {
   const meta = stateMeta(result.state, viewer);
   let keepers = result.state.keepers;
-  if (!meta.revealed && !viewer.isCommissioner) {
+  if (!meta.revealed && !seesAllKeepers(result.state, viewer.isCommissioner)) {
     keepers =
       viewer.owner && result.state.keepers[viewer.owner]
         ? { [viewer.owner]: result.state.keepers[viewer.owner] }
@@ -1165,6 +1176,10 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
   );
 
   const result = await mutateState((draft) => {
+    // Blind, he cannot see what he would overwrite.
+    if (authedOwner !== target && !seesAllKeepers(draft, isCommissioner)) {
+      throw new HttpError(409, "Turn off blind mode in Commish Mode to edit another team's keepers");
+    }
     if (draft.locks.keepersLocked && !isCommissioner) {
       throw new HttpError(423, 'Keepers are locked');
     }
@@ -1173,6 +1188,23 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
   });
   await appendAudit(actor(res), 'keepers.set', { target, selections: clean });
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
+});
+
+/**
+ * POST /api/league/commish-blind — the commissioner stops (or starts) seeing
+ * other teams' keepers, so achievement reveals work for him too.
+ */
+router.post('/commish-blind', requireAuth, requireCommissioner, async (req, res) => {
+  const blind = (req.body as { blind?: unknown } | undefined)?.blind;
+  if (typeof blind !== 'boolean') {
+    res.status(400).json({ error: 'Send blind: true or false' });
+    return;
+  }
+  const result = await mutateState((draft) => {
+    draft.commishBlind = blind;
+  });
+  await appendAudit(actor(res), 'commish.blind', { blind });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /** POST /api/league/keeper-visibility — reveal or hide all keeper names. */
@@ -2661,7 +2693,7 @@ router.post('/pick-trades/preview', requireAuth, async (req, res, next) => {
     res.json(
       previewProposal(currentDataset(state), state, input, {
         owner,
-        isCommissioner: isCommish,
+        isCommissioner: seesAllKeepers(state, isCommish),
         revealed: state.keepersRevealed === true,
       }),
     );
@@ -3419,7 +3451,13 @@ router.get('/history/versions/:id', async (req, res, next) => {
 router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
   const parsed = parseInt(String(req.query.limit ?? '50'), 10);
   const limit = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 200) : 50;
-  res.json(await readAudit(limit));
+  const [rows, { state }] = await Promise.all([readAudit(limit), getState()]);
+  // Blind means blind: the log would otherwise name every keeper saved.
+  if (!seesAllKeepers(state, true) && state.keepersRevealed !== true) {
+    res.json(rows.map((row) => (row.action === 'keepers.set' ? { ...row, detail: { target: (row.detail as { target?: unknown } | null)?.target ?? null } } : row)));
+    return;
+  }
+  res.json(rows);
 });
 
 // ─── Error handler ───────────────────────────────────────────────────────────
@@ -3564,8 +3602,8 @@ async function achievementFacts(
     const visible = visibleProps(props, [owner]);
     const sides = visible.filter((p) => p.takes.some((t) => t.owner === owner)).length;
     const mine = proposals.filter((p) => p.proposer === owner);
-    // The commissioner sees every keeper, so a guess proves nothing.
-    const guesses = isCommissionerOwner(owner) ? { hits: 0, near: 0 } : keeperGuessScore(state, ledger, owner);
+    // A commissioner who sees every keeper proves nothing by guessing.
+    const guesses = seesAllKeepers(state, isCommissionerOwner(owner)) ? { hits: 0, near: 0 } : keeperGuessScore(state, ledger, owner);
     facts[owner] = {
       ...NO_FACTS,
       signedRulebook: signatures.some((sig) => sig.owner === owner),
@@ -3664,7 +3702,7 @@ function revealState(state: LeagueDynamicState, ledger: AchievementLedger, owner
   const hidden = hiddenKeepers(owner, OWNERS, state.keepers, reveals);
   const check = canReveal({
     keepersPublic: state.keepersRevealed === true,
-    isCommissioner,
+    isCommissioner: seesAllKeepers(state, isCommissioner),
     left,
     hidden: hiddenCount(hidden),
   });

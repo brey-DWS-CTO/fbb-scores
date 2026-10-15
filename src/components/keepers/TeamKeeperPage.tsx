@@ -483,7 +483,8 @@ export default function TeamKeeperPage() {
   const postseasonGames = usePostseasonGames();
 
   const serverSelections = useMemo(() => state.keepers[owner] ?? [], [state.keepers, owner]);
-  const isCommish = identity?.isCommissioner ?? false;
+  // Blind, the commish is a member here: he sees and edits only his own keepers.
+  const isCommish = (identity?.isCommissioner ?? false) && meta?.commishBlind !== true;
   const [commissionerRealEdit, setCommissionerRealEdit] = useState(false);
   const projectionMode = !!identity
     && identity.owner !== owner

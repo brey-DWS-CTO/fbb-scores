@@ -128,6 +128,8 @@ export interface LeagueDynamicState {
   achievements?: AchievementLedger;
   /** Draft prop bets. Public, but served by their own route. */
   propBets?: PropBet[];
+  /** The commissioner turned off his view of other teams' keepers. */
+  commishBlind?: boolean;
 }
 
 export interface AuditRow {

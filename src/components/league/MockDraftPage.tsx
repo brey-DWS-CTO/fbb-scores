@@ -285,7 +285,7 @@ function MockDraftScreen() {
         <section className="panel mock-assumptions">
         <div className="hub-heading mock-sub">THEIR KEEPERS</div>
         {/* Members never see others' entered keepers before the reveal. */}
-        {!revealed && isCommish && (
+        {!revealed && isCommish && meta?.commishBlind !== true && (
           <>
             <label className="mock-use-entered">
               <input type="checkbox" checked={useEntered} onChange={(event) => setUseEntered(event.target.checked)} />
