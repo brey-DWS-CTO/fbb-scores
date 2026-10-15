@@ -37,7 +37,7 @@ import {
   type StarterSlot,
   type ValueBoard,
 } from './draftValue.js';
-import type { KeeperScenario } from './keeperScenario.js';
+import { knownThenGuess, partlyKnown, type KeeperScenario } from './keeperScenario.js';
 import { earlyKeeperNote } from './keeperEarly.js';
 
 // ─── Seeded randomness ──────────────────────────────────────────────────────
@@ -125,6 +125,12 @@ export interface MockBoardInput {
    * with `useEntered` on: "I think Kyle will change his mind."
    */
   guessInstead?: readonly string[];
+  /**
+   * How many keepers each team has saved (public). With it, a team whose
+   * keepers are only partly known, from achievement reveals, is topped up
+   * from the guess instead of being treated as complete.
+   */
+  keeperCounts?: Readonly<Record<string, number>>;
 }
 
 export interface MockKeeperSets {
@@ -173,8 +179,15 @@ export function keepersForMock(
       revealed
       || (input.useEntered === true && !guessInstead.has(owner) && (input.state.keepers[owner]?.length ?? 0) > 0)
     ) {
-      keepers[owner] = copy(input.state.keepers[owner]);
-      status[owner] = 'known';
+      const known = input.state.keepers[owner] ?? [];
+      if (!revealed && partlyKnown(known, input.keeperCounts?.[owner])) {
+        // Some revealed, the rest still a guess.
+        keepers[owner] = knownThenGuess(known, assumed, input.keeperCounts?.[owner]);
+        status[owner] = 'assumed';
+      } else {
+        keepers[owner] = copy(known);
+        status[owner] = 'known';
+      }
     } else {
       keepers[owner] = copy(assumed);
       status[owner] = 'assumed';

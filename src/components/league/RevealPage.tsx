@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import NavIcon from './NavIcon.js';
 import Confetti from './Confetti.js';
 import SignInPanel from './SignInPanel.js';
@@ -30,6 +31,7 @@ export default function RevealPage() {
   const { identity } = useIdentity();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [data, setData] = useState<AchievementsResponse | null>(null);
   const [phase, setPhase] = useState<Phase>('ready');
   const [reelName, setReelName] = useState('?');
@@ -72,6 +74,8 @@ export default function RevealPage() {
       const result = await revealKeeper(identity);
       window.clearInterval(idle);
       setData(result);
+      // The board and mocks read revealed keepers from league state; fetch it now.
+      void queryClient.invalidateQueries({ queryKey: ['league-state'] });
       const pick = result.revealed;
       const team = pick ? result.you.teams.find((t) => t.target === pick.target) : undefined;
       const shown = team?.shown.find((s) => s.playerKey === pick?.playerKey);
@@ -105,7 +109,7 @@ export default function RevealPage() {
       setReelName('?');
       void load();
     }
-  }, [identity, load]);
+  }, [identity, load, queryClient]);
 
   // Load, and spin straight away only when sent here to spin.
   useEffect(() => {
@@ -174,7 +178,7 @@ export default function RevealPage() {
           {!canSpin && phase !== 'spinning' && phase !== 'flipping' && you && (
             <p className="rule-edit-hint reveal-hint">{you.check.message}</p>
           )}
-          <Link className="unlock-later tap-btn" to="/achievements">
+          <Link className="unlock-later tap-btn" to="/revealed">
             SEE ALL YOUR REVEALS
           </Link>
         </div>

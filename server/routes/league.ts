@@ -497,14 +497,31 @@ function revealsReadyFor(state: LeagueDynamicState, viewer: Viewer): number {
   return revealsReady(left, hiddenCount(hiddenKeepers(viewer.owner, OWNERS, state.keepers, reveals)));
 }
 
+/**
+ * The keepers this owner has revealed, team by team, as they stand now. A
+ * revealed player the team has since dropped is left out.
+ */
+function revealedKeepersFor(state: LeagueDynamicState, owner: string): Record<string, KeeperSelection[]> {
+  const shown = ledgerOf(state.achievements).reveals[owner] ?? [];
+  const out: Record<string, KeeperSelection[]> = {};
+  for (const target of new Set(shown.map((r) => r.target))) {
+    if (target === owner) continue;
+    const keys = new Set(shown.filter((r) => r.target === target).map((r) => r.playerKey));
+    const kept = (state.keepers[target] ?? []).filter((k) => keys.has(k.playerKey));
+    if (kept.length > 0) out[target] = kept;
+  }
+  return out;
+}
+
 function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer: Viewer) {
   const meta = stateMeta(result.state, viewer);
   let keepers = result.state.keepers;
   if (!meta.revealed && !seesAllKeepers(result.state, viewer.isCommissioner)) {
-    keepers =
-      viewer.owner && result.state.keepers[viewer.owner]
-        ? { [viewer.owner]: result.state.keepers[viewer.owner] }
-        : {};
+    // Your own keepers, plus only the ones you have revealed with achievements.
+    keepers = viewer.owner ? revealedKeepersFor(result.state, viewer.owner) : {};
+    if (viewer.owner && result.state.keepers[viewer.owner]) {
+      keepers[viewer.owner] = result.state.keepers[viewer.owner];
+    }
   }
   // Pending offers are between two members. Accepted trades are league news,
   // so the ledger itself is never redacted.

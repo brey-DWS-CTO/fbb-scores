@@ -88,8 +88,7 @@ export default function AchievementsPage() {
 
   const you = data?.you;
   const earnedTotal = you ? ACHIEVEMENTS.filter((a) => you.earned[a.id]).length : 0;
-  // Newest first, so a fresh reveal lands on top.
-  const teams = you ? [...you.teams].sort((a, b) => b.lastAt.localeCompare(a.lastAt)) : [];
+  const seenCount = you ? you.teams.reduce((n, t) => n + t.shown.length, 0) : 0;
 
   return (
     <main className="rules-page achieve-page">
@@ -127,25 +126,10 @@ export default function AchievementsPage() {
               <p className="rule-edit-hint">{you.check.message}</p>
             )}
 
-            {teams.length > 0 && (
-              <ul className="achieve-seen">
-                {teams.map((team) => {
-                  return (
-                    <li key={team.target} className="achieve-seen-card">
-                      <span className="achieve-seen-team">
-                        {team.target.toUpperCase()} KEEPS · {team.shown.length} OF {Math.max(team.keeping, team.shown.length)} SHOWN
-                      </span>
-                      {team.shown.map((s) =>
-                        s.playerName ? (
-                          <span key={s.playerKey} className="achieve-seen-names">{s.playerName}</span>
-                        ) : (
-                          <span key={s.playerKey} className="achieve-seen-names achieve-muted">A player they have since dropped</span>
-                        ),
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+            {seenCount > 0 && (
+              <Link className="achieve-seen-link" to="/revealed">
+                {seenCount} {seenCount === 1 ? 'KEEPER' : 'KEEPERS'} REVEALED · SEE THEM
+              </Link>
             )}
           </section>
 

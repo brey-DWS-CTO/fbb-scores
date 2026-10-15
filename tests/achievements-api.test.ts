@@ -211,15 +211,20 @@ test('a reveal shows one keeper, once, and only to the owner who spent it', asyn
   // Spent, so no second look.
   assert.equal((await reveal('Joel')).status, 409);
 
-  // The poll payload never carries the ledger, and Amy's keepers stay hidden there.
+  // The board gets the one revealed keeper, never the other, and never the ledger.
+  const shownKey = body.revealed?.playerKey;
   const state = (await request('/api/league/state', { headers: auth('Joel') })).body as {
-    state: Record<string, unknown> & { keepers: Record<string, unknown> };
+    state: Record<string, unknown> & { keepers: Record<string, Array<{ playerKey: string }>> };
   };
   assert.equal(state.state.achievements, undefined);
-  assert.equal(state.state.keepers.Amy, undefined);
+  assert.deepEqual(state.state.keepers.Amy.map((k) => k.playerKey), [shownKey]);
 
-  // Nobody else sees Joel's reveal.
+  // Nobody else sees Joel's reveal, on the page or the board.
   assert.equal((await achievements('Ryan')).you.teams.length, 0);
+  const ryan = (await request('/api/league/state', { headers: auth('Ryan') })).body as {
+    state: { keepers: Record<string, unknown> };
+  };
+  assert.equal(ryan.state.keepers.Amy, undefined);
 });
 
 test('a whole-team reveal from the first cut gives the reveal back', async () => {

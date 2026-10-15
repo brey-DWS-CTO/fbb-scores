@@ -69,6 +69,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     primaryUntilKeepersPublic: true,
     tabs: [
       { to: '/achievements', label: 'ACHIEVEMENTS' },
+      { to: '/revealed', label: 'REVEALED' },
       { to: '/props', label: 'PROP BETS' },
     ],
   },

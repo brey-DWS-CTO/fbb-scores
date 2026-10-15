@@ -187,12 +187,12 @@ function MockDraftScreen() {
   }, [ownCandidates, tryKeepers, tryPicks]);
 
   const now = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [], useEntered, guessInstead }),
-    [dataset, viewer, state, scenario, proposals, useEntered, guessInstead],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [], useEntered, guessInstead, keeperCounts: meta?.keeperStatus }),
+    [dataset, viewer, state, scenario, proposals, useEntered, guessInstead, meta?.keeperStatus],
   );
   const whatIf = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead }),
-    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead, keeperCounts: meta?.keeperStatus }),
+    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead, meta?.keeperStatus],
   );
 
   // Picks a switched-on trade moves: traded only if that offer goes through.

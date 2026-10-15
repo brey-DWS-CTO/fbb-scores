@@ -29,6 +29,7 @@ import MockResultPage from './components/league/MockResultPage.js'
 import AchievementsPage from './components/league/AchievementsPage.js'
 import AchievementToast from './components/league/AchievementToast.js'
 import RevealPage from './components/league/RevealPage.js'
+import RevealedPage from './components/league/RevealedPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
 
 function App() {
@@ -84,6 +85,7 @@ function App() {
         <Route path="/dues" element={<DuesPage />} />
         <Route path="/achievements" element={<AchievementsPage />} />
         <Route path="/achievements/reveal" element={<RevealPage />} />
+        <Route path="/revealed" element={<RevealedPage />} />
         <Route path="/props" element={<PropBetsPage />} />
         <Route path="/rules" element={<RulesPage />} />
         <Route path="/rules/paper" element={<PaperPage />} />

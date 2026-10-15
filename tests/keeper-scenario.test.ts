@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { LeagueDynamicState } from '../src/lib/keeper/types.ts';
 import {
+  knownThenGuess,
+  partlyKnown,
   projectedOwners,
   projectedPlayerKeys,
   scenarioWithProjectedKeepers,
@@ -73,4 +75,30 @@ test('lists the owners with a projection saved, skipping empty ones', () => {
 
   assert.deepEqual([...projectedOwners(scenario)].sort(), ['Amy', 'Joel']);
   assert.deepEqual([...projectedOwners({})], []);
+});
+
+// ─── Revealed keepers beat guesses ─────────────────────────────────────────
+
+const sel = (playerKey: string) => ({ playerKey, playerName: playerKey });
+
+test('a revealed keeper stands; the guess fills only the hidden slot', () => {
+  const merged = knownThenGuess([sel('jokic')], [sel('curry'), sel('jokic')], 2);
+  assert.deepEqual(merged.map((k) => k.playerKey), ['jokic', 'curry']);
+});
+
+test('a team keeping one, already revealed, takes nothing from the guess', () => {
+  assert.deepEqual(knownThenGuess([sel('jokic')], [sel('curry')], 1).map((k) => k.playerKey), ['jokic']);
+});
+
+test('without a count, the guess tops up to two', () => {
+  assert.deepEqual(knownThenGuess([sel('jokic')], [sel('curry'), sel('luka')], undefined).map((k) => k.playerKey), ['jokic', 'curry']);
+});
+
+test('the board overlay keeps revealed keepers over the guess', () => {
+  const state = { keepers: { Amy: [sel('jokic')] } } as unknown as Parameters<typeof stateWithKeeperScenario>[0];
+  const out = stateWithKeeperScenario(state, { Amy: [sel('curry'), sel('luka')], Kyle: [sel('tatum')] }, { Amy: 2, Kyle: 1 });
+  assert.deepEqual(out.keepers.Amy.map((k) => k.playerKey), ['jokic', 'curry']);
+  assert.deepEqual(out.keepers.Kyle.map((k) => k.playerKey), ['tatum'], 'a team with nothing revealed is all guess');
+  assert.equal(partlyKnown([sel('jokic')], 2), true);
+  assert.equal(partlyKnown([sel('jokic')], 1), false);
 });

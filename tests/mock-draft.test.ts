@@ -157,6 +157,30 @@ test('a scenario guess fills the slot and is marked assumed, and the reveal turn
   assert.equal(revealed.assumedOwners.length, 0);
 });
 
+test('a keeper revealed by achievement stands; the guess fills only the hidden slot', () => {
+  // Brey's state holds one of Dustin's two keepers: the one he revealed.
+  const real = state({ keepers: { Dustin: [select('J. Tatum')] } });
+  const sets = keepersForMock(dataset, {
+    viewer: 'Brey',
+    state: real,
+    scenario: { Dustin: [select('J. Brown'), select('J. Tatum')] },
+    useEntered: true,
+    keeperCounts: { Dustin: 2 },
+  });
+  assert.deepEqual(sets.keepers.Dustin.map((k) => k.playerName), ['J. Tatum', 'J. Brown']);
+  assert.equal(sets.status.Dustin, 'assumed', 'still half a guess');
+
+  const whole = keepersForMock(dataset, {
+    viewer: 'Brey',
+    state: real,
+    scenario: { Dustin: [select('J. Brown')] },
+    useEntered: true,
+    keeperCounts: { Dustin: 1 },
+  });
+  assert.deepEqual(whole.keepers.Dustin.map((k) => k.playerName), ['J. Tatum']);
+  assert.equal(whole.status.Dustin, 'known', 'every keeper revealed');
+});
+
 test('the viewer own scenario entry is a what-if and beats their real selection', () => {
   const real = state({ keepers: { Brey: [select('C. Cunningham')] } });
   const noDeal = keepersForMock(dataset, { viewer: 'Brey', state: real, scenario: {} });
