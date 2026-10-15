@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import { deleteMockResult, fetchMockResults, fetchMockStats, fetchPickTrades, saveMockResult } from '../../lib/league/api.js';
+import { deleteMockResult, fetchMockResults, fetchMockStats, fetchMockTrades, fetchPickTrades, saveMockResult } from '../../lib/league/api.js';
+import { isMockTradeId, mockTradeProposal } from '../../lib/league/mockTrades.js';
 import type { SavedBoard } from '../../lib/league/mockBoard.js';
 import SavedMockBoard from './SavedMockBoard.js';
 import { gradeSummary, mockResultId } from '../../lib/league/mockGrade.js';
@@ -153,8 +154,20 @@ function MockDraftScreen() {
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
+  // Mock trades from the trade page join your real offers as switches.
+  const mockTradesQuery = useQuery({
+    queryKey: ['mock-trades', viewer ?? 'anon'],
+    queryFn: () => fetchMockTrades(identity as NonNullable<typeof identity>),
+    enabled: signedIn,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+  });
   const fetchedProposals = tradesQuery.data?.proposals;
-  const proposals = useMemo((): PickTradeProposal[] => fetchedProposals ?? [], [fetchedProposals]);
+  const fetchedMocks = mockTradesQuery.data;
+  const proposals = useMemo(
+    (): PickTradeProposal[] => [...(fetchedProposals ?? []), ...(fetchedMocks ?? []).map(mockTradeProposal)],
+    [fetchedProposals, fetchedMocks],
+  );
   const scenario = scenarioQuery.scenario;
 
   const values = useMemo(
@@ -220,7 +233,7 @@ function MockDraftScreen() {
   // A saved draft is replayed pick by pick on the board these build. Replaying
   // on half the data drops picks that no longer fit, so wait for all of it.
   const loading = draftData.isLoading || draftData.playerPoolQuery.isLoading || projectionsLoading
-    || tradesQuery.isLoading || scenarioQuery.isLoading;
+    || tradesQuery.isLoading || mockTradesQuery.isLoading || scenarioQuery.isLoading;
 
   // A finished draft the board has moved under (a keeper or a trade since)
   // would reopen half done. Start a new one; the old one is in Past mocks.
@@ -340,7 +353,7 @@ function MockDraftScreen() {
           <div className="hub-heading mock-sub">PENDING TRADES</div>
           {switchable.length === 0 && (
             <div className="mock-note">
-              No pending offer of yours to try. <Link to="/trades">Send one</Link> and it shows up here as a switch.
+              No pending offer or mock trade of yours to try. On the <Link to="/trades">trade page</Link>, send one or tap SAVE AS MOCK and it shows up here as a switch.
             </div>
           )}
           <ul className="mock-switches">
@@ -358,6 +371,7 @@ function MockDraftScreen() {
                       onChange={() => toggleTrade(proposal.id)}
                     />
                     <span>
+                      {isMockTradeId(proposal.id) && <span className="mock-tag mock-tag-mock">MOCK</span>}{' '}
                       <strong>{proposal.proposer} to {proposal.recipient}:</strong> {describeTrade(proposal, dataset)}
                       {blockedBy && !on && blocker && (
                         <small> Moves a pick the {blocker.proposer} to {blocker.recipient} offer already moves. Only one can be on.</small>
