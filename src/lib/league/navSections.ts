@@ -7,7 +7,7 @@
  * Pure. No server, no browser.
  */
 
-export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield';
+export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'trophy';
 
 export interface SectionTab {
   to: string;
@@ -16,11 +16,13 @@ export interface SectionTab {
 }
 
 export interface NavSection {
-  id: 'keepers' | 'draft' | 'trades' | 'league' | 'rules' | 'commish';
+  id: 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
   label: string;
   icon: SectionIcon;
   /** On the phone's bottom bar; the rest sit behind MORE. */
   primary?: boolean;
+  /** On the bottom bar only until keepers go public, then behind MORE. */
+  primaryUntilKeepersPublic?: boolean;
   commishOnly?: boolean;
   /**
    * Where the section opens. Without one, its first tab. A home that is not a
@@ -51,15 +53,23 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: 'LEAGUE',
     icon: 'home',
     primary: true,
-    // Achievements lead the tabs, but tapping LEAGUE still opens League HQ.
-    home: '/league',
     tabs: [
-      { to: '/achievements', label: 'ACHIEVEMENTS' },
       { to: '/league', label: 'LEAGUE HQ' },
-      { to: '/props', label: 'PROP BETS' },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
       { to: '/history', label: 'HISTORY' },
+    ],
+  },
+  {
+    // The pre-draft side games. Reveals mean nothing once keepers are public,
+    // so on draft day it steps off the phone bar and gives the room back.
+    id: 'vault',
+    label: 'VAULT',
+    icon: 'trophy',
+    primaryUntilKeepersPublic: true,
+    tabs: [
+      { to: '/achievements', label: 'ACHIEVEMENTS' },
+      { to: '/props', label: 'PROP BETS' },
     ],
   },
   {
@@ -91,10 +101,14 @@ export function onPath(pathname: string, to: string): boolean {
 }
 
 /** The sections a viewer may see, with only the tabs they may see. */
-export function visibleSections(isCommissioner: boolean): NavSection[] {
+export function visibleSections(isCommissioner: boolean, keepersPublic = false): NavSection[] {
   return NAV_SECTIONS
     .filter((section) => !section.commishOnly || isCommissioner)
-    .map((section) => ({ ...section, tabs: section.tabs.filter((tab) => !tab.commishOnly || isCommissioner) }));
+    .map((section) => ({
+      ...section,
+      primary: section.primary === true || (section.primaryUntilKeepersPublic === true && !keepersPublic),
+      tabs: section.tabs.filter((tab) => !tab.commishOnly || isCommissioner),
+    }));
 }
 
 /** The section a page belongs to, or null for pages outside the nav. */

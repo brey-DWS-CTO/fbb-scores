@@ -475,7 +475,7 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
   };
 }
 
-/** Keeper reveals this viewer could spend now. Drives the LEAGUE badge. */
+/** Keeper reveals this viewer could spend now. Drives the VAULT badge. */
 function revealsReadyFor(state: LeagueDynamicState, viewer: Viewer): number {
   if (!viewer.owner || viewer.isCommissioner || state.keepersRevealed === true) return 0;
   const ledger = ledgerOf(state.achievements);

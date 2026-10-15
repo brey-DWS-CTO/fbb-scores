@@ -122,10 +122,13 @@ export default function AchievementsPage() {
         <>
           <section className="panel achieve-reveal">
             <span className="hub-heading achieve-title">YOUR REVEALS</span>
-            <div className="achieve-ready">
-              <span className="achieve-ready-count">{you.left}</span>
-              <span className="achieve-ready-label">{you.left === 1 ? 'REVEAL READY' : 'REVEALS READY'}</span>
-            </div>
+            {/* A count nobody can spend is noise: the commish sees every keeper, and public keepers need no reveal. */}
+            {you.check.reason !== 'commish' && you.check.reason !== 'public' && (
+              <div className="achieve-ready">
+                <span className="achieve-ready-count">{you.left}</span>
+                <span className="achieve-ready-label">{you.left === 1 ? 'REVEAL READY' : 'REVEALS READY'}</span>
+              </div>
+            )}
             {you.check.ok ? (
               <button type="button" className="rule-edit-save tap-btn achieve-reveal-btn" disabled={busy} onClick={reveal}>
                 <NavIcon name="unlocked" size={16} className="icon-in-heading" />

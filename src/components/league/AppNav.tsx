@@ -49,7 +49,7 @@ export default function AppNav() {
 
   // One list drives both bars. `primary` sections sit on the phone's bottom
   // bar; the rest live behind MORE. Desktop shows every section.
-  const sections = visibleSections(identity?.isCommissioner === true);
+  const sections = visibleSections(identity?.isCommissioner === true, meta?.revealed === true);
   const current = sectionFor(location.pathname, sections);
   const primary = sections.filter((section) => section.primary);
   const secondary = sections.filter((section) => !section.primary);
@@ -105,7 +105,7 @@ export default function AppNav() {
                     {pendingTrades}
                   </span>
                 )}
-                {t.id === 'league' && revealsReady > 0 && (
+                {t.id === 'vault' && revealsReady > 0 && (
                   <span className="nav-pill" aria-label={`${revealsReady} keeper reveals ready`}>
                     {revealsReady}
                   </span>
@@ -130,7 +130,7 @@ export default function AppNav() {
             <span className="bottom-nav-icon" aria-hidden="true">
               <NavIcon name={t.icon} />
               {t.id === 'trades' && <NavBadge count={pendingTrades} label="offers waiting" />}
-              {t.id === 'league' && <NavBadge count={revealsReady} label="keeper reveals ready" />}
+              {t.id === 'vault' && <NavBadge count={revealsReady} label="keeper reveals ready" />}
             </span>
             <span className="hub-heading bottom-nav-label">{t.label}</span>
           </NavLink>

@@ -314,7 +314,7 @@ test('PAID UP waits for the collector to confirm', async () => {
   assert.ok((await achievements('Amy')).you.earned.dues);
 });
 
-test('the LEAGUE badge counts reveals you could spend now, for the viewer only', async () => {
+test('the VAULT badge counts reveals you could spend now, for the viewer only', async () => {
   await saveMock('Derek', 'mock-d-1', 2);
   await store.mutateState((draft) => {
     draft.keepers = {

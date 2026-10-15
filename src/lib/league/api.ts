@@ -54,7 +54,7 @@ import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
   pendingTrades?: number;
-  /** Keeper reveals this viewer has earned and not spent. Drives the LEAGUE badge. */
+  /** Keeper reveals this viewer has earned and not spent. Drives the VAULT badge. */
   revealsReady?: number;
   draftAt: string;
   revealed: boolean;
