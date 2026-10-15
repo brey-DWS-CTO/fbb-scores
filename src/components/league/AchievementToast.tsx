@@ -7,9 +7,7 @@ import { useIdentity } from '../../hooks/useLeague.js';
 import { fetchAchievementNews, markAchievementsSeen, sandboxActive } from '../../lib/league/api.js';
 import { ACHIEVEMENTS, type AchievementId } from '../../lib/league/achievements.js';
 
-/** Seconds before the toast carries you to the reveal on its own. */
-const AUTO_REVEAL_SECONDS = 4;
-/** Seconds before a toast with nothing to reveal tidies itself away. */
+/** Seconds before a toast with nothing to reveal tidies itself away. One with a reveal waits for a tap. */
 const AUTO_CLOSE_SECONDS = 8;
 /** How often to look while the page sits open. Every change you make also looks. */
 const POLL_MS = 60_000;
@@ -43,8 +41,8 @@ interface Shown {
 }
 
 /**
- * The big "ACHIEVEMENT UNLOCKED" moment. Pops over whatever page you are on,
- * then counts down and takes you to spin for a keeper.
+ * The big "ACHIEVEMENT UNLOCKED" moment. Pops over whatever page you are on
+ * and waits for a tap to go spin for a keeper.
  */
 export default function AchievementToast() {
   const { identity } = useIdentity();
@@ -65,7 +63,7 @@ export default function AchievementToast() {
       const news = await fetchAchievementNews(identity);
       if (news.fresh.length === 0) return;
       setShown({ ids: news.fresh, left: news.left, canReveal: news.canReveal });
-      setCount(news.canReveal ? AUTO_REVEAL_SECONDS : AUTO_CLOSE_SECONDS);
+      setCount(AUTO_CLOSE_SECONDS);
       // Seen the moment it shows, so a refresh or a second phone does not repeat it.
       await markAchievementsSeen(identity, news.fresh);
     } catch {
@@ -103,17 +101,16 @@ export default function AchievementToast() {
     navigate('/achievements/reveal', { state: { spin: true } });
   }, [navigate]);
 
-  // The countdown: to the reveal when there is one, else to closing.
+  // A toast with nothing to spend closes itself. One with a reveal waits: the spin is theirs to start.
   useEffect(() => {
-    if (!shown) return;
+    if (!shown || shown.canReveal) return;
     if (count <= 0) {
-      if (shown.canReveal) goReveal();
-      else close();
+      close();
       return;
     }
     const id = window.setTimeout(() => setCount((n) => n - 1), 1000);
     return () => window.clearTimeout(id);
-  }, [shown, count, goReveal, close]);
+  }, [shown, count, close]);
 
   if (!shown) return null;
   const many = shown.ids.length > 1;
@@ -141,7 +138,7 @@ export default function AchievementToast() {
               +{reveals} KEEPER {reveals === 1 ? 'REVEAL' : 'REVEALS'}
             </p>
             <button type="button" className="unlock-go tap-btn" onClick={goReveal}>
-              SPIN FOR A KEEPER · {count}
+              SPIN FOR A KEEPER
             </button>
             <button type="button" className="unlock-later tap-btn" onClick={close}>
               LATER

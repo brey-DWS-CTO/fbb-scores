@@ -5024,6 +5024,7 @@ html.theme-light {
   animation: confetti-fall 2.8s cubic-bezier(0.3, 0.6, 0.5, 1) forwards;
 }
 .confetti-wide { width: 11px; height: 7px; }
+.confetti-ball { width: 22px; height: 22px; border-radius: 50%; opacity: 1; }
 
 .reveal-page { display: flex; justify-content: center; }
 .reveal-stage {
