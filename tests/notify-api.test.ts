@@ -4,6 +4,7 @@ import type { Server } from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
 import test, { after, before, beforeEach } from 'node:test';
+import { ANNOUNCEMENTS } from '../src/lib/league/announcements.ts';
 import { pathToFileURL } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import type { LeagueDynamicState, PickRef, PickTradeProposal } from '../src/lib/keeper/types.ts';
@@ -44,6 +45,12 @@ let baseUrl = '';
 let mailLog: string[] = [];
 
 const PREFIX = '[notify] no mail key, would send to ';
+
+/** Mail from the deadline reminders only, leaving out one-time announcements. */
+function reminderMails(): Array<{ to: string; subject: string }> {
+  const announced = new Set(ANNOUNCEMENTS.map((a) => a.subject));
+  return mails().filter((m) => !announced.has(m.subject));
+}
 
 function mails(): Array<{ to: string; subject: string }> {
   return mailLog
@@ -334,12 +341,14 @@ test('the right secret runs the clock, and each reminder goes out once', async (
   process.env.CRON_SECRET = 'open-sesame';
   const first = await tick({ authorization: 'Bearer open-sesame' });
   assert.equal(first.status, 200);
-  const run = asRecord(first.body) as { due: number; sent: number };
+  const run = asRecord(first.body) as { due: number; sent: number; announced: number };
   // Three owners have addresses: the week warning and the keeper last call
   // for each of them.
   assert.equal(run.due, 6);
   assert.equal(run.sent, 6);
-  const firstBatch = mails();
+  // A one-time announcement may also be open on the real clock. It is not a
+  // reminder, so leave it out of the reminder count.
+  const firstBatch = reminderMails();
   assert.equal(firstBatch.length, 6);
   assert.equal(
     new Set(firstBatch.map((row) => row.to)).size,
@@ -350,9 +359,10 @@ test('the right secret runs the clock, and each reminder goes out once', async (
   mailLog = [];
   const again = await tick({ authorization: 'Bearer open-sesame' });
   assert.equal(again.status, 200);
-  const second = asRecord(again.body) as { due: number; sent: number };
+  const second = asRecord(again.body) as { due: number; sent: number; announced: number };
   assert.equal(second.due, 0, 'the store remembers what already went out');
   assert.equal(second.sent, 0);
+  assert.equal(second.announced, 0, 'an announcement goes out once too');
   assert.equal(mails().length, 0, 'ten people must not read the same warning twice');
 });
 
