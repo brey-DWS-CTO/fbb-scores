@@ -30,8 +30,8 @@ export default function MockBoardGrid({
   owners: readonly string[];
   rounds: readonly (readonly BoardCellView[])[];
   person: string;
-  /** Picks that move only if a switched-on pending trade goes through. */
-  projectedTrades?: ReadonlySet<number>;
+  /** Picks that move only if a switched-on pending trade goes through, to who holds them now. */
+  projectedTrades?: ReadonlyMap<number, string>;
   onPlayer?: (playerKey: string) => void;
 }) {
   return (
@@ -51,7 +51,8 @@ export default function MockBoardGrid({
                 const theme = cell.playerName ? positionTheme([...cell.positions]) : null;
                 const kept = cell.how === 'keeper';
                 const projected = kept && cell.keeperProjected;
-                const tradeProjected = projectedTrades?.has(cell.overall) === true;
+                const holderNow = projectedTrades?.get(cell.overall) ?? null;
+                const tradeProjected = holderNow !== null;
                 return (
                   <td
                     key={cell.overall}
@@ -69,7 +70,7 @@ export default function MockBoardGrid({
                         <span
                           className={`board-traded-tag${tradeProjected ? ' is-projected' : ''}`}
                           title={tradeProjected
-                            ? `${cell.owner} holds ${cell.via}'s pick only if the trade you switched on goes through`
+                            ? `${holderNow}'s now. ${cell.owner}'s if the trade you switched on goes through`
                             : `${cell.owner} holds ${cell.via}'s pick`}
                         >→ {cell.owner.toUpperCase()}</span>
                       )}

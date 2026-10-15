@@ -209,11 +209,12 @@ function MockDraftScreen() {
   );
 
   // Picks a switched-on trade moves: traded only if that offer goes through.
-  const projectedTrades = useMemo((): ReadonlySet<number> => {
+  // Each pick a switched-on trade moves, and who holds it now, before that trade.
+  const projectedTrades = useMemo((): ReadonlyMap<number, string> => {
     const before = new Map(now.board.slots.map((slot) => [slot.pick.overall, slot.pick.currentOwner]));
-    return new Set(whatIf.board.slots
+    return new Map(whatIf.board.slots
       .filter((slot) => before.get(slot.pick.overall) !== slot.pick.currentOwner)
-      .map((slot) => slot.pick.overall));
+      .map((slot) => [slot.pick.overall, before.get(slot.pick.overall) ?? slot.pick.currentOwner]));
   }, [now.board, whatIf.board]);
 
   const owners = useMemo(() => dataset.teams.map((team) => team.owner), [dataset.teams]);
