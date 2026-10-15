@@ -351,6 +351,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   const currentSlot = currentOverall !== null ? slots.find((slot) => slot.pick.overall === currentOverall) ?? null : null;
   const untilTurn = currentOverall !== null ? picksUntilTurn(slots, currentOverall, person) : null;
   const myNext = slots.find((slot) => slot.pick.currentOwner === person && slot.pick.overall >= (currentOverall ?? 1) && !slot.keeper && !slot.made) ?? null;
+  // On your pick: the one after it, so you can tell whether a player will wait.
+  const myAfter = slots.find((slot) => slot.pick.currentOwner === person && slot.pick.overall > (currentOverall ?? 1) && !slot.keeper && !slot.made) ?? null;
   const upcoming = upcomingPicks(slots, currentOverall ?? 1, person, 30);
 
   // The pool as the screen sees it: who is still there, plus the taken when asked.
@@ -658,7 +660,10 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                 </div>
               ) : myTurn ? (
                 <div className="room-turn is-mine">
-                  YOUR PICK
+                  <span>
+                    YOUR PICK
+                    {myAfter && <small className="room-turn-next"> · next at {myAfter.pick.round}.{myAfter.pick.slot}</small>}
+                  </span>
                   <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>
                   {menu}
                 </div>
