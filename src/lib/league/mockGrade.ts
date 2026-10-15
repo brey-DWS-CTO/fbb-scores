@@ -16,6 +16,7 @@
 import { fillsSlot, type Position, type RosterSettings, type StarterSlot } from './draftValue.js';
 import { ROSTER_ORDER } from './draftRoom.js';
 import type { MockMode, MockPick } from './mockDraft.js';
+import { parseSavedBoard, type SavedBoard } from './mockBoard.js';
 
 /** What grading needs to know about one player. */
 export interface GradePlayer {
@@ -191,6 +192,8 @@ export interface MockResultRecord {
   seed: number;
   mode: MockMode;
   grade: MockGrade;
+  /** Every team's picks. Mocks finished before boards were kept have none. */
+  board?: SavedBoard;
 }
 
 /** Commissioner keeps every mock; everyone else keeps their latest ten. */
@@ -219,6 +222,8 @@ export function parseMockResult(owner: string, body: unknown): MockResultRecord 
     throw new Error('The result needs its grade.');
   }
   if (JSON.stringify(grade).length > 20_000) throw new Error('That result is too large.');
+  // A board that does not check out is left off; the grade still saves.
+  const board = value.board === undefined ? null : parseSavedBoard(value.board);
   return {
     id: value.id,
     owner,
@@ -226,5 +231,6 @@ export function parseMockResult(owner: string, body: unknown): MockResultRecord 
     seed: value.seed,
     mode: value.mode,
     grade,
+    ...(board ? { board } : {}),
   };
 }

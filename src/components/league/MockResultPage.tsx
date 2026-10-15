@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchSharedMockResult } from '../../lib/league/api.js';
 import MockGradeCard from './MockGradeCard.js';
+import SavedMockBoard from './SavedMockBoard.js';
 import ShareButton from './ShareButton.js';
 import NavIcon from './NavIcon.js';
 
@@ -48,6 +49,7 @@ export default function MockResultPage() {
             </small>
           </div>
           <MockGradeCard grade={record.grade} person={record.owner} />
+          <SavedMockBoard board={record.board} person={record.owner} />
         </section>
       )}
       <div className="mock-note" style={{ marginTop: 14 }}>

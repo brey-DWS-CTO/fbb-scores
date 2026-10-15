@@ -135,3 +135,34 @@ test('mock results: your own only, saved once, members keep ten, the commish kee
   const bad = await request('/api/league/mock-results', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ ...result(1), mode: 'wild' }) });
   assert.equal(bad.status, 400);
 });
+
+test('mock stats count every finished mock, trimmed or not, and show the best grade to everyone', async () => {
+  // Joel saved twelve above, keeps nine on file now, and still counts twelve.
+  const read = await request('/api/league/mock-stats', { headers: auth('Joel') });
+  assert.equal(read.status, 200);
+  const stats = read.body.stats as Array<{ owner: string; mocks: number; bestGrade: string | null }>;
+  const joel = stats.find((row) => row.owner === 'Joel')!;
+  assert.equal(joel.mocks, 12);
+  assert.equal(joel.bestGrade, 'B');
+  assert.equal(stats.find((row) => row.owner === commissioner)!.mocks, 12);
+  assert.ok(stats.filter((row) => row.mocks === 0).every((row) => row.bestGrade === null));
+  assert.equal((await request('/api/league/mock-stats')).status, 401);
+});
+
+test('a finished mock keeps its whole board, and a bad board is left off', async () => {
+  const board = {
+    owners: ['Joel', 'Ryan'],
+    rounds: [[
+      { overall: 1, round: 1, slot: 1, owner: 'Joel', via: null, playerKey: 'p1', playerName: 'N. Jokic', positions: ['C'], how: 'keeper', keeperProjected: false, keeperEarly: null },
+      { overall: 2, round: 1, slot: 2, owner: 'Ryan', via: 'Joel', playerKey: 'p2', playerName: 'L. Doncic', positions: ['PG'], how: 'pick', keeperProjected: false, keeperEarly: null },
+    ]],
+  };
+  const saved = await request('/api/league/mock-results', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ ...result(40), board }) });
+  assert.equal(saved.status, 200);
+  const shared = await request('/api/league/mock-results/mock-test40-40');
+  assert.deepEqual((shared.body.result as { board: unknown }).board, board);
+
+  const junk = await request('/api/league/mock-results', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ ...result(41), board: { owners: 'nope' } }) });
+  assert.equal(junk.status, 200, 'the grade still saves');
+  assert.equal((await request('/api/league/mock-results/mock-test41-41')).body.result.board, undefined);
+});

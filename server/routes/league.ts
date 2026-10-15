@@ -126,11 +126,13 @@ import {
   listMockResults,
   findMockResult,
   saveMockResult,
+  listMockFinishes,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
+import { mockStats } from '../../src/lib/league/mockStats.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import {
   DUES_ACTIONS,
@@ -759,6 +761,12 @@ router.get('/nba-watch', requireAuth, requireCommissioner, async (req, res) => {
 // Each signed-in member keeps their own finished, graded mocks. The owner
 // comes from the sign-in, never the body. The commissioner keeps every one;
 // everyone else keeps their latest ten.
+
+/** GET /api/league/mock-stats — every owner's finished mocks and best grade. Everyone sees it. */
+router.get('/mock-stats', requireAuth, async (_req, res) => {
+  const finishes = await listMockFinishes(leagueDataset.season);
+  res.json({ stats: mockStats(OWNERS, finishes) });
+});
 
 /** GET /api/league/mock-results — your saved mocks, newest first. */
 router.get('/mock-results', requireAuth, async (_req, res) => {

@@ -36,6 +36,7 @@ import type { DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js
 import type { PlayerPoolSnapshot } from '../../src/lib/league/playerPool.js';
 import type { RulebookSignature } from '../../src/lib/league/rulebookSignatures.js';
 import { foldProblem, foldedBook } from '../../src/lib/league/rulebookFold.js';
+import type { MockFinish } from '../../src/lib/league/mockStats.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
@@ -146,6 +147,13 @@ export class PlayerPoolAcceptError extends Error {
     super(message);
     this.reason = reason;
   }
+}
+
+/** The rank and room size a saved mock finished with, for the counts. */
+function finishOf(row: MockResultRow): MockFinish | null {
+  const grade = (row.result as { grade?: { rank?: unknown; teams?: unknown } } | null)?.grade;
+  if (typeof grade?.rank !== 'number' || typeof grade?.teams !== 'number') return null;
+  return { owner: row.owner, id: row.id, rank: grade.rank, teams: grade.teams };
 }
 
 /** One finished, graded mock draft. Each owner keeps their own. */
@@ -483,6 +491,8 @@ interface StoreBackend {
   findMockResult(season: number, id: string): Promise<MockResultRow | null>;
   /** Insert unless the same id is already there. Then keep only the newest `keep`, or all when null. */
   saveMockResult(row: MockResultRow, keep: number | null): Promise<void>;
+  /** Every finished mock this season, each owner's saved ones and the never-trimmed log. */
+  listMockFinishes(season: number): Promise<MockFinish[]>;
   deleteMockResult(season: number, owner: string, id: string): Promise<void>;
   listProjectionEdits(season: number): Promise<ProjectionEditRow[]>;
   saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow>;
@@ -790,6 +800,16 @@ class NeonBackend implements StoreBackend {
       reason text not null,
       published_at timestamptz not null,
       published_by text not null
+    )`;
+    // One row per finished mock, never trimmed, so counts outlive the last ten.
+    await this.sql`CREATE TABLE IF NOT EXISTS mock_finishes (
+      season int not null,
+      owner text not null,
+      id text not null,
+      rank int not null,
+      teams int not null,
+      finished_at timestamptz not null,
+      primary key (season, owner, id)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS mock_results (
       season int not null,
@@ -1284,6 +1304,12 @@ class NeonBackend implements StoreBackend {
     await this.sql`INSERT INTO mock_results (season, owner, id, data, created_at)
       VALUES (${row.season}, ${row.owner}, ${row.id}, ${JSON.stringify(row.result)}::jsonb, ${row.createdAt})
       ON CONFLICT (season, owner, id) DO NOTHING`;
+    const finish = finishOf(row);
+    if (finish) {
+      await this.sql`INSERT INTO mock_finishes (season, owner, id, rank, teams, finished_at)
+        VALUES (${row.season}, ${row.owner}, ${row.id}, ${finish.rank}, ${finish.teams}, ${row.createdAt})
+        ON CONFLICT (season, owner, id) DO NOTHING`;
+    }
     if (keep !== null) {
       await this.sql`DELETE FROM mock_results WHERE season = ${row.season} AND owner = ${row.owner}
         AND id NOT IN (
@@ -1291,6 +1317,18 @@ class NeonBackend implements StoreBackend {
           ORDER BY created_at DESC LIMIT ${keep}
         )`;
     }
+  }
+
+  async listMockFinishes(season: number): Promise<MockFinish[]> {
+    await this.ensureInit();
+    // The log, plus whatever saved mocks predate it. The pure count takes each draft once.
+    const rows = (await this.sql`SELECT owner, id, rank, teams FROM mock_finishes WHERE season = ${season}
+      UNION
+      SELECT owner, id, (data->'grade'->>'rank')::int, (data->'grade'->>'teams')::int
+        FROM mock_results WHERE season = ${season} AND data->'grade'->>'rank' IS NOT NULL`) as Array<{
+      owner: string; id: string; rank: number; teams: number;
+    }>;
+    return rows.map((row) => ({ owner: row.owner, id: row.id, rank: Number(row.rank), teams: Number(row.teams) }));
   }
 
   async deleteMockResult(season: number, owner: string, id: string): Promise<void> {
@@ -1799,6 +1837,7 @@ interface FileDoc {
   }>;
   projectionEdits: ProjectionEditRow[];
   mockResults: MockResultRow[];
+  mockFinishes: Array<MockFinish & { season: number }>;
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
@@ -1827,6 +1866,7 @@ function emptyDoc(): FileDoc {
     keeperScenarios: [],
     projectionEdits: [],
     mockResults: [],
+    mockFinishes: [],
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
@@ -1886,6 +1926,7 @@ class FileBackend implements StoreBackend {
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
         projectionEdits: Array.isArray(doc.projectionEdits) ? doc.projectionEdits : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
+        mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
@@ -2251,12 +2292,26 @@ class FileBackend implements StoreBackend {
       const doc = this.readDoc();
       const mine = (entry: MockResultRow) => entry.season === row.season && entry.owner === row.owner;
       if (!doc.mockResults.some((entry) => mine(entry) && entry.id === row.id)) doc.mockResults.push(row);
+      const finish = finishOf(row);
+      if (finish && !doc.mockFinishes.some((entry) => entry.season === row.season && entry.owner === row.owner && entry.id === row.id)) {
+        doc.mockFinishes.push({ season: row.season, ...finish });
+      }
       if (keep !== null) {
         const newest = doc.mockResults.filter(mine).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, keep);
         doc.mockResults = doc.mockResults.filter((entry) => !mine(entry) || newest.includes(entry));
       }
       this.writeDoc(doc);
     });
+  }
+
+  async listMockFinishes(season: number): Promise<MockFinish[]> {
+    await this.ensureInit();
+    const doc = this.readDoc();
+    const saved = doc.mockResults.filter((row) => row.season === season).map(finishOf)
+      .filter((finish): finish is MockFinish => finish !== null);
+    const logged = doc.mockFinishes.filter((row) => row.season === season)
+      .map(({ owner, id, rank, teams }) => ({ owner, id, rank, teams }));
+    return [...logged, ...saved];
   }
 
   async deleteMockResult(season: number, owner: string, id: string): Promise<void> {
@@ -3043,6 +3098,10 @@ export async function findMockResult(season: number, id: string): Promise<MockRe
 
 export async function saveMockResult(row: MockResultRow, keep: number | null): Promise<void> {
   return getBackend().saveMockResult(row, keep);
+}
+
+export async function listMockFinishes(season: number): Promise<MockFinish[]> {
+  return getBackend().listMockFinishes(season);
 }
 
 export async function deleteMockResult(season: number, owner: string, id: string): Promise<void> {
