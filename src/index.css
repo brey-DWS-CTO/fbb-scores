@@ -4395,8 +4395,6 @@ html.theme-light {
 .room-clock .room-share { margin-left: auto; }
 .room-queue-toggle { margin-left: auto; }
 .room-queue-fold { display: none; }
-/* DRAFT and GONE BY NEXT lead the row on a phone and trail it on a wide screen. */
-.room-draft-lead, .room-gone-lead { display: none; }
 .room-name-short { display: none; }
 .room-sort-quick { display: none; }
 .mock-shared .room-grade { margin-top: 10px; }
@@ -4510,7 +4508,6 @@ html.theme-light {
 
   /* DRAFT, GONE and the name pin on the left; the stats slide under them. */
   .room .room-draft-lead, .room .room-gone-lead { display: table-cell; position: sticky; z-index: 3; }
-  .room .room-gone-trail, .room .room-draft-trail { display: none; }
   .room .room-table .room-draft-lead { left: 0; width: 56px; min-width: 56px; padding: 4px; }
   .room .room-table .room-draft-lead .mock-mini-btn { min-height: 32px; padding: 0 6px; font-size: 0.6rem; width: 100%; }
   .room .room-table .room-gone-lead { left: 56px; width: 44px; min-width: 44px; padding: 4px; font-size: 0.72rem; }
@@ -4794,6 +4791,34 @@ html.theme-light {
   .nba-team-table { font-size: 0.7rem; }
   .nba-name-full { display: none; }
   .nba-name-short { display: inline; }
+}
+
+/* ─── LEAGUE HQ activity log ─── */
+.league-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.league-activity li { padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 8px; }
+.league-activity-head { display: flex; align-items: baseline; gap: 8px; color: var(--text-hi); font-size: 0.85rem; }
+.league-activity-head span { margin-left: auto; color: var(--text-dim); font-size: 0.7rem; white-space: nowrap; }
+.league-activity-line { color: var(--text-body); font-size: 0.8rem; margin-top: 2px; }
+
+/* ─── Mock draft, wide screen: the keeper pause gets the clock column's full width ─── */
+@media (min-width: 840px) {
+  .room-turn.is-keeper { flex-wrap: wrap; row-gap: 10px; padding: 12px; }
+  .room-turn.is-keeper > span { flex: 1 1 100%; line-height: 1.45; }
+  .room-turn.is-keeper > .mock-mini-btn { flex: 1 1 auto; margin-left: 0; }
+  .room-turn.is-keeper .room-keeper-odds { margin-top: 6px; font-size: 0.74rem; line-height: 1.45; }
+}
+
+/* ─── Mock draft results list: a traded pick says whose it was; a projected trade is dashed ─── */
+.room-update-owner .board-traded-tag { display: block; margin-top: 2px; font-size: 0.55rem; width: fit-content; margin-left: auto; }
+.board-traded-tag.is-projected { background: transparent; color: var(--neon-yellow); border: 1px dashed var(--neon-yellow); }
+
+/* ─── Mock draft board: a filled cell is always a dark position color, so its words stay light in either theme ─── */
+.room-grid td[style] .room-grid-name { color: #f4f4fb; }
+.room-grid td[style] .room-grid-label { color: rgba(244, 244, 251, 0.72); }
+
+/* ─── Mock draft, phone: with a card tapped, the corner badge says "Up in 3 picks at 7.9" ─── */
+@media (max-width: 839px) {
+  .room.has-picked .room-mini-clock.is-wait { font-size: 0.66rem; letter-spacing: 0.02em; white-space: nowrap; }
 }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
