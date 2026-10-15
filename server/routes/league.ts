@@ -140,6 +140,8 @@ import {
   earnedCount,
   earnedFrom,
   firstGuessToRecord,
+  markSeen,
+  unseenAchievements,
   guessHit,
   guessNear,
   hiddenCount,
@@ -3538,15 +3540,18 @@ router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, 
 // from the league's own records every time, then stamped into the ledger so it
 // sticks. See src/lib/league/achievements.ts.
 
-/** What every owner has done, from the records. */
-async function achievementFacts(state: LeagueDynamicState): Promise<Record<string, OwnerFacts>> {
+/** What owners have done, from the records. Everyone by default; one owner for a quick check. */
+async function achievementFacts(
+  state: LeagueDynamicState,
+  who: readonly string[] = OWNERS,
+): Promise<Record<string, OwnerFacts>> {
   const season = leagueDataset.season;
   const [signatures, polls, dues, finishes, mocks] = await Promise.all([
     listRulebookSignatures(RULEBOOK_SEASON),
     seasonPolls(),
     listDues(DUES_SEASON),
     listMockFinishes(season),
-    Promise.all(OWNERS.map((owner) => listMockResults(season, owner))),
+    Promise.all(who.map((owner) => listMockResults(season, owner))),
   ]);
   // The same counts the MOCKS DONE table shows, from the log that is never trimmed.
   const mockRows = new Map(mockStats(OWNERS, finishes).map((row) => [row.owner, row]));
@@ -3554,7 +3559,7 @@ async function achievementFacts(state: LeagueDynamicState): Promise<Record<strin
   const proposals = proposalsOf(state);
   const props = allProps(state);
   const facts: Record<string, OwnerFacts> = {};
-  OWNERS.forEach((owner, i) => {
+  who.forEach((owner, i) => {
     const saved = mocks[i].map((row) => row.result as Partial<MockResultRecord> | null);
     const visible = visibleProps(props, [owner]);
     const sides = visible.filter((p) => p.takes.some((t) => t.owner === owner)).length;
@@ -3606,13 +3611,13 @@ function keeperGuessScore(state: LeagueDynamicState, ledger: AchievementLedger, 
  * Guesses saved before first-guess tracking shipped count as the first. Copy
  * them into the ledger once, so a later edit cannot replace them.
  */
-async function seedFirstGuesses(state: LeagueDynamicState): Promise<boolean> {
+async function seedFirstGuesses(state: LeagueDynamicState, who: readonly string[] = OWNERS): Promise<boolean> {
   if (state.keepersRevealed === true) return false;
   const ledger = ledgerOf(state.achievements);
-  const scenarios = await Promise.all(OWNERS.map((owner) => getKeeperScenario(state.season, owner)));
+  const scenarios = await Promise.all(who.map((owner) => getKeeperScenario(state.season, owner)));
   const at = new Date().toISOString();
   const missing: Array<{ owner: string; target: string; keys: string[] }> = [];
-  OWNERS.forEach((owner, i) => {
+  who.forEach((owner, i) => {
     for (const [target, sels] of Object.entries(scenarios[i])) {
       if (target === owner || sels.length === 0 || ledger.firstGuesses[owner]?.[target]) continue;
       missing.push({ owner, target, keys: sels.map((s) => s.playerKey) });
@@ -3630,18 +3635,20 @@ async function seedFirstGuesses(state: LeagueDynamicState): Promise<boolean> {
   return true;
 }
 
-/** Stamp anything new for every owner. Writes only when something changed. */
-async function syncAchievements(): Promise<{ state: LeagueDynamicState; facts: Record<string, OwnerFacts> }> {
+/** Stamp anything new, for everyone or just the owners named. Writes only when something changed. */
+async function syncAchievements(
+  who: readonly string[] = OWNERS,
+): Promise<{ state: LeagueDynamicState; facts: Record<string, OwnerFacts> }> {
   let current = await getState();
-  if (await seedFirstGuesses(current.state)) current = await getState();
-  const facts = await achievementFacts(current.state);
+  if (await seedFirstGuesses(current.state, who)) current = await getState();
+  const facts = await achievementFacts(current.state, who);
   const at = new Date().toISOString();
   const before = ledgerOf(current.state.achievements);
-  const changed = OWNERS.some((owner) => stampEarned(before.earned[owner], earnedFrom(facts[owner]), at) !== null);
+  const changed = who.some((owner) => stampEarned(before.earned[owner], earnedFrom(facts[owner]), at) !== null);
   if (!changed) return { state: current.state, facts };
   const result = await mutateState((draft) => {
     const ledger = ledgerOf(draft.achievements);
-    for (const owner of OWNERS) {
+    for (const owner of who) {
       const next = stampEarned(ledger.earned[owner], earnedFrom(facts[owner]), at);
       if (next) ledger.earned[owner] = next;
     }
@@ -3704,6 +3711,41 @@ function achievementsPayload(
 router.get('/achievements', requireAuth, async (_req, res) => {
   const { state, facts } = await syncAchievements();
   res.json(achievementsPayload(state, facts, res.locals.owner as string, res.locals.isCommissioner === true));
+});
+
+/**
+ * GET /api/league/achievements/news — achievements you have earned and not
+ * been shown yet. The app asks after every change you make, so it checks only
+ * you. The commissioner acting as someone gets nothing, so the real member
+ * still sees their own toast.
+ */
+router.get('/achievements/news', requireAuth, async (_req, res) => {
+  const owner = res.locals.owner as string;
+  if (res.locals.actingBy) {
+    res.json({ fresh: [], left: 0, canReveal: false });
+    return;
+  }
+  const { state } = await syncAchievements([owner]);
+  const ledger = ledgerOf(state.achievements);
+  const mine = revealState(state, ledger, owner, res.locals.isCommissioner === true);
+  res.json({ fresh: unseenAchievements(ledger, owner), left: mine.left, canReveal: mine.check.ok });
+});
+
+/** POST /api/league/achievements/seen — the toast for these was shown. */
+router.post('/achievements/seen', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  if (res.locals.actingBy) {
+    res.json({ ok: true });
+    return;
+  }
+  const raw = (req.body as { ids?: unknown } | undefined)?.ids;
+  const ids = Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string').slice(0, 50) : [];
+  await mutateState((draft) => {
+    const ledger = ledgerOf(draft.achievements);
+    ledger.seen[owner] = markSeen(ledger.seen[owner], ids);
+    draft.achievements = ledger;
+  });
+  res.json({ ok: true });
 });
 
 /** POST /api/league/achievements/reveal — spend one reveal on one keeper of a random team. */

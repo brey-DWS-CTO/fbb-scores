@@ -1582,3 +1582,21 @@ export async function removePropBet(c: Credentials, id: string): Promise<PropBet
   });
   return data;
 }
+
+export interface AchievementNews {
+  /** Earned and not yet shown in a toast, in list order. */
+  fresh: AchievementId[];
+  left: number;
+  canReveal: boolean;
+}
+
+/** Anything new since the last toast. Checks only the signed-in member. */
+export async function fetchAchievementNews(c: Credentials): Promise<AchievementNews> {
+  const { data } = await axios.get<AchievementNews>('/api/league/achievements/news', { headers: authHeaders(c) });
+  return data;
+}
+
+/** The toast for these went up; do not show them again. */
+export async function markAchievementsSeen(c: Credentials, ids: AchievementId[]): Promise<void> {
+  await axios.post('/api/league/achievements/seen', { ids }, { headers: authHeaders(c) });
+}

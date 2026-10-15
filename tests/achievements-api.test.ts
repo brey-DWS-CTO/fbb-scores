@@ -126,7 +126,7 @@ beforeEach(async () => {
     draft.draft.picks = {};
     draft.keepers = {};
     draft.keepersRevealed = false;
-    draft.achievements = { earned: {}, reveals: {}, firstGuesses: {} };
+    draft.achievements = { earned: {}, reveals: {}, firstGuesses: {}, seen: {} };
     draft.propBets = [];
   });
   for (const owner of Object.keys(pins)) {
@@ -229,6 +229,7 @@ test('a whole-team reveal from the first cut gives the reveal back', async () =>
       earned: {},
       reveals: { Bryan: [{ target: 'Amy', at: '2026-10-14T00:00:00.000Z' } as never] },
       firstGuesses: {},
+      seen: {},
     };
   });
   assert.equal((await achievements('Bryan')).you.left, 1);
@@ -338,6 +339,36 @@ test('CLOSE CALL: one keeper right on the first guess', async () => {
   const earned = (await achievements('Amy')).you.earned;
   assert.ok(earned['close-call']);
   assert.equal(earned.scout, undefined);
+});
+
+test('news: fresh unlocks show once, then never again', async () => {
+  await saveMock('Derek', 'mock-d-1', 2);
+  const news = async () =>
+    (await request('/api/league/achievements/news', { headers: auth('Derek') })).body as {
+      fresh: string[];
+      left: number;
+      canReveal: boolean;
+    };
+  const first = await news();
+  assert.deepEqual(first.fresh, ['first-mock', 'honor-roll']);
+  assert.equal(first.left, 2);
+
+  const seen = await request('/api/league/achievements/seen', {
+    method: 'POST',
+    headers: auth('Derek'),
+    body: JSON.stringify({ ids: first.fresh }),
+  });
+  assert.equal(seen.status, 200);
+  assert.deepEqual((await news()).fresh, []);
+
+  // A new unlock later shows on its own.
+  assert.equal((await setProp('Derek', { subject: 'Kyle', text: 'trades', line: 1.5 })).status, 200);
+  assert.deepEqual((await news()).fresh, ['prop-bet']);
+});
+
+test('news needs a sign-in', async () => {
+  assert.equal((await request('/api/league/achievements/news')).status, 401);
+  assert.equal((await request('/api/league/achievements/seen', { method: 'POST' })).status, 401);
 });
 
 // ─── Prop bets ─────────────────────────────────────────────────────────────

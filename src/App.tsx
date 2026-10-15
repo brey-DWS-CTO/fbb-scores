@@ -27,6 +27,8 @@ import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
 import AchievementsPage from './components/league/AchievementsPage.js'
+import AchievementToast from './components/league/AchievementToast.js'
+import RevealPage from './components/league/RevealPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
 
 function App() {
@@ -65,6 +67,7 @@ function App() {
         </Link>
       )}
       {!bareMode && <AppNav />}
+      {!bareMode && !sandbox && <AchievementToast />}
       <ActingAsBanner />
       {!bareMode && <SectionTabs />}
       <Routes>
@@ -80,6 +83,7 @@ function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/dues" element={<DuesPage />} />
         <Route path="/achievements" element={<AchievementsPage />} />
+        <Route path="/achievements/reveal" element={<RevealPage />} />
         <Route path="/props" element={<PropBetsPage />} />
         <Route path="/rules" element={<RulesPage />} />
         <Route path="/rules/paper" element={<PaperPage />} />

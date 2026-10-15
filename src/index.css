@@ -4921,6 +4921,198 @@ html.theme-light {
 .mock-stats-table { margin-top: 8px; }
 .mock-stats-table .mock-grade-letter { font-size: 0.85rem; }
 
+/* ─── Achievement unlock toast, keeper reveal reel, confetti ──────────── */
+.unlock-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(3px);
+  animation: unlock-fade 0.2s ease-out;
+}
+.unlock-card {
+  position: relative;
+  z-index: 1002;
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 18px 18px;
+  border: 2px solid var(--neon-yellow);
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 230, 0, 0.18), var(--panel-bg) 60%);
+  box-shadow: 0 0 0 4px rgba(255, 230, 0, 0.12), 0 0 48px rgba(255, 230, 0, 0.35);
+  text-align: center;
+  animation: unlock-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.unlock-burst {
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--neon-yellow);
+  background: repeating-conic-gradient(rgba(255, 230, 0, 0.22) 0 12deg, transparent 12deg 30deg);
+  animation: unlock-rays 6s linear infinite;
+}
+.unlock-burst .nav-icon { animation: unlock-rays 6s linear infinite reverse; filter: drop-shadow(0 0 10px rgba(255, 230, 0, 0.8)); }
+.unlock-heading {
+  margin: 0;
+  color: var(--neon-yellow);
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 14px rgba(255, 230, 0, 0.6);
+}
+.unlock-names { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.unlock-names li { color: var(--text-max); font-size: 1rem; font-weight: 900; letter-spacing: 0.06em; }
+.unlock-names .unlock-more { color: var(--text-dim); font-size: 0.75rem; }
+.unlock-prize {
+  margin: 4px 0 2px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 255, 204, 0.12);
+  border: 1px solid var(--neon-teal);
+  color: var(--neon-teal);
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  animation: unlock-pulse 1.2s ease-in-out infinite;
+}
+.unlock-go, .unlock-later {
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-family: inherit;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+.unlock-go {
+  border: none;
+  background: var(--neon-yellow);
+  color: #111;
+  font-size: 0.95rem;
+  box-shadow: 0 0 22px rgba(255, 230, 0, 0.45);
+}
+.unlock-later {
+  min-height: 44px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--text-mid);
+  font-size: 0.72rem;
+}
+
+.confetti { position: fixed; inset: 0; z-index: 1001; pointer-events: none; overflow: hidden; }
+.confetti-piece {
+  position: absolute;
+  top: -16px;
+  width: 7px;
+  height: 13px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confetti-fall 2.8s cubic-bezier(0.3, 0.6, 0.5, 1) forwards;
+}
+.confetti-wide { width: 11px; height: 7px; }
+
+.reveal-page { display: flex; justify-content: center; }
+.reveal-stage {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0 32px;
+  text-align: center;
+}
+.reveal-kicker { color: var(--neon-purple); font-size: 0.75rem; letter-spacing: 0.12em; }
+.reveal-reel {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 10px;
+  border: 2px solid var(--neon-purple);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(204, 0, 255, 0.14), var(--panel-bg) 40%, var(--panel-bg) 60%, rgba(204, 0, 255, 0.14));
+  box-shadow: inset 0 0 24px rgba(204, 0, 255, 0.25);
+}
+.reveal-reel-name { color: var(--text-max); font-size: 2rem; font-weight: 900; letter-spacing: 0.06em; line-height: 1.1; }
+.reveal-reel-keeps { color: var(--text-dim); font-size: 0.7rem; font-weight: 900; letter-spacing: 0.14em; }
+.reveal-spinning .reveal-reel-name { animation: reveal-blur 0.12s linear infinite; }
+.reveal-flipping .reveal-reel, .reveal-done .reveal-reel { border-color: var(--neon-yellow); box-shadow: 0 0 28px rgba(255, 230, 0, 0.4); }
+.reveal-flipping .reveal-reel-name, .reveal-done .reveal-reel-name { color: var(--neon-yellow); }
+
+.reveal-card { position: relative; width: 100%; height: 150px; perspective: 900px; }
+.reveal-card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  backface-visibility: hidden;
+  transition: transform 0.7s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.reveal-card-back {
+  border: 2px dashed var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--text-dim);
+  font-size: 3.4rem;
+  font-weight: 900;
+}
+.reveal-card-front {
+  transform: rotateY(180deg);
+  border: 2px solid var(--neon-yellow);
+  background: radial-gradient(circle at 50% 30%, rgba(255, 230, 0, 0.2), var(--panel-bg) 70%);
+  box-shadow: 0 0 36px rgba(255, 230, 0, 0.35);
+}
+.reveal-card.is-flipped .reveal-card-back { transform: rotateY(-180deg); }
+.reveal-card.is-flipped .reveal-card-front { transform: rotateY(0deg); }
+.reveal-player { color: var(--text-max); font-size: 1.7rem; font-weight: 900; line-height: 1.15; }
+.reveal-of { color: var(--neon-yellow); font-size: 0.66rem; font-weight: 900; letter-spacing: 0.1em; }
+.reveal-actions { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.reveal-hint { margin: 0; }
+
+@keyframes unlock-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes unlock-pop {
+  0% { transform: scale(0.4) rotate(-6deg); opacity: 0; }
+  70% { transform: scale(1.06) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes unlock-rays { to { transform: rotate(360deg); } }
+@keyframes unlock-pulse { 50% { transform: scale(1.06); box-shadow: 0 0 16px rgba(0, 255, 204, 0.4); } }
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--drift), 105vh) rotate(var(--spin)); opacity: 0.85; }
+}
+@keyframes reveal-blur {
+  0% { transform: translateY(-3px); filter: blur(1px); }
+  50% { transform: translateY(3px); filter: blur(2px); }
+  100% { transform: translateY(-3px); filter: blur(1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .unlock-backdrop, .unlock-card, .unlock-burst, .unlock-burst .nav-icon, .unlock-prize,
+  .reveal-spinning .reveal-reel-name { animation: none; }
+  .confetti { display: none; }
+  .reveal-card-face { transition: none; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

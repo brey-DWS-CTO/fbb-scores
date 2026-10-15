@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import SignInPanel from './SignInPanel.js';
@@ -7,7 +7,6 @@ import { useIdentity } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
   fetchAchievements,
-  revealKeeper,
   type AchievementsResponse,
 } from '../../lib/league/api.js';
 import {
@@ -57,23 +56,24 @@ function progress(id: AchievementId, facts: OwnerFacts): string | null {
  */
 export default function AchievementsPage() {
   const { identity } = useIdentity();
+  const navigate = useNavigate();
   const [data, setData] = useState<AchievementsResponse | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fresh, setFresh] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!identity) return;
-    try {
-      setData(await fetchAchievements(identity));
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    }
-  }, [identity]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!identity) return;
+    let cancelled = false;
+    fetchAchievements(identity)
+      .then((next) => {
+        if (!cancelled) setData(next);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(apiErrorMessage(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [identity]);
 
   if (!identity) {
     return (
@@ -83,19 +83,8 @@ export default function AchievementsPage() {
     );
   }
 
-  const reveal = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await revealKeeper(identity);
-      setData(next);
-      setFresh(next.revealed ? `${next.revealed.target}:${next.revealed.playerKey}` : null);
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  // The reveal plays out on its own screen, slot machine and all.
+  const reveal = () => navigate('/achievements/reveal', { state: { spin: true } });
 
   const you = data?.you;
   const earnedTotal = you ? ACHIEVEMENTS.filter((a) => you.earned[a.id]).length : 0;
@@ -130,7 +119,7 @@ export default function AchievementsPage() {
               </div>
             )}
             {you.check.ok ? (
-              <button type="button" className="rule-edit-save tap-btn achieve-reveal-btn" disabled={busy} onClick={reveal}>
+              <button type="button" className="rule-edit-save tap-btn achieve-reveal-btn" onClick={reveal}>
                 <NavIcon name="unlocked" size={16} className="icon-in-heading" />
                 REVEAL A KEEPER
               </button>
@@ -141,9 +130,8 @@ export default function AchievementsPage() {
             {teams.length > 0 && (
               <ul className="achieve-seen">
                 {teams.map((team) => {
-                  const isNew = team.shown.some((s) => `${team.target}:${s.playerKey}` === fresh);
                   return (
-                    <li key={team.target} className={isNew ? 'achieve-seen-card achieve-seen-new' : 'achieve-seen-card'}>
+                    <li key={team.target} className="achieve-seen-card">
                       <span className="achieve-seen-team">
                         {team.target.toUpperCase()} KEEPS · {team.shown.length} OF {Math.max(team.keeping, team.shown.length)} SHOWN
                       </span>

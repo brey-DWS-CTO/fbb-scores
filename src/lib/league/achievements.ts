@@ -188,10 +188,12 @@ export interface AchievementLedger {
   reveals: Record<string, KeeperReveal[]>;
   /** viewer -> team -> the first keeper guess they saved for that team. */
   firstGuesses: Record<string, Record<string, FirstGuess>>;
+  /** owner -> achievements whose unlock toast they have already seen. */
+  seen: Record<string, string[]>;
 }
 
 export function emptyLedger(): AchievementLedger {
-  return { earned: {}, reveals: {}, firstGuesses: {} };
+  return { earned: {}, reveals: {}, firstGuesses: {}, seen: {} };
 }
 
 /**
@@ -208,7 +210,21 @@ export function ledgerOf(raw: Partial<AchievementLedger> | undefined | null): Ac
     earned: raw?.earned ?? {},
     reveals,
     firstGuesses: raw?.firstGuesses ?? {},
+    seen: raw?.seen ?? {},
   };
+}
+
+/** Earned, in list order, and not yet shown in a toast. */
+export function unseenAchievements(ledger: AchievementLedger, owner: string): AchievementId[] {
+  const earned = ledger.earned[owner] ?? {};
+  const seen = new Set(ledger.seen[owner] ?? []);
+  return ACHIEVEMENTS.filter((a) => earned[a.id] && !seen.has(a.id)).map((a) => a.id);
+}
+
+/** Add ids to an owner's seen list, keeping only real achievement ids, once each. */
+export function markSeen(current: readonly string[] | undefined, ids: readonly string[]): string[] {
+  const known = new Set<string>(ACHIEVEMENTS.map((a) => a.id));
+  return [...new Set([...(current ?? []), ...ids.filter((id) => known.has(id))])];
 }
 
 /**
