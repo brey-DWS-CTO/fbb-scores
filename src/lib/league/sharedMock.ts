@@ -12,7 +12,6 @@
  * Pure. No server, no browser. The time is passed in.
  */
 import type { LeagueDataset, LeagueDynamicState } from '../keeper/types.js';
-import type { KeeperScenario } from './keeperScenario.js';
 import type { TeamScore } from './mockGrade.js';
 import {
   boardFromKeeperSets,
@@ -42,9 +41,15 @@ export interface SharedMockRoom {
   id: string;
   season: number;
   host: string;
-  /** Everyone asked to the table, the host first. */
+  /**
+   * An open room: anyone in the league may sit down while it waits, and the
+   * host starts it when ready. Otherwise the people were asked by name and
+   * the draft starts when the last of them sits down.
+   */
+  open?: boolean;
+  /** Everyone at the table, the host first. In an open room, everyone who has sat down. */
   people: string[];
-  /** Who has sat down. The host is in from the start; the draft starts once everyone is. */
+  /** Who has sat down. The host is in from the start. */
   joined: string[];
   mode: MockMode;
   seed: number;
@@ -116,6 +121,16 @@ export function newSharedMock(input: NewSharedMockInput): SharedMockRoom {
   };
 }
 
+/** A room anyone may join. The host has the first seat and starts it when ready. */
+export function openSharedMock(input: Omit<NewSharedMockInput, 'guests'>): SharedMockRoom {
+  return {
+    ...newSharedMock({ ...input, guests: ['\u0000'] }),
+    open: true,
+    people: [input.host],
+    joined: [input.host],
+  };
+}
+
 /** The other people at the table, from one person's seat. */
 export function othersAt(room: Pick<SharedMockRoom, 'people'>, viewer: string): string[] {
   return room.people.filter((owner) => owner !== viewer);
@@ -131,29 +146,27 @@ const copy = (selections: readonly { playerKey: string; playerName: string }[] |
   (selections ?? []).map((selection) => ({ ...selection }));
 
 /**
- * Whose keepers go on a shared board. After the reveal, everyone's real ones.
- * Before it, the people at the table show each other their real keepers,
- * which they agreed to by sitting down, and the host's projections cover
- * every other team. No other team's real keepers are read, so none can leak.
+ * Whose keepers go on a shared board: only the ones everyone at the table
+ * can see. After the reveal, everyone's real ones. Before it, the people at
+ * the table show each other their real keepers, which they agreed to by
+ * sitting down, and every other team's picks stay live. Nobody's
+ * projections go on, since each person projects the room differently and
+ * one person's guesses would tilt the draft for the rest. No other team's
+ * real keepers are read, so none can leak.
  */
 export function sharedMockKeepers(
   dataset: Pick<LeagueDataset, 'teams'>,
   state: Pick<LeagueDynamicState, 'keepers' | 'keepersRevealed'>,
   people: readonly string[],
-  hostScenario: KeeperScenario,
 ): MockKeeperSets {
   const revealed = state.keepersRevealed === true;
   const keepers: MockKeeperSets['keepers'] = {};
   const status: MockKeeperSets['status'] = {};
   for (const team of dataset.teams) {
     const owner = team.owner;
-    if (revealed || people.includes(owner)) {
-      keepers[owner] = copy(state.keepers[owner]);
-      status[owner] = 'known';
-    } else {
-      keepers[owner] = copy(hostScenario[owner]);
-      status[owner] = 'assumed';
-    }
+    const seen = revealed || people.includes(owner);
+    keepers[owner] = seen ? copy(state.keepers[owner]) : [];
+    status[owner] = seen ? 'known' : 'assumed';
   }
   return { keepers, status };
 }
@@ -163,9 +176,8 @@ export function sharedMockBoard(
   dataset: LeagueDataset,
   state: LeagueDynamicState,
   people: readonly string[],
-  hostScenario: KeeperScenario,
 ): MockBoard {
-  return boardFromKeeperSets(dataset, state, sharedMockKeepers(dataset, state, people, hostScenario));
+  return boardFromKeeperSets(dataset, state, sharedMockKeepers(dataset, state, people));
 }
 
 /** The first of the people's live picks without a choice, in draft order, or null once they are all made. */
@@ -198,8 +210,10 @@ export function startSharedMock(room: SharedMockRoom, board: MockBoard, seed: nu
 }
 
 /**
- * Take a seat. When the last person sits down the draft starts, on the board
- * `start` builds. Building one reads the league, so the caller brings it.
+ * Take a seat. In a room where people were asked by name, the draft starts
+ * when the last of them sits down, on the board `start` builds. Building one
+ * reads the league, so the caller brings it. In an open room sitting down
+ * only adds a seat; the host starts it.
  */
 export function joinSharedMock(
   room: SharedMockRoom,
@@ -207,7 +221,14 @@ export function joinSharedMock(
   at: string,
   start: () => { board: MockBoard; seed: number },
 ): SharedMockRoom {
-  if (sharedMockPhase(room) === 'ended') throw new Error('This mock is over.');
+  const phase = sharedMockPhase(room);
+  if (phase === 'ended') throw new Error('This mock is over.');
+  if (room.open) {
+    if (room.people.includes(who)) return room;
+    if (phase !== 'waiting') throw new Error('This mock has started.');
+    if (room.people.length >= MAX_PEOPLE) throw new Error(`The room is full: ${MAX_PEOPLE} seats.`);
+    return { ...room, people: [...room.people, who], joined: [...room.joined, who] };
+  }
   if (!room.people.includes(who)) throw new Error('You were not asked to this mock.');
   if (room.joined.includes(who)) return room;
   const joined = [...room.joined, who];
@@ -215,6 +236,23 @@ export function joinSharedMock(
   if (!room.people.every((person) => joined.includes(person))) return seated;
   const { board, seed } = start();
   return startSharedMock(seated, board, seed, at);
+}
+
+/** The host starts an open room, once somebody else is in it. */
+export function startOpenSharedMock(
+  room: SharedMockRoom,
+  by: string,
+  at: string,
+  start: () => { board: MockBoard; seed: number },
+): SharedMockRoom {
+  const phase = sharedMockPhase(room);
+  if (phase === 'ended') throw new Error('This mock is over.');
+  if (phase !== 'waiting') throw new Error('This mock has started.');
+  if (!room.open) throw new Error('This mock starts when everyone asked has sat down.');
+  if (by !== room.host) throw new Error(`Only ${room.host} can start it.`);
+  if (room.people.length < 2) throw new Error('Wait for somebody to join first.');
+  const { board, seed } = start();
+  return startSharedMock(room, board, seed, at);
 }
 
 /** When the clock on a pick runs out, in milliseconds since the epoch. */
@@ -267,15 +305,29 @@ export function pickInSharedMock(
 }
 
 /**
- * Leave. A draft under way, or one still waiting on someone, ends for
- * everyone. A finished or ended one only leaves this person's mock page.
+ * Leave. A draft under way ends for everyone, and so does a waiting room
+ * when its host leaves. Anyone else leaving an open room that is still
+ * waiting just gives up their seat. A finished or ended one only leaves
+ * this person's mock page.
  */
 export function quitSharedMock(room: SharedMockRoom, by: string, at: string): SharedMockRoom {
   if (!room.people.includes(by)) throw new Error('You are not in this mock.');
   const dismissed = room.dismissed.includes(by) ? room.dismissed : [...room.dismissed, by];
   const phase = sharedMockPhase(room);
   if (phase === 'finished' || phase === 'ended') return { ...room, dismissed };
+  if (room.open && phase === 'waiting' && by !== room.host) {
+    return {
+      ...room,
+      people: room.people.filter((person) => person !== by),
+      joined: room.joined.filter((person) => person !== by),
+    };
+  }
   return { ...room, endedAt: at, endedBy: by, clock: null, dismissed };
+}
+
+/** Whether a waiting open room has a seat for this person. */
+export function canJoinOpenRoom(room: SharedMockRoom, who: string): boolean {
+  return room.open === true && sharedMockPhase(room) === 'waiting' && !room.people.includes(who) && room.people.length < MAX_PEOPLE;
 }
 
 /** Whether a room still gets a line on this person's mock page. */
@@ -328,6 +380,7 @@ export function parseSharedMockRoom(value: unknown): SharedMockRoom | null {
     id: raw.id,
     season: raw.season,
     host: raw.host,
+    ...(raw.open === true ? { open: true } : {}),
     people: raw.people,
     joined: raw.joined,
     mode: raw.mode,

@@ -9,6 +9,7 @@ import {
   pickSharedMock,
   quitSharedMockRoom,
   saveSharedMockResults,
+  startSharedMockRoom,
   type SharedMockResponse,
 } from '../../lib/league/api.js';
 import { useDraftData, useIdentity } from '../../hooks/useLeague.js';
@@ -20,7 +21,7 @@ import { defaultMockSettings, prepareMock, type MockKeeperSets, type MockMode } 
 import { gradeMock, mockResultId, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
 import { buildProjections, type PlayerProjection } from '../../lib/league/projections.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
-import { clockDeadlineMs, namesOf, othersAt, sharedMockPhase } from '../../lib/league/sharedMock.js';
+import { MAX_PEOPLE, clockDeadlineMs, namesOf, othersAt, sharedMockPhase } from '../../lib/league/sharedMock.js';
 import DraftRoom, { type RoomProgress, type SharedRoomControls } from './DraftRoom.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
@@ -210,7 +211,9 @@ function SharedMockScreen({ id }: { id: string }) {
     <div className="mock-head">
       <h1 className="hub-heading glow-teal" style={{ fontSize: '0.85rem', color: 'var(--neon-teal)', margin: 0, lineHeight: 1.6 }}>
         <NavIcon name="target" size={16} className="icon-in-heading" />
-        MOCK WITH {others.length > 0 ? namesOf(others).toUpperCase() : 'A FRIEND'}
+        {room?.open && !room.people.includes(viewer)
+          ? `${room.host.toUpperCase()}'S MOCK ROOM`
+          : `MOCK WITH ${others.length > 0 ? namesOf(others).toUpperCase() : 'FRIENDS'}`}
       </h1>
       <IdentityChip />
     </div>
@@ -248,6 +251,67 @@ function SharedMockScreen({ id }: { id: string }) {
     void apply(() => quitSharedMockRoom(identity, room.id)).then(() => then?.()).catch(() => { /* shown on the page */ });
   };
 
+  if (phase === 'waiting' && room.open) {
+    const inRoom = room.people.includes(viewer);
+    const isHost = room.host === viewer;
+    const keepers = roomQuery.data?.keepers ?? {};
+    const join = () => { void apply(() => joinSharedMockRoom(identity, room.id)).catch(() => { /* shown on the page */ }); };
+    const start = () => { void apply(() => startSharedMockRoom(identity, room.id)).catch(() => { /* shown on the page */ }); };
+    return (
+      <div className="mock-page">
+        {head}
+        <section className="panel mock-friend-wait">
+          <div className="hub-heading">
+            {isHost ? 'YOUR ROOM' : `${room.host.toUpperCase()}'S ROOM`}
+            <small>{room.people.length} of {MAX_PEOPLE} seats · {roomLabel(room.mode)} room</small>
+          </div>
+          <ul className="mock-guesses">
+            {room.people.map((person) => (
+              <li key={person}>
+                <div className="mock-guess-head">
+                  <span className="mock-guess-owner">{person}{person === room.host ? ' (opened it)' : ''}</span>
+                </div>
+                <span className="mock-guess-players">
+                  {!inRoom
+                    ? <span className="mock-live">keepers show once you join</span>
+                    : (keepers[person] ?? []).length === 0
+                      ? <span className="mock-live">no keepers entered</span>
+                      : (keepers[person] ?? []).map((keeper) => (
+                        <span key={keeper.playerKey}>{keeper.playerName} <span className="mock-tag mock-tag-known">keeper</span></span>
+                      ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="mock-note">
+            Everyone drafts their own real team; the other teams are computers. Two minutes a pick, and the clock keeps running
+            if someone walks away. Before the reveal only the keepers of the people in the room go on the board; every other
+            team&apos;s picks stay live.
+          </div>
+          <div className="mock-friend-actions">
+            {isHost && (
+              <button type="button" className="tap-btn mock-mini-btn is-primary" disabled={room.people.length < 2} onClick={start}>
+                {room.people.length < 2 ? 'WAITING FOR SOMEBODY TO JOIN' : 'START THE DRAFT'}
+              </button>
+            )}
+            {!inRoom && room.people.length < MAX_PEOPLE && (
+              <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={join}>JOIN</button>
+            )}
+            {!inRoom && room.people.length >= MAX_PEOPLE && <span className="mock-note">The room is full.</span>}
+            {inRoom && <ShareButton url={link} title={`${room.host}'s mock draft room`} />}
+            {inRoom && (
+              <button type="button" className="tap-btn mock-mini-btn" onClick={() => leave(() => navigate('/mock'))}>
+                {isHost ? 'CLOSE THE ROOM' : 'LEAVE'}
+              </button>
+            )}
+          </div>
+          {error && <div className="mock-note mock-note-bad">{error}</div>}
+        </section>
+        {back}
+      </div>
+    );
+  }
+
   if (phase === 'waiting') {
     const seated = room.joined.includes(viewer);
     const missing = room.people.filter((person) => !room.joined.includes(person));
@@ -272,7 +336,7 @@ function SharedMockScreen({ id }: { id: string }) {
               <div className="mock-note">
                 You each draft your own team against eight computer teams, in the {roomLabel(room.mode)} room. Two minutes a pick,
                 and the clock keeps running if one of you walks away. Before the reveal you see each other&apos;s real keepers;
-                {' '}{room.host}&apos;s projections cover the other teams.
+                {' '}every other team&apos;s picks stay live.
               </div>
               <div className="mock-friend-actions">
                 <button

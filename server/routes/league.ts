@@ -133,6 +133,7 @@ import {
   deleteMockTrade,
   getSharedMock,
   listSharedMocks,
+  listOpenSharedMocks,
   insertSharedMock,
   updateSharedMock,
   SharedMockWriteError,
@@ -147,6 +148,7 @@ import {
   joinSharedMock,
   namesOf,
   newSharedMock,
+  openSharedMock,
   othersAt,
   parseSharedMockRoom,
   pickInSharedMock,
@@ -155,6 +157,7 @@ import {
   sharedMockId,
   sharedMockPhase,
   showsFor,
+  startOpenSharedMock,
   type SharedMockRoom,
 } from '../../src/lib/league/sharedMock.js';
 import {
@@ -2886,10 +2889,58 @@ async function changeSharedMock(
   }
 }
 
-/** GET /api/league/shared-mocks — the mocks you were asked to and have not cleared. */
+/** The open rooms still waiting to start, which anyone may join. */
+async function openSharedMocks(): Promise<SharedMockRoom[]> {
+  const rows = await listOpenSharedMocks(leagueDataset.season);
+  return rows
+    .map((row) => parseSharedMockRoom(row.room))
+    .filter((room): room is SharedMockRoom => room !== null && room.open === true && sharedMockPhase(room) === 'waiting');
+}
+
+/**
+ * GET /api/league/shared-mocks — the mocks you are in and have not cleared,
+ * plus any open room waiting for people, so the mock page can offer it.
+ */
 router.get('/shared-mocks', requireAuth, async (_req, res, next) => {
   try {
-    res.json({ rooms: await sharedMocksFor(res.locals.owner as string), now: new Date().toISOString() });
+    const owner = res.locals.owner as string;
+    const mine = await sharedMocksFor(owner);
+    const seen = new Set(mine.map((room) => room.id));
+    const open = (await openSharedMocks()).filter((room) => !seen.has(room.id));
+    res.json({ rooms: [...mine, ...open], now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/open — open a room anyone may join. One
+ * open room in the league at a time, and you start it when you are ready.
+ */
+router.post('/shared-mocks/open', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const mode = body.mode === 'sharp' || body.mode === 'realistic' ? body.mode : null;
+    if (!mode) {
+      res.status(400).json({ error: 'Pick a room: sharp or normal.' });
+      return;
+    }
+    const waiting = (await openSharedMocks())[0];
+    if (waiting) {
+      res.status(409).json({ error: `${waiting.host}'s room is already open. Join it instead.` });
+      return;
+    }
+    const busy = (room: SharedMockRoom) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+    const mine = (await sharedMocksFor(owner)).find(busy);
+    if (mine) {
+      res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const room = openSharedMock({ id: sharedMockId(at, Math.random()), season: leagueDataset.season, host: owner, mode, at });
+    await insertSharedMock({ id: room.id, season: room.season, room, version: 0, updatedAt: at });
+    res.json({ room, now: at });
   } catch (err) {
     next(err);
   }
@@ -2937,7 +2988,12 @@ router.post('/shared-mocks', requireAuth, async (req, res, next) => {
   }
 });
 
-/** GET /api/league/shared-mocks/:id — one room, for the people in it. */
+/**
+ * GET /api/league/shared-mocks/:id — one room, for the people in it, with
+ * their real keepers, which they show each other by sitting down. Anyone may
+ * look at an open room that is still waiting, so the link invites, but the
+ * keepers come only once they are in.
+ */
 router.get('/shared-mocks/:id', requireAuth, async (req, res, next) => {
   try {
     const owner = res.locals.owner as string;
@@ -2946,11 +3002,32 @@ router.get('/shared-mocks/:id', requireAuth, async (req, res, next) => {
       res.status(404).json({ error: 'No such mock.' });
       return;
     }
-    if (!room.people.includes(owner)) {
+    const inRoom = room.people.includes(owner);
+    if (!inRoom && !(room.open === true && sharedMockPhase(room) === 'waiting')) {
       res.status(403).json({ error: `This mock is ${namesOf(room.people)}'s.` });
       return;
     }
-    res.json({ room, now: new Date().toISOString() });
+    const keepers: Record<string, KeeperSelection[]> = {};
+    if (inRoom) {
+      const { state } = await getState();
+      for (const person of room.people) keepers[person] = (state.keepers[person] ?? []).map((keeper) => ({ ...keeper }));
+    }
+    res.json({ room, keepers, now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks/:id/start — the host starts an open room. */
+router.post('/shared-mocks/:id/start', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const { state } = await getState();
+    const dataset = currentDataset(state);
+    await changeSharedMock(res, routeParam(req.params.id), (current, at) => startOpenSharedMock(current, owner, at, () => ({
+      board: sharedMockBoard(dataset, state, current.people),
+      seed: Math.floor(Math.random() * 100_000),
+    })));
   } catch (err) {
     next(err);
   }
@@ -2970,16 +3047,23 @@ router.post('/shared-mocks/:id/join', requireAuth, async (req, res, next) => {
       res.status(404).json({ error: 'No such mock.' });
       return;
     }
-    if (!room.people.includes(owner)) {
+    if (!room.open && !room.people.includes(owner)) {
       res.status(403).json({ error: 'You were not asked to this mock.' });
       return;
     }
+    if (room.open && !room.people.includes(owner)) {
+      const busy = (entry: SharedMockRoom) => entry.id !== room.id && (sharedMockPhase(entry) === 'waiting' || sharedMockPhase(entry) === 'live');
+      const mine = (await sharedMocksFor(owner)).find(busy);
+      if (mine) {
+        res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+        return;
+      }
+    }
     // Everything the board needs is read first, so the write itself stays quick.
     const { state } = await getState();
-    const scenario = await getKeeperScenario(state.season, room.host);
     const dataset = currentDataset(state);
     await changeSharedMock(res, id, (current, at) => joinSharedMock(current, owner, at, () => ({
-      board: sharedMockBoard(dataset, state, current.people, scenario),
+      board: sharedMockBoard(dataset, state, current.people),
       seed: Math.floor(Math.random() * 100_000),
     })));
   } catch (err) {

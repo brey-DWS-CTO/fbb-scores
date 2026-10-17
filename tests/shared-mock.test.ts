@@ -14,10 +14,12 @@ import { applyPlayerPoolToDataset, playerPoolFromDataset } from '../src/lib/leag
 import {
   SHARED_GRACE_SECONDS,
   SHARED_PICK_SECONDS,
+  canJoinOpenRoom,
   clockHasRunOut,
   headToHead,
   joinSharedMock,
   newSharedMock,
+  openSharedMock,
   nextPersonSlot,
   onTheClock,
   parseSharedMockRoom,
@@ -28,6 +30,7 @@ import {
   sharedMockKeepers,
   sharedMockPhase,
   showsFor,
+  startOpenSharedMock,
   type SharedMockRoom,
 } from '../src/lib/league/sharedMock.ts';
 
@@ -56,7 +59,6 @@ const PEOPLE = ['Brey', 'Joel'];
 const breyKeeps = keeperOf('Brey');
 const joelKeeps = keeperOf('Joel');
 const kyleReallyKeeps = keeperOf('Kyle');
-const breyThinksKyleKeeps = keeperOf('Kyle', 1);
 const state: LeagueDynamicState = {
   season: 2027,
   keepers: { Brey: [breyKeeps], Joel: [joelKeeps], Kyle: [kyleReallyKeeps] },
@@ -64,47 +66,45 @@ const state: LeagueDynamicState = {
   draft: { picks: {}, startedAt: null },
   locks: { keepersLocked: false },
 };
-const hostScenario = { Kyle: [breyThinksKyleKeeps] };
 const T0 = '2026-10-16T20:00:00.000Z';
 const later = (seconds: number) => new Date(Date.parse(T0) + seconds * 1000).toISOString();
 
 // ─── Whose keepers go on the board ──────────────────────────────────────────
 
-test('before the reveal the two people see each other\'s real keepers and the host\'s projections for the rest', () => {
-  const sets = sharedMockKeepers(dataset, state, PEOPLE, hostScenario);
+test('before the reveal the people at the table see each other\'s real keepers and nobody else\'s', () => {
+  const sets = sharedMockKeepers(dataset, state, PEOPLE);
   assert.deepEqual(sets.keepers.Brey, [breyKeeps]);
   assert.deepEqual(sets.keepers.Joel, [joelKeeps]);
   assert.equal(sets.status.Brey, 'known');
   assert.equal(sets.status.Joel, 'known');
-  // Kyle's real keeper stays hidden: the board carries the host's guess.
-  assert.deepEqual(sets.keepers.Kyle, [breyThinksKyleKeeps]);
+  // Kyle's real keeper stays hidden, and nobody's guess stands in for it:
+  // each person projects the room differently, so his picks stay live.
+  assert.deepEqual(sets.keepers.Kyle, []);
   assert.equal(sets.status.Kyle, 'assumed');
   const everyKey = Object.values(sets.keepers).flat().map((keeper) => keeper.playerKey);
   assert.ok(!everyKey.includes(kyleReallyKeeps.playerKey), 'a hidden keeper never reaches the board');
-  // A team the host has no guess for keeps its picks live.
   assert.deepEqual(sets.keepers.Amy, []);
-  assert.equal(sets.status.Amy, 'assumed');
 });
 
 test('after the reveal everyone\'s real keepers are on the board', () => {
-  const sets = sharedMockKeepers(dataset, { ...state, keepersRevealed: true }, PEOPLE, hostScenario);
+  const sets = sharedMockKeepers(dataset, { ...state, keepersRevealed: true }, PEOPLE);
   assert.deepEqual(sets.keepers.Kyle, [kyleReallyKeeps]);
   assert.equal(sets.status.Kyle, 'known');
 });
 
 test('the shared board fills both people\'s keeper slots as known', () => {
-  const board = sharedMockBoard(dataset, state, PEOPLE, hostScenario);
+  const board = sharedMockBoard(dataset, state, PEOPLE);
   const kept = board.slots.filter((slot) => slot.keeper);
   assert.ok(kept.some((slot) => slot.pick.currentOwner === 'Brey' && slot.keeper?.status === 'known'));
   assert.ok(kept.some((slot) => slot.pick.currentOwner === 'Joel' && slot.keeper?.status === 'known'));
-  assert.ok(kept.some((slot) => slot.pick.currentOwner === 'Kyle' && slot.keeper?.status === 'assumed'));
+  assert.ok(!kept.some((slot) => slot.pick.currentOwner === 'Kyle'), 'a team not at the table has no keeper on the board');
   assert.ok(board.taken.includes(breyKeeps.playerKey));
   assert.ok(!board.taken.includes(kyleReallyKeeps.playerKey));
 });
 
 // ─── The room ───────────────────────────────────────────────────────────────
 
-const board = sharedMockBoard(dataset, state, PEOPLE, hostScenario);
+const board = sharedMockBoard(dataset, state, PEOPLE);
 const prepared = prepareMock({ board, values, settings: defaultMockSettings('sharp', OWNERS, 7) });
 const freshRoom = () => newSharedMock({ id: 'with-test-0001', season: 2027, host: 'Brey', guests: ['Joel'], mode: 'sharp', at: T0 });
 const start = () => ({ board, seed: 7 });
@@ -240,4 +240,50 @@ test('a room survives the store as JSON, and the id is safe in a link', () => {
   assert.equal(parseSharedMockRoom(null), null);
   assert.match(sharedMockId(T0, 0.42), /^with-[a-z0-9]+-[a-z0-9]{4}$/);
   assert.notEqual(sharedMockId(T0, 0.42), sharedMockId(T0, 0.43));
+});
+
+// ─── An open room ───────────────────────────────────────────────────────────
+
+test('an open room takes anyone until it is full, and only the host starts it', () => {
+  const opened = openSharedMock({ id: 'with-open-0001', season: 2027, host: 'Brey', mode: 'realistic', at: T0 });
+  assert.equal(opened.open, true);
+  assert.deepEqual(opened.people, ['Brey']);
+  assert.equal(sharedMockPhase(opened), 'waiting');
+  assert.throws(() => startOpenSharedMock(opened, 'Brey', later(1), start), /Wait for somebody/);
+  assert.equal(canJoinOpenRoom(opened, 'Joel'), true);
+  assert.equal(canJoinOpenRoom(opened, 'Brey'), false);
+
+  const two = joinSharedMock(opened, 'Joel', later(2), start);
+  assert.equal(sharedMockPhase(two), 'waiting', 'sitting down does not start an open room');
+  assert.deepEqual(two.people, ['Brey', 'Joel']);
+  assert.deepEqual(two.joined, ['Brey', 'Joel']);
+  assert.deepEqual(joinSharedMock(two, 'Joel', later(3), start), two);
+  const four = joinSharedMock(joinSharedMock(two, 'Kyle', later(3), start), 'Amy', later(4), start);
+  assert.throws(() => joinSharedMock(four, 'Ryan', later(5), start), /full/);
+  assert.equal(canJoinOpenRoom(four, 'Ryan'), false);
+
+  assert.throws(() => startOpenSharedMock(two, 'Joel', later(5), start), /Only Brey/);
+  const live = startOpenSharedMock(two, 'Brey', later(5), start);
+  assert.equal(sharedMockPhase(live), 'live');
+  assert.ok(live.clock);
+  assert.throws(() => joinSharedMock(live, 'Kyle', later(6), start), /has started/);
+  assert.throws(() => startOpenSharedMock(live, 'Brey', later(6), start), /has started/);
+  assert.throws(() => startOpenSharedMock(joinSharedMock(freshRoom(), 'Joel', T0, start), 'Brey', later(1), start), /has started/);
+});
+
+test('leaving an open room before the start gives up the seat; the host leaving closes it', () => {
+  const two = joinSharedMock(openSharedMock({ id: 'with-open-0002', season: 2027, host: 'Brey', mode: 'sharp', at: T0 }), 'Joel', later(1), start);
+  const left = quitSharedMock(two, 'Joel', later(2));
+  assert.equal(sharedMockPhase(left), 'waiting');
+  assert.deepEqual(left.people, ['Brey']);
+  assert.deepEqual(left.joined, ['Brey']);
+  assert.equal(canJoinOpenRoom(left, 'Joel'), true, 'he may come back');
+  const closed = quitSharedMock(two, 'Brey', later(2));
+  assert.equal(sharedMockPhase(closed), 'ended');
+  assert.equal(closed.endedBy, 'Brey');
+  // Once it runs, leaving ends it for everyone, as in any shared mock.
+  const live = startOpenSharedMock(two, 'Brey', later(3), start);
+  assert.equal(sharedMockPhase(quitSharedMock(live, 'Joel', later(4))), 'ended');
+  // The flag survives the store.
+  assert.equal(parseSharedMockRoom(JSON.parse(JSON.stringify(live)))?.open, true);
 });
