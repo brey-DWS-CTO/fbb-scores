@@ -80,6 +80,10 @@ function SharedMockScreen({ id }: { id: string }) {
       const phase = sharedMockPhase(room);
       return phase === 'live' ? 3_000 : phase === 'waiting' ? 5_000 : false;
     },
+    // Keep up even in a tab that is not in front, so a laptop with the room
+    // behind another window still picks from its own queue when its clock
+    // runs out. A draft is an hour at most, so the cost is bounded.
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: false,
     staleTime: 1_000,
@@ -172,10 +176,20 @@ function SharedMockScreen({ id }: { id: string }) {
       clockOverall: room.clock?.overall ?? null,
       deadlineMs: room.clock ? clockDeadlineMs(room.clock) - skew : null,
       onPick: (overall, playerKey) => apply(() => pickSharedMock(identity, room.id, overall, playerKey)),
-      onRunOut: (overall, playerKey) => apply(() => expireSharedMock(identity, room.id, overall, playerKey)),
+      // Running a clock out happens in the background, and the other phone
+      // usually gets there first; a refusal is nothing to show, so the room
+      // is only read again and the tick tries once more.
+      onRunOut: async (overall, playerKey) => {
+        try {
+          queryClient.setQueryData(queryKey, await expireSharedMock(identity, room.id, overall, playerKey));
+        } catch (caught) {
+          void queryClient.invalidateQueries({ queryKey });
+          throw caught;
+        }
+      },
       onQuit: () => { void apply(() => quitSharedMockRoom(identity, room.id)).catch(() => { /* shown above the room */ }); },
     };
-  }, [room, identity, skew, apply]);
+  }, [room, identity, skew, apply, queryClient, queryKey]);
 
   if (!viewer || !identity) {
     return <SignInPanel reason="Sign in to join this mock draft." />;
