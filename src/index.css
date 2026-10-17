@@ -5182,6 +5182,8 @@ html.theme-light {
 .mock-friend-form .mock-select { min-width: 160px; }
 .mock-friend-wait { display: grid; gap: 10px; }
 .mock-friend-wait > .hub-heading small { margin-left: 10px; color: var(--text-dim); font-weight: 700; }
+/* The draft is over: a plain way to the next one, beside the board link. */
+.room-done-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
 .mock-friend-wait .mock-friend-actions { margin-left: 0; }
 a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .room-clock.is-them { border-color: var(--neon-yellow); }
