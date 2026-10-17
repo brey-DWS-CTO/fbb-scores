@@ -533,6 +533,8 @@ interface StoreBackend {
   getSharedMock(id: string): Promise<SharedMockRow | null>;
   /** Every room this owner was asked to this season, newest first. */
   listSharedMocks(season: number, owner: string): Promise<SharedMockRow[]>;
+  /** Open rooms still waiting to start, which anyone in the league may join. */
+  listOpenSharedMocks(season: number): Promise<SharedMockRow[]>;
   insertSharedMock(row: SharedMockRow): Promise<void>;
   /**
    * Read, change, write, retrying if another phone wrote in between. Two
@@ -1439,6 +1441,21 @@ class NeonBackend implements StoreBackend {
     await this.ensureInit();
     const rows = (await this.sql`SELECT id, season, data, version, updated_at FROM shared_mocks
       WHERE season = ${season} AND data->'people' ? ${owner}
+      ORDER BY updated_at DESC LIMIT 20`) as Array<{
+      id: string;
+      season: number;
+      data: unknown;
+      version: number;
+      updated_at: string | Date;
+    }>;
+    return rows.map((row) => ({ id: row.id, season: row.season, room: row.data, version: row.version, updatedAt: new Date(row.updated_at).toISOString() }));
+  }
+
+  async listOpenSharedMocks(season: number): Promise<SharedMockRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, data, version, updated_at FROM shared_mocks
+      WHERE season = ${season} AND data->>'open' = 'true'
+        AND data->>'startedAt' IS NULL AND data->>'endedAt' IS NULL
       ORDER BY updated_at DESC LIMIT 20`) as Array<{
       id: string;
       season: number;
@@ -2514,6 +2531,18 @@ class FileBackend implements StoreBackend {
       .map((entry) => structuredClone(entry));
   }
 
+  async listOpenSharedMocks(season: number): Promise<SharedMockRow[]> {
+    await this.ensureInit();
+    return this.readDoc().sharedMocks
+      .filter((entry) => {
+        const room = entry.room as { open?: unknown; startedAt?: unknown; endedAt?: unknown } | null;
+        return entry.season === season && room?.open === true && !room.startedAt && !room.endedAt;
+      })
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 20)
+      .map((entry) => structuredClone(entry));
+  }
+
   async insertSharedMock(row: SharedMockRow): Promise<void> {
     await this.ensureInit();
     await this.enqueueWrite(() => {
@@ -3358,6 +3387,10 @@ export async function getSharedMock(id: string): Promise<SharedMockRow | null> {
 
 export async function listSharedMocks(season: number, owner: string): Promise<SharedMockRow[]> {
   return getBackend().listSharedMocks(season, owner);
+}
+
+export async function listOpenSharedMocks(season: number): Promise<SharedMockRow[]> {
+  return getBackend().listOpenSharedMocks(season);
 }
 
 export async function insertSharedMock(row: SharedMockRow): Promise<void> {

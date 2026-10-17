@@ -10,12 +10,12 @@ import {
   fetchMockTrades,
   fetchPickTrades,
   fetchSharedMocks,
-  inviteSharedMock,
   joinSharedMockRoom,
+  openSharedMockRoom,
   quitSharedMockRoom,
   saveMockResult,
 } from '../../lib/league/api.js';
-import { namesOf, onTheClock, othersAt, sharedMockPhase } from '../../lib/league/sharedMock.js';
+import { MAX_PEOPLE, namesOf, onTheClock, othersAt, sharedMockPhase } from '../../lib/league/sharedMock.js';
 import ShareButton from './ShareButton.js';
 import { isMockTradeId, mockTradeProposal } from '../../lib/league/mockTrades.js';
 import type { SavedBoard } from '../../lib/league/mockBoard.js';
@@ -153,7 +153,6 @@ function MockDraftScreen() {
     staleTime: 5_000,
   });
   const rooms = useMemo(() => roomsQuery.data?.rooms ?? [], [roomsQuery.data]);
-  const [inviteWho, setInviteWho] = useState('');
   const [friendBusy, setFriendBusy] = useState(false);
   const [friendError, setFriendError] = useState<string | null>(null);
   const friendAct = async (call: () => Promise<unknown>, then?: () => void) => {
@@ -332,21 +331,34 @@ function MockDraftScreen() {
   // Draft with a friend: your open mock, the invites waiting on you, and a
   // way to ask somebody. One open mock a person, so the form hides while
   // you have one.
-  const openRoom = rooms.find((room) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live');
+  const busy = (room: typeof rooms[number]) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+  const myRoom = rooms.find((room) => room.people.includes(viewer) && busy(room));
+  const anyOpen = rooms.find((room) => room.open === true && sharedMockPhase(room) === 'waiting');
   const friendPanel = identity && (
     <section className="panel mock-friend">
-      <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>DRAFT WITH A FRIEND</div>
+      <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>DRAFT WITH FRIENDS</div>
       {rooms.map((room) => {
         const phase = sharedMockPhase(room);
+        const inRoom = room.people.includes(viewer);
         const others = namesOf(othersAt(room, viewer));
         const link = `/mock/with/${room.id}`;
-        const asked = phase === 'waiting' && !room.joined.includes(viewer);
+        const asked = !room.open && phase === 'waiting' && !room.joined.includes(viewer);
         const clockOwner = onTheClock(room);
+        const quit = () => friendAct(() => quitSharedMockRoom(identity, room.id));
         return (
           <div key={room.id} className="mock-friend-row">
             <span>
+              {room.open && phase === 'waiting' && !inRoom && (
+                <><strong>{room.host}</strong>&apos;s room is open: {namesOf(room.people)}. {room.people.length} of {MAX_PEOPLE} seats, {roomLabel(room.mode)} room.</>
+              )}
+              {room.open && phase === 'waiting' && inRoom && room.host === viewer && (
+                <>Your room is open: {namesOf(room.people)}. Start it when you are ready.</>
+              )}
+              {room.open && phase === 'waiting' && inRoom && room.host !== viewer && (
+                <>You are in <strong>{room.host}</strong>&apos;s room: {namesOf(room.people)}. Waiting for {room.host} to start it.</>
+              )}
               {phase === 'waiting' && asked && <><strong>{room.host}</strong> wants a mock with you. {roomLabel(room.mode) === 'sharp' ? 'Sharp' : 'Normal'} room.</>}
-              {phase === 'waiting' && !asked && <>Waiting for <strong>{others}</strong> to join.</>}
+              {!room.open && phase === 'waiting' && !asked && <>Waiting for <strong>{others}</strong> to join.</>}
               {phase === 'live' && (
                 <>
                   Your mock with <strong>{others}</strong> is on.
@@ -354,9 +366,28 @@ function MockDraftScreen() {
                 </>
               )}
               {phase === 'finished' && <>Your mock with <strong>{others}</strong> is done. The grade is in Past mocks.</>}
-              {phase === 'ended' && <><strong>{room.endedBy}</strong> {room.startedAt ? 'left your mock, so it ended' : 'passed on your mock'}.</>}
+              {phase === 'ended' && <><strong>{room.endedBy}</strong> {room.startedAt ? 'left your mock, so it ended' : room.open ? 'closed the room' : 'passed on your mock'}.</>}
             </span>
             <span className="mock-friend-actions">
+              {room.open && phase === 'waiting' && !inRoom && room.people.length < MAX_PEOPLE && (
+                <button
+                  type="button"
+                  className="tap-btn mock-mini-btn is-primary"
+                  disabled={friendBusy || myRoom !== undefined}
+                  title={myRoom ? 'Quit your own mock first.' : undefined}
+                  onClick={() => friendAct(() => joinSharedMockRoom(identity, room.id), () => navigate(link))}
+                >
+                  JOIN
+                </button>
+              )}
+              {room.open && phase === 'waiting' && inRoom && (
+                <>
+                  <Link className="tap-btn mock-mini-btn is-primary" to={link}>{room.host === viewer ? 'OPEN' : 'OPEN'}</Link>
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>
+                    {room.host === viewer ? 'CLOSE' : 'LEAVE'}
+                  </button>
+                </>
+              )}
               {asked && (
                 <>
                   <button
@@ -367,52 +398,43 @@ function MockDraftScreen() {
                   >
                     JOIN
                   </button>
-                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={() => friendAct(() => quitSharedMockRoom(identity, room.id))}>
-                    NO THANKS
-                  </button>
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>NO THANKS</button>
                 </>
               )}
-              {phase === 'waiting' && !asked && (
+              {!room.open && phase === 'waiting' && !asked && (
                 <>
                   <ShareButton url={`${window.location.origin}${link}`} title={`Mock draft with ${viewer}`} />
-                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={() => friendAct(() => quitSharedMockRoom(identity, room.id))}>
-                    CANCEL
-                  </button>
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>CANCEL</button>
                 </>
               )}
               {phase === 'live' && <Link className="tap-btn mock-mini-btn is-primary" to={link}>OPEN</Link>}
               {phase === 'finished' && <Link className="tap-btn mock-mini-btn" to={link}>SEE IT</Link>}
               {(phase === 'finished' || phase === 'ended') && (
-                <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={() => friendAct(() => quitSharedMockRoom(identity, room.id))}>
-                  DISMISS
-                </button>
+                <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>DISMISS</button>
               )}
             </span>
           </div>
         );
       })}
-      {!openRoom && (
+      {!myRoom && !anyOpen && (
         <div className="mock-friend-form">
-          <select className="hub-input mock-select" aria-label="Who to draft with" value={inviteWho} onChange={(event) => setInviteWho(event.target.value)}>
-            <option value="">Pick a friend</option>
-            {owners.filter((owner) => owner !== viewer).map((owner) => <option key={owner} value={owner}>{owner}</option>)}
-          </select>
           <button
             type="button"
             className="tap-btn mock-mini-btn is-primary"
-            disabled={inviteWho === '' || friendBusy}
+            disabled={friendBusy}
             onClick={() => friendAct(async () => {
-              const { room } = await inviteSharedMock(identity, inviteWho, mode);
+              const { room } = await openSharedMockRoom(identity, mode);
               navigate(`/mock/with/${room.id}`);
             })}
           >
-            INVITE
+            OPEN A ROOM
           </button>
+          <span className="mock-note mock-note-dim" style={{ margin: 0 }}>Anyone can join. You start it when you are ready. Up to {MAX_PEOPLE} people; the {roomLabel(mode)} room.</span>
         </div>
       )}
       {friendError && <div className="mock-note mock-note-bad">{friendError}</div>}
       <div className="mock-note mock-note-dim">
-        You each draft your own team against eight computer teams in the {roomLabel(mode)} room. Two minutes a pick. The clock keeps running if one of you walks away.
+        Everyone drafts their own real team; the other teams are computers. Two minutes a pick. The clock keeps running if someone walks away.
       </div>
     </section>
   );

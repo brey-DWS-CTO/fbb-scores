@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import rawDataset from '../src/data/league-2027.json' with { type: 'json' };
 import type { LeagueDataset } from '../src/lib/keeper/types.ts';
+import { resolveTeamKeepers } from '../src/lib/keeper/engine.ts';
 import type { SharedMockRoom } from '../src/lib/league/sharedMock.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
@@ -235,4 +236,67 @@ test('a finished mock saves a grade to both people\'s Past mocks', async () => {
   assert.equal(kyleAgain.length, 1);
   assert.equal((kyleAgain[0].grade as { rank: number }).rank, 4, 'another phone never overwrites your record');
   assert.equal((await request(`/api/league/shared-mocks/${room.id}/results`, { method: 'POST', headers: auth('Amy'), body: JSON.stringify({ results }) })).status, 403);
+});
+
+test('an open room shows up for everyone, fills by joining, and the host starts it', async () => {
+  const bad = await request('/api/league/shared-mocks/open', { method: 'POST', headers: auth('Dustin'), body: JSON.stringify({ mode: 'wild' }) });
+  assert.equal(bad.status, 400);
+  const opened = await request('/api/league/shared-mocks/open', { method: 'POST', headers: auth('Dustin'), body: JSON.stringify({ mode: 'realistic' }) });
+  assert.equal(opened.status, 200, JSON.stringify(opened.body));
+  const room = roomOf(opened.body);
+  assert.equal(room.open, true);
+  assert.deepEqual(room.people, ['Dustin']);
+
+  // One open room in the league at a time.
+  const second = await request('/api/league/shared-mocks/open', { method: 'POST', headers: auth('Patrick'), body: JSON.stringify({ mode: 'sharp' }) });
+  assert.equal(second.status, 409);
+  assert.match(String(asRecord(second.body).error), /Dustin's room is already open/);
+
+  // Everyone sees it on their mock page and may look, but keepers come once they are in.
+  assert.ok((await list('Patrick')).some((entry) => entry.id === room.id));
+  const peek = await read('Patrick', room.id);
+  assert.equal(peek.status, 200);
+  assert.deepEqual(asRecord(peek.body).keepers, {});
+  assert.equal((await request(`/api/league/shared-mocks/${room.id}/start`, { method: 'POST', headers: auth('Dustin') })).status, 409, 'nobody to draft with yet');
+
+  // A real keeper of his, so the engine takes it.
+  const patrickKeeps = dataset.players
+    .filter((player) => player.fantasyTeam === 'Patrick' && player.keeper.eligible)
+    .find((player) => resolveTeamKeepers(dataset, 'Patrick', [{ playerKey: player.key, playerName: player.name }]).valid);
+  assert.ok(patrickKeeps);
+  await store.mutateState((draft) => { draft.keepers.Patrick = [{ playerKey: patrickKeeps.key, playerName: patrickKeeps.name }]; });
+  const joined = roomOf((await join('Patrick', room.id)).body);
+  assert.equal(joined.startedAt, null, 'joining does not start an open room');
+  assert.deepEqual(joined.people, ['Dustin', 'Patrick']);
+  const seen = asRecord((await read('Dustin', room.id)).body).keepers as Record<string, unknown[]>;
+  assert.equal(seen.Patrick.length, 1, 'the people in the room see one another\'s real keepers');
+  assert.deepEqual(seen.Dustin, []);
+
+  // Only the host starts it; then nobody else can join.
+  const notHost = await request(`/api/league/shared-mocks/${room.id}/start`, { method: 'POST', headers: auth('Patrick') });
+  assert.equal(notHost.status, 409);
+  const started = roomOf((await request(`/api/league/shared-mocks/${room.id}/start`, { method: 'POST', headers: auth('Dustin') })).body);
+  assert.ok(started.startedAt);
+  assert.ok(started.board);
+  assert.ok(started.board!.slots.some((slot) => slot.pick.currentOwner === 'Patrick' && slot.keeper?.playerKey === patrickKeeps.key));
+  assert.ok(!started.board!.slots.some((slot) => slot.pick.currentOwner === 'Bryan' && slot.keeper), 'a team not in the room has no keeper on the board');
+  assert.equal((await join('Bryan', room.id)).status, 409);
+  assert.equal((await read('Bryan', room.id)).status, 403, 'once it runs, only the people in it may look');
+  assert.ok(!(await list('Bryan')).some((entry) => entry.id === room.id));
+
+  await store.mutateState((draft) => { delete draft.keepers.Patrick; });
+  assert.equal((await quit('Dustin', room.id)).status, 200);
+  assert.equal((await quit('Patrick', room.id)).status, 200);
+});
+
+test('leaving an open room before it starts frees the seat, and the host can close it', async () => {
+  const room = roomOf((await request('/api/league/shared-mocks/open', { method: 'POST', headers: auth('Bryan'), body: JSON.stringify({ mode: 'sharp' }) })).body);
+  await join('Aaron', room.id);
+  const left = roomOf((await quit('Aaron', room.id)).body);
+  assert.deepEqual(left.people, ['Bryan']);
+  assert.equal(left.endedAt, null);
+  assert.ok((await list('Aaron')).some((entry) => entry.id === room.id), 'it is still open to him');
+  const closed = roomOf((await quit('Bryan', room.id)).body);
+  assert.equal(closed.endedBy, 'Bryan');
+  assert.ok(!(await list('Aaron')).some((entry) => entry.id === room.id));
 });

@@ -661,8 +661,22 @@ export async function acceptTeamNames(
 
 export interface SharedMockResponse {
   room: SharedMockRoom;
+  /** The real keepers of the people in the room, once you are one of them. */
+  keepers?: Record<string, KeeperSelection[]>;
   /** The server's clock as it answered, so a phone can line its clock up. */
   now: string;
+}
+
+/** Open a room anyone may join. You start it when you are ready. */
+export async function openSharedMockRoom(c: Credentials, mode: MockMode): Promise<SharedMockResponse> {
+  const { data } = await axios.post('/api/league/shared-mocks/open', { mode }, { headers: authHeaders(c) });
+  return data;
+}
+
+/** The host starts an open room. */
+export async function startSharedMockRoom(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/start`, {}, { headers: authHeaders(c) });
+  return data;
 }
 
 /** The mocks you were asked to and have not cleared. */
