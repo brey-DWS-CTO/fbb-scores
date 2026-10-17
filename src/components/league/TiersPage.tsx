@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { sourceLabel } from '../../lib/league/expertProjections.js';
+import ProjectionSourceSwitch from './ProjectionSourceSwitch.js';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { POSITIONS, valueBoard, type Position } from '../../lib/league/draftValue.js';
@@ -357,6 +358,7 @@ export default function TiersPage() {
       </div>
 
       <section className="panel mock-controls proj-controls">
+        <ProjectionSourceSwitch onChange={() => setPage(0)} />
         <div className="mock-seg" role="radiogroup" aria-label="Position">
           {(['ALL', ...POSITIONS] as const).map((choice) => (
             <button
