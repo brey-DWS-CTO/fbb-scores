@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchDraftRankings, fetchExpertProjections, fetchProjectionEdits } from '../lib/league/api.js';
-import { applyProjectionSource, type ProjectionSource } from '../lib/league/expertProjections.js';
+import { applyProjectionSource, sourceLabel, type ProjectionSource } from '../lib/league/expertProjections.js';
 import { applyProjectionEdits, editsById, type ProjectionEdits } from '../lib/league/projectionEdits.js';
 import type { DraftRankingSnapshot } from '../lib/league/draftRankings.js';
 import { useIdentity, useLeagueState } from './useLeague.js';
@@ -28,6 +28,9 @@ export function useProjectionData(enabled = true): {
   edits: ProjectionEdits;
   /** Where the lines come from: ESPN for everyone but the commissioner. */
   source: ProjectionSource;
+  /** The commissioner's other source, unedited, for the VS column: Hashtag on ESPN, ESPN otherwise. */
+  compare: DraftRankingSnapshot | null;
+  compareLabel: string;
   loading: boolean;
 } {
   const { identity } = useIdentity();
@@ -51,7 +54,8 @@ export function useProjectionData(enabled = true): {
   const expertQuery = useQuery({
     queryKey: ['expert-projections', identity?.owner ?? 'anon'],
     queryFn: () => fetchExpertProjections(identity as NonNullable<typeof identity>),
-    enabled: signedIn && source !== 'espn',
+    // The commissioner always loads it: on ESPN it is the other side of his VS column.
+    enabled: signedIn && identity?.isCommissioner === true,
     staleTime: Infinity,
   });
   const espn = rankings.data?.snapshot ?? null;
@@ -59,12 +63,19 @@ export function useProjectionData(enabled = true): {
   const original = useMemo(() => (espn ? applyProjectionSource(espn, expert, source) : null), [espn, expert, source]);
   const edits = useMemo(() => editsById(editsQuery.data ?? []), [editsQuery.data]);
   const snapshot = useMemo(() => (original ? applyProjectionEdits(original, edits) : null), [original, edits]);
+  const onEspn = !expert || source === 'espn';
+  const compare = useMemo(
+    () => (!espn || !expert ? null : onEspn ? applyProjectionSource(espn, expert, 'hashtag') : espn),
+    [espn, expert, onEspn],
+  );
   return {
     snapshot,
     original,
     espn,
     edits,
     source: expert ? source : 'espn',
+    compare,
+    compareLabel: sourceLabel(onEspn ? 'hashtag' : 'espn'),
     loading: rankings.isLoading || editsQuery.isLoading || expertQuery.isLoading,
   };
 }
