@@ -189,3 +189,37 @@ export function applyProjectionSource<T extends Pick<DraftRankingSnapshot, 'play
     }),
   };
 }
+
+// ─── ESPN's blanks ──────────────────────────────────────────────────────────
+
+/**
+ * The outside lines for players ESPN lists but does not project (Sandro
+ * Mamukelashvili, Cam Spencer, Daniss Jenkins on 17 October). These fill the
+ * blanks for every owner, so they are the only outside lines anyone but the
+ * commissioner receives.
+ */
+export function projectionGaps(
+  players: readonly (Pick<DraftRankingPlayer, 'espnId' | 'fullName' | 'projection'> & { proTeam?: string })[],
+  expert: Pick<ExpertProjections, 'players'>,
+): ExpertLine[] {
+  const blanks = players.filter((player) => player.projection === null);
+  return [...matchExpert(blanks, expert).byEspnId.values()];
+}
+
+/** The snapshot with ESPN's blanks filled from the outside lines. A player ESPN projects is left alone. */
+export function fillProjectionGaps<T extends Pick<DraftRankingSnapshot, 'players'>>(
+  snapshot: T,
+  fills: Pick<ExpertProjections, 'players'> | null,
+): T {
+  if (!fills || fills.players.length === 0) return snapshot;
+  const blanks = snapshot.players.filter((player) => player.projection === null);
+  const { byEspnId } = matchExpert(blanks, fills);
+  if (byEspnId.size === 0) return snapshot;
+  return {
+    ...snapshot,
+    players: snapshot.players.map((player): DraftRankingPlayer => {
+      const line = byEspnId.get(player.espnId);
+      return line ? { ...player, projection: rowOf(expertPerGame(line, null), line.games, 'hashtag') } : player;
+    }),
+  };
+}
