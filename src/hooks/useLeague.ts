@@ -6,6 +6,8 @@ import {
   fetchPlayerPool,
   fetchPublishedHistory,
   sandboxActive,
+  leaveTestDraft,
+  testDraftJoined,
   pinDead,
   sessionExpired,
   actAsOwner,
@@ -25,6 +27,7 @@ import { draftIsLive, pollInterval } from '../lib/league/polling.js';
 import { idleForMs, wakeOnActivity } from './useActivity.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
 import type { KeeperScenario } from '../lib/league/keeperScenario.js';
+import { replyFits } from '../lib/league/testDraft.js';
 
 const EMPTY_KEEPER_SCENARIO: KeeperScenario = {};
 
@@ -62,6 +65,13 @@ export function useLeagueState(fast = false) {
   // The server names who it thinks is asking. When that is not the owner this
   // phone shows, the sign-in has likely run out, and the page would show an
   // empty team under a real name. Check, and sign the phone out if so.
+  // The commish closed the test draft: the server answered with the league,
+  // so this device leaves the test too.
+  const testEnded = query.isSuccess && testDraftJoined() && query.data.meta?.testDraft?.serving !== true;
+  useEffect(() => {
+    if (testEnded) leaveTestDraft();
+  }, [testEnded]);
+
   const serverViewer = query.isSuccess ? query.data.meta?.viewer : undefined;
   useEffect(() => {
     if (serverViewer === undefined || !identity) return;
@@ -165,6 +175,8 @@ export function useApplyStateResponse() {
   const { identity } = useIdentity();
   return useCallback(
     (res: StateResponse) => {
+      // A reply from the other side of the test draft never lands on this screen.
+      if (!replyFits(testDraftJoined(), res.meta)) return;
       qc.setQueryData(['league-state', identity?.owner ?? 'anon'], res);
     },
     [qc, identity?.owner],

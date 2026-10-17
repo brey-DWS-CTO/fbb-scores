@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
 import { useDraftData } from '../../hooks/useLeague.js';
-import { sandboxActive } from '../../lib/league/api.js';
+import { sandboxActive, testDraftJoined } from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import NavIcon from '../league/NavIcon.js';
@@ -168,7 +168,7 @@ export default function DraftTvPage() {
           >
             EXIT TV
           </Link>
-          {sandboxActive() && (
+          {(sandboxActive() || testDraftJoined()) && (
             <div
               style={{
                 color: 'var(--neon-yellow)',

@@ -437,6 +437,17 @@ function defaultState(): LeagueDynamicState {
   };
 }
 
+/** The league_state row that holds the shared test draft. Row 1 is the league. */
+const TEST_DRAFT_ROW = 2;
+
+/** A test-draft write landed after the commissioner ended the test. */
+export class TestDraftMissingError extends Error {
+  constructor() {
+    super('The test draft has ended');
+    this.name = 'TestDraftMissingError';
+  }
+}
+
 /** Unclaimed PINs are stored as the empty string. */
 const UNCLAIMED = '';
 /** Commissioner-assigned temporary PINs are stored prefixed; signing in with
@@ -448,6 +459,9 @@ const TEMP_PREFIX = 'T:';
 interface StoreBackend {
   getState(): Promise<StateResult>;
   mutateState(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
+  getTestDraft(): Promise<StateResult | null>;
+  setTestDraft(state: LeagueDynamicState | null): Promise<void>;
+  mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
   getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario>;
   setKeeperScenarioTarget(
     season: number,
@@ -906,6 +920,51 @@ class NeonBackend implements StoreBackend {
       if (updated[0]) return { state: draft, version: updated[0].version };
     }
     throw new Error('League state changed too often; retry the request');
+  }
+
+  // The shared test draft is a second row of league_state. Every live query
+  // names id = 1, so row 2 never leaks into the real league.
+  async getTestDraft(): Promise<StateResult | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data, version, updated_at FROM league_state WHERE id = ${TEST_DRAFT_ROW}`) as Array<{
+      data: LeagueDynamicState;
+      version: number;
+      updated_at: string | Date;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return { state: row.data, version: row.version, updatedAt: new Date(row.updated_at).toISOString() };
+  }
+
+  async setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+    await this.ensureInit();
+    if (state === null) {
+      await this.sql`DELETE FROM league_state WHERE id = ${TEST_DRAFT_ROW}`;
+      return;
+    }
+    await this.sql`INSERT INTO league_state (id, data, version)
+      VALUES (${TEST_DRAFT_ROW}, ${JSON.stringify(state)}::jsonb, 1)
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, version = league_state.version + 1, updated_at = now()`;
+  }
+
+  async mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+    await this.ensureInit();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const rows = (await this.sql`SELECT data, version FROM league_state WHERE id = ${TEST_DRAFT_ROW}`) as Array<{
+        data: LeagueDynamicState;
+        version: number;
+      }>;
+      const row = rows[0];
+      if (!row) throw new TestDraftMissingError();
+      const draft = structuredClone(row.data);
+      fn(draft);
+      const updated = (await this.sql`UPDATE league_state
+        SET data = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
+        WHERE id = ${TEST_DRAFT_ROW} AND version = ${row.version}
+        RETURNING version`) as Array<{ version: number }>;
+      if (updated[0]) return { state: draft, version: updated[0].version };
+    }
+    throw new Error('The test draft changed too often; retry the request');
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -1895,6 +1954,8 @@ interface FileDoc {
   ownerEmails: OwnerEmailRow[];
   loginTokens: LoginTokenRow[];
   sessions: SessionRow[];
+  /** The shared test draft, or null when none is running. */
+  testDraft?: { state: LeagueDynamicState; version: number; updatedAt: string } | null;
 }
 
 /** Every list a fresh document starts with. */
@@ -1986,6 +2047,7 @@ class FileBackend implements StoreBackend {
         ownerEmails: Array.isArray(doc.ownerEmails) ? doc.ownerEmails : [],
         loginTokens: Array.isArray(doc.loginTokens) ? doc.loginTokens : [],
         sessions: Array.isArray(doc.sessions) ? doc.sessions : [],
+        testDraft: doc.testDraft ?? null,
       };
     } catch {
       // A missing or unreadable file starts empty. Every list must be present,
@@ -2026,6 +2088,35 @@ class FileBackend implements StoreBackend {
     });
   }
 
+
+  async getTestDraft(): Promise<StateResult | null> {
+    await this.ensureInit();
+    return this.readDoc().testDraft ?? null;
+  }
+
+  async setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.testDraft = state === null
+        ? null
+        : { state, version: (doc.testDraft?.version ?? 0) + 1, updatedAt: new Date().toISOString() };
+      this.writeDoc(doc);
+    });
+  }
+
+  async mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (!doc.testDraft) throw new TestDraftMissingError();
+      const draft = structuredClone(doc.testDraft.state);
+      fn(draft);
+      doc.testDraft = { state: draft, version: doc.testDraft.version + 1, updatedAt: new Date().toISOString() };
+      this.writeDoc(doc);
+      return { state: draft, version: doc.testDraft.version };
+    });
+  }
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
     await this.ensureInit();
     const doc = this.readDoc();
@@ -2783,6 +2874,23 @@ export async function mutateState(
   fn: (draft: LeagueDynamicState) => void,
 ): Promise<MutateResult> {
   return getBackend().mutateState(fn);
+}
+
+/** The shared test draft, or null when none is running. */
+export async function getTestDraft(): Promise<StateResult | null> {
+  return getBackend().getTestDraft();
+}
+
+/** Start (or restart) the shared test draft with this state, or end it with null. */
+export async function setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+  return getBackend().setTestDraft(state);
+}
+
+/** Change the shared test draft. Throws TestDraftMissingError when none is running. */
+export async function mutateTestDraft(
+  fn: (draft: LeagueDynamicState) => void,
+): Promise<MutateResult> {
+  return getBackend().mutateTestDraft(fn);
 }
 
 export async function getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {

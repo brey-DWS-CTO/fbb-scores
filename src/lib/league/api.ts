@@ -4,6 +4,7 @@ import type { MockStatRow } from './mockStats.js';
 import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
+import { TEST_DRAFT_HEADER, type TestDraftMeta } from './testDraft.js';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
 import type {
   KeeperSelection,
@@ -75,6 +76,8 @@ export interface StateMeta {
   };
   viewer: string | null;
   isCommissioner: boolean;
+  /** Whether a shared test draft is open, and whether this reply is it. */
+  testDraft?: TestDraftMeta;
 }
 
 export interface StateResponse {
@@ -165,6 +168,55 @@ export interface SchedulePreviewResponse {
 const authHeaders = (c: Credentials): Record<string, string> =>
   c.session ? { 'x-session': c.session } : { 'x-owner': c.owner, 'x-pin': c.pin ?? '' };
 
+/* ── The shared test draft ──────────────────────────────────────────────────
+ * A copy of the league on the server that every member can join. A device
+ * that joins sends the test header on state reads and draft writes, and
+ * nothing else, so keeper pages and trades still talk to the real league.
+ * The commissioner's on-device sandbox below wins when both are on. */
+const TEST_DRAFT_KEY = 'fbb-test-draft';
+
+/** True when this device has joined the shared test draft. */
+export function testDraftJoined(): boolean {
+  if (readSandbox()) return false;
+  try {
+    return localStorage.getItem(TEST_DRAFT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function joinTestDraft(): void {
+  try {
+    localStorage.setItem(TEST_DRAFT_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function leaveTestDraft(): void {
+  try {
+    localStorage.removeItem(TEST_DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+const testDraftHeader = (): Record<string, string> => (testDraftJoined() ? { [TEST_DRAFT_HEADER]: '1' } : {});
+const draftHeaders = (c: Credentials): Record<string, string> => ({ ...authHeaders(c), ...testDraftHeader() });
+
+/** Open the shared test draft, or start it over. Joins this device. */
+export async function startTestDraft(c: Credentials): Promise<StateResponse> {
+  const { data } = await axios.post<StateResponse>('/api/league/test-draft/start', {}, { headers: authHeaders(c) });
+  joinTestDraft();
+  return data;
+}
+
+/** Close the shared test draft for everyone. */
+export async function endTestDraft(c: Credentials): Promise<void> {
+  await axios.post('/api/league/test-draft/end', {}, { headers: authHeaders(c) });
+  leaveTestDraft();
+}
+
 /* ── Commissioner TEST MODE (sandbox) ────────────────────────────────────────
  * While active, keeper/draft reads and writes stay entirely in localStorage —
  * nothing touches the server — so the commissioner can fill in anyone's
@@ -239,7 +291,7 @@ export function exitSandbox(): void {
 
 async function fetchLiveState(credentials?: Credentials | null): Promise<StateResponse> {
   const { data } = await axios.get<StateResponse>('/api/league/state', {
-    headers: credentials ? authHeaders(credentials) : undefined,
+    headers: { ...(credentials ? authHeaders(credentials) : {}), ...testDraftHeader() },
   });
   return data;
 }
@@ -425,7 +477,7 @@ export async function submitDraftPick(
       }
     });
   }
-  const { data } = await axios.post('/api/league/draft/pick', pick, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/pick', pick, { headers: draftHeaders(c) });
   return data;
 }
 
@@ -443,7 +495,7 @@ export async function clearDraftPick(c: Credentials, overallPick: number): Promi
     });
   }
   const { data } = await axios.delete(`/api/league/draft/pick/${overallPick}`, {
-    headers: authHeaders(c),
+    headers: draftHeaders(c),
   });
   return data;
 }
@@ -472,7 +524,7 @@ export async function callDraftClock(c: Credentials): Promise<StateResponse> {
       if (s.draft.clock && !s.draft.clock.call) s.draft.clock = callClock(s.draft.clock, c.owner, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: draftHeaders(c) });
   return data;
 }
 
@@ -493,7 +545,7 @@ export async function expireDraftClock(c: Credentials, onClockOverall: number): 
       }
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/expire', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/expire', {}, { headers: draftHeaders(c) });
   return data;
 }
 
@@ -504,7 +556,7 @@ export async function pauseDraftClock(c: Credentials): Promise<StateResponse> {
       if (s.draft.clock) s.draft.clock = pauseClock(s.draft.clock, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/pause', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/pause', {}, { headers: draftHeaders(c) });
   return data;
 }
 
@@ -515,7 +567,7 @@ export async function resumeDraftClock(c: Credentials): Promise<StateResponse> {
       if (s.draft.clock) s.draft.clock = resumeClock(s.draft.clock, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/resume', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/resume', {}, { headers: draftHeaders(c) });
   return data;
 }
 

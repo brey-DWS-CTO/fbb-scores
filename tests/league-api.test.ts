@@ -1112,3 +1112,73 @@ test('a write-in pick lands with its own key, and cannot double a pool player or
   assert.equal(again.status, 409);
   assert.match(String(again.body.error), /already on the board/);
 });
+
+test('test draft: members pick in a shared copy that never touches the league', async () => {
+  const joelPlayer = dataset.players.find((player) => player.fantasyTeam === 'Joel');
+  assert.ok(joelPlayer);
+  const live = cleanState();
+  live.keepers = { Joel: [{ playerKey: joelPlayer.key, playerName: joelPlayer.name }] };
+  await replaceState(live);
+  const inTest = (owner: keyof typeof pins) => ({ ...auth(owner), 'x-test-draft': '1' });
+
+  const memberStart = await request('/api/league/test-draft/start', { method: 'POST', headers: auth('Joel') });
+  assert.equal(memberStart.status, 403);
+  const started = await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(started.status, 200);
+  assert.deepEqual((started.body.meta as { testDraft: unknown }).testDraft, { running: true, serving: true });
+
+  // Secret keepers stay secret: the copy has none, and the board is open to all.
+  const joelView = await request('/api/league/state', { headers: inTest('Joel') });
+  const testState = joelView.body.state as LeagueDynamicState;
+  assert.deepEqual(testState.keepers, {});
+  assert.ok(testState.draft.startedAt);
+  const liveView = await request('/api/league/state', { headers: auth('Joel') });
+  assert.deepEqual((liveView.body.meta as { testDraft: unknown }).testDraft, { running: true, serving: false });
+
+  const first = dataset.players[0];
+  const second = dataset.players[1];
+  assert.ok(first && second);
+  const joelPick = await request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: inTest('Joel'),
+    body: JSON.stringify({ overallPick: 1, playerKey: first.key, playerName: first.name }),
+  });
+  assert.equal(joelPick.status, 200);
+  // The commish enters Ryan's pick from his own seat.
+  const commishPick = await request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: inTest(commissioner),
+    body: JSON.stringify({ overallPick: 2, playerKey: second.key, playerName: second.name }),
+  });
+  assert.equal(commishPick.status, 200);
+  assert.equal(Object.keys((commishPick.body.state as LeagueDynamicState).draft.picks).length, 2);
+
+  const league = await store.getState();
+  assert.equal(league.state.draft.startedAt, null);
+  assert.deepEqual(league.state.draft.picks, {});
+  assert.equal(league.state.keepers.Joel?.length, 1);
+
+  // A joined device cannot change the league by mistake.
+  const realStart = await request('/api/league/draft/start', { method: 'POST', headers: inTest(commissioner) });
+  assert.equal(realStart.status, 409);
+
+  const ended = await request('/api/league/test-draft/end', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(ended.status, 200);
+  const afterEnd = await request('/api/league/state', { headers: inTest('Joel') });
+  assert.deepEqual((afterEnd.body.meta as { testDraft: unknown }).testDraft, { running: false, serving: false });
+  const latePick = await request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: inTest('Ryan'),
+    body: JSON.stringify({ overallPick: 3, playerKey: first.key, playerName: first.name }),
+  });
+  assert.equal(latePick.status, 410);
+});
+
+test('test draft: closed once the real draft starts', async () => {
+  const live = cleanState();
+  live.keepersRevealed = true;
+  live.draft.startedAt = '2026-10-18T21:00:00.000Z';
+  await replaceState(live);
+  const blocked = await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(blocked.status, 409);
+});

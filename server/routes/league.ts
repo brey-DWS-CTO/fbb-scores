@@ -131,9 +131,16 @@ import {
   listMockTrades,
   saveMockTrade,
   deleteMockTrade,
+  getTestDraft,
+  mutateTestDraft,
+  setTestDraft,
+  TestDraftMissingError,
   type KeeperSelection,
   type LeagueDynamicState,
+  type MutateResult,
+  type StateResult,
 } from '../lib/leagueStore.js';
+import { TEST_DRAFT_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
 import {
@@ -543,6 +550,70 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
   return { ...result, state, meta };
 }
 
+// ─── The shared test draft ───────────────────────────────────────────────────
+//
+// A device that has joined the test sends x-test-draft: 1. On the draft
+// routes below that header swaps the league for the test copy, which lives in
+// its own row and writes nothing to the audit log. Any other write carrying it
+// is refused, so a joined device can never touch the real league by mistake.
+
+const TEST_DRAFT_ROUTES = [
+  /^\/state$/,
+  /^\/draft\/pick(\/\d+)?$/,
+  /^\/draft\/clock\/(expire|call|pause|resume)$/,
+  /^\/test-draft\/(start|end)$/,
+];
+
+router.use((req, res, next) => {
+  if (req.header(TEST_DRAFT_HEADER) !== '1') {
+    next();
+    return;
+  }
+  if (TEST_DRAFT_ROUTES.some((route) => route.test(req.path))) {
+    res.locals.testDraft = true;
+    next();
+    return;
+  }
+  if (req.method === 'GET') {
+    next();
+    return;
+  }
+  res.status(409).json({ error: 'Leave the test draft before you change the league' });
+});
+
+const inTestDraft = (res: Response): boolean => res.locals.testDraft === true;
+
+/** The league, or the test draft for a device in the test. */
+async function draftState(res: Response): Promise<StateResult> {
+  if (!inTestDraft(res)) return getState();
+  const test = await getTestDraft();
+  if (!test) throw new HttpError(410, 'The test draft has ended');
+  return test;
+}
+
+/** Change the league, or the test draft for a device in the test. */
+async function mutateDraft(res: Response, fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+  if (!inTestDraft(res)) return mutateState(fn);
+  try {
+    return await mutateTestDraft(fn);
+  } catch (error) {
+    if (error instanceof TestDraftMissingError) throw new HttpError(410, 'The test draft has ended');
+    throw error;
+  }
+}
+
+/** Test picks stay out of the league's audit log. */
+async function auditDraft(res: Response, action: string, detail: unknown): Promise<void> {
+  if (!inTestDraft(res)) await appendAudit(actor(res), action, detail);
+}
+
+/** A state reply that says whether it came from the test draft. */
+function draftReply<T extends { state: LeagueDynamicState }>(res: Response, result: T, viewer: Viewer) {
+  const body = redactState(result, viewer);
+  if (!inTestDraft(res)) return body;
+  return { ...body, meta: { ...body.meta, testDraft: { running: true, serving: true } } };
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 /**
@@ -551,7 +622,13 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
  */
 router.get('/state', async (req, res) => {
   const viewer = await optionalViewer(req);
-  res.json(redactState(await getState(), viewer));
+  const test = await getTestDraft();
+  if (inTestDraft(res) && test) {
+    res.json(draftReply(res, test, viewer));
+    return;
+  }
+  const body = redactState(await getState(), viewer);
+  res.json({ ...body, meta: { ...body.meta, testDraft: { running: test !== null, serving: false } } });
 });
 
 /** GET /api/league/player-pool — active or draft-pinned pool. */
@@ -1273,15 +1350,15 @@ function settleClock(draft: LeagueDynamicState, dataset: LeagueDataset, now: str
  * does nothing when time is still left or the pick already moved on.
  */
 router.post('/draft/clock/expire', requireAuth, async (_req, res) => {
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
   let yielded: number | null = null;
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     yielded = settleClock(draft, currentDataset(draft, draftPoolDataset), now);
   });
-  if (yielded !== null) await appendAudit(actor(res), 'draft.pick_yielded', { overallPick: yielded, at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
+  if (yielded !== null) await auditDraft(res, 'draft.pick_yielded', { overallPick: yielded, at: now });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
 });
 
 /**
@@ -1306,7 +1383,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
 
   const authedOwner = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   // A write-in is a player the locked pool does not have: name, team and position typed in.
   const writeIn = body.writeIn === true;
@@ -1327,7 +1404,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     player = found;
   }
   const timestamp = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
@@ -1376,7 +1453,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       draft.draft.clock = startPickClock(timestamp, isPaused(draft.draft.clock));
     }
   });
-  await appendAudit(actor(res), 'draft.pick', {
+  await auditDraft(res, 'draft.pick', {
     overallPick,
     playerKey: player.key,
     playerName: player.name,
@@ -1385,7 +1462,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     isKeeper: false,
     writeIn,
   });
-  res.json(redactState(result, { owner: authedOwner, isCommissioner }));
+  res.json(draftReply(res, result, { owner: authedOwner, isCommissioner }));
 });
 
 /**
@@ -1397,7 +1474,7 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
     res.status(400).json({ error: 'Invalid overallPick' });
     return;
   }
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     const was = draft.draft.picks[String(overallPick)];
     delete draft.draft.picks[String(overallPick)];
     if (was?.skipped) {
@@ -1408,8 +1485,8 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
       draft.draft.clock = startPickClock(new Date().toISOString(), isPaused(draft.draft.clock));
     }
   });
-  await appendAudit(actor(res), 'draft.pick_cleared', { overallPick });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.pick_cleared', { overallPick });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1448,11 +1525,11 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
 router.post('/draft/clock/call', requireAuth, async (_req, res) => {
   const caller = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
   let calledOn = '';
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) throw new HttpError(409, 'The draft has not started');
     const dataset = currentDataset(draft, draftPoolDataset);
     settleClock(draft, dataset, now);
@@ -1473,30 +1550,30 @@ router.post('/draft/clock/call', requireAuth, async (_req, res) => {
     calledOn = onClock!.pick.currentOwner;
     draft.draft.clock = callClock(draft.draft.clock!, caller, now);
   });
-  await appendAudit(actor(res), 'draft.clock_called', { on: calledOn, at: now });
-  res.json(redactState(result, { owner: caller, isCommissioner }));
+  await auditDraft(res, 'draft.clock_called', { on: calledOn, at: now });
+  res.json(draftReply(res, result, { owner: caller, isCommissioner }));
 });
 
 /** POST /api/league/draft/clock/pause — freeze the pick timer and any CLOCK (commissioner only). */
 router.post('/draft/clock/pause', requireAuth, requireCommissioner, async (_req, res) => {
   const now = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
     draft.draft.clock = pauseClock(draft.draft.clock, now);
   });
-  await appendAudit(actor(res), 'draft.clock_paused', { at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.clock_paused', { at: now });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /** POST /api/league/draft/clock/resume — let the clock run again (commissioner only). */
 router.post('/draft/clock/resume', requireAuth, requireCommissioner, async (_req, res) => {
   const now = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
     draft.draft.clock = resumeClock(draft.draft.clock, now);
   });
-  await appendAudit(actor(res), 'draft.clock_resumed', { at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.clock_resumed', { at: now });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1542,6 +1619,28 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
   });
   await appendAudit(actor(res), 'draft.reset', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/test-draft/start — open the shared test draft, or start it
+ * over (commissioner only). Members join it from their draft page.
+ */
+router.post('/test-draft/start', requireAuth, requireCommissioner, async (_req, res) => {
+  const { state } = await getState();
+  if (state.draft.startedAt !== null) throw new HttpError(409, 'The real draft has started. Test drafts are closed.');
+  await setTestDraft(testDraftState(state, new Date().toISOString(), FALLBACK_PLAYER_POOL.id));
+  await appendAudit(actor(res), 'test-draft.started', null);
+  const test = await getTestDraft();
+  if (!test) throw new HttpError(500, 'The test draft did not save');
+  res.locals.testDraft = true;
+  res.json(draftReply(res, test, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/** POST /api/league/test-draft/end — close the test draft for everyone (commissioner only). */
+router.post('/test-draft/end', requireAuth, requireCommissioner, async (_req, res) => {
+  await setTestDraft(null);
+  await appendAudit(actor(res), 'test-draft.ended', null);
+  res.json({ ok: true });
 });
 
 /**

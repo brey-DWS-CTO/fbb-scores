@@ -12,11 +12,15 @@ import {
 import {
   apiErrorMessage,
   clearKeeperScenario,
-  enterSandbox,
+  endTestDraft,
   exitSandbox,
   expireDraftClock,
+  joinTestDraft,
+  leaveTestDraft,
   sandboxActive,
   startDraft,
+  startTestDraft,
+  testDraftJoined,
 } from '../../lib/league/api.js';
 import { clockExpired } from '../../lib/league/draftClock.js';
 import { formatDraftAt } from '../../lib/league/format.js';
@@ -31,6 +35,7 @@ import IdentityChip from '../league/IdentityChip.js';
 import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
+import LiveRoom from './LiveRoom.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
@@ -254,23 +259,45 @@ export default function DraftPage() {
     }
   };
 
-  // A dry run from right here: copy the league into test mode, start it,
-  // reload so every read comes from the copy. Nothing touches the server.
+  // The shared test draft: a copy of the league on the server that every
+  // member can join from this page and pick in from their own phone. Joining
+  // or leaving reloads, so every read comes from the right side.
   const [testBusy, setTestBusy] = useState(false);
+  const [endArmed, setEndArmed] = useState(false);
   const inSandbox = sandboxActive();
+  const inTestDraft = testDraftJoined();
+  const testOpen = meta?.testDraft?.running === true;
   const doTestDraft = async () => {
     if (!identity || testBusy) return;
     setTestBusy(true);
     setStartError(null);
     try {
-      await enterSandbox(identity);
-      await startDraft(identity);
+      await startTestDraft(identity);
       window.location.reload();
     } catch (e) {
-      exitSandbox();
       setStartError(apiErrorMessage(e));
       setTestBusy(false);
     }
+  };
+  const doEndTestDraft = async () => {
+    if (!identity || testBusy) return;
+    setTestBusy(true);
+    setStartError(null);
+    try {
+      await endTestDraft(identity);
+      window.location.reload();
+    } catch (e) {
+      setStartError(apiErrorMessage(e));
+      setTestBusy(false);
+    }
+  };
+  const doJoinTestDraft = () => {
+    joinTestDraft();
+    window.location.reload();
+  };
+  const doLeaveTestDraft = () => {
+    leaveTestDraft();
+    window.location.reload();
   };
   const doExitTest = () => {
     exitSandbox();
@@ -295,19 +322,22 @@ export default function DraftPage() {
     ? board.slice(onClockIdx + 1).filter((c) => !c.selection && !c.keeper).slice(0, 3)
     : [];
 
-  // Only the commissioner's screen carries numbers. Members and the TV get none.
-  const { numbers } = useDraftNumbers({
-    enabled: started && identity?.isCommissioner === true,
+  // The pick on the clock is yours to enter when it is your team's, or you are the commish.
+  const canEnterOnClock =
+    started && poolReady && onClock !== null && identity !== null
+    && (identity.isCommissioner || identity.owner === onClock.pick.currentOwner);
+
+  // Every signed-in member gets the numbers in the player list. The gone
+  // odds run only while the viewer can enter the pick on the clock, the way
+  // the mock room shows them only on your turn. The TV gets none.
+  const { numbers, projections, gone } = useDraftNumbers({
+    enabled: started && identity !== null,
+    odds: canEnterOnClock,
     dataset,
     state: boardState,
     onClock,
     person: identity?.owner ?? null,
   });
-
-  // The pick on the clock is yours to enter when it is your team's, or you are the commish.
-  const canEnterOnClock =
-    started && poolReady && onClock !== null && identity !== null
-    && (identity.isCommissioner || identity.owner === onClock.pick.currentOwner);
 
   const rounds = useMemo(
     () => Array.from({ length: dataset.draftRounds }, (_, i) => i + 1),
@@ -417,6 +447,51 @@ export default function DraftPage() {
         </Link>
       </div>
 
+      {inTestDraft && (
+        <div className="panel test-draft-panel">
+          <div className="hub-heading">
+            <NavIcon name="flask" size={14} className="icon-in-heading" />
+            TEST DRAFT
+          </div>
+          <p>Everyone who joins picks in the same copy of the draft. Nothing here counts, and the real league stays as it was.</p>
+          <div className="test-draft-actions">
+            {identity?.isCommissioner && (
+              <button className="tap-btn" type="button" disabled={testBusy} onClick={doTestDraft}>
+                START OVER
+              </button>
+            )}
+            {identity?.isCommissioner && (
+              <button
+                className="tap-btn is-danger"
+                type="button"
+                disabled={testBusy}
+                onClick={endArmed ? doEndTestDraft : () => setEndArmed(true)}
+              >
+                {endArmed ? 'END IT FOR EVERYONE?' : 'END TEST'}
+              </button>
+            )}
+            <button className="tap-btn" type="button" onClick={doLeaveTestDraft}>
+              LEAVE TEST
+            </button>
+          </div>
+          {startError && <div className="test-draft-error">{startError}</div>}
+        </div>
+      )}
+      {!inTestDraft && !inSandbox && testOpen && identity && !started && (
+        <div className="panel test-draft-panel">
+          <div className="hub-heading">
+            <NavIcon name="flask" size={14} className="icon-in-heading" />
+            TEST DRAFT OPEN
+          </div>
+          <p>The commish opened a practice draft. Join to make picks from your own phone. Nothing counts.</p>
+          <div className="test-draft-actions">
+            <button className="tap-btn is-go" type="button" onClick={doJoinTestDraft}>
+              JOIN THE TEST
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ON THE CLOCK hero */}
       {scenarioActive && (
         <div
@@ -511,7 +586,7 @@ export default function DraftPage() {
                     FOR REAL? TAP TO GO LIVE
                   </button>
                 )}
-                {!inSandbox && (
+                {!inSandbox && !inTestDraft && (
                   <div style={{ marginTop: 10 }}>
                     <button
                       className="tap-btn"
@@ -530,10 +605,10 @@ export default function DraftPage() {
                       }}
                     >
                       <NavIcon name="flask" size={15} className="icon-in-heading" />
-                      {testBusy ? 'SETTING UP…' : 'RUN A TEST DRAFT'}
+                      {testBusy ? 'SETTING UP…' : testOpen ? 'START THE TEST OVER' : 'RUN A TEST DRAFT'}
                     </button>
                     <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginTop: 6 }}>
-                      A copy on this device only. Nothing is saved to the league.
+                      A practice copy everyone can join from this page. Nothing counts.
                     </div>
                   </div>
                 )}
@@ -662,6 +737,19 @@ export default function DraftPage() {
           </div>
         )}
       </div>
+
+      {started && poolReady && onClock && identity && (
+        <LiveRoom
+          board={board}
+          everyone={dataset.players}
+          available={pool}
+          onClock={onClock}
+          person={identity.owner}
+          canDraft={canEnterOnClock}
+          projections={projections}
+          gone={gone}
+        />
+      )}
 
       {started && !onClock && (
         <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />

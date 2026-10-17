@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
-import { sandboxActive } from './lib/league/api.js'
+import { sandboxActive, testDraftJoined } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
 import NavIcon from './components/league/NavIcon.js'
 import ActingAsBanner from './components/league/ActingAsBanner.js';
@@ -65,6 +65,15 @@ function App() {
         >
           <NavIcon name="flask" size={14} className="icon-in-heading" />
           TEST MODE. Sandbox only, nothing is saved. Tap to exit in Commish Mode.
+        </Link>
+      )}
+      {!sandbox && testDraftJoined() && (
+        <Link
+          to="/draft"
+          className="test-draft-strip"
+        >
+          <NavIcon name="flask" size={14} className="icon-in-heading" />
+          TEST DRAFT. Picks here do not count. Tap to open the draft.
         </Link>
       )}
       {!bareMode && <AppNav />}
