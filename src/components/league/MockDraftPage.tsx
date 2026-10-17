@@ -101,14 +101,17 @@ function MockDraftScreen() {
   const acting = Boolean(identity?.impersonatedBy);
   const [saved] = useState(() => (acting ? null : readSave(viewer)));
   const [mode, setMode] = useState<MockMode>(saved?.mode ?? 'sharp');
-  const [seed, setSeed] = useState(saved?.seed ?? 7);
+  // A finished draft gets a new seed, so the next one is a different draft.
+  const [seed, setSeed] = useState(saved && !saved.finished ? saved.seed : Math.floor(Math.random() * 100_000));
   const [tradesOn, setTradesOn] = useState<string[]>(saved?.tradesOn ?? []);
   const [tryKeepers, setTryKeepers] = useState(saved?.tryKeepers ?? false);
   const [tryPicks, setTryPicks] = useState<[string, string]>(saved?.tryPicks ?? ['', '']);
   const [useEntered, setUseEntered] = useState(saved?.useEntered ?? true);
   const [guessInstead, setGuessInstead] = useState<string[]>(saved?.guessInstead ?? []);
-  const [progress, setProgress] = useState<RoomProgress | null>(() => (saved
-    ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft, finished: saved.finished }
+  // A finished draft is in Past mocks already. Coming back to the page
+  // starts a fresh one rather than reopening the old grade.
+  const [progress, setProgress] = useState<RoomProgress | null>(() => (saved && !saved.finished
+    ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft, finished: false }
     : null));
   const onProgress = useCallback((next: RoomProgress) => setProgress(next), []);
 
