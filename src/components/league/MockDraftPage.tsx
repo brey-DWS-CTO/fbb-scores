@@ -71,7 +71,7 @@ function MockDraftScreen() {
   const isCommish = identity?.isCommissioner === true;
   const signedIn = viewer !== null;
 
-  // ESPN's numbers with the commissioner's projection edits laid over them.
+  // ESPN's numbers with your own projection edits laid over them.
   const { snapshot, original, edits, loading: projectionsLoading } = useProjectionData();
   const tradesQuery = useQuery({
     queryKey: ['pick-trades', viewer ?? 'anon'],

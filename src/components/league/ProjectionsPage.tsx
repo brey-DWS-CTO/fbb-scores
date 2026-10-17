@@ -326,7 +326,7 @@ export default function ProjectionsPage() {
       </div>
       <div className="mock-intro">
         Points a game in our scoring: ESPN&apos;s line plus the double-double bonus.
-        {' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow, and only you see them.'}
+        {' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow and change only your numbers.'}
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet.{' '}
             {isCommish ? <Link to="/admin">Fetch them in Commish Mode.</Link> : 'The commish will load them soon.'}</>

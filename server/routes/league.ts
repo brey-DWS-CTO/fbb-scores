@@ -933,7 +933,7 @@ router.put('/projection-edits/:espnId', requireAuth, async (req, res) => {
   const by = res.locals.owner as string;
   const edit: ProjectionEdit = { ...parsed, editedAt: at, editedBy: by };
   await saveProjectionEdit({ season, owner: by, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
-  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name, games: edit.games, perGame: edit.perGame });
+  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name });
   res.json({ edit });
 });
 

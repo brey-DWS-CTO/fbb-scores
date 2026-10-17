@@ -859,13 +859,17 @@ class NeonBackend implements StoreBackend {
     await this.sql`ALTER TABLE projection_edits ADD COLUMN IF NOT EXISTS owner text`;
     await this.sql`UPDATE projection_edits SET owner = updated_by WHERE owner IS NULL`;
     await this.sql`ALTER TABLE projection_edits ALTER COLUMN owner SET NOT NULL`;
-    await this.sql`DO $$ BEGIN
+    await this.sql`DO $$ DECLARE old_key text; BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_index i
           JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
           WHERE i.indrelid = 'projection_edits'::regclass AND i.indisprimary AND a.attname = 'owner'
       ) THEN
-        ALTER TABLE projection_edits DROP CONSTRAINT projection_edits_pkey;
+        SELECT conname INTO old_key FROM pg_constraint
+          WHERE conrelid = 'projection_edits'::regclass AND contype = 'p';
+        IF old_key IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE projection_edits DROP CONSTRAINT %I', old_key);
+        END IF;
         ALTER TABLE projection_edits ADD PRIMARY KEY (season, owner, espn_id);
       END IF;
     END $$`;

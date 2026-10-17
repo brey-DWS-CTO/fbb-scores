@@ -8,7 +8,7 @@ import { useIdentity, useLeagueState } from './useLeague.js';
 export const PROJECTION_EDITS_KEY = ['projection-edits'] as const;
 
 /**
- * ESPN's accepted rankings with the commissioner's projection edits laid on
+ * ESPN's accepted rankings with your own projection edits laid on
  * top. Every page that values players reads this, so an edit shows up in
  * projections, the mock draft and the draft room alike.
  */
