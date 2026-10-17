@@ -771,6 +771,12 @@ export async function fetchExpertProjections(c: Credentials): Promise<ExpertProj
   return data as ExpertProjections;
 }
 
+/** Hashtag's lines for the players ESPN does not project. Every owner reads these. */
+export async function fetchProjectionFills(c: Credentials): Promise<Pick<ExpertProjections, 'players'>> {
+  const { data } = await axios.get('/api/league/projection-fills', { headers: authHeaders(c) });
+  return data as Pick<ExpertProjections, 'players'>;
+}
+
 /** Your own edits to ESPN's projections. */
 export async function fetchProjectionEdits(c: Credentials): Promise<ProjectionEdit[]> {
   const { data } = await axios.get('/api/league/projection-edits', { headers: authHeaders(c) });

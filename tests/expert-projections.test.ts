@@ -114,3 +114,16 @@ test('editing a Hashtag line re-estimates its double-doubles; games alone keep t
   const fewerGames = projectedPerGame(editedProjection(jokic, { ...base, games: 50, perGame: {} }))!;
   assert.equal(fewerGames['37'], 0.8, 'Hashtag\'s rate stands');
 });
+
+test('ESPN\'s blanks take the Hashtag line; anyone ESPN projects is left alone', async () => {
+  const { projectionGaps, fillProjectionGaps } = await import('../src/lib/league/expertProjections.ts');
+  const expert: ExpertProjections = { source: 'hashtag', updated: '2026-10-16', players: parseHashtagPaste(PASTE) };
+  // Sarr has no ESPN line here; Jokic has one.
+  const gaps = projectionGaps(snapshot.players, expert);
+  assert.deepEqual(gaps.map((line) => line.name), ['Alexandre Sarr']);
+  const filled = fillProjectionGaps(snapshot, { players: gaps });
+  assert.equal(projectedPerGame(filled.players[1].projection)!['0'], 15.4);
+  assert.equal(filled.players[1].projection!.stats['42'], 68);
+  assert.equal(filled.players[0].projection, espnJokic, 'ESPN\'s own line stands');
+  assert.equal(fillProjectionGaps(snapshot, null), snapshot);
+});
