@@ -238,10 +238,12 @@ interface PickSheetProps {
    * and the sheet shows nothing without it.
    */
   numbers?: PickNumbersByKey | null;
+  /** Open on the write-in form instead of the player list. */
+  startInWriteIn?: boolean;
 }
 
 /** Bottom sheet for entering a live draft pick into an empty cell. */
-export default function PickSheet({ cell, pool, onClose, numbers = null }: PickSheetProps) {
+export default function PickSheet({ cell, pool, onClose, numbers = null, startInWriteIn = false }: PickSheetProps) {
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const postseasonGames = usePostseasonGames();
@@ -252,7 +254,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null }: PickS
   const [position, setPosition] = useState<PositionFilter>('ALL');
   const [sortChoice, setSortChoice] = useState<PickSort>('name');
   const [thenChoice, setThenChoice] = useState<PickSort | null>(null);
-  const [writeIn, setWriteIn] = useState(false);
+  const [writeIn, setWriteIn] = useState(startInWriteIn);
   const desktop = useDesktop();
 
   const isCommissioner = identity?.isCommissioner === true;

@@ -1198,3 +1198,21 @@ test('test draft: closed once the real draft starts', async () => {
   const blocked = await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) });
   assert.equal(blocked.status, 409);
 });
+
+test('draft room: each side lists who checked in, and the test has its own room', async () => {
+  const live = cleanState();
+  live.keepersRevealed = true;
+  await replaceState(live);
+  assert.equal((await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+
+  const anonymous = await request('/api/league/draft-room', { method: 'POST' });
+  assert.equal(anonymous.status, 401);
+  await request('/api/league/draft-room', { method: 'POST', headers: auth('Joel') });
+  const ryanInTest = await request('/api/league/draft-room', { method: 'POST', headers: { ...auth('Ryan'), 'x-test-draft': '1' } });
+  assert.deepEqual(ryanInTest.body, { room: 'test', owners: ['Ryan'] });
+  const commishInLeague = await request('/api/league/draft-room', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(commishInLeague.body.room, 'league');
+  assert.deepEqual([...(commishInLeague.body.owners as string[])].sort(), ['Joel', commissioner].sort());
+
+  await request('/api/league/test-draft/end', { method: 'POST', headers: auth(commissioner) });
+});

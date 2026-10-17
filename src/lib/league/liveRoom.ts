@@ -10,7 +10,13 @@ import type { PlayerProjection } from './projections.js';
 
 export type RoomSortKey =
   | 'rank' | 'adp' | 'fppg' | 'total' | 'games' | 'pi' | 'po'
-  | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone';
+  | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone'
+  | TextSortKey;
+
+/** Sorts that need no numbers: all a member gets while the draft runs. */
+export type TextSortKey = 'name' | 'team' | 'pos';
+export const TEXT_SORTS: readonly TextSortKey[] = ['name', 'team', 'pos'];
+const isTextSort = (key: RoomSortKey): key is TextSortKey => (TEXT_SORTS as readonly string[]).includes(key);
 
 export interface RoomSort {
   key: RoomSortKey;
@@ -18,6 +24,15 @@ export interface RoomSort {
 }
 
 export const DEFAULT_ROOM_SORT: RoomSort = { key: 'rank', dir: 1 };
+/** Members see no numbers, so their list starts by name. */
+export const MEMBER_ROOM_SORT: RoomSort = { key: 'name', dir: 1 };
+
+/** The words a text sort compares. */
+function textOf(player: DatasetPlayer, key: TextSortKey): string {
+  if (key === 'team') return player.proTeam.toUpperCase();
+  if (key === 'pos') return player.positions.join('/');
+  return (player.fullName ?? player.name).split(/\s+/).slice(-1)[0] ?? player.name;
+}
 
 /** Who already has a player, and with which pick. */
 export interface TakenBy {
@@ -59,6 +74,7 @@ export function roomValue(
     case 'pi': return projection?.playInGames ?? null;
     case 'po': return projection?.playoffGames ?? null;
     case 'gone': return gone ? gone.get(playerKey) ?? 0 : null;
+    case 'name': case 'team': case 'pos': return null;
     default: return projection?.line?.[key] ?? null;
   }
 }
@@ -66,7 +82,7 @@ export function roomValue(
 /** Tap a column again to flip it. Rank, ADP and turnovers start low; the rest start high. */
 export function nextRoomSort(current: RoomSort, key: RoomSortKey): RoomSort {
   if (current.key === key) return { key, dir: current.dir === 1 ? -1 : 1 };
-  return { key, dir: key === 'rank' || key === 'adp' || key === 'to' ? 1 : -1 };
+  return { key, dir: key === 'rank' || key === 'adp' || key === 'to' || isTextSort(key) ? 1 : -1 };
 }
 
 /**
@@ -98,6 +114,10 @@ export function roomRows(input: {
     })
     .map((player) => ({ player, taken: taken.get(player.key) ?? null }))
     .sort((a, b) => {
+      if (isTextSort(sort.key)) {
+        const byText = textOf(a.player, sort.key).localeCompare(textOf(b.player, sort.key)) * sort.dir;
+        return byText || (a.player.fullName ?? a.player.name).localeCompare(b.player.fullName ?? b.player.name);
+      }
       const x = roomValue(projections.get(a.player.key), gone, sort.key, a.player.key);
       const y = roomValue(projections.get(b.player.key), gone, sort.key, b.player.key);
       const tie = rank(a.player) - rank(b.player) || a.player.name.localeCompare(b.player.name);

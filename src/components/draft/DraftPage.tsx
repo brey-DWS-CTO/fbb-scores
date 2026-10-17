@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 import { earlyKeeperNote } from '../../lib/league/keeperEarly.js';
@@ -11,6 +12,7 @@ import {
 } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
+  checkInDraftRoom,
   clearKeeperScenario,
   endTestDraft,
   exitSandbox,
@@ -24,12 +26,14 @@ import {
 } from '../../lib/league/api.js';
 import { clockExpired } from '../../lib/league/draftClock.js';
 import { formatDraftAt } from '../../lib/league/format.js';
+import { PRESENCE_POLL_MS, roomChanges } from '../../lib/league/presence.js';
 import {
   projectedPlayerKeys,
   stateWithKeeperScenario,
 } from '../../lib/league/keeperScenario.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import { useDraftNumbers } from '../../hooks/useDraftNumbers.js';
+import { useDraftSounds } from '../../hooks/useDraftSounds.js';
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
 import NavIcon from '../league/NavIcon.js';
@@ -215,6 +219,8 @@ export default function DraftPage() {
   const applyState = useApplyStateResponse();
   const [view, setView] = useState<'list' | 'grid'>('grid');
   const [pickTarget, setPickTarget] = useState<BoardCell | null>(null);
+  // The picker opens straight to the write-in form from the player list.
+  const [pickWriteIn, setPickWriteIn] = useState(false);
   const [clearTarget, setClearTarget] = useState<BoardCell | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
   const [startArmed, setStartArmed] = useState(false);
@@ -299,6 +305,23 @@ export default function DraftPage() {
     leaveTestDraft();
     window.location.reload();
   };
+  // Who has the draft open. Each open page checks in every few seconds; a
+  // short note says who just came in or went out.
+  const roomQuery = useQuery({
+    queryKey: ['draft-room', identity?.owner ?? 'anon', inTestDraft ? 'test' : 'league'],
+    queryFn: () => checkInDraftRoom(identity!),
+    enabled: identity !== null && !inSandbox,
+    refetchInterval: PRESENCE_POLL_MS,
+  });
+  const roomOwners = roomQuery.data?.owners;
+  const [room, setRoom] = useState<{ last: readonly string[] | undefined; notes: string[] }>({ last: undefined, notes: [] });
+  if (roomOwners !== room.last) {
+    const { joined, left } = roomChanges(room.last ?? null, roomOwners ?? []);
+    const at = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const fresh = [...joined.map((owner) => `${owner} joined ${at}`), ...left.map((owner) => `${owner} left ${at}`)];
+    setRoom({ last: roomOwners, notes: [...fresh, ...room.notes].slice(0, 3) });
+  }
+
   const doExitTest = () => {
     exitSandbox();
     window.location.reload();
@@ -327,11 +350,11 @@ export default function DraftPage() {
     started && poolReady && onClock !== null && identity !== null
     && (identity.isCommissioner || identity.owner === onClock.pick.currentOwner);
 
-  // Every signed-in member gets the numbers in the player list. The gone
-  // odds run only while the viewer can enter the pick on the clock, the way
-  // the mock room shows them only on your turn. The TV gets none.
+  // Only the commissioner's screen carries numbers. Members pick from names,
+  // positions and teams; nothing is fetched or simulated for them. The gone
+  // odds run while he can enter the pick on the clock.
   const { numbers, projections, gone } = useDraftNumbers({
-    enabled: started && identity !== null,
+    enabled: started && identity?.isCommissioner === true,
     odds: canEnterOnClock,
     dataset,
     state: boardState,
@@ -395,6 +418,25 @@ export default function DraftPage() {
   }, [identity, clock, onClock, applyState, inSandbox]);
   const skippedCells = board.filter((cell) => cell.skipped);
 
+  // A chime when your pick comes up, beeps at two minutes, an alarm on CLOCK.
+  const { soundOn, setSoundOn } = useDraftSounds({
+    enabled: started && identity !== null,
+    clock,
+    onClockOverall: onClock?.pick.overall ?? null,
+    mine: onClock !== null && onClock.pick.currentOwner === identity?.owner,
+  });
+
+  // While the draft runs on a phone the page works like the mock room: the
+  // app's bar steps aside and the room's own bar picks Players, Board or Picks.
+  const navigate = useNavigate();
+  const roomMode = started && identity !== null;
+  const [liveTab, setLiveTab] = useState<'players' | 'board' | 'picks'>('players');
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('in-live-room', roomMode);
+    return () => document.documentElement.classList.remove('in-live-room');
+  }, [roomMode]);
+  const tabClass = (tab: typeof liveTab) => `live-tab${liveTab === tab ? ' is-shown' : ''}`;
+
   return (
     <div
       style={{
@@ -409,6 +451,17 @@ export default function DraftPage() {
           2027 DRAFT
         </div>
         <IdentityChip />
+        {roomMode && (
+          <button
+            className={`tap-btn live-sound-btn${soundOn ? ' is-on' : ''}`}
+            type="button"
+            aria-pressed={soundOn}
+            onClick={() => setSoundOn(!soundOn)}
+            title="Sound when you are up, at two minutes, and when CLOCK is called on you"
+          >
+            {soundOn ? 'SOUND ON' : 'SOUND OFF'}
+          </button>
+        )}
         {inSandbox && identity?.isCommissioner && (
           <button
             className="tap-btn"
@@ -447,6 +500,21 @@ export default function DraftPage() {
         </Link>
       </div>
 
+      {identity && !inSandbox && roomOwners && (
+        <div className="panel draft-room-panel" aria-live="polite">
+          <div className="draft-room-line">
+            <span className="hub-heading">IN THE DRAFT · {roomOwners.length}</span>
+            {roomOwners.map((owner) => (
+              <span key={owner} className={`draft-room-chip${owner === identity.owner ? ' is-me' : ''}`}>{owner}</span>
+            ))}
+          </div>
+          {room.notes.length > 0 && (
+            <div className="draft-room-notes">
+              {room.notes.map((note) => <span key={note}>{note}</span>)}
+            </div>
+          )}
+        </div>
+      )}
       {inTestDraft && (
         <div className="panel test-draft-panel">
           <div className="hub-heading">
@@ -651,16 +719,6 @@ export default function DraftPage() {
                 marginTop: 12,
               }}
             >
-              {canEnterOnClock && (
-                <button
-                  className="tap-btn"
-                  type="button"
-                  onClick={() => setPickTarget(onClock)}
-                  style={{ ...ACTION_BUTTON, border: 'none', background: 'var(--neon-teal)', color: '#001a14' }}
-                >
-                  ENTER PICK {pickLabel(onClock.pick)}
-                </button>
-              )}
               {identity?.isCommissioner && (
                 <button
                   className="tap-btn"
@@ -739,20 +797,30 @@ export default function DraftPage() {
       </div>
 
       {started && poolReady && onClock && identity && (
-        <LiveRoom
-          board={board}
-          everyone={dataset.players}
-          available={pool}
-          onClock={onClock}
-          person={identity.owner}
-          canDraft={canEnterOnClock}
-          projections={projections}
-          gone={gone}
-        />
+        <div className={tabClass('players')}>
+          <LiveRoom
+            board={board}
+            everyone={dataset.players}
+            available={pool}
+            onClock={onClock}
+            person={identity.owner}
+            canDraft={canEnterOnClock}
+            showStats={identity.isCommissioner}
+            projections={projections}
+            gone={gone}
+            queueKey={`fbb-live-queue-${identity.owner}-${inTestDraft ? 'test' : 'league'}`}
+            onWriteIn={() => {
+              setPickWriteIn(true);
+              setPickTarget(onClock);
+            }}
+          />
+        </div>
       )}
 
       {started && !onClock && (
-        <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
+        <div className={tabClass('picks')}>
+          <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
+        </div>
       )}
 
       {meta && !meta.revealed && started && (
@@ -795,8 +863,11 @@ export default function DraftPage() {
       )}
 
       {/* picks made, newest first, like the mock room's pick list */}
+      {roomMode && allPicks.length === 0 && (
+        <div className={`panel live-empty ${tabClass('picks')}`}>No picks yet.</div>
+      )}
       {allPicks.length > 0 && (
-        <div className="panel" style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+        <div className={`panel ${tabClass('picks')}`} style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
               PICKS · {allPicks.length} MADE
@@ -839,6 +910,7 @@ export default function DraftPage() {
       )}
 
       {/* view toggle */}
+      <div className={tabClass('board')}>
       <div
         aria-label="Position color key"
         style={{
@@ -939,10 +1011,35 @@ export default function DraftPage() {
           />
         </div>
       )}
+      </div>
+
+      {roomMode && (
+        <nav className="live-phone-tabs" aria-label="Draft room">
+          {([['players', 'people', 'PLAYERS'], ['board', 'tiers', 'BOARD'], ['picks', 'ballot', 'PICKS']] as const).map(([tab, icon, label]) => (
+            <button key={tab} type="button" className={liveTab === tab ? 'is-on' : ''} aria-pressed={liveTab === tab} onClick={() => setLiveTab(tab)}>
+              <span aria-hidden="true"><NavIcon name={icon} /></span>
+              <span className="hub-heading">{label}</span>
+            </button>
+          ))}
+          <button type="button" className="is-exit" onClick={() => navigate(identity ? `/keepers/${identity.owner}` : '/')}>
+            <span aria-hidden="true"><NavIcon name="close" /></span>
+            <span className="hub-heading">EXIT</span>
+          </button>
+        </nav>
+      )}
 
       {showSignIn && <TeamPickerModal onClose={() => setShowSignIn(false)} />}
       {pickTarget && (
-        <PickSheet cell={pickTarget} pool={pool} numbers={numbers} onClose={() => setPickTarget(null)} />
+        <PickSheet
+          cell={pickTarget}
+          pool={pool}
+          numbers={numbers}
+          startInWriteIn={pickWriteIn}
+          onClose={() => {
+            setPickTarget(null);
+            setPickWriteIn(false);
+          }}
+        />
       )}
       {clearTarget && <ClearPickSheet cell={clearTarget} onClose={() => setClearTarget(null)} />}
     </div>

@@ -31,6 +31,7 @@ import AchievementToast from './components/league/AchievementToast.js'
 import RevealPage from './components/league/RevealPage.js'
 import RevealedPage from './components/league/RevealedPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
+import StatsGate from './components/league/StatsGate.js'
 
 function App() {
   const location = useLocation()
@@ -101,10 +102,10 @@ function App() {
         <Route path="/votes" element={<VotesPage />} />
         <Route path="/trades" element={<TradesPage />} />
         <Route path="/admin" element={<AdminPage />} />
-        <Route path="/mock" element={<MockDraftPage />} />
-        <Route path="/mock/result/:id" element={<MockResultPage />} />
-        <Route path="/projections" element={<ProjectionsPage />} />
-        <Route path="/tiers" element={<TiersPage />} />
+        <Route path="/mock" element={<StatsGate><MockDraftPage /></StatsGate>} />
+        <Route path="/mock/result/:id" element={<StatsGate><MockResultPage /></StatsGate>} />
+        <Route path="/projections" element={<StatsGate><ProjectionsPage /></StatsGate>} />
+        <Route path="/tiers" element={<StatsGate><TiersPage /></StatsGate>} />
         <Route path="/schedule" element={<SchedulePage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />

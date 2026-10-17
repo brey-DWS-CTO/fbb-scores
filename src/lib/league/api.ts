@@ -218,6 +218,12 @@ export async function endTestDraft(c: Credentials): Promise<void> {
   leaveTestDraft();
 }
 
+/** Check in to the draft room and hear who else is there. A device in the test checks in to the test's room. */
+export async function checkInDraftRoom(c: Credentials): Promise<{ room: 'league' | 'test'; owners: string[] }> {
+  const { data } = await axios.post('/api/league/draft-room', {}, { headers: draftHeaders(c) });
+  return data;
+}
+
 /* ── Commissioner TEST MODE (sandbox) ────────────────────────────────────────
  * While active, keeper/draft reads and writes stay entirely in localStorage —
  * nothing touches the server — so the commissioner can fill in anyone's

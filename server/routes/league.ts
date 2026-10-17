@@ -132,6 +132,8 @@ import {
   saveMockTrade,
   deleteMockTrade,
   getTestDraft,
+  listPresence,
+  touchPresence,
   mutateTestDraft,
   setTestDraft,
   TestDraftMissingError,
@@ -141,6 +143,7 @@ import {
   type StateResult,
 } from '../lib/leagueStore.js';
 import { TEST_DRAFT_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
+import { inRoom, PRESENCE_WINDOW_MS } from '../../src/lib/league/presence.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
 import {
@@ -562,6 +565,7 @@ const TEST_DRAFT_ROUTES = [
   /^\/draft\/pick(\/\d+)?$/,
   /^\/draft\/clock\/(expire|call|pause|resume)$/,
   /^\/test-draft\/(start|end)$/,
+  /^\/draft-room$/,
 ];
 
 router.use((req, res, next) => {
@@ -1624,6 +1628,18 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
   });
   await appendAudit(actor(res), 'draft.reset', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/draft-room — the draft page checks in every few seconds
+ * and gets back who else has it open. The test draft has its own room.
+ */
+router.post('/draft-room', requireAuth, async (_req, res) => {
+  const room = inTestDraft(res) ? 'test' : 'league';
+  const now = Date.now();
+  await touchPresence(room, res.locals.owner as string, new Date(now).toISOString());
+  const rows = await listPresence(room, new Date(now - PRESENCE_WINDOW_MS).toISOString());
+  res.json({ room, owners: inRoom(rows, now, OWNERS) });
 });
 
 /**
