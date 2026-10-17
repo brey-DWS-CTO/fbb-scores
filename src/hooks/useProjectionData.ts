@@ -1,23 +1,28 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchDraftRankings, fetchProjectionEdits } from '../lib/league/api.js';
+import { fetchDraftRankings, fetchExpertProjections, fetchProjectionEdits } from '../lib/league/api.js';
+import { applyProjectionSource, type ProjectionSource } from '../lib/league/expertProjections.js';
 import { applyProjectionEdits, editsById, type ProjectionEdits } from '../lib/league/projectionEdits.js';
 import type { DraftRankingSnapshot } from '../lib/league/draftRankings.js';
 import { useIdentity, useLeagueState } from './useLeague.js';
+import { useProjectionSource } from './useProjectionSource.js';
 
 export const PROJECTION_EDITS_KEY = ['projection-edits'] as const;
 
 /**
  * ESPN's accepted rankings with your own projection edits laid on
  * top. Every page that values players reads this, so an edit shows up in
- * projections, the mock draft and the draft room alike.
+ * projections, the mock draft and the draft room alike. The commissioner can
+ * swap ESPN's lines for Hashtag's, or a blend, before the edits go on.
  */
 export function useProjectionData(enabled = true): {
   /** The snapshot with edits applied. */
   snapshot: DraftRankingSnapshot | null;
-  /** ESPN's numbers before any edit. */
+  /** The chosen source's numbers before any edit. */
   original: DraftRankingSnapshot | null;
   edits: ProjectionEdits;
+  /** Where the lines come from: ESPN for everyone but the commissioner. */
+  source: ProjectionSource;
   loading: boolean;
 } {
   const { identity } = useIdentity();
@@ -37,8 +42,23 @@ export function useProjectionData(enabled = true): {
     enabled: signedIn,
     staleTime: 30_000,
   });
-  const original = rankings.data?.snapshot ?? null;
+  const source = useProjectionSource();
+  const expertQuery = useQuery({
+    queryKey: ['expert-projections', identity?.owner ?? 'anon'],
+    queryFn: () => fetchExpertProjections(identity as NonNullable<typeof identity>),
+    enabled: signedIn && source !== 'espn',
+    staleTime: Infinity,
+  });
+  const espn = rankings.data?.snapshot ?? null;
+  const expert = expertQuery.data ?? null;
+  const original = useMemo(() => (espn ? applyProjectionSource(espn, expert, source) : null), [espn, expert, source]);
   const edits = useMemo(() => editsById(editsQuery.data ?? []), [editsQuery.data]);
   const snapshot = useMemo(() => (original ? applyProjectionEdits(original, edits) : null), [original, edits]);
-  return { snapshot, original, edits, loading: rankings.isLoading || editsQuery.isLoading };
+  return {
+    snapshot,
+    original,
+    edits,
+    source: expert ? source : 'espn',
+    loading: rankings.isLoading || editsQuery.isLoading || expertQuery.isLoading,
+  };
 }

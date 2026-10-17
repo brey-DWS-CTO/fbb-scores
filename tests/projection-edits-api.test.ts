@@ -80,6 +80,14 @@ test('each owner keeps their own projection edits', async () => {
   await request('/api/league/projection-edits/7', { method: 'DELETE', headers: auth(commissioner) });
 });
 
+test('only the commissioner reads Hashtag projections', async () => {
+  assert.equal((await request('/api/league/expert-projections')).status, 401);
+  assert.equal((await request('/api/league/expert-projections', { headers: auth('Joel') })).status, 403);
+  const read = await request('/api/league/expert-projections', { headers: auth(commissioner) });
+  assert.equal(read.status, 200);
+  assert.equal((read.body.players as unknown[]).length, 200);
+});
+
 test('the first read writes the two injury estimates once; save, change and reset work', async () => {
   const first = await request('/api/league/projection-edits', { headers: auth(commissioner) });
   assert.equal(first.status, 200);

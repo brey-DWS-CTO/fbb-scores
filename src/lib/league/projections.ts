@@ -12,7 +12,7 @@
  * Pure. No server, no browser.
  */
 import { computeFpts, round1 } from '../espn/calculations.js';
-import { bonusOdds } from './doubleDoubles.js';
+import { BONUS_STATS, bonusOdds } from './doubleDoubles.js';
 import {
   lastSeasonFppg,
   projectedFppg,
@@ -157,6 +157,9 @@ export function buildProjections(
   const byEspnId = new Map<number, DraftRankingPlayer>();
   for (const entry of snapshot?.players ?? []) byEspnId.set(entry.espnId, entry);
   const scoringItems = snapshot?.scoringItems ?? [];
+  // The line before the bonus. A source that projects double-doubles itself
+  // (Hashtag) carries them in the line; they belong in the bonus column.
+  const lineItems = scoringItems.filter((item) => !BONUS_STATS.has(item.statId));
   const kept = keeperIndex(keepers);
 
   return values.entries.map((entry) => {
@@ -164,7 +167,7 @@ export function buildProjections(
     const espn = player.espnId !== null ? byEspnId.get(player.espnId) ?? null : null;
     const perGame = projectedPerGame(espn?.projection ?? null);
     const lastPerGame = projectedPerGame(espn?.lastSeason ?? null);
-    const base = perGame !== null && scoringItems.length > 0 ? round1(computeFpts(perGame, [...scoringItems])) : null;
+    const base = perGame !== null && scoringItems.length > 0 ? round1(computeFpts(perGame, lineItems)) : null;
     // The bonus is whatever the projected total carries over ESPN's line, so
     // the two parts always add up to the number on screen.
     const bonus = base !== null && entry.source === 'projection' && entry.fppg !== null
@@ -192,8 +195,8 @@ export function buildProjections(
       ...postseasonOf(player.proTeam),
       base,
       bonus,
-      ddOdds: odds ? round2(odds.doubleDouble) : null,
-      tdOdds: odds ? round2(odds.tripleDouble) : null,
+      ddOdds: odds ? round2(perGame?.['37'] ?? odds.doubleDouble) : null,
+      tdOdds: odds ? round2(perGame?.['38'] ?? odds.tripleDouble) : null,
       games,
       edit,
       espn: edit && player.espnId !== null
@@ -419,10 +422,10 @@ export type Tone = 'good' | 'warn' | 'bad' | null;
 export const CHANGE_STEP = 3;
 
 /** Hover text for an edited player: what was changed and what ESPN said. */
-export function editTitle(row: Pick<PlayerProjection, 'edit' | 'espn'>): string | null {
+export function editTitle(row: Pick<PlayerProjection, 'edit' | 'espn'>, source = 'ESPN'): string | null {
   if (!row.edit) return null;
   const espn = row.espn
-    ? ` ESPN: ${row.espn.fppg?.toFixed(1) ?? 'no'} FPPG over ${row.espn.games ?? 'no'} games.`
+    ? ` ${source}: ${row.espn.fppg?.toFixed(1) ?? 'no'} FPPG over ${row.espn.games ?? 'no'} games.`
     : '';
   return `Your edit${row.edit.note ? ` (${row.edit.note})` : ''}.${espn}`;
 }

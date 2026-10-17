@@ -29,6 +29,8 @@ import {
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import { PROJECTION_EDITS_KEY, useProjectionData } from '../../hooks/useProjectionData.js';
+import { setProjectionSource, useProjectionSource } from '../../hooks/useProjectionSource.js';
+import { PROJECTION_SOURCES, sourceLabel } from '../../lib/league/expertProjections.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
 import { EDITABLE_COLUMNS, cellEdited, cellFollowsMinutes, editedProjection, projectionGames, withCellEdit } from '../../lib/league/projectionEdits.js';
@@ -151,7 +153,10 @@ export default function ProjectionsPage() {
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
 
-  const { snapshot, original, edits } = useProjectionData();
+  const { snapshot, original, edits, source } = useProjectionData();
+  const pickedSource = useProjectionSource();
+  const label = sourceLabel(source);
+  const columnLabel = (column: { id: ProjectionColumnId; label: string }) => (column.id === 'base' ? label.toUpperCase() : column.label);
   const [editedOnly, setEditedOnly] = useState(false);
   // The player whose stats are open for typing, and what has been typed.
   const [rowEdit, setRowEdit] = useState<{ key: string; values: Record<string, string> } | null>(null);
@@ -325,7 +330,7 @@ export default function ProjectionsPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus.
+        Points a game in our scoring: the {label} line plus the double-double bonus.
         {' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow and change only your numbers.'}
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet.{' '}
@@ -360,6 +365,22 @@ export default function ProjectionsPage() {
             </button>
           )}
         </div>
+        {isCommish && (
+          <div className="mock-seg" role="radiogroup" aria-label="Projection source" title="Only you see this. Everyone else uses ESPN.">
+            {PROJECTION_SOURCES.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                role="radio"
+                aria-checked={pickedSource === choice.id}
+                className={`tap-btn mock-seg-btn${pickedSource === choice.id ? ' is-on' : ''}`}
+                onClick={() => { setProjectionSource(choice.id); resetPage(); }}
+              >
+                {choice.label.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mock-seg" role="radiogroup" aria-label="Position">
           {(['ALL', ...POSITIONS] as const).map((choice) => (
             <button
@@ -400,7 +421,7 @@ export default function ProjectionsPage() {
           {PROJECTION_COLUMNS.filter((column) => !FIXED_COLUMNS.has(column.id)).map((column) => (
             <label key={column.id} className="proj-column-pick" title={column.header}>
               <input type="checkbox" checked={!hidden.has(column.id)} onChange={() => toggleColumn(column.id)} />
-              {column.label}
+              {columnLabel(column)}
             </label>
           ))}
           {hidden.size > 0 && (
@@ -436,7 +457,7 @@ export default function ProjectionsPage() {
                     title={column.header}
                   >
                     <button type="button" onClick={() => { setSort(nextSort(sort, column.id)); resetPage(); }}>
-                      {column.label}
+                      {columnLabel(column)}
                       <span className={sorted ? 'proj-caret is-on' : 'proj-caret'} aria-hidden="true">
                         {sorted === 'asc' ? '▲' : sorted === 'desc' ? '▼' : '↕'}
                       </span>
@@ -470,7 +491,7 @@ export default function ProjectionsPage() {
                             <button
                               type="button"
                               className={`proj-pencil${row.edit ? ' is-edited' : ''}`}
-                              title={row.edit ? `${editTitle(row) ?? 'Edited.'} Click to change.` : 'Change his projection'}
+                              title={row.edit ? `${editTitle(row, label) ?? 'Edited.'} Click to change.` : 'Change his projection'}
                               aria-label={`Edit ${row.name}`}
                               onClick={() => openRow(row)}
                             >
@@ -489,7 +510,7 @@ export default function ProjectionsPage() {
                       <td
                         key={column.id}
                         className={classes}
-                        title={(edited || scaled) && !open ? `ESPN: ${espnValue(row, statId)?.toFixed(column.id === 'games' ? 0 : 1) ?? 'none'}${scaled ? '. Follows his minutes.' : ''}` : undefined}
+                        title={(edited || scaled) && !open ? `${label}: ${espnValue(row, statId)?.toFixed(column.id === 'games' ? 0 : 1) ?? 'none'}${scaled ? '. Follows his minutes.' : ''}` : undefined}
                       >
                         {open && statId !== undefined ? (
                           <input

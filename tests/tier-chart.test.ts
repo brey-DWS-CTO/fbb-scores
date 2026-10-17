@@ -105,7 +105,7 @@ test('a commish edit puts ESPN\'s own number on the bar', () => {
   const jokic = projections.find((row) => row.name === 'Nikola Jokic')!;
   const edited = { ...jokic, fppg: 70, total: 70 * 72, edit: { espnId: jokic.espnId! } as never, espn: { fppg: jokic.fppg, games: 72 } };
   const [row] = buildTierRows([edited], dataset.players);
-  assert.deepEqual(row.estimates.map((estimate) => estimate.label), ['Commish projection', 'ESPN projection', 'Last season']);
+  assert.deepEqual(row.estimates.map((estimate) => estimate.label), ['Your projection', 'ESPN projection', 'Last season']);
   assert.equal(row.fppgHigh, 70);
   assert.equal(row.fppgLow, 64.2);
 });

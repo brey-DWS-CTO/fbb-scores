@@ -213,6 +213,7 @@ import {
   type VoteChoice,
 } from '../../src/lib/league/polls.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
+import hashtagProjections from '../data/hashtag-projections-2027.json' with { type: 'json' };
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
 import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
 import type { Rulebook } from '../../src/lib/league/rulebook.js';
@@ -947,6 +948,14 @@ router.delete('/projection-edits/:espnId', requireAuth, async (req, res) => {
   await deleteProjectionEdit(leagueDataset.season, res.locals.owner as string, espnId);
   await appendAudit(actor(res), 'projection_edit.removed', { espnId });
   res.json({ ok: true });
+});
+
+/**
+ * GET /api/league/expert-projections — Hashtag Basketball's lines, for the
+ * commissioner's ESPN, Hashtag or Blend switch. Nobody else sees them.
+ */
+router.get('/expert-projections', requireAuth, requireCommissioner, (_req, res) => {
+  res.json(hashtagProjections);
 });
 
 /** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */
