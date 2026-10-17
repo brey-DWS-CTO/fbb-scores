@@ -7,7 +7,7 @@
  * Pure. No server, no browser. Storage is passed in.
  */
 import { fillsSlot, type Position, type RosterSettings, type StarterSlot } from './draftValue.js';
-import { replayLive, type LiveChoices, type LiveState } from './liveMock.js';
+import { replayLive, type LiveChoices, type LiveState, type People } from './liveMock.js';
 import type { MockCandidate, MockKeeper, MockMode, MockPick, MockSlot, PreparedMock } from './mockDraft.js';
 
 // ─── Who is up ──────────────────────────────────────────────────────────────
@@ -277,7 +277,7 @@ export function parseMockSave(raw: string | null): MockSave | null {
 export function replaySaved(
   prepared: PreparedMock,
   seed: number,
-  person: string,
+  people: People,
   choices: LiveChoices,
 ): { live: LiveState; choices: Record<number, string>; dropped: number } {
   const kept: Record<number, string> = { ...choices };
@@ -285,7 +285,7 @@ export function replaySaved(
   let dropped = 0;
   for (;;) {
     try {
-      return { live: replayLive(prepared, seed, person, kept), choices: kept, dropped };
+      return { live: replayLive(prepared, seed, people, kept), choices: kept, dropped };
     } catch {
       const last = order.pop();
       if (last === undefined) throw new Error('The mock draft cannot be replayed');

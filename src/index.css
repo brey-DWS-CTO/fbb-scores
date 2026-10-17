@@ -5173,6 +5173,22 @@ html.theme-light {
 /* ─── Mock draft: on your pick, where your next one is ─── */
 .room-turn.is-mine .room-turn-next { color: var(--text-mid); font-weight: 700; letter-spacing: 0; white-space: nowrap; }
 
+/* ─── Mock draft with a friend: the invite panel, and a friend's clock ─── */
+.mock-friend { display: grid; gap: 10px; margin-bottom: 12px; }
+.mock-friend-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 0.82rem; }
+.mock-friend-row strong { color: var(--text-max); }
+.mock-friend-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.mock-friend-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mock-friend-form .mock-select { min-width: 160px; }
+.mock-friend-wait { display: grid; gap: 10px; }
+.mock-friend-wait .mock-friend-actions { margin-left: 0; }
+a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.room-clock.is-them { border-color: var(--neon-yellow); }
+.room-clock.is-them .room-clock-big { color: var(--neon-yellow); }
+.room-turn.is-them { background: rgba(255, 221, 0, 0.1); color: var(--neon-yellow); font-weight: 900; letter-spacing: 0.06em; }
+.room-mini-clock.is-them { color: var(--neon-yellow); }
+.room-upcoming li.is-them .room-upcoming-row { color: var(--neon-yellow); font-weight: 800; }
+
 /* ─── Projections: room for the numbers on a phone ─── */
 /* Scrolled sideways, names shorten to J. Tatum and the pencil steps aside,
    as in the mock draft's player list. The open row keeps its UNDO. */

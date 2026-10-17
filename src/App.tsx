@@ -26,6 +26,7 @@ import ProjectionsPage from './components/league/ProjectionsPage.js'
 import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
+import SharedMockPage from './components/league/SharedMockPage.js'
 import AchievementsPage from './components/league/AchievementsPage.js'
 import AchievementToast from './components/league/AchievementToast.js'
 import RevealPage from './components/league/RevealPage.js'
@@ -94,6 +95,7 @@ function App() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/mock" element={<MockDraftPage />} />
         <Route path="/mock/result/:id" element={<MockResultPage />} />
+        <Route path="/mock/with/:id" element={<SharedMockPage />} />
         <Route path="/projections" element={<ProjectionsPage />} />
         <Route path="/tiers" element={<TiersPage />} />
         <Route path="/schedule" element={<SchedulePage />} />

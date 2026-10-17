@@ -131,11 +131,32 @@ import {
   listMockTrades,
   saveMockTrade,
   deleteMockTrade,
+  getSharedMock,
+  listSharedMocks,
+  insertSharedMock,
+  updateSharedMock,
+  SharedMockWriteError,
   type KeeperSelection,
   type LeagueDynamicState,
 } from '../lib/leagueStore.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
+import {
+  MAX_PEOPLE,
+  clockHasRunOut,
+  joinSharedMock,
+  namesOf,
+  newSharedMock,
+  othersAt,
+  parseSharedMockRoom,
+  pickInSharedMock,
+  quitSharedMock,
+  sharedMockBoard,
+  sharedMockId,
+  sharedMockPhase,
+  showsFor,
+  type SharedMockRoom,
+} from '../../src/lib/league/sharedMock.js';
 import {
   NO_FACTS,
   canReveal,
@@ -2808,6 +2829,260 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
     });
     // After the answer, never before it. The offer is saved either way.
     notifyTradeOffered(proposal, appOrigin(req));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Mock draft with a friend ────────────────────────────────────────────────
+//
+// Two people at one table, or more, and the rest of the room computers. The
+// room lives here so every phone sees the same draft; the rules are in
+// src/lib/league/sharedMock.ts. Only the people asked to a room can read or
+// change it. Each phone replays the draft itself; the server never does.
+
+/** The season's rooms this owner was asked to and has not cleared, newest first. */
+async function sharedMocksFor(owner: string): Promise<SharedMockRoom[]> {
+  const rows = await listSharedMocks(leagueDataset.season, owner);
+  return rows
+    .map((row) => parseSharedMockRoom(row.room))
+    .filter((room): room is SharedMockRoom => room !== null && showsFor(room, owner));
+}
+
+/** A room by its id, or null. The caller decides who may see it. */
+async function sharedMockById(id: string): Promise<SharedMockRoom | null> {
+  const row = await getSharedMock(id);
+  return row ? parseSharedMockRoom(row.room) : null;
+}
+
+/** Change one room and answer with it. A rule broken on the way is a 409 in plain words. */
+async function changeSharedMock(
+  res: Response,
+  id: string,
+  mutate: (room: SharedMockRoom, at: string) => SharedMockRoom,
+): Promise<void> {
+  const at = new Date().toISOString();
+  try {
+    const row = await updateSharedMock(id, (value) => {
+      const room = parseSharedMockRoom(value);
+      if (!room) throw new HttpError(500, 'That mock cannot be read.');
+      return mutate(room, at);
+    }, at);
+    res.json({ room: row.room, now: at });
+  } catch (err) {
+    if (err instanceof SharedMockWriteError) {
+      res.status(err.code === 'not-found' ? 404 : 409).json({ error: err.code === 'not-found' ? 'No such mock.' : err.message });
+      return;
+    }
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    if (err instanceof Error) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+}
+
+/** GET /api/league/shared-mocks — the mocks you were asked to and have not cleared. */
+router.get('/shared-mocks', requireAuth, async (_req, res, next) => {
+  try {
+    res.json({ rooms: await sharedMocksFor(res.locals.owner as string), now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks — ask somebody to a mock. One open mock a person. */
+router.post('/shared-mocks', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const guest = typeof body.with === 'string' ? body.with : '';
+    if (!OWNERS.includes(guest) || guest === owner) {
+      res.status(400).json({ error: 'Pick somebody in the league to draft with.' });
+      return;
+    }
+    const mode = body.mode === 'sharp' || body.mode === 'realistic' ? body.mode : null;
+    if (!mode) {
+      res.status(400).json({ error: 'Pick a room: sharp or normal.' });
+      return;
+    }
+    const open = (room: SharedMockRoom) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+    const mine = (await sharedMocksFor(owner)).find(open);
+    if (mine) {
+      res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+      return;
+    }
+    const theirs = (await sharedMocksFor(guest)).find((room) => sharedMockPhase(room) === 'live');
+    if (theirs) {
+      res.status(409).json({ error: `${guest} is in a mock right now.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const room = newSharedMock({
+      id: sharedMockId(at, Math.random()),
+      season: leagueDataset.season,
+      host: owner,
+      guests: [guest],
+      mode,
+      at,
+    });
+    await insertSharedMock({ id: room.id, season: room.season, room, version: 0, updatedAt: at });
+    res.json({ room, now: at });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/league/shared-mocks/:id — one room, for the people in it. */
+router.get('/shared-mocks/:id', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const room = await sharedMockById(routeParam(req.params.id));
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    if (!room.people.includes(owner)) {
+      res.status(403).json({ error: `This mock is ${namesOf(room.people)}'s.` });
+      return;
+    }
+    res.json({ room, now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/join — take your seat. When the last
+ * person sits down the draft starts: the board is built here, from the
+ * league as it stands, and frozen into the room.
+ */
+router.post('/shared-mocks/:id/join', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const id = routeParam(req.params.id);
+    const room = await sharedMockById(id);
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    if (!room.people.includes(owner)) {
+      res.status(403).json({ error: 'You were not asked to this mock.' });
+      return;
+    }
+    // Everything the board needs is read first, so the write itself stays quick.
+    const { state } = await getState();
+    const scenario = await getKeeperScenario(state.season, room.host);
+    const dataset = currentDataset(state);
+    await changeSharedMock(res, id, (current, at) => joinSharedMock(current, owner, at, () => ({
+      board: sharedMockBoard(dataset, state, current.people, scenario),
+      seed: Math.floor(Math.random() * 100_000),
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** The pick and player a body names, or null with the complaint sent. */
+function sharedPickBody(req: Request, res: Response): { overall: number; playerKey: string } | null {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const overall = Number(body.overall);
+  const playerKey = typeof body.playerKey === 'string' ? body.playerKey.trim() : '';
+  if (!Number.isInteger(overall) || overall <= 0 || playerKey === '' || playerKey.length > 80) {
+    res.status(400).json({ error: 'Say which pick and which player.' });
+    return null;
+  }
+  return { overall, playerKey };
+}
+
+/** POST /api/league/shared-mocks/:id/pick — your pick, on your clock. */
+router.post('/shared-mocks/:id/pick', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const pick = sharedPickBody(req, res);
+    if (!pick) return;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) =>
+      pickInSharedMock(room, owner, pick.overall, pick.playerKey, at, 'pick'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/expire — the clock ran out, so the room
+ * makes the pick. The person on the clock may say so the moment it hits
+ * zero; anyone else at the table a few seconds later.
+ */
+router.post('/shared-mocks/:id/expire', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const pick = sharedPickBody(req, res);
+    if (!pick) return;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) => {
+      if (!clockHasRunOut(room, owner, Date.parse(at))) throw new Error('Time is not up yet.');
+      return pickInSharedMock(room, owner, pick.overall, pick.playerKey, at, 'auto');
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks/:id/quit — leave. A draft under way ends for everyone. */
+router.post('/shared-mocks/:id/quit', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) => quitSharedMock(room, owner, at));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/results — the grades, one per person,
+ * from whichever phone finishes the replay first. Each lands in that
+ * person's Past mocks and counts in Mocks done. The same draft saves once.
+ */
+router.post('/shared-mocks/:id/results', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const room = await sharedMockById(routeParam(req.params.id));
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    if (!room.joined.includes(owner)) {
+      res.status(403).json({ error: 'You are not in this mock.' });
+      return;
+    }
+    if (sharedMockPhase(room) !== 'finished') {
+      res.status(409).json({ error: 'This mock is not finished.' });
+      return;
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const results = Array.isArray(body.results) ? body.results.slice(0, MAX_PEOPLE) : [];
+    const saved: string[] = [];
+    for (const entry of results) {
+      const who = typeof (entry as { owner?: unknown })?.owner === 'string' ? (entry as { owner: string }).owner : '';
+      if (!room.joined.includes(who)) continue;
+      let record: MockResultRecord;
+      try {
+        record = parseMockResult(who, { ...(entry as Record<string, unknown>), vs: othersAt(room, who) });
+      } catch {
+        continue;
+      }
+      const keep = isCommissionerOwner(who) ? null : MEMBER_MOCK_LIMIT;
+      // Your own phone grades you on your own numbers, so your own post
+      // takes over your record. Another phone's grade of you only fills a
+      // gap, since it is on the room's numbers.
+      if (who === owner) await deleteMockResult(leagueDataset.season, who, record.id);
+      await saveMockResult({ season: leagueDataset.season, owner: who, id: record.id, result: record, createdAt: record.finishedAt }, keep);
+      saved.push(who);
+    }
+    res.json({ saved });
   } catch (err) {
     next(err);
   }

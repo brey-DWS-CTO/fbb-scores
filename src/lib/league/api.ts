@@ -1,7 +1,10 @@
 import type { ExpertProjections } from './expertProjections.js';
 import type { ProjectionEdit } from './projectionEdits.js';
-import type { MockResultRecord } from './mockGrade.js';
+import type { MockGrade, MockResultRecord } from './mockGrade.js';
 import type { MockStatRow } from './mockStats.js';
+import type { MockMode } from './mockDraft.js';
+import type { SavedBoard } from './mockBoard.js';
+import type { SharedMockRoom } from './sharedMock.js';
 import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
@@ -651,6 +654,62 @@ export async function acceptTeamNames(
     { ...preview.candidate, fingerprint: preview.fingerprint },
     { headers: authHeaders(c) },
   );
+  return data;
+}
+
+// ─── Mock draft with a friend ───────────────────────────────────────────────
+
+export interface SharedMockResponse {
+  room: SharedMockRoom;
+  /** The server's clock as it answered, so a phone can line its clock up. */
+  now: string;
+}
+
+/** The mocks you were asked to and have not cleared. */
+export async function fetchSharedMocks(c: Credentials): Promise<{ rooms: SharedMockRoom[]; now: string }> {
+  const { data } = await axios.get('/api/league/shared-mocks', { headers: authHeaders(c) });
+  return data;
+}
+
+export async function fetchSharedMock(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.get(`/api/league/shared-mocks/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
+  return data;
+}
+
+/** Ask somebody to a mock. */
+export async function inviteSharedMock(c: Credentials, withOwner: string, mode: MockMode): Promise<SharedMockResponse> {
+  const { data } = await axios.post('/api/league/shared-mocks', { with: withOwner, mode }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function joinSharedMockRoom(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/join`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function pickSharedMock(c: Credentials, id: string, overall: number, playerKey: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/pick`, { overall, playerKey }, { headers: authHeaders(c) });
+  return data;
+}
+
+/** The clock ran out on `overall`: the pick the room makes. */
+export async function expireSharedMock(c: Credentials, id: string, overall: number, playerKey: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/expire`, { overall, playerKey }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function quitSharedMockRoom(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/quit`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** Every person's grade for a finished shared mock, saved to each one's Past mocks. */
+export async function saveSharedMockResults(
+  c: Credentials,
+  id: string,
+  results: Array<{ owner: string; id: string; seed: number; mode: MockMode; grade: MockGrade; board?: SavedBoard }>,
+): Promise<{ saved: string[] }> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/results`, { results }, { headers: authHeaders(c) });
   return data;
 }
 
