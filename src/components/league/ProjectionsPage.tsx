@@ -7,7 +7,7 @@ import {
   FIXED_COLUMNS,
   PLAY_IN_COUNTS,
   PLAYOFF_COUNTS,
-  PROJECTION_COLUMNS,
+  projectionColumnsFor,
   buildProjections,
   changeTone,
   editTitle,
@@ -26,11 +26,12 @@ import {
   type ProjectionSort,
   type Tone,
 } from '../../lib/league/projections.js';
+import { shortName } from '../../lib/league/draftRoom.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import { PROJECTION_EDITS_KEY, useProjectionData } from '../../hooks/useProjectionData.js';
-import { setProjectionSource, useProjectionSource } from '../../hooks/useProjectionSource.js';
-import { PROJECTION_SOURCES, sourceLabel } from '../../lib/league/expertProjections.js';
+import { sourceLabel } from '../../lib/league/expertProjections.js';
+import ProjectionSourceSwitch from './ProjectionSourceSwitch.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
 import { EDITABLE_COLUMNS, cellEdited, cellFollowsMinutes, editedProjection, projectionGames, withCellEdit } from '../../lib/league/projectionEdits.js';
@@ -41,6 +42,10 @@ import NavIcon from './NavIcon.js';
 
 const PAGE_SIZES = [20, 50, 100, 200, 500] as const;
 const HIDDEN_KEY = 'nerds.projections.hidden';
+
+/** Pixels scrolled sideways before names shorten, and back before they grow. The mock draft's marks. */
+const SHORT_NAME_AT = 40;
+const FULL_NAME_AT = 8;
 
 function readHidden(): Set<ProjectionColumnId> {
   try {
@@ -128,6 +133,7 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
     case 'ftPct': return { text: one(row.line?.ftPct ?? null) };
     case 'lastSeason': return { text: one(row.lastSeason) };
     case 'change': return { text: signed(row.change), className: toneClass(changeTone(row.change)).trim() };
+    case 'vsOther': return { text: signed(row.vsOther), className: toneClass(changeTone(row.vsOther)).trim() };
     case 'espnRank': return { text: whole(row.espnRank) };
     case 'adp': return { text: one(row.adp) };
   }
@@ -153,10 +159,23 @@ export default function ProjectionsPage() {
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
 
-  const { snapshot, original, edits, source } = useProjectionData();
-  const pickedSource = useProjectionSource();
+  const { snapshot, original, edits, source, compare, compareLabel } = useProjectionData();
   const label = sourceLabel(source);
-  const columnLabel = (column: { id: ProjectionColumnId; label: string }) => (column.id === 'base' ? label.toUpperCase() : column.label);
+  const columnLabel = (column: { id: ProjectionColumnId; label: string }) => {
+    if (column.id === 'base') return label.toUpperCase();
+    if (column.id === 'vsOther') return `VS ${compareLabel.toUpperCase()}`;
+    return column.label;
+  };
+  // Postseason counts and the other projection are the commissioner's alone.
+  const available = useMemo(() => projectionColumnsFor(isCommish), [isCommish]);
+  // The list scrolled sideways: names shorten so the stats fit, as in the mock draft.
+  const [scrolled, setScrolled] = useState(false);
+  const onTableScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const left = event.currentTarget.scrollLeft;
+    // A gap between the two marks, so a finger resting near one does not flicker.
+    const next = scrolled ? left > FULL_NAME_AT : left > SHORT_NAME_AT;
+    if (next !== scrolled) setScrolled(next);
+  };
   const [editedOnly, setEditedOnly] = useState(false);
   // The player whose stats are open for typing, and what has been typed.
   const [rowEdit, setRowEdit] = useState<{ key: string; values: Record<string, string> } | null>(null);
@@ -173,7 +192,7 @@ export default function ProjectionsPage() {
   const [exporting, setExporting] = useState(false);
   const [hidden, setHidden] = useState<Set<ProjectionColumnId>>(readHidden);
   const [picking, setPicking] = useState(false);
-  const columns = useMemo(() => visibleColumns(hidden), [hidden]);
+  const columns = useMemo(() => visibleColumns(hidden, available), [hidden, available]);
   const toggleColumn = (id: ProjectionColumnId) => {
     const next = new Set(hidden);
     if (next.has(id)) next.delete(id);
@@ -195,8 +214,8 @@ export default function ProjectionsPage() {
     [dataset, viewer, state, scenario],
   );
   const rows = useMemo(
-    () => buildProjections(values, snapshot, keeperSets, edits, original),
-    [values, snapshot, keeperSets, edits, original],
+    () => buildProjections(values, snapshot, keeperSets, edits, original, compare),
+    [values, snapshot, keeperSets, edits, original, compare],
   );
   const shown = useMemo(
     () => sortProjections(filterProjections(rows, { query, position, hideKept, editedOnly }), sort),
@@ -331,7 +350,7 @@ export default function ProjectionsPage() {
       </div>
       <div className="mock-intro">
         Points a game in our scoring: the {label} line plus the double-double bonus.
-        {' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow and change only your numbers.'}
+        {' Tap ✎ by a player to change his stats; tap anywhere else to save. Your edits show in yellow and change only your numbers.'}
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet.{' '}
             {isCommish ? <Link to="/admin">Fetch them in Commish Mode.</Link> : 'The commish will load them soon.'}</>
@@ -365,22 +384,7 @@ export default function ProjectionsPage() {
             </button>
           )}
         </div>
-        {isCommish && (
-          <div className="mock-seg" role="radiogroup" aria-label="Projection source" title="Only you see this. Everyone else uses ESPN.">
-            {PROJECTION_SOURCES.map((choice) => (
-              <button
-                key={choice.id}
-                type="button"
-                role="radio"
-                aria-checked={pickedSource === choice.id}
-                className={`tap-btn mock-seg-btn${pickedSource === choice.id ? ' is-on' : ''}`}
-                onClick={() => { setProjectionSource(choice.id); resetPage(); }}
-              >
-                {choice.label.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
+        <ProjectionSourceSwitch onChange={resetPage} />
         <div className="mock-seg" role="radiogroup" aria-label="Position">
           {(['ALL', ...POSITIONS] as const).map((choice) => (
             <button
@@ -405,20 +409,20 @@ export default function ProjectionsPage() {
         </label>
         <div className="proj-export">
           <button type="button" className={`tap-btn mock-mini-btn${picking ? ' is-on' : ''}`} aria-expanded={picking} onClick={() => setPicking(!picking)}>
-            COLUMNS{hidden.size > 0 ? ` (${PROJECTION_COLUMNS.length - hidden.size} of ${PROJECTION_COLUMNS.length})` : ''}
+            COLUMNS{columns.length < available.length ? ` ${columns.length}/${available.length}` : ''}
           </button>
           <button type="button" className="tap-btn mock-mini-btn" onClick={exportCsv} disabled={shown.length === 0}>
-            EXPORT CSV
+            <span className="proj-export-word">EXPORT </span>CSV
           </button>
           <button type="button" className="tap-btn mock-mini-btn" onClick={() => void exportXlsx()} disabled={shown.length === 0 || exporting}>
-            {exporting ? 'SAVING…' : 'EXPORT XLSX'}
+            {exporting ? 'SAVING…' : <><span className="proj-export-word">EXPORT </span>XLSX</>}
           </button>
         </div>
       </section>
 
       {picking && (
         <section className="panel proj-columns" aria-label="Columns to show">
-          {PROJECTION_COLUMNS.filter((column) => !FIXED_COLUMNS.has(column.id)).map((column) => (
+          {available.filter((column) => !FIXED_COLUMNS.has(column.id)).map((column) => (
             <label key={column.id} className="proj-column-pick" title={column.header}>
               <input type="checkbox" checked={!hidden.has(column.id)} onChange={() => toggleColumn(column.id)} />
               {columnLabel(column)}
@@ -442,7 +446,7 @@ export default function ProjectionsPage() {
 
       {saveError && <div className="identity-error" role="alert">{saveError}</div>}
 
-      <div className="panel proj-table-wrap">
+      <div className={`panel proj-table-wrap${scrolled ? ' is-scrolled' : ''}`} onScroll={onTableScroll}>
         <table className="proj-table">
           <thead>
             <tr>
@@ -486,7 +490,10 @@ export default function ProjectionsPage() {
                     if (column.id === 'name') {
                       return (
                         <td key={column.id} className={classes}>
-                          <span className="proj-name">{text}</span>
+                          <span className="proj-name">
+                            <span className="proj-name-full">{text}</span>
+                            <span className="proj-name-short">{shortName(row.name)}</span>
+                          </span>
                           {row.espnId !== null && row.line !== null && !open && (
                             <button
                               type="button"

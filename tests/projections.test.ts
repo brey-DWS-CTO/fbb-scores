@@ -216,3 +216,25 @@ test('play-in and playoff games come from the schedule', async () => {
   assert.equal(jokic.playoffGames, den.playoffs.total);
   assert.ok(jokic.playInGames! > 0 && jokic.playoffGames! > 0);
 });
+
+test('postseason counts and the VS column are the commissioner\'s alone', async () => {
+  const { projectionColumnsFor, visibleColumns } = await import('../src/lib/league/projections.ts');
+  const member = projectionColumnsFor(false).map((column) => column.id);
+  assert.ok(!member.includes('playInGames') && !member.includes('playoffGames') && !member.includes('vsOther'));
+  const commish = projectionColumnsFor(true).map((column) => column.id);
+  assert.ok(commish.includes('playInGames') && commish.includes('playoffGames') && commish.includes('vsOther'));
+  // Hiding nothing still leaves the member without them.
+  assert.ok(!visibleColumns(new Set(), projectionColumnsFor(false)).some((column) => column.id === 'playInGames'));
+});
+
+test('VS is this line\'s points a game less the other source\'s, and empty without one', () => {
+  const jokic = fixture.players.find((player) => player.fullName === 'Nikola Jokic')!;
+  const boosted = {
+    players: fixture.players.map((player) => (player === jokic
+      ? { ...player, projection: { ...player.projection!, stats: { ...player.projection!.stats, '0': player.projection!.stats['0'] + 72 } } }
+      : player)),
+  };
+  const compared = buildProjections(values, fixture, NO_KEEPERS, undefined, undefined, boosted as typeof fixture);
+  assert.equal(compared.find((row) => row.espnId === jokic.espnId)!.vsOther, -1, 'one point a game fewer than the other source');
+  assert.equal(rows.find((row) => row.espnId === jokic.espnId)!.vsOther, null);
+});
