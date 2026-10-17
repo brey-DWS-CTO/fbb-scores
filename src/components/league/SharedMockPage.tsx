@@ -63,7 +63,10 @@ function SharedMockScreen({ id }: { id: string }) {
   const viewer = identity?.owner ?? null;
   const draftData = useDraftData();
   const { dataset } = draftData;
-  const { snapshot, original, edits, loading: projectionsLoading } = useProjectionData();
+  // ESPN's numbers alone, no source swap and no edits: every phone must rank
+  // the players the same way, or the computer teams draft differently on
+  // each one and the two replays come apart.
+  const { espn: snapshot, loading: projectionsLoading } = useProjectionData();
 
   const queryKey = useMemo(() => ['mock-room', id, viewer ?? 'anon'] as const, [id, viewer]);
   const roomQuery = useQuery({
@@ -118,8 +121,8 @@ function SharedMockScreen({ id }: { id: string }) {
     return { keepers, status };
   }, [board]);
   const projections = useMemo((): ReadonlyMap<string, PlayerProjection> =>
-    new Map(buildProjections(values, snapshot, kept, edits, original).map((row) => [row.key, row])),
-  [values, snapshot, kept, edits, original]);
+    new Map(buildProjections(values, snapshot, kept).map((row) => [row.key, row])),
+  [values, snapshot, kept]);
   const owners = useMemo(() => dataset.teams.map((team) => team.owner), [dataset.teams]);
   const mode = room?.mode ?? 'sharp';
   const seed = room?.seed ?? 0;
