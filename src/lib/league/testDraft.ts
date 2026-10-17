@@ -61,3 +61,13 @@ export type StateSide = 'league' | 'test';
 export function stateSide(meta: { testDraft?: TestDraftMeta } | null | undefined): StateSide {
   return meta?.testDraft?.serving === true ? 'test' : 'league';
 }
+
+/** The room represented by the state currently on screen, independent of storage. */
+export type DraftRoom = { side: 'league' } | { side: 'test'; startedAt: string | null };
+export const TEST_DRAFT_SESSION_HEADER = 'x-test-draft-started-at';
+
+export function draftRoomHeaders(room: DraftRoom): Record<string, string> {
+  if (room.side === 'league') return {};
+  if (!room.startedAt) throw new Error('Wait for the test draft to load');
+  return { [TEST_DRAFT_HEADER]: '1', [TEST_DRAFT_SESSION_HEADER]: room.startedAt };
+}

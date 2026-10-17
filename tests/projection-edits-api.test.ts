@@ -54,12 +54,38 @@ after(async () => {
 
 type Edit = { espnId: number; games: number | null; perGame: Record<string, number>; editedBy: string };
 
-test('projection edits are the commissioner\'s alone', async () => {
+test('each owner keeps their own projection edits', async () => {
   assert.equal((await request('/api/league/projection-edits')).status, 401);
-  // Members read the edits (projections are open to all) but cannot write them.
-  assert.equal((await request('/api/league/projection-edits', { headers: auth('Joel') })).status, 200);
+  // A member with no edits sees none, so ESPN's line, not the commish's seeds.
+  const empty = await request('/api/league/projection-edits', { headers: auth('Joel') });
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.body.edits, []);
+
   const put = await request('/api/league/projection-edits/7', { method: 'PUT', headers: auth('Joel'), body: JSON.stringify({ name: 'X', games: 3 }) });
-  assert.equal(put.status, 403);
+  assert.equal(put.status, 200);
+  assert.equal((put.body.edit as Edit).editedBy, 'Joel');
+  const joel = (await request('/api/league/projection-edits', { headers: auth('Joel') })).body.edits as Edit[];
+  assert.deepEqual(joel.map((edit) => [edit.espnId, edit.games]), [[7, 3]]);
+
+  // The commish editing the same player leaves Joel's line alone.
+  await request('/api/league/projection-edits/7', { method: 'PUT', headers: auth(commissioner), body: JSON.stringify({ name: 'X', games: 60 }) });
+  const joelAgain = (await request('/api/league/projection-edits', { headers: auth('Joel') })).body.edits as Edit[];
+  assert.deepEqual(joelAgain.map((edit) => edit.games), [3]);
+
+  // Undo clears only your own.
+  assert.equal((await request('/api/league/projection-edits/7', { method: 'DELETE', headers: auth('Joel') })).status, 200);
+  assert.deepEqual((await request('/api/league/projection-edits', { headers: auth('Joel') })).body.edits, []);
+  const commish = (await request('/api/league/projection-edits', { headers: auth(commissioner) })).body.edits as Edit[];
+  assert.equal(commish.find((edit) => edit.espnId === 7)?.games, 60);
+  await request('/api/league/projection-edits/7', { method: 'DELETE', headers: auth(commissioner) });
+});
+
+test('only the commissioner reads Hashtag projections', async () => {
+  assert.equal((await request('/api/league/expert-projections')).status, 401);
+  assert.equal((await request('/api/league/expert-projections', { headers: auth('Joel') })).status, 403);
+  const read = await request('/api/league/expert-projections', { headers: auth(commissioner) });
+  assert.equal(read.status, 200);
+  assert.equal((read.body.players as unknown[]).length, 200);
 });
 
 test('the first read writes the two injury estimates once; save, change and reset work', async () => {

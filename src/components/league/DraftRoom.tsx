@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useIdentity } from '../../hooks/useLeague.js';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, oddsKeeperThere, type LiveChoices } from '../../lib/league/liveMock.js';
 import type { MockCandidate, MockMode, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
@@ -21,6 +22,7 @@ import MockBoardGrid, { KeeperChip } from './MockBoardGrid.js';
 import { boardFromGrid, type SavedBoard } from '../../lib/league/mockBoard.js';
 import ShareButton from './ShareButton.js';
 import { gradeMock, mockResultId, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
+import { SHARED_GRACE_SECONDS, headToHead } from '../../lib/league/sharedMock.js';
 import { positionColor } from '../draft/boardUtils.js';
 
 /** A position code in the board's own colour for it. */
@@ -61,6 +63,26 @@ interface Props {
   onNewDraft: () => void;
   /** Called once when the last pick lands, with the draft's grade. */
   onFinished: (finished: { choices: Record<number, string>; grade: MockGrade; board: SavedBoard }) => void;
+  /** Set for a mock with a friend. */
+  shared?: SharedRoomControls;
+}
+
+/**
+ * A mock with a friend: the server holds the picks and the clock, and this
+ * room only shows them and sends the person's own. `saved.choices` is the
+ * server's, refreshed as it polls.
+ */
+export interface SharedRoomControls {
+  /** Everyone at the table, the viewer included. */
+  people: readonly string[];
+  /** The pick on the server's clock, and when it runs out on this phone's clock. */
+  clockOverall: number | null;
+  deadlineMs: number | null;
+  onPick: (overall: number, playerKey: string) => Promise<void>;
+  /** Time ran out on `overall`: the pick the room makes. */
+  onRunOut: (overall: number, playerKey: string) => Promise<void>;
+  /** End the mock for everyone. */
+  onQuit: () => void;
 }
 
 type CenterTab = 'players' | 'teams' | 'results';
@@ -94,21 +116,36 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 
  * before. What is new is that it is saved as it goes, so leaving the page and
  * coming back finds it where it was, with the clock paused.
  */
-export default function DraftRoom({ prepared, values, projections, projectedTrades, person, seed, mode, saved, onProgress, onNewDraft, onFinished }: Props) {
+export default function DraftRoom({ prepared, values, projections, projectedTrades, person, seed, mode, saved, onProgress, onNewDraft, onFinished, shared }: Props) {
   const navigate = useNavigate();
+  // Play-in and playoff games (PI, PO) are the commissioner's columns only.
+  const { identity } = useIdentity();
+  const showPostseason = identity?.isCommissioner === true;
+  // Everyone whose picks stop the replay: the person alone, or the whole table.
+  const people = shared?.people ?? person;
   // Only the first render restores; after that the room owns its state.
-  const [restored] = useState(() => replaySaved(prepared, seed, person, saved?.choices ?? {}));
-  const [started, setStarted] = useState(saved?.started === true);
-  const [choices, setChoices] = useState<LiveChoices>(restored.choices);
+  const [restored] = useState(() => replaySaved(prepared, seed, people, saved?.choices ?? {}));
+  const [started, setStarted] = useState(shared !== undefined || saved?.started === true);
+  // In a mock with a friend the server's choices come in through `saved`.
+  const [ownChoices, setOwnChoices] = useState<LiveChoices>(restored.choices);
+  const sharedChoices = saved?.choices;
+  const choices = useMemo((): LiveChoices => (shared ? sharedChoices ?? {} : ownChoices), [shared, sharedChoices, ownChoices]);
   const [queue, setQueue] = useState<string[]>(saved?.queue ?? []);
   // A restored draft shows everything at once; there is nothing to watch roll in.
-  const [revealed, setRevealed] = useState(saved?.started ? restored.live.picks.length : 0);
-  const [clock, setClock] = useState<Clock>(() => {
+  const [revealed, setRevealed] = useState(saved?.started || shared ? restored.live.picks.length : 0);
+  const [ownClock, setClock] = useState<Clock>(() => {
     const waiting = restored.live.waitingOn?.pick.overall;
     if (!saved?.started || waiting === undefined || saved.clockLeft === null) return null;
     const at = Date.now();
     return { overall: waiting, deadline: at + saved.clockLeft * 1000, pausedAt: at };
   });
+  // With a friend the clock is the server's, never paused.
+  const sharedOverall = shared?.clockOverall ?? null;
+  const sharedDeadline = shared?.deadlineMs ?? null;
+  const clock = useMemo((): Clock => {
+    if (!shared) return ownClock;
+    return sharedOverall !== null && sharedDeadline !== null ? { overall: sharedOverall, deadline: sharedDeadline, pausedAt: null } : null;
+  }, [shared, ownClock, sharedOverall, sharedDeadline]);
   const [now, setNow] = useState(() => Date.now());
   const [center, setCenter] = useState<CenterTab>('players');
   const [selected, setSelected] = useState<string | null>(null);
@@ -137,17 +174,21 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   // The list first: the latest pick on top. The board is a tap away.
   const [resultsView, setResultsView] = useState<'list' | 'board'>('list');
 
-  const live = useMemo(() => replaySaved(prepared, seed, person, choices).live, [prepared, seed, person, choices]);
+  const live = useMemo(() => replaySaved(prepared, seed, people, choices).live, [prepared, seed, people, choices]);
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
   const caughtUp = revealed >= live.picks.length;
   // The draft halts at each of the person's own keeper slots, so they can see
   // who would still be there, then CONTINUE. The keeper itself never changes.
+  // Not with a friend: their clock is running while you look.
   const [skipped, setSkipped] = useState<ReadonlySet<number>>(() => new Set());
   const nextUp = live.picks[revealed];
-  const atMyKeeper = started && !caughtUp && nextUp?.how === 'keeper' && nextUp.owner === person && !skipped.has(nextUp.overall)
+  const atMyKeeper = started && !shared && !caughtUp && nextUp?.how === 'keeper' && nextUp.owner === person && !skipped.has(nextUp.overall)
     ? nextUp
     : null;
-  const myTurn = started && caughtUp && live.waitingOn !== null;
+  const onClockOwner = live.waitingOn?.pick.currentOwner ?? null;
+  const myTurn = started && caughtUp && live.waitingOn !== null && (!shared || onClockOwner === person);
+  // A friend's pick, on their clock.
+  const theirTurn = shared !== undefined && started && caughtUp && live.waitingOn !== null && !myTurn;
   const over = started && caughtUp && live.over;
   const slots = prepared.input.board.slots;
 
@@ -247,6 +288,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   // ── The clock ────────────────────────────────────────────────────────────
   const waitingOverall = live.waitingOn?.pick.overall ?? null;
   useEffect(() => {
+    if (shared) return;
     if (!myTurn || waitingOverall === null) {
       if (clock === null) return;
       const stop = setTimeout(() => setClock(null), 0);
@@ -255,21 +297,40 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
     if (clock?.overall === waitingOverall) return;
     const start = setTimeout(() => setClock({ overall: waitingOverall, deadline: Date.now() + PICK_CLOCK * 1000, pausedAt: null }), 0);
     return () => clearTimeout(start);
-  }, [myTurn, waitingOverall, clock]);
+  }, [shared, myTurn, waitingOverall, clock]);
 
+  // With a friend, the pick the room has already been told ran out, so one
+  // phone says it once. A refusal (the server says not yet) clears it so the
+  // next tick tries again.
+  const ranOut = useRef<number | null>(null);
   useEffect(() => {
     if (!clock || clock.pausedAt !== null) return;
     const tick = setInterval(() => {
       const at = Date.now();
       setNow(at);
+      if (shared) {
+        // Only once the replay here agrees with the server about whose pick it is.
+        if (!live.waitingOn || live.waitingOn.pick.overall !== clock.overall) return;
+        const mine = live.waitingOn.pick.currentOwner === person;
+        if (at < clock.deadline + (mine ? 0 : SHARED_GRACE_SECONDS * 1000)) return;
+        if (ranOut.current === clock.overall) return;
+        ranOut.current = clock.overall;
+        // Your own clock: the top of your queue. A friend's: the best fit for them.
+        const pick = mine ? queuedPick(queue, live.run.available(), autoPick(live)) : autoPick(live);
+        if (!pick) return;
+        shared.onRunOut(clock.overall, pick.playerKey).catch(() => {
+          window.setTimeout(() => { if (ranOut.current === clock.overall) ranOut.current = null; }, 2000);
+        });
+        return;
+      }
       if (at >= clock.deadline) {
         // Time is up: the top of the queue, else the best value left.
         const pick = queuedPick(queue, live.run.available(), autoPick(live));
-        if (pick) setChoices((current) => ({ ...current, [clock.overall]: pick.playerKey }));
+        if (pick) setOwnChoices((current) => ({ ...current, [clock.overall]: pick.playerKey }));
       }
     }, 250);
     return () => clearInterval(tick);
-  }, [clock, live, queue]);
+  }, [clock, live, queue, shared, person]);
   const secondsLeft = secondsOn(clock, now);
   const paused = clock !== null && clock.pausedAt !== null;
   const togglePause = () =>
@@ -293,19 +354,30 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   );
 
   // ── Actions ──────────────────────────────────────────────────────────────
+  // With a friend a pick goes to the server and comes back on the next
+  // answer; one at a time, so a double tap cannot send two.
+  const sending = useRef(false);
   const draft = (playerKey: string) => {
     if (!myTurn || !live.waitingOn) return;
-    setChoices((current) => ({ ...current, [live.waitingOn!.pick.overall]: playerKey }));
+    const overall = live.waitingOn.pick.overall;
+    if (shared) {
+      if (sending.current) return;
+      sending.current = true;
+      shared.onPick(overall, playerKey).catch(() => { /* the page says why */ }).finally(() => { sending.current = false; });
+    } else {
+      setOwnChoices((current) => ({ ...current, [overall]: playerKey }));
+    }
     setQueue((current) => current.filter((key) => key !== playerKey));
     setSearch('');
   };
   const undo = () => {
+    if (shared) return;
     const mine = Object.keys(choices).map(Number).sort((a, b) => a - b);
     const last = mine[mine.length - 1];
     if (last === undefined) return;
     const next = { ...choices };
     delete next[last];
-    setChoices(next);
+    setOwnChoices(next);
     setRevealed(Math.min(revealed, last - 1));
     // The replay runs forward again from here, so any keeper pause it had
     // passed on the way is due again.
@@ -314,8 +386,9 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
   // RESTART plays the same draft over from the first pick, same room, same
   // seed, same queue. NEW DRAFT clears the room for a fresh seed.
   const restart = (fresh = false) => {
+    if (shared) return;
     setStarted(!fresh);
-    setChoices({});
+    setOwnChoices({});
     setRevealed(0);
     setClock(null);
     setSkipped(new Set());
@@ -326,8 +399,9 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
     // straight away, and the last thing it saves must be the empty draft.
     progressRef.current = { started: !fresh, choices: {}, queue: fresh ? [] : queue, clockLeft: null, finished: false };
   };
-  // Leave the room. The draft stays saved; DRAFT brings it back.
-  const exit = () => navigate('/draft/start');
+  // Leave the room. The draft stays saved; DRAFT brings it back. With a
+  // friend it keeps running on the server, and the mock page has the way in.
+  const exit = () => navigate(shared ? '/mock' : '/draft/start');
 
   // ── What the screen shows ────────────────────────────────────────────────
   const shownPicks = useMemo(() => (started ? live.picks.slice(0, revealed) : []), [started, live.picks, revealed]);
@@ -385,8 +459,10 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
       return `${candidate.playerName} ${projection?.name ?? ''} ${projection?.proTeam ?? ''}`.toLowerCase().includes(needle);
     })
     .sort((a, b) => {
-      const x = rowValue(a, sort.key);
-      const y = rowValue(b, sort.key);
+      // A member never sees PI or PO, so a sort on them falls back to the board.
+      const key = !showPostseason && (sort.key === 'pi' || sort.key === 'po') ? 'rank' : sort.key;
+      const x = rowValue(a, key);
+      const y = rowValue(b, key);
       if (x === null || y === null) return x === y ? a.valueRank - b.valueRank : x === null ? 1 : -1;
       return (x - y) * sort.dir || a.valueRank - b.valueRank;
     })
@@ -531,10 +607,12 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
     ? null
     : `Up in ${untilTurn} pick${untilTurn === 1 ? '' : 's'}${myNext ? ` at ${myNext.pick.round}.${myNext.pick.slot}` : ''}`;
   const miniClock = (
-    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${!myTurn && upIn ? ' is-wait' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
-      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : upIn ?? (currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…')}
+    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${theirTurn ? ' is-them' : ''}${!myTurn && !theirTurn && upIn ? ' is-wait' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
+      {myTurn || theirTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : upIn ?? (currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…')}
     </span>
   );
+  // With a friend: how you did against them, once the draft is over.
+  const versus = shared && grade ? headToHead(grade.standings, person, shared.people.filter((owner) => owner !== person)) : '';
   const cardFor = (key: string, extra: { role: 'keeper' | 'compare' | 'card' }) => (
     <PlayerCard
       key={`${extra.role}-${key}`}
@@ -589,9 +667,30 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
       </button>
       {menuOpen && (
         <div className="room-menu-sheet" role="menu">
-          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART THIS DRAFT</button>
-          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
-          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={exit}>LEAVE THE ROOM</button>
+          {shared ? (
+            <>
+              {!over && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="tap-btn mock-mini-btn"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    if (window.confirm('Quit this mock? It ends for everyone at the table.')) shared.onQuit();
+                  }}
+                >
+                  QUIT THIS MOCK
+                </button>
+              )}
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={exit}>LEAVE THE ROOM</button>
+            </>
+          ) : (
+            <>
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART THIS DRAFT</button>
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={exit}>LEAVE THE ROOM</button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -601,7 +700,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
     <div ref={roomRef} className={`room room-center-${center}${atMyKeeper ? ' is-at-keeper' : ''}${compact ? ' is-compact' : ''}${hasPicked ? ' has-picked' : ''}`}>
       {/* ── Left: the clock and who picks next ── */}
       <aside className="room-left">
-        <div ref={clockRef2} className={`panel room-clock${myTurn ? ' is-mine' : ''}${started ? '' : ' is-before'}`}>
+        <div ref={clockRef2} className={`panel room-clock${myTurn ? ' is-mine' : ''}${theirTurn ? ' is-them' : ''}${started ? '' : ' is-before'}`}>
           {!started ? (
             <>
               <button type="button" className="tap-btn live-start-btn" onClick={() => setStarted(true)}>START DRAFT</button>
@@ -611,7 +710,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
             <>
               <div className="room-clock-row">
                 <div className={`room-clock-big mock-grade-letter grade-${(grade?.grade ?? 'c')[0].toLowerCase()}`}>{grade?.grade ?? 'DONE'}</div>
-                <div className="room-clock-meta"><span>Draft complete.</span><span>Saved to Past mocks.</span></div>
+                <div className="room-clock-meta"><span>Draft complete.</span><span>{versus || 'Saved to Past mocks.'}</span></div>
                 {shareUrl && grade && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} className="room-share" />}
                 {menu}
               </div>
@@ -621,23 +720,25 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
             <>
               <div className="room-clock-row">
                 <div className={`room-clock-big${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
-                  {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : '…'}
+                  {myTurn || theirTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : '…'}
                 </div>
                 {currentSlot && (
                   <div className="room-clock-meta">
                     <span>Round {currentSlot.pick.round}</span><span>Pick {currentSlot.pick.slot}</span><span>{ordinal(currentSlot.pick.overall)} overall</span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="tap-btn room-undo-btn"
-                  onClick={undo}
-                  disabled={Object.keys(choices).length === 0}
-                  title="Take back your last pick"
-                >
-                  <NavIcon name="undo" size="1.5em" />
-                  <span>UNDO</span>
-                </button>
+                {!shared && (
+                  <button
+                    type="button"
+                    className="tap-btn room-undo-btn"
+                    onClick={undo}
+                    disabled={Object.keys(choices).length === 0}
+                    title="Take back your last pick"
+                  >
+                    <NavIcon name="undo" size="1.5em" />
+                    <span>UNDO</span>
+                  </button>
+                )}
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
@@ -664,7 +765,15 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                     YOUR PICK
                     {myAfter && <small className="room-turn-next"> · next at {myAfter.pick.round}.{myAfter.pick.slot}</small>}
                   </span>
-                  <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>
+                  {!shared && <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>}
+                  {menu}
+                </div>
+              ) : theirTurn && onClockOwner ? (
+                <div className="room-turn is-them">
+                  <span>
+                    {onClockOwner.toUpperCase()}&apos;S PICK
+                    {upIn && <small className="room-turn-next"> · {upIn.toLowerCase()}</small>}
+                  </span>
                   {menu}
                 </div>
               ) : (
@@ -684,7 +793,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
           </div>
           <ol className="room-upcoming">
             {upcoming.map((pick, index) => (
-              <li key={pick.overall} className={`${pick.mine ? 'is-mine' : ''}${index === 0 && started && !over ? ' is-now' : ''}`}>
+              <li key={pick.overall} className={`${pick.mine ? 'is-mine' : ''}${!pick.mine && shared?.people.includes(pick.owner) ? 'is-them' : ''}${index === 0 && started && !over ? ' is-now' : ''}`}>
                 {(index === 0 || upcoming[index - 1].round !== pick.round) && <div className="room-round">Round {pick.round}</div>}
                 <span className="room-upcoming-row">
                   <span className="room-upcoming-num">{pick.overall}</span>
@@ -779,8 +888,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                     {sortHead('fppg', 'FPPG')}
                     {sortHead('total', 'TOTAL', 'Projected season points')}
                     {sortHead('games', 'GP')}
-                    {sortHead('pi', 'PI', 'Team games in our play-in weeks')}
-                    {sortHead('po', 'PO', 'Team games in our playoff weeks')}
+                    {showPostseason && sortHead('pi', 'PI', 'Team games in our play-in weeks')}
+                    {showPostseason && sortHead('po', 'PO', 'Team games in our playoff weeks')}
                     {sortHead('pts', 'PTS')}
                     {sortHead('reb', 'REB')}
                     {sortHead('ast', 'AST')}
@@ -847,8 +956,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
-                        <PostseasonCell games={projection?.playInGames} />
-                        <PostseasonCell games={projection?.playoffGames} />
+                        {showPostseason && <PostseasonCell games={projection?.playInGames} />}
+                        {showPostseason && <PostseasonCell games={projection?.playoffGames} />}
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -879,7 +988,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                   <tr>
                     <th className="room-slot-col">Slot</th>
                     <th className="room-player-col">Player</th>
-                    {['FPPG', 'TOTAL', 'GP', 'PI', 'PO', 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
+                    {['FPPG', 'TOTAL', 'GP', ...(showPostseason ? ['PI', 'PO'] : []), 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
                       <th key={label} className="room-num"><span className="room-th">{label}</span></th>
                     ))}
                   </tr>
@@ -904,8 +1013,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                         <td className="room-num room-strong">{candidate ? one(projection?.fppg) : '–'}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num">{projection?.games ?? '–'}</td>
-                        <PostseasonCell games={projection?.playInGames} />
-                        <PostseasonCell games={projection?.playoffGames} />
+                        {showPostseason && <PostseasonCell games={projection?.playInGames} />}
+                        {showPostseason && <PostseasonCell games={projection?.playoffGames} />}
                         <td className="room-num">{one(line?.min)}</td>
                         <td className="room-num">{one(line?.pts)}</td>
                         <td className="room-num">{one(line?.reb)}</td>

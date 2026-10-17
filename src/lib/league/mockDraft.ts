@@ -198,8 +198,17 @@ export function keepersForMock(
 
 /** The board a mock draft starts from. Reads everything through the keeper engine. */
 export function buildMockBoard(dataset: LeagueDataset, input: MockBoardInput): MockBoard {
-  const { keepers, status } = keepersForMock(dataset, input);
-  const dynamic: LeagueDynamicState = { ...input.state, keepers };
+  return boardFromKeeperSets(dataset, input.state, keepersForMock(dataset, input));
+}
+
+/**
+ * The board for a given set of keepers, team by team. `buildMockBoard` picks
+ * the sets for one viewer; a mock with a friend picks its own, since two
+ * people share one board.
+ */
+export function boardFromKeeperSets(dataset: LeagueDataset, state: LeagueDynamicState, sets: MockKeeperSets): MockBoard {
+  const { keepers, status } = sets;
+  const dynamic: LeagueDynamicState = { ...state, keepers };
   const cells = buildDraftBoard(dataset, dynamic);
   const available = new Set(availablePlayers(dataset, dynamic).map((player) => player.key));
 

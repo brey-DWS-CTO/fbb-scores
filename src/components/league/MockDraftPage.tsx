@@ -1,8 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import { deleteMockResult, fetchMockResults, fetchMockStats, fetchMockTrades, fetchPickTrades, saveMockResult } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  deleteMockResult,
+  fetchMockResults,
+  fetchMockStats,
+  fetchMockTrades,
+  fetchPickTrades,
+  fetchSharedMocks,
+  joinSharedMockRoom,
+  openSharedMockRoom,
+  quitSharedMockRoom,
+  saveMockResult,
+} from '../../lib/league/api.js';
+import { MAX_PEOPLE, namesOf, onTheClock, othersAt, sharedMockPhase } from '../../lib/league/sharedMock.js';
+import ShareButton from './ShareButton.js';
 import { isMockTradeId, mockTradeProposal } from '../../lib/league/mockTrades.js';
 import type { SavedBoard } from '../../lib/league/mockBoard.js';
 import SavedMockBoard from './SavedMockBoard.js';
@@ -71,7 +85,7 @@ function MockDraftScreen() {
   const isCommish = identity?.isCommissioner === true;
   const signedIn = viewer !== null;
 
-  // ESPN's numbers with the commissioner's projection edits laid over them.
+  // ESPN's numbers with your own projection edits laid over them.
   const { snapshot, original, edits, loading: projectionsLoading } = useProjectionData();
   const tradesQuery = useQuery({
     queryKey: ['pick-trades', viewer ?? 'anon'],
@@ -128,6 +142,33 @@ function MockDraftScreen() {
     enabled: identity !== null,
     staleTime: 30_000,
   });
+  // Mocks with a friend: the ones you were asked to, and the one you are in.
+  const navigate = useNavigate();
+  const roomsQuery = useQuery({
+    queryKey: ['mock-rooms', viewer ?? 'anon'],
+    queryFn: () => fetchSharedMocks(identity as NonNullable<typeof identity>),
+    enabled: identity !== null,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
+  });
+  const rooms = useMemo(() => roomsQuery.data?.rooms ?? [], [roomsQuery.data]);
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [friendError, setFriendError] = useState<string | null>(null);
+  const friendAct = async (call: () => Promise<unknown>, then?: () => void) => {
+    if (!identity) return;
+    setFriendBusy(true);
+    setFriendError(null);
+    try {
+      await call();
+      await queryClient.invalidateQueries({ queryKey: ['mock-rooms'] });
+      then?.();
+    } catch (caught) {
+      setFriendError(apiErrorMessage(caught));
+    } finally {
+      setFriendBusy(false);
+    }
+  };
   useEffect(() => {
     if (!viewer || acting) return;
     const save: MockSave = {
@@ -286,6 +327,117 @@ function MockDraftScreen() {
     whatIf.applied.length > 0 ? `${whatIf.applied.length} trade${whatIf.applied.length === 1 ? '' : 's'} on` : 'no trades on',
     ownKeepers !== null ? 'trying a different pair of your own' : null,
   ].filter(Boolean).join(' · ');
+
+  // Draft with a friend: your open mock, the invites waiting on you, and a
+  // way to ask somebody. One open mock a person, so the form hides while
+  // you have one.
+  const busy = (room: typeof rooms[number]) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+  const myRoom = rooms.find((room) => room.people.includes(viewer) && busy(room));
+  const anyOpen = rooms.find((room) => room.open === true && sharedMockPhase(room) === 'waiting');
+  const friendPanel = identity && (
+    <section className="panel mock-friend">
+      <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>DRAFT WITH FRIENDS</div>
+      {rooms.map((room) => {
+        const phase = sharedMockPhase(room);
+        const inRoom = room.people.includes(viewer);
+        const others = namesOf(othersAt(room, viewer));
+        const link = `/mock/with/${room.id}`;
+        const asked = !room.open && phase === 'waiting' && !room.joined.includes(viewer);
+        const clockOwner = onTheClock(room);
+        const quit = () => friendAct(() => quitSharedMockRoom(identity, room.id));
+        return (
+          <div key={room.id} className="mock-friend-row">
+            <span>
+              {room.open && phase === 'waiting' && !inRoom && (
+                <><strong>{room.host}</strong>&apos;s room is open: {namesOf(room.people)}. {room.people.length} of {MAX_PEOPLE} seats, {roomLabel(room.mode)} room.</>
+              )}
+              {room.open && phase === 'waiting' && inRoom && room.host === viewer && (
+                <>Your room is open: {namesOf(room.people)}. Start it when you are ready.</>
+              )}
+              {room.open && phase === 'waiting' && inRoom && room.host !== viewer && (
+                <>You are in <strong>{room.host}</strong>&apos;s room: {namesOf(room.people)}. Waiting for {room.host} to start it.</>
+              )}
+              {phase === 'waiting' && asked && <><strong>{room.host}</strong> wants a mock with you. {roomLabel(room.mode) === 'sharp' ? 'Sharp' : 'Normal'} room.</>}
+              {!room.open && phase === 'waiting' && !asked && <>Waiting for <strong>{others}</strong> to join.</>}
+              {phase === 'live' && (
+                <>
+                  Your mock with <strong>{others}</strong> is on.
+                  {clockOwner ? (clockOwner === viewer ? ' Your pick!' : ` ${clockOwner} is on the clock.`) : ''}
+                </>
+              )}
+              {phase === 'finished' && <>Your mock with <strong>{others}</strong> is done. The grade is in Past mocks.</>}
+              {phase === 'ended' && <><strong>{room.endedBy}</strong> {room.startedAt ? 'left your mock, so it ended' : room.open ? 'closed the room' : 'passed on your mock'}.</>}
+            </span>
+            <span className="mock-friend-actions">
+              {room.open && phase === 'waiting' && !inRoom && room.people.length < MAX_PEOPLE && (
+                <button
+                  type="button"
+                  className="tap-btn mock-mini-btn is-primary"
+                  disabled={friendBusy || myRoom !== undefined}
+                  title={myRoom ? 'Quit your own mock first.' : undefined}
+                  onClick={() => friendAct(() => joinSharedMockRoom(identity, room.id), () => navigate(link))}
+                >
+                  JOIN
+                </button>
+              )}
+              {room.open && phase === 'waiting' && inRoom && (
+                <>
+                  <Link className="tap-btn mock-mini-btn is-primary" to={link}>{room.host === viewer ? 'OPEN' : 'OPEN'}</Link>
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>
+                    {room.host === viewer ? 'CLOSE' : 'LEAVE'}
+                  </button>
+                </>
+              )}
+              {asked && (
+                <>
+                  <button
+                    type="button"
+                    className="tap-btn mock-mini-btn is-primary"
+                    disabled={friendBusy}
+                    onClick={() => friendAct(() => joinSharedMockRoom(identity, room.id), () => navigate(link))}
+                  >
+                    JOIN
+                  </button>
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>NO THANKS</button>
+                </>
+              )}
+              {!room.open && phase === 'waiting' && !asked && (
+                <>
+                  <ShareButton url={`${window.location.origin}${link}`} title={`Mock draft with ${viewer}`} />
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>CANCEL</button>
+                </>
+              )}
+              {phase === 'live' && <Link className="tap-btn mock-mini-btn is-primary" to={link}>OPEN</Link>}
+              {phase === 'finished' && <Link className="tap-btn mock-mini-btn" to={link}>SEE IT</Link>}
+              {(phase === 'finished' || phase === 'ended') && (
+                <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>DISMISS</button>
+              )}
+            </span>
+          </div>
+        );
+      })}
+      {!myRoom && !anyOpen && (
+        <div className="mock-friend-form">
+          <button
+            type="button"
+            className="tap-btn mock-mini-btn is-primary"
+            disabled={friendBusy}
+            onClick={() => friendAct(async () => {
+              const { room } = await openSharedMockRoom(identity, mode);
+              navigate(`/mock/with/${room.id}`);
+            })}
+          >
+            OPEN A ROOM
+          </button>
+          <span className="mock-note mock-note-dim" style={{ margin: 0 }}>Anyone can join. You start it when you are ready. Up to {MAX_PEOPLE} people; the {roomLabel(mode)} room.</span>
+        </div>
+      )}
+      {friendError && <div className="mock-note mock-note-bad">{friendError}</div>}
+      <div className="mock-note mock-note-dim">
+        Everyone drafts their own real team; the other teams are computers. Two minutes a pick. The clock keeps running if someone walks away.
+      </div>
+    </section>
+  );
 
   // Before a live draft starts, the setup sits on top and open: keepers and
   // trades change the board, and changing them later restarts the draft.
@@ -471,6 +623,7 @@ function MockDraftScreen() {
       </section>
       )}
 
+      {setupFirst && friendPanel}
       {setupFirst && setup}
 
       {boardMoved && !progress?.started && (
@@ -501,6 +654,7 @@ function MockDraftScreen() {
       )}
 
       {!setupFirst && setup}
+      {!setupFirst && friendPanel}
 
       <details className="commish-fold mock-history">
         <summary className="hub-heading">
@@ -517,12 +671,16 @@ function MockDraftScreen() {
                   <span className={`mock-grade-letter grade-${record.grade.grade[0].toLowerCase()}`}>{record.grade.grade}</span>
                   <span className="mock-history-line">
                     {gradeSummary(record.grade)}
-                    <small>{new Date(record.finishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {roomLabel(record.mode)} room</small>
+                    <small>
+                      {new Date(record.finishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {roomLabel(record.mode)} room
+                      {record.vs && record.vs.length > 0 ? ` · with ${namesOf(record.vs)}` : ''}
+                    </small>
                   </span>
                 </button>
                 {openResult === record.id && (
                   <>
-                    <MockGradeCard grade={record.grade} person={record.owner} />
+                    {/* The row above already shows the letter and the line. */}
+                    <MockGradeCard grade={record.grade} person={record.owner} headline={false} />
                     <SavedMockBoard board={record.board} person={record.owner} />
                     <button type="button" className="tap-btn mock-mini-btn" onClick={() => forget(record.id)}>FORGET THIS ONE</button>
                   </>

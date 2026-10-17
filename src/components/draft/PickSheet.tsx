@@ -1,3 +1,4 @@
+import type { DraftRoom } from '../../lib/league/testDraft.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /** Wide enough for a second row of sort chips. Phones keep one sort. */
@@ -230,6 +231,7 @@ function CancelButton({ onClose }: { onClose: () => void }) {
 }
 
 interface PickSheetProps {
+  room: DraftRoom;
   cell: BoardCell;
   pool: DatasetPlayer[];
   onClose: () => void;
@@ -243,7 +245,8 @@ interface PickSheetProps {
 }
 
 /** Bottom sheet for entering a live draft pick into an empty cell. */
-export default function PickSheet({ cell, pool, onClose, numbers = null, startInWriteIn = false }: PickSheetProps) {
+export default function PickSheet({ room: displayedRoom, cell, pool, onClose, numbers = null, startInWriteIn = false }: PickSheetProps) {
+  const [room] = useState(displayedRoom);
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const postseasonGames = usePostseasonGames();
@@ -285,7 +288,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null, startIn
         playerName: player.name,
         proTeam: player.proTeam,
         positions: player.positions,
-      });
+      }, room);
       applyState(res);
       onClose();
     } catch (e) {
@@ -312,7 +315,7 @@ export default function PickSheet({ cell, pool, onClose, numbers = null, startIn
         proTeam: parsed.player.proTeam,
         positions: parsed.player.positions,
         writeIn: true,
-      });
+      }, room);
       applyState(res);
       onClose();
     } catch (e) {
@@ -702,7 +705,8 @@ export default function PickSheet({ cell, pool, onClose, numbers = null, startIn
 }
 
 /** Commissioner action sheet: clear a live (non-keeper) pick off the board. */
-export function ClearPickSheet({ cell, onClose }: { cell: BoardCell; onClose: () => void }) {
+export function ClearPickSheet({ room: displayedRoom, cell, onClose }: { room: DraftRoom; cell: BoardCell; onClose: () => void }) {
+  const [room] = useState(displayedRoom);
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const [busy, setBusy] = useState(false);
@@ -713,7 +717,7 @@ export function ClearPickSheet({ cell, onClose }: { cell: BoardCell; onClose: ()
     setBusy(true);
     setError(null);
     try {
-      const res = await clearDraftPick(identity, cell.pick.overall);
+      const res = await clearDraftPick(identity, cell.pick.overall, room);
       applyState(res);
       onClose();
     } catch (e) {

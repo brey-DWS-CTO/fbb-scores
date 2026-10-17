@@ -79,3 +79,14 @@ test('members sort by last name, team or position, with no numbers', () => {
   const byTeam = roomRows({ ...base, sort: nextRoomSort({ key: 'name', dir: 1 }, 'team'), available: [jokic, sga, luka], taken: new Map() });
   assert.deepEqual(byTeam.map((row) => row.player.proTeam), ['den', 'lal', 'okc']);
 });
+
+
+test('all players remain browsable beyond 150, with sorting and filtering intact', () => {
+  const players = Array.from({ length: 401 }, (_, i) => player(String(i).padStart(3, '0'), ['PG']));
+  const rows = roomRows({ ...base, sort: { key: 'name', dir: 1 }, available: players, everyone: players, taken: new Map() });
+  assert.equal(rows.length, 401);
+  const pages = [rows.slice(0, 150), rows.slice(150, 300), rows.slice(300, 450)];
+  assert.deepEqual(pages.flat().map((row) => row.player.key), players.map((entry) => entry.key));
+  const found = roomRows({ ...base, search: '400', available: players, everyone: players, taken: new Map() });
+  assert.equal(found[0]?.player.key, '400');
+});

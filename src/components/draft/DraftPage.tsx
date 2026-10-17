@@ -1,3 +1,4 @@
+import { stateSide, type DraftRoom } from '../../lib/league/testDraft.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -212,7 +213,11 @@ function PickRow({
 }
 
 export default function DraftPage() {
-  const { state, meta, dataset, playerPoolQuery } = useDraftData(true, testDraftJoined() ? 'test' : 'league');
+  const [side] = useState(() => testDraftJoined() ? 'test' as const : 'league' as const);
+  const { state, meta, dataset, playerPoolQuery } = useDraftData(true, side);
+  const room: DraftRoom = useMemo(() => stateSide(meta) === 'test'
+    ? { side: 'test', startedAt: state.draft.startedAt }
+    : { side: 'league' }, [meta, state.draft.startedAt]);
   const { identity } = useIdentity();
   const teamName = useTeamName();
   const scenarioQuery = useKeeperScenario();
@@ -271,7 +276,7 @@ export default function DraftPage() {
   const [testBusy, setTestBusy] = useState(false);
   const [endArmed, setEndArmed] = useState(false);
   const inSandbox = sandboxActive();
-  const inTestDraft = testDraftJoined();
+  const inTestDraft = room.side === 'test';
   const testOpen = meta?.testDraft?.running === true;
   const doTestDraft = async () => {
     if (!identity || testBusy) return;
@@ -309,17 +314,17 @@ export default function DraftPage() {
   // short note says who just came in or went out.
   const roomQuery = useQuery({
     queryKey: ['draft-room', identity?.owner ?? 'anon', inTestDraft ? 'test' : 'league'],
-    queryFn: () => checkInDraftRoom(identity!),
-    enabled: identity !== null && !inSandbox,
+    queryFn: () => checkInDraftRoom(identity!, room),
+    enabled: identity !== null && !inSandbox && meta !== null,
     refetchInterval: PRESENCE_POLL_MS,
   });
   const roomOwners = roomQuery.data?.owners;
-  const [room, setRoom] = useState<{ last: readonly string[] | undefined; notes: string[] }>({ last: undefined, notes: [] });
-  if (roomOwners !== room.last) {
-    const { joined, left } = roomChanges(room.last ?? null, roomOwners ?? []);
+  const [presence, setPresence] = useState<{ last: readonly string[] | undefined; notes: string[] }>({ last: undefined, notes: [] });
+  if (roomOwners !== presence.last) {
+    const { joined, left } = roomChanges(presence.last ?? null, roomOwners ?? []);
     const at = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const fresh = [...joined.map((owner) => `${owner} joined ${at}`), ...left.map((owner) => `${owner} left ${at}`)];
-    setRoom({ last: roomOwners, notes: [...fresh, ...room.notes].slice(0, 3) });
+    setPresence({ last: roomOwners, notes: [...fresh, ...presence.notes].slice(0, 3) });
   }
 
   const doExitTest = () => {
@@ -403,7 +408,7 @@ export default function DraftPage() {
     const report = () => {
       if (reportedCall.current === callAt) return;
       reportedCall.current = callAt;
-      expireDraftClock(identity, onClock.pick.overall).then(applyState).catch(() => {
+      expireDraftClock(identity, onClock.pick.overall, room).then(applyState).catch(() => {
         reportedCall.current = null;
       });
     };
@@ -415,7 +420,7 @@ export default function DraftPage() {
       if (clockExpired(clock, Date.now())) report();
     }, 500);
     return () => window.clearInterval(tick);
-  }, [identity, clock, onClock, applyState, inSandbox]);
+  }, [identity, clock, onClock, applyState, inSandbox, room]);
   const skippedCells = board.filter((cell) => cell.skipped);
 
   // A chime when your pick comes up, beeps at two minutes, an alarm on CLOCK.
@@ -508,9 +513,9 @@ export default function DraftPage() {
               <span key={owner} className={`draft-room-chip${owner === identity.owner ? ' is-me' : ''}`}>{owner}</span>
             ))}
           </div>
-          {room.notes.length > 0 && (
+          {presence.notes.length > 0 && (
             <div className="draft-room-notes">
-              {room.notes.map((note) => <span key={note}>{note}</span>)}
+              {presence.notes.map((note) => <span key={note}>{note}</span>)}
             </div>
           )}
         </div>
@@ -736,7 +741,7 @@ export default function DraftPage() {
                   ↶ UNDO LAST PICK
                 </button>
               )}
-              <ClockControls clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
+              <ClockControls room={room} clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
             </div>
             {skippedCells.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
@@ -799,6 +804,7 @@ export default function DraftPage() {
       {started && poolReady && onClock && identity && (
         <div className={tabClass('players')}>
           <LiveRoom
+            room={room}
             board={board}
             everyone={dataset.players}
             available={pool}
@@ -1031,6 +1037,7 @@ export default function DraftPage() {
       {showSignIn && <TeamPickerModal onClose={() => setShowSignIn(false)} />}
       {pickTarget && (
         <PickSheet
+          room={room}
           cell={pickTarget}
           pool={pool}
           numbers={numbers}
@@ -1041,7 +1048,7 @@ export default function DraftPage() {
           }}
         />
       )}
-      {clearTarget && <ClearPickSheet cell={clearTarget} onClose={() => setClearTarget(null)} />}
+      {clearTarget && <ClearPickSheet room={room} cell={clearTarget} onClose={() => setClearTarget(null)} />}
     </div>
   );
 }

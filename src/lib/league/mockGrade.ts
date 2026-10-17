@@ -196,6 +196,8 @@ export interface MockResultRecord {
   board?: SavedBoard;
   /** Trade offers switched on for this draft. Mocks from before this was kept have none. */
   tradesOn?: string[];
+  /** The other people at the table, in a mock drafted with a friend. */
+  vs?: string[];
 }
 
 /** Commissioner keeps every mock; everyone else keeps their latest ten. */
@@ -229,6 +231,9 @@ export function parseMockResult(owner: string, body: unknown): MockResultRecord 
   const tradesOn = Array.isArray(value.tradesOn)
     ? value.tradesOn.filter((id): id is string => typeof id === 'string' && id.length <= 80).slice(0, 20)
     : [];
+  const vs = Array.isArray(value.vs)
+    ? value.vs.filter((name): name is string => typeof name === 'string' && name.length <= 40 && name !== owner).slice(0, 8)
+    : [];
   return {
     id: value.id,
     owner,
@@ -238,5 +243,6 @@ export function parseMockResult(owner: string, body: unknown): MockResultRecord 
     grade,
     ...(board ? { board } : {}),
     ...(tradesOn.length > 0 ? { tradesOn } : {}),
+    ...(vs.length > 0 ? { vs } : {}),
   };
 }

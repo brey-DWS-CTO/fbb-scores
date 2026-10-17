@@ -179,9 +179,10 @@ export interface MockResultRow {
   createdAt: string;
 }
 
-/** One commissioner edit to a player's ESPN projection. */
+/** One owner's edit to a player's ESPN projection. Each owner keeps their own. */
 export interface ProjectionEditRow {
   season: number;
+  owner: string;
   espnId: number;
   /** The edit as `src/lib/league/projectionEdits.ts` defines it; stored whole. */
   edit: unknown;
@@ -301,6 +302,26 @@ export class PollWriteError extends Error {
     super(message);
     this.code = code;
     this.name = 'PollWriteError';
+  }
+}
+
+/** A mock draft two or more people share. One row per room, written whole. */
+export interface SharedMockRow {
+  id: string;
+  season: number;
+  /** The room as `src/lib/league/sharedMock.ts` defines it; stored whole. */
+  room: unknown;
+  /** Bumped on every write, so two phones picking at once cannot overwrite each other. */
+  version: number;
+  updatedAt: string;
+}
+
+export class SharedMockWriteError extends Error {
+  code: 'not-found' | 'duplicate' | 'busy';
+  constructor(code: SharedMockWriteError['code'], message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'SharedMockWriteError';
   }
 }
 
@@ -526,10 +547,21 @@ interface StoreBackend {
   listMockTrades(season: number, owner: string): Promise<MockTrade[]>;
   saveMockTrade(trade: MockTrade): Promise<void>;
   deleteMockTrade(season: number, owner: string, id: string): Promise<void>;
+  getSharedMock(id: string): Promise<SharedMockRow | null>;
+  /** Every room this owner was asked to this season, newest first. */
+  listSharedMocks(season: number, owner: string): Promise<SharedMockRow[]>;
+  /** Open rooms still waiting to start, which anyone in the league may join. */
+  listOpenSharedMocks(season: number): Promise<SharedMockRow[]>;
+  insertSharedMock(row: SharedMockRow): Promise<void>;
+  /**
+   * Read, change, write, retrying if another phone wrote in between. Two
+   * people in one room must never lose a pick to each other.
+   */
+  updateSharedMock(id: string, mutate: (room: unknown) => unknown, at: string): Promise<SharedMockRow>;
   deleteMockResult(season: number, owner: string, id: string): Promise<void>;
-  listProjectionEdits(season: number): Promise<ProjectionEditRow[]>;
+  listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]>;
   saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow>;
-  deleteProjectionEdit(season: number, espnId: number): Promise<void>;
+  deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void>;
   getRulebookDraft(season: number): Promise<RulebookDraftRow | null>;
   saveRulebookDraft(
     season: number,
@@ -834,6 +866,15 @@ class NeonBackend implements StoreBackend {
       published_at timestamptz not null,
       published_by text not null
     )`;
+    // A mock draft two people share. The room is written whole; the version
+    // is what keeps two phones from writing over each other.
+    await this.sql`CREATE TABLE IF NOT EXISTS shared_mocks (
+      id text primary key,
+      season int not null,
+      data jsonb not null,
+      version int not null default 0,
+      updated_at timestamptz not null
+    )`;
     // Trades an owner built and kept for themselves. Never sent, never mailed.
     await this.sql`CREATE TABLE IF NOT EXISTS mock_trades (
       season int not null,
@@ -863,11 +904,12 @@ class NeonBackend implements StoreBackend {
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS projection_edits (
       season int not null,
+      owner text not null,
       espn_id int not null,
       data jsonb not null,
       updated_at timestamptz not null default now(),
       updated_by text not null,
-      primary key (season, espn_id)
+      primary key (season, owner, espn_id)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS draft_presence (
       room text not null,
@@ -875,6 +917,25 @@ class NeonBackend implements StoreBackend {
       seen_at timestamptz not null,
       primary key (room, owner)
     )`;
+    // Edits were league-wide until 16 October 2026. Each old row becomes the
+    // edit of whoever saved it, and the key gains the owner.
+    await this.sql`ALTER TABLE projection_edits ADD COLUMN IF NOT EXISTS owner text`;
+    await this.sql`UPDATE projection_edits SET owner = updated_by WHERE owner IS NULL`;
+    await this.sql`ALTER TABLE projection_edits ALTER COLUMN owner SET NOT NULL`;
+    await this.sql`DO $$ DECLARE old_key text; BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_index i
+          JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+          WHERE i.indrelid = 'projection_edits'::regclass AND i.indisprimary AND a.attname = 'owner'
+      ) THEN
+        SELECT conname INTO old_key FROM pg_constraint
+          WHERE conrelid = 'projection_edits'::regclass AND contype = 'p';
+        IF old_key IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE projection_edits DROP CONSTRAINT %I', old_key);
+        END IF;
+        ALTER TABLE projection_edits ADD PRIMARY KEY (season, owner, espn_id);
+      END IF;
+    END $$`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_draft (
       season int primary key,
       data jsonb not null,
@@ -970,6 +1031,7 @@ class NeonBackend implements StoreBackend {
       const updated = (await this.sql`UPDATE league_state
         SET data = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
         WHERE id = ${TEST_DRAFT_ROW} AND version = ${row.version}
+          AND data->'draft'->>'startedAt' = ${row.data.draft.startedAt}
         RETURNING version`) as Array<{ version: number }>;
       if (updated[0]) return { state: draft, version: updated[0].version };
     }
@@ -1445,6 +1507,72 @@ class NeonBackend implements StoreBackend {
     await this.sql`DELETE FROM mock_trades WHERE season = ${season} AND owner = ${owner} AND id = ${id}`;
   }
 
+  async getSharedMock(id: string): Promise<SharedMockRow | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, data, version, updated_at FROM shared_mocks WHERE id = ${id}`) as Array<{
+      id: string;
+      season: number;
+      data: unknown;
+      version: number;
+      updated_at: string | Date;
+    }>;
+    const row = rows[0];
+    return row ? { id: row.id, season: row.season, room: row.data, version: row.version, updatedAt: new Date(row.updated_at).toISOString() } : null;
+  }
+
+  async listSharedMocks(season: number, owner: string): Promise<SharedMockRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, data, version, updated_at FROM shared_mocks
+      WHERE season = ${season} AND data->'people' ? ${owner}
+      ORDER BY updated_at DESC LIMIT 20`) as Array<{
+      id: string;
+      season: number;
+      data: unknown;
+      version: number;
+      updated_at: string | Date;
+    }>;
+    return rows.map((row) => ({ id: row.id, season: row.season, room: row.data, version: row.version, updatedAt: new Date(row.updated_at).toISOString() }));
+  }
+
+  async listOpenSharedMocks(season: number): Promise<SharedMockRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, season, data, version, updated_at FROM shared_mocks
+      WHERE season = ${season} AND data->>'open' = 'true'
+        AND data->>'startedAt' IS NULL AND data->>'endedAt' IS NULL
+      ORDER BY updated_at DESC LIMIT 20`) as Array<{
+      id: string;
+      season: number;
+      data: unknown;
+      version: number;
+      updated_at: string | Date;
+    }>;
+    return rows.map((row) => ({ id: row.id, season: row.season, room: row.data, version: row.version, updatedAt: new Date(row.updated_at).toISOString() }));
+  }
+
+  async insertSharedMock(row: SharedMockRow): Promise<void> {
+    await this.ensureInit();
+    const written = (await this.sql`INSERT INTO shared_mocks (id, season, data, version, updated_at)
+      VALUES (${row.id}, ${row.season}, ${JSON.stringify(row.room)}::jsonb, ${row.version}, ${row.updatedAt})
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id`) as Array<{ id: string }>;
+    if (!written[0]) throw new SharedMockWriteError('duplicate', 'That mock already exists');
+  }
+
+  async updateSharedMock(id: string, mutate: (room: unknown) => unknown, at: string): Promise<SharedMockRow> {
+    await this.ensureInit();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const current = await this.getSharedMock(id);
+      if (!current) throw new SharedMockWriteError('not-found', 'No such mock');
+      const next = mutate(current.room);
+      const written = (await this.sql`UPDATE shared_mocks
+        SET data = ${JSON.stringify(next)}::jsonb, version = version + 1, updated_at = ${at}
+        WHERE id = ${id} AND version = ${current.version}
+        RETURNING version`) as Array<{ version: number }>;
+      if (written[0]) return { ...current, room: next, version: written[0].version, updatedAt: at };
+    }
+    throw new SharedMockWriteError('busy', 'The mock is changing too fast. Try again.');
+  }
+
   async listMockFinishes(season: number): Promise<MockFinish[]> {
     await this.ensureInit();
     // The log, plus whatever saved mocks predate it. The pure count takes each draft once.
@@ -1462,10 +1590,10 @@ class NeonBackend implements StoreBackend {
     await this.sql`DELETE FROM mock_results WHERE season = ${season} AND owner = ${owner} AND id = ${id}`;
   }
 
-  async listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
+  async listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT espn_id, data, updated_at, updated_by
-      FROM projection_edits WHERE season = ${season} ORDER BY espn_id`) as Array<{
+      FROM projection_edits WHERE season = ${season} AND owner = ${owner} ORDER BY espn_id`) as Array<{
       espn_id: number;
       data: unknown;
       updated_at: string | Date;
@@ -1473,6 +1601,7 @@ class NeonBackend implements StoreBackend {
     }>;
     return rows.map((row) => ({
       season,
+      owner,
       espnId: row.espn_id,
       edit: row.data,
       updatedAt: new Date(row.updated_at).toISOString(),
@@ -1482,16 +1611,16 @@ class NeonBackend implements StoreBackend {
 
   async saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
     await this.ensureInit();
-    await this.sql`INSERT INTO projection_edits (season, espn_id, data, updated_at, updated_by)
-      VALUES (${row.season}, ${row.espnId}, ${JSON.stringify(row.edit)}::jsonb, ${row.updatedAt}, ${row.updatedBy})
-      ON CONFLICT (season, espn_id) DO UPDATE
+    await this.sql`INSERT INTO projection_edits (season, owner, espn_id, data, updated_at, updated_by)
+      VALUES (${row.season}, ${row.owner}, ${row.espnId}, ${JSON.stringify(row.edit)}::jsonb, ${row.updatedAt}, ${row.updatedBy})
+      ON CONFLICT (season, owner, espn_id) DO UPDATE
         SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
     return row;
   }
 
-  async deleteProjectionEdit(season: number, espnId: number): Promise<void> {
+  async deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
     await this.ensureInit();
-    await this.sql`DELETE FROM projection_edits WHERE season = ${season} AND espn_id = ${espnId}`;
+    await this.sql`DELETE FROM projection_edits WHERE season = ${season} AND owner = ${owner} AND espn_id = ${espnId}`;
   }
 
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
@@ -1965,6 +2094,7 @@ interface FileDoc {
   mockResults: MockResultRow[];
   mockFinishes: Array<MockFinish & { season: number }>;
   mockTrades: MockTrade[];
+  sharedMocks: SharedMockRow[];
   rulebookDrafts: RulebookDraftRow[];
   rulebookVersions: RulebookVersionRow[];
   rulebookSignatures: RulebookSignature[];
@@ -1999,6 +2129,7 @@ function emptyDoc(): FileDoc {
     mockResults: [],
     mockFinishes: [],
     mockTrades: [],
+    sharedMocks: [],
     rulebookDrafts: [],
     rulebookVersions: [],
     rulebookSignatures: [],
@@ -2056,10 +2187,14 @@ class FileBackend implements StoreBackend {
         scheduleSnapshots: Array.isArray(doc.scheduleSnapshots) ? doc.scheduleSnapshots : [],
         draftRankingSnapshots: Array.isArray(doc.draftRankingSnapshots) ? doc.draftRankingSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
-        projectionEdits: Array.isArray(doc.projectionEdits) ? doc.projectionEdits : [],
+        // Rows from before edits were per owner belong to whoever saved them.
+        projectionEdits: Array.isArray(doc.projectionEdits)
+          ? doc.projectionEdits.map((row) => ({ ...row, owner: row.owner ?? row.updatedBy }))
+          : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
         mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
         mockTrades: Array.isArray(doc.mockTrades) ? doc.mockTrades : [],
+        sharedMocks: Array.isArray(doc.sharedMocks) ? doc.sharedMocks : [],
         rulebookDrafts: Array.isArray(doc.rulebookDrafts) ? doc.rulebookDrafts : [],
         rulebookVersions: Array.isArray(doc.rulebookVersions) ? doc.rulebookVersions : [],
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
@@ -2514,6 +2649,62 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async getSharedMock(id: string): Promise<SharedMockRow | null> {
+    await this.ensureInit();
+    const row = this.readDoc().sharedMocks.find((entry) => entry.id === id);
+    return row ? structuredClone(row) : null;
+  }
+
+  async listSharedMocks(season: number, owner: string): Promise<SharedMockRow[]> {
+    await this.ensureInit();
+    return this.readDoc().sharedMocks
+      .filter((entry) => {
+        const people = (entry.room as { people?: unknown } | null)?.people;
+        return entry.season === season && Array.isArray(people) && people.includes(owner);
+      })
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 20)
+      .map((entry) => structuredClone(entry));
+  }
+
+  async listOpenSharedMocks(season: number): Promise<SharedMockRow[]> {
+    await this.ensureInit();
+    return this.readDoc().sharedMocks
+      .filter((entry) => {
+        const room = entry.room as { open?: unknown; startedAt?: unknown; endedAt?: unknown } | null;
+        return entry.season === season && room?.open === true && !room.startedAt && !room.endedAt;
+      })
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 20)
+      .map((entry) => structuredClone(entry));
+  }
+
+  async insertSharedMock(row: SharedMockRow): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (doc.sharedMocks.some((entry) => entry.id === row.id)) {
+        throw new SharedMockWriteError('duplicate', 'That mock already exists');
+      }
+      doc.sharedMocks.push(structuredClone(row));
+      this.writeDoc(doc);
+    });
+  }
+
+  async updateSharedMock(id: string, mutate: (room: unknown) => unknown, at: string): Promise<SharedMockRow> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const at_ = doc.sharedMocks.findIndex((entry) => entry.id === id);
+      if (at_ === -1) throw new SharedMockWriteError('not-found', 'No such mock');
+      const current = doc.sharedMocks[at_];
+      const next: SharedMockRow = { ...current, room: mutate(structuredClone(current.room)), version: current.version + 1, updatedAt: at };
+      doc.sharedMocks[at_] = structuredClone(next);
+      this.writeDoc(doc);
+      return next;
+    });
+  }
+
   async listMockFinishes(season: number): Promise<MockFinish[]> {
     await this.ensureInit();
     const doc = this.readDoc();
@@ -2532,27 +2723,27 @@ class FileBackend implements StoreBackend {
     });
   }
 
-  async listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
+  async listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]> {
     await this.ensureInit();
     return this.readDoc().projectionEdits
-      .filter((row) => row.season === season)
+      .filter((row) => row.season === season && row.owner === owner)
       .sort((a, b) => a.espnId - b.espnId);
   }
 
   async saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
     return this.enqueueWrite(() => {
       const doc = this.readDoc();
-      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === row.season && entry.espnId === row.espnId));
+      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === row.season && entry.owner === row.owner && entry.espnId === row.espnId));
       doc.projectionEdits.push(row);
       this.writeDoc(doc);
       return row;
     });
   }
 
-  async deleteProjectionEdit(season: number, espnId: number): Promise<void> {
+  async deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
     await this.enqueueWrite(() => {
       const doc = this.readDoc();
-      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === season && entry.espnId === espnId));
+      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === season && entry.owner === owner && entry.espnId === espnId));
       this.writeDoc(doc);
     });
   }
@@ -3353,20 +3544,40 @@ export async function deleteMockTrade(season: number, owner: string, id: string)
   return getBackend().deleteMockTrade(season, owner, id);
 }
 
+export async function getSharedMock(id: string): Promise<SharedMockRow | null> {
+  return getBackend().getSharedMock(id);
+}
+
+export async function listSharedMocks(season: number, owner: string): Promise<SharedMockRow[]> {
+  return getBackend().listSharedMocks(season, owner);
+}
+
+export async function listOpenSharedMocks(season: number): Promise<SharedMockRow[]> {
+  return getBackend().listOpenSharedMocks(season);
+}
+
+export async function insertSharedMock(row: SharedMockRow): Promise<void> {
+  return getBackend().insertSharedMock(row);
+}
+
+export async function updateSharedMock(id: string, mutate: (room: unknown) => unknown, at: string): Promise<SharedMockRow> {
+  return getBackend().updateSharedMock(id, mutate, at);
+}
+
 export async function deleteMockResult(season: number, owner: string, id: string): Promise<void> {
   return getBackend().deleteMockResult(season, owner, id);
 }
 
-export async function listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
-  return getBackend().listProjectionEdits(season);
+export async function listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]> {
+  return getBackend().listProjectionEdits(season, owner);
 }
 
 export async function saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
   return getBackend().saveProjectionEdit(row);
 }
 
-export async function deleteProjectionEdit(season: number, espnId: number): Promise<void> {
-  return getBackend().deleteProjectionEdit(season, espnId);
+export async function deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
+  return getBackend().deleteProjectionEdit(season, owner, espnId);
 }
 
 export async function getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {

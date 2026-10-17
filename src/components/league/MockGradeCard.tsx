@@ -5,19 +5,23 @@ interface Props {
   person: string;
   /** Show the full roster and standings, not just the headline. */
   full?: boolean;
+  /** Leave off the letter and the one-line summary, when the row above already shows them. */
+  headline?: boolean;
   onPlayer?: (playerKey: string) => void;
   /** Tap a team in the standings to see its roster. */
   onTeam?: (owner: string) => void;
 }
 
 /** The grade for one finished mock: headline, notes, roster by slot and the room's standings. */
-export default function MockGradeCard({ grade, person, full = true, onPlayer, onTeam }: Props) {
+export default function MockGradeCard({ grade, person, full = true, headline = true, onPlayer, onTeam }: Props) {
   return (
     <div className="mock-grade">
-      <div className="mock-grade-head">
-        <span className={`mock-grade-letter grade-${grade.grade[0].toLowerCase()}`}>{grade.grade}</span>
-        <span className="mock-grade-line">{gradeSummary(grade)}</span>
-      </div>
+      {headline && (
+        <div className="mock-grade-head">
+          <span className={`mock-grade-letter grade-${grade.grade[0].toLowerCase()}`}>{grade.grade}</span>
+          <span className="mock-grade-line">{gradeSummary(grade)}</span>
+        </div>
+      )}
       <ul className="mock-grade-notes">
         {grade.steal && <li>Best value: <strong>{grade.steal.name}</strong> at {grade.steal.label}, {grade.steal.by} picks after his ADP.</li>}
         {grade.reach && <li>Biggest reach: <strong>{grade.reach.name}</strong> at {grade.reach.label}, {grade.reach.by} picks before his ADP.</li>}

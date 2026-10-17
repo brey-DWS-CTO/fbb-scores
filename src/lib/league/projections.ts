@@ -12,7 +12,7 @@
  * Pure. No server, no browser.
  */
 import { computeFpts, round1 } from '../espn/calculations.js';
-import { bonusOdds } from './doubleDoubles.js';
+import { BONUS_STATS, bonusOdds } from './doubleDoubles.js';
 import {
   lastSeasonFppg,
   projectedFppg,
@@ -77,18 +77,20 @@ export interface PlayerProjection {
   /** His NBA team's games in our play-in weeks, and in our playoff weeks. */
   playInGames: number | null;
   playoffGames: number | null;
-  /** Games ESPN projects him to play, or the commissioner's estimate. */
+  /** Games ESPN projects him to play, or your own estimate. */
   games: number | null;
-  /** The commissioner's edit behind these numbers, if any. */
+  /** Your edit behind these numbers, if any. */
   edit: ProjectionEdit | null;
-  /** ESPN's own FPPG and games, kept for an edited player so the screen can compare. */
-  espn: { fppg: number | null; games: number | null } | null;
+  /** The unedited line's FPPG and games (ESPN's, or the commish's pick), kept for an edited player so the screen can compare. */
+  espn: { fppg: number | null; games: number | null; label: string } | null;
   line: ProjectedLine | null;
   /** Last season's real per-game line, when ESPN's numbers carry it. */
   lastLine: ProjectedLine | null;
   lastSeason: number | null;
   /** This season's number less last season's. */
   change: number | null;
+  /** Points a game over the other source's line (ESPN's, or Hashtag's when ESPN is in use). Commish only. */
+  vsOther: number | null;
   espnRank: number | null;
   /** ADP, or null when ESPN's number only means "undrafted". */
   adp: number | null;
@@ -149,14 +151,21 @@ export function buildProjections(
   snapshot: Pick<DraftRankingSnapshot, 'players' | 'scoringItems'> | null,
   keepers: KeeperSets,
   edits?: ProjectionEdits,
-  /** ESPN's snapshot before edits, to show what an edit changed. */
-  original?: Pick<DraftRankingSnapshot, 'players'> | null,
+  /** The snapshot before edits, to show what an edit changed. */
+  original?: (Pick<DraftRankingSnapshot, 'players'> & { lineLabel?: string }) | null,
+  /** The other source's unedited lines, for the commissioner's VS column. */
+  compare?: Pick<DraftRankingSnapshot, 'players'> | null,
 ): PlayerProjection[] {
+  const compareById = new Map<number, DraftRankingPlayer>();
+  for (const entry of compare?.players ?? []) compareById.set(entry.espnId, entry);
   const originalById = new Map<number, DraftRankingPlayer>();
   for (const entry of original?.players ?? []) originalById.set(entry.espnId, entry);
   const byEspnId = new Map<number, DraftRankingPlayer>();
   for (const entry of snapshot?.players ?? []) byEspnId.set(entry.espnId, entry);
   const scoringItems = snapshot?.scoringItems ?? [];
+  // The line before the bonus. A source that projects double-doubles itself
+  // (Hashtag) carries them in the line; they belong in the bonus column.
+  const lineItems = scoringItems.filter((item) => !BONUS_STATS.has(item.statId));
   const kept = keeperIndex(keepers);
 
   return values.entries.map((entry) => {
@@ -164,7 +173,7 @@ export function buildProjections(
     const espn = player.espnId !== null ? byEspnId.get(player.espnId) ?? null : null;
     const perGame = projectedPerGame(espn?.projection ?? null);
     const lastPerGame = projectedPerGame(espn?.lastSeason ?? null);
-    const base = perGame !== null && scoringItems.length > 0 ? round1(computeFpts(perGame, [...scoringItems])) : null;
+    const base = perGame !== null && scoringItems.length > 0 ? round1(computeFpts(perGame, lineItems)) : null;
     // The bonus is whatever the projected total carries over ESPN's line, so
     // the two parts always add up to the number on screen.
     const bonus = base !== null && entry.source === 'projection' && entry.fppg !== null
@@ -192,8 +201,8 @@ export function buildProjections(
       ...postseasonOf(player.proTeam),
       base,
       bonus,
-      ddOdds: odds ? round2(odds.doubleDouble) : null,
-      tdOdds: odds ? round2(odds.tripleDouble) : null,
+      ddOdds: odds ? round2(perGame?.['37'] ?? odds.doubleDouble) : null,
+      tdOdds: odds ? round2(perGame?.['38'] ?? odds.tripleDouble) : null,
       games,
       edit,
       espn: edit && player.espnId !== null
@@ -203,6 +212,7 @@ export function buildProjections(
           return {
             fppg: projectedFppg(before, scoringItems),
             games: beforeGames !== undefined && Number.isFinite(beforeGames) ? beforeGames : null,
+            label: original?.lineLabel ?? 'ESPN',
           };
         })()
         : null,
@@ -212,6 +222,11 @@ export function buildProjections(
       change: entry.fppg !== null && lastSeason !== null && entry.source !== 'last-season'
         ? round1(entry.fppg - lastSeason)
         : null,
+      vsOther: (() => {
+        if (entry.fppg === null || entry.source !== 'projection' || player.espnId === null) return null;
+        const other = projectedFppg(compareById.get(player.espnId)?.projection ?? null, scoringItems);
+        return other !== null ? round1(entry.fppg - other) : null;
+      })(),
       espnRank: entry.espnRank,
       adp: realAdp(entry.adp),
       valueRank: entry.rank,
@@ -241,7 +256,7 @@ export type ProjectionColumnId =
   | 'playInGames' | 'playoffGames'
   | 'ddOdds' | 'tdOdds' | 'min' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to'
   | 'fgm' | 'fga' | 'fgPct' | 'ftm' | 'fta' | 'ftPct'
-  | 'lastSeason' | 'change' | 'espnRank' | 'adp';
+  | 'lastSeason' | 'change' | 'vsOther' | 'espnRank' | 'adp';
 
 export interface ProjectionColumn {
   id: ProjectionColumnId;
@@ -265,8 +280,9 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'total', label: 'TOTAL', header: 'Projected season points', firstDir: 'desc', value: (row) => row.total },
   { id: 'playInGames', label: 'PI', header: 'Team games in our play-in weeks', firstDir: 'desc', value: (row) => row.playInGames },
   { id: 'playoffGames', label: 'PO', header: 'Team games in our playoff weeks', firstDir: 'desc', value: (row) => row.playoffGames },
-  { id: 'base', label: 'ESPN', header: 'ESPN line, our scoring', firstDir: 'desc', value: (row) => row.base },
+  { id: 'base', label: 'ESPN', header: 'Projected line, our scoring', firstDir: 'desc', value: (row) => row.base },
   { id: 'change', label: 'VS LAST', header: 'Change from last season', firstDir: 'desc', value: (row) => row.change },
+  { id: 'vsOther', label: 'VS', header: 'Points a game over the other projection', firstDir: 'desc', value: (row) => row.vsOther },
   { id: 'bonus', label: '+DD', header: 'Double-double bonus', firstDir: 'desc', value: (row) => row.bonus },
   { id: 'ddOdds', label: 'DD%', header: 'Double-double odds', firstDir: 'desc', value: (row) => row.ddOdds },
   { id: 'tdOdds', label: 'TD%', header: 'Triple-double odds', firstDir: 'desc', value: (row) => row.tdOdds },
@@ -296,9 +312,17 @@ const COLUMN_BY_ID = new Map(PROJECTION_COLUMNS.map((column) => [column.id, colu
 /** The player column cannot be hidden: a row needs a name. */
 export const FIXED_COLUMNS: ReadonlySet<ProjectionColumnId> = new Set(['name']);
 
+/** Columns only the commissioner sees: postseason game counts and the other projection. */
+export const COMMISH_COLUMNS: ReadonlySet<ProjectionColumnId> = new Set(['playInGames', 'playoffGames', 'vsOther']);
+
+/** The columns this viewer may pick from. */
+export function projectionColumnsFor(isCommissioner: boolean): ProjectionColumn[] {
+  return PROJECTION_COLUMNS.filter((column) => isCommissioner || !COMMISH_COLUMNS.has(column.id));
+}
+
 /** The columns to show, in table order, with the hidden ones left out. */
-export function visibleColumns(hidden: ReadonlySet<string>): ProjectionColumn[] {
-  return PROJECTION_COLUMNS.filter((column) => FIXED_COLUMNS.has(column.id) || !hidden.has(column.id));
+export function visibleColumns(hidden: ReadonlySet<string>, available: readonly ProjectionColumn[] = PROJECTION_COLUMNS): ProjectionColumn[] {
+  return available.filter((column) => FIXED_COLUMNS.has(column.id) || !hidden.has(column.id));
 }
 
 /** The columns hidden until somebody picks their own. Brey's choice, 2026-10-12. */
@@ -422,7 +446,7 @@ export const CHANGE_STEP = 3;
 export function editTitle(row: Pick<PlayerProjection, 'edit' | 'espn'>): string | null {
   if (!row.edit) return null;
   const espn = row.espn
-    ? ` ESPN: ${row.espn.fppg?.toFixed(1) ?? 'no'} FPPG over ${row.espn.games ?? 'no'} games.`
+    ? ` ${row.espn.label}: ${row.espn.fppg?.toFixed(1) ?? 'no'} FPPG over ${row.espn.games ?? 'no'} games.`
     : '';
   return `Your edit${row.edit.note ? ` (${row.edit.note})` : ''}.${espn}`;
 }

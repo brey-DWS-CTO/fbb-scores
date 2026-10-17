@@ -137,15 +137,39 @@ import {
   mutateTestDraft,
   setTestDraft,
   TestDraftMissingError,
+  getSharedMock,
+  listSharedMocks,
+  listOpenSharedMocks,
+  insertSharedMock,
+  updateSharedMock,
+  SharedMockWriteError,
   type KeeperSelection,
   type LeagueDynamicState,
   type MutateResult,
   type StateResult,
 } from '../lib/leagueStore.js';
-import { TEST_DRAFT_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
+import { TEST_DRAFT_HEADER, TEST_DRAFT_SESSION_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
 import { inRoom, PRESENCE_WINDOW_MS } from '../../src/lib/league/presence.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
+import {
+  MAX_PEOPLE,
+  clockHasRunOut,
+  joinSharedMock,
+  namesOf,
+  newSharedMock,
+  openSharedMock,
+  othersAt,
+  parseSharedMockRoom,
+  pickInSharedMock,
+  quitSharedMock,
+  sharedMockBoard,
+  sharedMockId,
+  sharedMockPhase,
+  showsFor,
+  startOpenSharedMock,
+  type SharedMockRoom,
+} from '../../src/lib/league/sharedMock.js';
 import {
   NO_FACTS,
   canReveal,
@@ -223,6 +247,7 @@ import {
   type VoteChoice,
 } from '../../src/lib/league/polls.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
+import hashtagProjections from '../data/hashtag-projections-2027.json' with { type: 'json' };
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
 import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
 import type { Rulebook } from '../../src/lib/league/rulebook.js';
@@ -575,6 +600,7 @@ router.use((req, res, next) => {
   }
   if (TEST_DRAFT_ROUTES.some((route) => route.test(req.path))) {
     res.locals.testDraft = true;
+    res.locals.testDraftStartedAt = req.header(TEST_DRAFT_SESSION_HEADER);
     next();
     return;
   }
@@ -599,7 +625,12 @@ async function draftState(res: Response): Promise<StateResult> {
 async function mutateDraft(res: Response, fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
   if (!inTestDraft(res)) return mutateState(fn);
   try {
-    return await mutateTestDraft(fn);
+    return await mutateTestDraft((draft) => {
+      if (!res.locals.testDraftStartedAt || draft.draft.startedAt !== res.locals.testDraftStartedAt) {
+        throw new HttpError(409, 'The test draft changed. Refresh before making a pick.');
+      }
+      fn(draft);
+    });
   } catch (error) {
     if (error instanceof TestDraftMissingError) throw new HttpError(410, 'The test draft has ended');
     throw error;
@@ -978,30 +1009,33 @@ router.delete('/mock-results/:id', requireAuth, async (req, res) => {
 
 // ─── Projection edits ────────────────────────────────────────────────────────
 //
-// The commissioner's changes to ESPN's projections, one row per player. The
-// client lays them over the accepted rankings snapshot; the snapshot itself is
-// never touched, so a fresh ESPN fetch keeps every edit on top.
+// Each owner's own changes to ESPN's projections, one row per owner and
+// player. Nobody sees another owner's edits; with none, you see ESPN's line.
+// The owner comes from the sign-in, never the body. The client lays the edits
+// over the accepted rankings snapshot; the snapshot itself is never touched,
+// so a fresh ESPN fetch keeps every edit on top.
 
-/** The two games estimates made before edits had a screen, written once. */
+/** The commissioner's two games estimates made before edits had a screen, written once. */
 async function seedProjectionEdits(season: number, by: string): Promise<void> {
   if (!(await claimSentNotice(`projection-edits-seed-${season}`, season))) return;
   const at = new Date().toISOString();
   for (const seed of SEED_EDITS) {
     const edit: ProjectionEdit = { ...seed, editedAt: at, editedBy: by };
-    await saveProjectionEdit({ season, espnId: seed.espnId, edit, updatedAt: at, updatedBy: by });
+    await saveProjectionEdit({ season, owner: by, espnId: seed.espnId, edit, updatedAt: at, updatedBy: by });
   }
 }
 
-/** GET /api/league/projection-edits — every edit this season. Any owner reads; the projections are league-wide. */
+/** GET /api/league/projection-edits — your own edits this season. */
 router.get('/projection-edits', requireAuth, async (_req, res) => {
   const season = leagueDataset.season;
-  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, res.locals.owner as string);
-  const rows = await listProjectionEdits(season);
+  const owner = res.locals.owner as string;
+  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, owner);
+  const rows = await listProjectionEdits(season, owner);
   res.json({ season, edits: rows.map((row) => row.edit) });
 });
 
-/** PUT /api/league/projection-edits/:espnId — save one player's edit. */
-router.put('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+/** PUT /api/league/projection-edits/:espnId — save one player's edit, for you alone. */
+router.put('/projection-edits/:espnId', requireAuth, async (req, res) => {
   const season = leagueDataset.season;
   let parsed;
   try {
@@ -1013,21 +1047,29 @@ router.put('/projection-edits/:espnId', requireAuth, requireCommissioner, async 
   const at = new Date().toISOString();
   const by = res.locals.owner as string;
   const edit: ProjectionEdit = { ...parsed, editedAt: at, editedBy: by };
-  await saveProjectionEdit({ season, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
-  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name, games: edit.games, perGame: edit.perGame });
+  await saveProjectionEdit({ season, owner: by, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
+  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name });
   res.json({ edit });
 });
 
-/** DELETE /api/league/projection-edits/:espnId — back to ESPN's projection. */
-router.delete('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+/** DELETE /api/league/projection-edits/:espnId — your line back to ESPN's projection. */
+router.delete('/projection-edits/:espnId', requireAuth, async (req, res) => {
   const espnId = Number(req.params.espnId);
   if (!Number.isInteger(espnId) || espnId <= 0) {
     res.status(400).json({ error: 'That is not a player.' });
     return;
   }
-  await deleteProjectionEdit(leagueDataset.season, espnId);
+  await deleteProjectionEdit(leagueDataset.season, res.locals.owner as string, espnId);
   await appendAudit(actor(res), 'projection_edit.removed', { espnId });
   res.json({ ok: true });
+});
+
+/**
+ * GET /api/league/expert-projections — Hashtag Basketball's lines, for the
+ * commissioner's ESPN, Hashtag or Blend switch. Nobody else sees them.
+ */
+router.get('/expert-projections', requireAuth, requireCommissioner, (_req, res) => {
+  res.json(hashtagProjections);
 });
 
 /** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */
@@ -2916,6 +2958,341 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
     });
     // After the answer, never before it. The offer is saved either way.
     notifyTradeOffered(proposal, appOrigin(req));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Mock draft with a friend ────────────────────────────────────────────────
+//
+// Two people at one table, or more, and the rest of the room computers. The
+// room lives here so every phone sees the same draft; the rules are in
+// src/lib/league/sharedMock.ts. Only the people asked to a room can read or
+// change it. Each phone replays the draft itself; the server never does.
+
+/** The season's rooms this owner was asked to and has not cleared, newest first. */
+async function sharedMocksFor(owner: string): Promise<SharedMockRoom[]> {
+  const rows = await listSharedMocks(leagueDataset.season, owner);
+  return rows
+    .map((row) => parseSharedMockRoom(row.room))
+    .filter((room): room is SharedMockRoom => room !== null && showsFor(room, owner));
+}
+
+/** A room by its id, or null. The caller decides who may see it. */
+async function sharedMockById(id: string): Promise<SharedMockRoom | null> {
+  const row = await getSharedMock(id);
+  return row ? parseSharedMockRoom(row.room) : null;
+}
+
+/** Change one room and answer with it. A rule broken on the way is a 409 in plain words. */
+async function changeSharedMock(
+  res: Response,
+  id: string,
+  mutate: (room: SharedMockRoom, at: string) => SharedMockRoom,
+): Promise<void> {
+  const at = new Date().toISOString();
+  try {
+    const row = await updateSharedMock(id, (value) => {
+      const room = parseSharedMockRoom(value);
+      if (!room) throw new HttpError(500, 'That mock cannot be read.');
+      return mutate(room, at);
+    }, at);
+    res.json({ room: row.room, now: at });
+  } catch (err) {
+    if (err instanceof SharedMockWriteError) {
+      res.status(err.code === 'not-found' ? 404 : 409).json({ error: err.code === 'not-found' ? 'No such mock.' : err.message });
+      return;
+    }
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    if (err instanceof Error) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+}
+
+/** The open rooms still waiting to start, which anyone may join. */
+async function openSharedMocks(): Promise<SharedMockRoom[]> {
+  const rows = await listOpenSharedMocks(leagueDataset.season);
+  return rows
+    .map((row) => parseSharedMockRoom(row.room))
+    .filter((room): room is SharedMockRoom => room !== null && room.open === true && sharedMockPhase(room) === 'waiting');
+}
+
+/**
+ * GET /api/league/shared-mocks — the mocks you are in and have not cleared,
+ * plus any open room waiting for people, so the mock page can offer it.
+ */
+router.get('/shared-mocks', requireAuth, async (_req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const mine = await sharedMocksFor(owner);
+    const seen = new Set(mine.map((room) => room.id));
+    const open = (await openSharedMocks()).filter((room) => !seen.has(room.id));
+    res.json({ rooms: [...mine, ...open], now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/open — open a room anyone may join. One
+ * open room in the league at a time, and you start it when you are ready.
+ */
+router.post('/shared-mocks/open', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const mode = body.mode === 'sharp' || body.mode === 'realistic' ? body.mode : null;
+    if (!mode) {
+      res.status(400).json({ error: 'Pick a room: sharp or normal.' });
+      return;
+    }
+    const waiting = (await openSharedMocks())[0];
+    if (waiting) {
+      res.status(409).json({ error: `${waiting.host}'s room is already open. Join it instead.` });
+      return;
+    }
+    const busy = (room: SharedMockRoom) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+    const mine = (await sharedMocksFor(owner)).find(busy);
+    if (mine) {
+      res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const room = openSharedMock({ id: sharedMockId(at, Math.random()), season: leagueDataset.season, host: owner, mode, at });
+    await insertSharedMock({ id: room.id, season: room.season, room, version: 0, updatedAt: at });
+    res.json({ room, now: at });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks — ask somebody to a mock. One open mock a person. */
+router.post('/shared-mocks', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const guest = typeof body.with === 'string' ? body.with : '';
+    if (!OWNERS.includes(guest) || guest === owner) {
+      res.status(400).json({ error: 'Pick somebody in the league to draft with.' });
+      return;
+    }
+    const mode = body.mode === 'sharp' || body.mode === 'realistic' ? body.mode : null;
+    if (!mode) {
+      res.status(400).json({ error: 'Pick a room: sharp or normal.' });
+      return;
+    }
+    const open = (room: SharedMockRoom) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+    const mine = (await sharedMocksFor(owner)).find(open);
+    if (mine) {
+      res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+      return;
+    }
+    const theirs = (await sharedMocksFor(guest)).find((room) => sharedMockPhase(room) === 'live');
+    if (theirs) {
+      res.status(409).json({ error: `${guest} is in a mock right now.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const room = newSharedMock({
+      id: sharedMockId(at, Math.random()),
+      season: leagueDataset.season,
+      host: owner,
+      guests: [guest],
+      mode,
+      at,
+    });
+    await insertSharedMock({ id: room.id, season: room.season, room, version: 0, updatedAt: at });
+    res.json({ room, now: at });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/league/shared-mocks/:id — one room, for the people in it, with
+ * their real keepers, which they show each other by sitting down. Anyone may
+ * look at an open room that is still waiting, so the link invites, but the
+ * keepers come only once they are in.
+ */
+router.get('/shared-mocks/:id', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const room = await sharedMockById(routeParam(req.params.id));
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    const inRoom = room.people.includes(owner);
+    if (!inRoom && !(room.open === true && sharedMockPhase(room) === 'waiting')) {
+      res.status(403).json({ error: `This mock is ${namesOf(room.people)}'s.` });
+      return;
+    }
+    const keepers: Record<string, KeeperSelection[]> = {};
+    if (inRoom) {
+      const { state } = await getState();
+      for (const person of room.people) keepers[person] = (state.keepers[person] ?? []).map((keeper) => ({ ...keeper }));
+    }
+    res.json({ room, keepers, now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks/:id/start — the host starts an open room. */
+router.post('/shared-mocks/:id/start', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const { state } = await getState();
+    const dataset = currentDataset(state);
+    await changeSharedMock(res, routeParam(req.params.id), (current, at) => startOpenSharedMock(current, owner, at, () => ({
+      board: sharedMockBoard(dataset, state, current.people),
+      seed: Math.floor(Math.random() * 100_000),
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/join — take your seat. When the last
+ * person sits down the draft starts: the board is built here, from the
+ * league as it stands, and frozen into the room.
+ */
+router.post('/shared-mocks/:id/join', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const id = routeParam(req.params.id);
+    const room = await sharedMockById(id);
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    if (!room.open && !room.people.includes(owner)) {
+      res.status(403).json({ error: 'You were not asked to this mock.' });
+      return;
+    }
+    if (room.open && !room.people.includes(owner)) {
+      const busy = (entry: SharedMockRoom) => entry.id !== room.id && (sharedMockPhase(entry) === 'waiting' || sharedMockPhase(entry) === 'live');
+      const mine = (await sharedMocksFor(owner)).find(busy);
+      if (mine) {
+        res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+        return;
+      }
+    }
+    // Everything the board needs is read first, so the write itself stays quick.
+    const { state } = await getState();
+    const dataset = currentDataset(state);
+    await changeSharedMock(res, id, (current, at) => joinSharedMock(current, owner, at, () => ({
+      board: sharedMockBoard(dataset, state, current.people),
+      seed: Math.floor(Math.random() * 100_000),
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** The pick and player a body names, or null with the complaint sent. */
+function sharedPickBody(req: Request, res: Response): { overall: number; playerKey: string } | null {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const overall = Number(body.overall);
+  const playerKey = typeof body.playerKey === 'string' ? body.playerKey.trim() : '';
+  if (!Number.isInteger(overall) || overall <= 0 || playerKey === '' || playerKey.length > 80) {
+    res.status(400).json({ error: 'Say which pick and which player.' });
+    return null;
+  }
+  return { overall, playerKey };
+}
+
+/** POST /api/league/shared-mocks/:id/pick — your pick, on your clock. */
+router.post('/shared-mocks/:id/pick', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const pick = sharedPickBody(req, res);
+    if (!pick) return;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) =>
+      pickInSharedMock(room, owner, pick.overall, pick.playerKey, at, 'pick'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/expire — the clock ran out, so the room
+ * makes the pick. The person on the clock may say so the moment it hits
+ * zero; anyone else at the table a few seconds later.
+ */
+router.post('/shared-mocks/:id/expire', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const pick = sharedPickBody(req, res);
+    if (!pick) return;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) => {
+      if (!clockHasRunOut(room, owner, Date.parse(at))) throw new Error('Time is not up yet.');
+      return pickInSharedMock(room, owner, pick.overall, pick.playerKey, at, 'auto');
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks/:id/quit — leave. A draft under way ends for everyone. */
+router.post('/shared-mocks/:id/quit', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) => quitSharedMock(room, owner, at));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/results — the grades, one per person,
+ * from whichever phone finishes the replay first. Each lands in that
+ * person's Past mocks and counts in Mocks done. The same draft saves once.
+ */
+router.post('/shared-mocks/:id/results', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const room = await sharedMockById(routeParam(req.params.id));
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    if (!room.joined.includes(owner)) {
+      res.status(403).json({ error: 'You are not in this mock.' });
+      return;
+    }
+    if (sharedMockPhase(room) !== 'finished') {
+      res.status(409).json({ error: 'This mock is not finished.' });
+      return;
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const results = Array.isArray(body.results) ? body.results.slice(0, MAX_PEOPLE) : [];
+    const saved: string[] = [];
+    for (const entry of results) {
+      const who = typeof (entry as { owner?: unknown })?.owner === 'string' ? (entry as { owner: string }).owner : '';
+      if (!room.joined.includes(who)) continue;
+      let record: MockResultRecord;
+      try {
+        record = parseMockResult(who, { ...(entry as Record<string, unknown>), vs: othersAt(room, who) });
+      } catch {
+        continue;
+      }
+      const keep = isCommissionerOwner(who) ? null : MEMBER_MOCK_LIMIT;
+      // Your own phone grades you on your own numbers, so your own post
+      // takes over your record. Another phone's grade of you only fills a
+      // gap, since it is on the room's numbers.
+      if (who === owner) await deleteMockResult(leagueDataset.season, who, record.id);
+      await saveMockResult({ season: leagueDataset.season, owner: who, id: record.id, result: record, createdAt: record.finishedAt }, keep);
+      saved.push(who);
+    }
+    res.json({ saved });
   } catch (err) {
     next(err);
   }

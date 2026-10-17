@@ -1,3 +1,4 @@
+import type { DraftRoom } from '../../lib/league/testDraft.js';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { BoardCell, DatasetPlayer } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
@@ -59,6 +60,7 @@ function useQueue(storageKey: string): [string[], (update: (current: string[]) =
 }
 
 interface Props {
+  room: DraftRoom;
   board: readonly BoardCell[];
   /** Every player in the pool, taken or not. */
   everyone: readonly DatasetPlayer[];
@@ -86,13 +88,14 @@ interface Props {
  * column sorts and how often each player is gone before his next pick.
  * Members get names, positions and teams, nothing more.
  */
-export default function LiveRoom({ board, everyone, available, onClock, person, canDraft, showStats, projections, gone, queueKey, onWriteIn }: Props) {
+export default function LiveRoom({ room, board, everyone, available, onClock, person, canDraft, showStats, projections, gone, queueKey, onWriteIn }: Props) {
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const [sort, setSort] = useState<RoomSort>(showStats ? DEFAULT_ROOM_SORT : MEMBER_ROOM_SORT);
   const [position, setPosition] = useState('ALL');
   const [search, setSearch] = useState('');
   const [showDrafted, setShowDrafted] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(150);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -132,7 +135,7 @@ export default function LiveRoom({ board, everyone, available, onClock, person, 
         playerName: player.name,
         proTeam: player.proTeam,
         positions: player.positions,
-      }));
+      }, room));
       setSelected(null);
     } catch (e) {
       setError(apiErrorMessage(e));
@@ -272,7 +275,7 @@ export default function LiveRoom({ board, everyone, available, onClock, person, 
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ player, taken: takenBy }, index) => {
+            {rows.slice(0, visibleCount).map(({ player, taken: takenBy }, index) => {
               const projection = showStats ? projections.get(player.key) : undefined;
               const share = gone?.get(player.key) ?? 0;
               const fullName = player.fullName ?? player.name;
@@ -355,6 +358,11 @@ export default function LiveRoom({ board, everyone, available, onClock, person, 
           </tbody>
         </table>
       </div>
+      {rows.length > visibleCount && (
+        <button type="button" className="tap-btn" onClick={() => setVisibleCount((count) => count + 150)}>
+          SHOW MORE PLAYERS ({visibleCount} OF {rows.length})
+        </button>
+      )}
       {showGone && <div className="mock-note mock-note-dim">GONE: how often he is taken before your next pick, across 60 drafts played from here.</div>}
       {canDraft && (
         <button type="button" className="live-room-writein" onClick={onWriteIn}>

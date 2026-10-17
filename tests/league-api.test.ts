@@ -1119,12 +1119,14 @@ test('test draft: members pick in a shared copy that never touches the league', 
   const live = cleanState();
   live.keepers = { Joel: [{ playerKey: joelPlayer.key, playerName: joelPlayer.name }] };
   await replaceState(live);
-  const inTest = (owner: keyof typeof pins) => ({ ...auth(owner), 'x-test-draft': '1' });
+  let testStartedAt = '';
+  const inTest = (owner: keyof typeof pins) => ({ ...auth(owner), 'x-test-draft': '1', 'x-test-draft-started-at': testStartedAt });
 
   const memberStart = await request('/api/league/test-draft/start', { method: 'POST', headers: auth('Joel') });
   assert.equal(memberStart.status, 403);
   const started = await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) });
   assert.equal(started.status, 200);
+  testStartedAt = (started.body.state as LeagueDynamicState).draft.startedAt!;
   assert.deepEqual((started.body.meta as { testDraft: unknown }).testDraft, { running: true, serving: true });
 
   // Secret keepers stay secret: the copy has none, and the board is open to all.
@@ -1215,4 +1217,65 @@ test('draft room: each side lists who checked in, and the test has its own room'
   assert.deepEqual([...(commishInLeague.body.owners as string[])].sort(), ['Joel', commissioner].sort());
 
   await request('/api/league/test-draft/end', { method: 'POST', headers: auth(commissioner) });
+});
+
+
+test('test writes reject missing and stale sessions, including after restart and real start', async () => {
+  const opened = await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(opened.status, 200);
+  const oldAt = (opened.body.state as LeagueDynamicState).draft.startedAt!;
+  const staleHeaders = { ...auth(commissioner), 'x-test-draft': '1', 'x-test-draft-started-at': oldAt };
+  const first = dataset.players[0]!;
+  const pickBody = JSON.stringify({ overallPick: 1, playerKey: first.key, playerName: first.name });
+  const missing = await request('/api/league/draft/pick', {
+    method: 'POST', headers: { ...auth(commissioner), 'x-test-draft': '1' }, body: pickBody,
+  });
+  assert.equal(missing.status, 409);
+  const restarted = await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(restarted.status, 200);
+  assert.notEqual((restarted.body.state as LeagueDynamicState).draft.startedAt, oldAt);
+  for (const [method, route] of [
+    ['POST', '/draft/pick'], ['DELETE', '/draft/pick/1'],
+    ['POST', '/draft/clock/call'], ['POST', '/draft/clock/expire'],
+    ['POST', '/draft/clock/pause'], ['POST', '/draft/clock/resume'],
+  ]) {
+    const result = await request('/api/league' + route, { method, headers: staleHeaders, ...(route === '/draft/pick' ? { body: pickBody } : {}) });
+    assert.equal(result.status, 409, route);
+  }
+  assert.deepEqual((await store.getTestDraft())!.state.draft.picks, {});
+  await store.mutateState((draft) => { draft.keepersRevealed = true; });
+  assert.equal((await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+  const late = await request('/api/league/draft/pick', { method: 'POST', headers: staleHeaders, body: pickBody });
+  assert.equal(late.status, 410);
+  assert.deepEqual((await store.getState()).state.draft.picks, {});
+});
+
+test('48 simultaneous pick submissions cannot overwrite a pick or draft a player twice', async () => {
+  await store.mutateState((draft) => { draft.keepersRevealed = true; });
+  assert.equal((await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+  const replies = await Promise.all(Array.from({ length: 48 }, (_, i) => {
+    const player = dataset.players[i]!;
+    return request('/api/league/draft/pick', {
+      method: 'POST', headers: auth(commissioner),
+      body: JSON.stringify({ overallPick: 1, playerKey: player.key, playerName: player.name }),
+    });
+  }));
+  assert.equal(replies.filter((reply) => reply.status === 200).length, 1);
+  assert.equal(replies.filter((reply) => reply.status === 409).length, 47);
+  const won = (await store.getState()).state.draft.picks['1']!;
+  const duplicates = await Promise.all(Array.from({ length: 24 }, () => request('/api/league/draft/pick', {
+    method: 'POST', headers: auth(commissioner),
+    body: JSON.stringify({ overallPick: 2, playerKey: won.playerKey, playerName: won.playerName }),
+  })));
+  assert.ok(duplicates.every((reply) => reply.status === 409));
+  const state = (await store.getState()).state;
+  assert.equal(Object.keys(state.draft.picks).length, 1);
+  assert.deepEqual(state.draft.picks['1'], won);
+  const owners = ['Joel', 'Ryan', commissioner];
+  const presence = await Promise.all(Array.from({ length: 48 }, (_, i) => request('/api/league/draft-room', {
+    method: 'POST', headers: auth(owners[i % owners.length]!),
+  })));
+  assert.ok(presence.every((reply) => reply.status === 200));
+  const present = await request('/api/league/draft-room', { method: 'POST', headers: auth(commissioner) });
+  assert.deepEqual([...(present.body.owners as string[])].sort(), [...owners].sort());
 });

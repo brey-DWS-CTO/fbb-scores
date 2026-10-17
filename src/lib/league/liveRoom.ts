@@ -124,5 +124,5 @@ export function roomRows(input: {
       if (x === null || y === null) return x === y ? tie : x === null ? 1 : -1;
       return (x - y) * sort.dir || tie;
     })
-    .slice(0, input.limit ?? 150);
+    .slice(0, input.limit ?? Number.POSITIVE_INFINITY);
 }

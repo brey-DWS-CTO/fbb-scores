@@ -5324,6 +5324,46 @@ html.theme-light {
 .stats-gate-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: var(--neon-teal); color: #001a14; font-weight: 800; text-decoration: none; }
 .draft-room-notes { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; color: var(--text-dim); font-size: 0.7rem; font-weight: 700; }
 
+/* ─── Mock draft with a friend: the invite panel, and a friend's clock ─── */
+.mock-friend { display: grid; gap: 10px; margin-bottom: 12px; }
+.mock-friend-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 0.82rem; }
+.mock-friend-row strong { color: var(--text-max); }
+.mock-friend-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.mock-friend-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mock-friend-form .mock-select { min-width: 160px; }
+.mock-friend-wait { display: grid; gap: 10px; }
+.mock-friend-wait > .hub-heading small { margin-left: 10px; color: var(--text-dim); font-weight: 700; }
+.mock-friend-wait .mock-friend-actions { margin-left: 0; }
+a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.room-clock.is-them { border-color: var(--neon-yellow); }
+.room-clock.is-them .room-clock-big { color: var(--neon-yellow); }
+.room-turn.is-them { background: rgba(255, 221, 0, 0.1); color: var(--neon-yellow); font-weight: 900; letter-spacing: 0.06em; }
+.room-mini-clock.is-them { color: var(--neon-yellow); }
+.room-upcoming li.is-them .room-upcoming-row { color: var(--neon-yellow); font-weight: 800; }
+
+/* ─── Projections: room for the numbers on a phone ─── */
+/* Scrolled sideways, names shorten to J. Tatum and the pencil steps aside,
+   as in the mock draft's player list. The open row keeps its UNDO. */
+.proj-name-short { display: none; }
+.proj-table-wrap.is-scrolled .proj-name-full { display: none; }
+.proj-table-wrap.is-scrolled .proj-name-short { display: inline; }
+.proj-table-wrap.is-scrolled .proj-row:not(.is-editing) button.proj-pencil { display: none; }
+.proj-table-wrap.is-scrolled .proj-col-name { box-shadow: 2px 0 0 var(--panel-border); }
+.proj-source-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.proj-source-caption { color: var(--text-mid); font-size: 0.72rem; font-weight: 700; }
+@media (max-width: 839px) {
+  .proj-table-wrap.is-scrolled .proj-row:not(.is-editing) td.proj-col-name,
+  .proj-table-wrap.is-scrolled th.proj-col-name { max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+  /* A slimmer # column and cell padding buy most of another stat column. */
+  .proj-table .proj-col-pos { width: 32px; min-width: 32px; max-width: 32px; }
+  .proj-table th.proj-col-pos span, .proj-table td.proj-col-pos { padding-left: 4px; padding-right: 4px; }
+  .proj-table .proj-col-name { left: 32px; }
+  .proj-table td { padding: 6px 5px; }
+  .proj-table th button { padding: 9px 5px; }
+  .proj-table button.proj-pencil { margin-left: 4px; padding: 0 4px; font-size: 0.72rem; }
+  .proj-export-word { display: none; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

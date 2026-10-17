@@ -1,10 +1,14 @@
+import type { ExpertProjections } from './expertProjections.js';
 import type { ProjectionEdit } from './projectionEdits.js';
-import type { MockResultRecord } from './mockGrade.js';
+import type { MockGrade, MockResultRecord } from './mockGrade.js';
 import type { MockStatRow } from './mockStats.js';
+import type { MockMode } from './mockDraft.js';
+import type { SavedBoard } from './mockBoard.js';
+import type { SharedMockRoom } from './sharedMock.js';
 import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
-import { TEST_DRAFT_HEADER, type TestDraftMeta } from './testDraft.js';
+import { TEST_DRAFT_HEADER, draftRoomHeaders, type DraftRoom, type TestDraftMeta } from './testDraft.js';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
 import type {
   KeeperSelection,
@@ -202,8 +206,7 @@ export function leaveTestDraft(): void {
   }
 }
 
-const testDraftHeader = (): Record<string, string> => (testDraftJoined() ? { [TEST_DRAFT_HEADER]: '1' } : {});
-const draftHeaders = (c: Credentials): Record<string, string> => ({ ...authHeaders(c), ...testDraftHeader() });
+const draftHeaders = (c: Credentials, room: DraftRoom): Record<string, string> => ({ ...authHeaders(c), ...draftRoomHeaders(room) });
 
 /** Open the shared test draft, or start it over. Joins this device. */
 export async function startTestDraft(c: Credentials): Promise<StateResponse> {
@@ -219,8 +222,8 @@ export async function endTestDraft(c: Credentials): Promise<void> {
 }
 
 /** Check in to the draft room and hear who else is there. A device in the test checks in to the test's room. */
-export async function checkInDraftRoom(c: Credentials): Promise<{ room: 'league' | 'test'; owners: string[] }> {
-  const { data } = await axios.post('/api/league/draft-room', {}, { headers: draftHeaders(c) });
+export async function checkInDraftRoom(c: Credentials, room: DraftRoom): Promise<{ room: 'league' | 'test'; owners: string[] }> {
+  const { data } = await axios.post('/api/league/draft-room', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
@@ -298,7 +301,7 @@ export function exitSandbox(): void {
 
 async function fetchLiveState(credentials?: Credentials | null, test = false): Promise<StateResponse> {
   const { data } = await axios.get<StateResponse>('/api/league/state', {
-    headers: { ...(credentials ? authHeaders(credentials) : {}), ...(test ? testDraftHeader() : {}) },
+    headers: { ...(credentials ? authHeaders(credentials) : {}), ...(test ? { [TEST_DRAFT_HEADER]: '1' } : {}) },
   });
   return data;
 }
@@ -462,6 +465,7 @@ export async function submitDraftPick(
     /** The player is not in the pool; name, team and position were typed in. */
     writeIn?: boolean;
   },
+  room: DraftRoom,
 ): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
@@ -485,11 +489,11 @@ export async function submitDraftPick(
       }
     });
   }
-  const { data } = await axios.post('/api/league/draft/pick', pick, { headers: draftHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/pick', pick, { headers: draftHeaders(c, room) });
   return data;
 }
 
-export async function clearDraftPick(c: Credentials, overallPick: number): Promise<StateResponse> {
+export async function clearDraftPick(c: Credentials, overallPick: number, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
@@ -503,7 +507,7 @@ export async function clearDraftPick(c: Credentials, overallPick: number): Promi
     });
   }
   const { data } = await axios.delete(`/api/league/draft/pick/${overallPick}`, {
-    headers: draftHeaders(c),
+    headers: draftHeaders(c, room),
   });
   return data;
 }
@@ -525,14 +529,14 @@ export async function startDraft(c: Credentials): Promise<StateResponse> {
 }
 
 /** Call CLOCK on the team picking (rule 2.3.1). The screen checks `canCallClock` first; the server checks again. */
-export async function callDraftClock(c: Credentials): Promise<StateResponse> {
+export async function callDraftClock(c: Credentials, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       if (s.draft.clock && !s.draft.clock.call) s.draft.clock = callClock(s.draft.clock, c.owner, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: draftHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
@@ -541,7 +545,7 @@ export async function callDraftClock(c: Credentials): Promise<StateResponse> {
  * yields the pick on the clock if time really is up. `onClockOverall` is
  * only for test mode, which has no server to ask.
  */
-export async function expireDraftClock(c: Credentials, onClockOverall: number): Promise<StateResponse> {
+export async function expireDraftClock(c: Credentials, onClockOverall: number, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
@@ -553,29 +557,29 @@ export async function expireDraftClock(c: Credentials, onClockOverall: number): 
       }
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/expire', {}, { headers: draftHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/expire', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
-export async function pauseDraftClock(c: Credentials): Promise<StateResponse> {
+export async function pauseDraftClock(c: Credentials, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       if (s.draft.clock) s.draft.clock = pauseClock(s.draft.clock, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/pause', {}, { headers: draftHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/pause', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
-export async function resumeDraftClock(c: Credentials): Promise<StateResponse> {
+export async function resumeDraftClock(c: Credentials, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       if (s.draft.clock) s.draft.clock = resumeClock(s.draft.clock, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/resume', {}, { headers: draftHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/resume', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
@@ -713,6 +717,76 @@ export async function acceptTeamNames(
   return data;
 }
 
+// ─── Mock draft with a friend ───────────────────────────────────────────────
+
+export interface SharedMockResponse {
+  room: SharedMockRoom;
+  /** The real keepers of the people in the room, once you are one of them. */
+  keepers?: Record<string, KeeperSelection[]>;
+  /** The server's clock as it answered, so a phone can line its clock up. */
+  now: string;
+}
+
+/** Open a room anyone may join. You start it when you are ready. */
+export async function openSharedMockRoom(c: Credentials, mode: MockMode): Promise<SharedMockResponse> {
+  const { data } = await axios.post('/api/league/shared-mocks/open', { mode }, { headers: authHeaders(c) });
+  return data;
+}
+
+/** The host starts an open room. */
+export async function startSharedMockRoom(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/start`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** The mocks you were asked to and have not cleared. */
+export async function fetchSharedMocks(c: Credentials): Promise<{ rooms: SharedMockRoom[]; now: string }> {
+  const { data } = await axios.get('/api/league/shared-mocks', { headers: authHeaders(c) });
+  return data;
+}
+
+export async function fetchSharedMock(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.get(`/api/league/shared-mocks/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
+  return data;
+}
+
+/** Ask somebody to a mock. */
+export async function inviteSharedMock(c: Credentials, withOwner: string, mode: MockMode): Promise<SharedMockResponse> {
+  const { data } = await axios.post('/api/league/shared-mocks', { with: withOwner, mode }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function joinSharedMockRoom(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/join`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function pickSharedMock(c: Credentials, id: string, overall: number, playerKey: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/pick`, { overall, playerKey }, { headers: authHeaders(c) });
+  return data;
+}
+
+/** The clock ran out on `overall`: the pick the room makes. */
+export async function expireSharedMock(c: Credentials, id: string, overall: number, playerKey: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/expire`, { overall, playerKey }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function quitSharedMockRoom(c: Credentials, id: string): Promise<SharedMockResponse> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/quit`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** Every person's grade for a finished shared mock, saved to each one's Past mocks. */
+export async function saveSharedMockResults(
+  c: Credentials,
+  id: string,
+  results: Array<{ owner: string; id: string; seed: number; mode: MockMode; grade: MockGrade; board?: SavedBoard }>,
+): Promise<{ saved: string[] }> {
+  const { data } = await axios.post(`/api/league/shared-mocks/${encodeURIComponent(id)}/results`, { results }, { headers: authHeaders(c) });
+  return data;
+}
+
 /** Your saved mock drafts, newest first. */
 export async function fetchMockResults(c: Credentials): Promise<MockResultRecord[]> {
   const { data } = await axios.get('/api/league/mock-results', { headers: authHeaders(c) });
@@ -751,7 +825,13 @@ export async function deleteMockResult(c: Credentials, id: string): Promise<void
   await axios.delete(`/api/league/mock-results/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
 }
 
-/** The commissioner's edits to ESPN's projections. */
+/** Hashtag Basketball's lines. Commissioner only. */
+export async function fetchExpertProjections(c: Credentials): Promise<ExpertProjections> {
+  const { data } = await axios.get('/api/league/expert-projections', { headers: authHeaders(c) });
+  return data as ExpertProjections;
+}
+
+/** Your own edits to ESPN's projections. */
 export async function fetchProjectionEdits(c: Credentials): Promise<ProjectionEdit[]> {
   const { data } = await axios.get('/api/league/projection-edits', { headers: authHeaders(c) });
   return data.edits as ProjectionEdit[];
