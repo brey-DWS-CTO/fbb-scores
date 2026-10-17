@@ -5181,6 +5181,7 @@ html.theme-light {
 .mock-friend-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .mock-friend-form .mock-select { min-width: 160px; }
 .mock-friend-wait { display: grid; gap: 10px; }
+.mock-friend-wait > .hub-heading small { margin-left: 10px; color: var(--text-dim); font-weight: 700; }
 .mock-friend-wait .mock-friend-actions { margin-left: 0; }
 a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .room-clock.is-them { border-color: var(--neon-yellow); }
