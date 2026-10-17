@@ -178,9 +178,10 @@ export interface MockResultRow {
   createdAt: string;
 }
 
-/** One commissioner edit to a player's ESPN projection. */
+/** One owner's edit to a player's ESPN projection. Each owner keeps their own. */
 export interface ProjectionEditRow {
   season: number;
+  owner: string;
   espnId: number;
   /** The edit as `src/lib/league/projectionEdits.ts` defines it; stored whole. */
   edit: unknown;
@@ -510,9 +511,9 @@ interface StoreBackend {
   saveMockTrade(trade: MockTrade): Promise<void>;
   deleteMockTrade(season: number, owner: string, id: string): Promise<void>;
   deleteMockResult(season: number, owner: string, id: string): Promise<void>;
-  listProjectionEdits(season: number): Promise<ProjectionEditRow[]>;
+  listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]>;
   saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow>;
-  deleteProjectionEdit(season: number, espnId: number): Promise<void>;
+  deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void>;
   getRulebookDraft(season: number): Promise<RulebookDraftRow | null>;
   saveRulebookDraft(
     season: number,
@@ -846,12 +847,28 @@ class NeonBackend implements StoreBackend {
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS projection_edits (
       season int not null,
+      owner text not null,
       espn_id int not null,
       data jsonb not null,
       updated_at timestamptz not null default now(),
       updated_by text not null,
-      primary key (season, espn_id)
+      primary key (season, owner, espn_id)
     )`;
+    // Edits were league-wide until 16 October 2026. Each old row becomes the
+    // edit of whoever saved it, and the key gains the owner.
+    await this.sql`ALTER TABLE projection_edits ADD COLUMN IF NOT EXISTS owner text`;
+    await this.sql`UPDATE projection_edits SET owner = updated_by WHERE owner IS NULL`;
+    await this.sql`ALTER TABLE projection_edits ALTER COLUMN owner SET NOT NULL`;
+    await this.sql`DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_index i
+          JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+          WHERE i.indrelid = 'projection_edits'::regclass AND i.indisprimary AND a.attname = 'owner'
+      ) THEN
+        ALTER TABLE projection_edits DROP CONSTRAINT projection_edits_pkey;
+        ALTER TABLE projection_edits ADD PRIMARY KEY (season, owner, espn_id);
+      END IF;
+    END $$`;
     await this.sql`CREATE TABLE IF NOT EXISTS rulebook_draft (
       season int primary key,
       data jsonb not null,
@@ -1380,10 +1397,10 @@ class NeonBackend implements StoreBackend {
     await this.sql`DELETE FROM mock_results WHERE season = ${season} AND owner = ${owner} AND id = ${id}`;
   }
 
-  async listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
+  async listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT espn_id, data, updated_at, updated_by
-      FROM projection_edits WHERE season = ${season} ORDER BY espn_id`) as Array<{
+      FROM projection_edits WHERE season = ${season} AND owner = ${owner} ORDER BY espn_id`) as Array<{
       espn_id: number;
       data: unknown;
       updated_at: string | Date;
@@ -1391,6 +1408,7 @@ class NeonBackend implements StoreBackend {
     }>;
     return rows.map((row) => ({
       season,
+      owner,
       espnId: row.espn_id,
       edit: row.data,
       updatedAt: new Date(row.updated_at).toISOString(),
@@ -1400,16 +1418,16 @@ class NeonBackend implements StoreBackend {
 
   async saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
     await this.ensureInit();
-    await this.sql`INSERT INTO projection_edits (season, espn_id, data, updated_at, updated_by)
-      VALUES (${row.season}, ${row.espnId}, ${JSON.stringify(row.edit)}::jsonb, ${row.updatedAt}, ${row.updatedBy})
-      ON CONFLICT (season, espn_id) DO UPDATE
+    await this.sql`INSERT INTO projection_edits (season, owner, espn_id, data, updated_at, updated_by)
+      VALUES (${row.season}, ${row.owner}, ${row.espnId}, ${JSON.stringify(row.edit)}::jsonb, ${row.updatedAt}, ${row.updatedBy})
+      ON CONFLICT (season, owner, espn_id) DO UPDATE
         SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
     return row;
   }
 
-  async deleteProjectionEdit(season: number, espnId: number): Promise<void> {
+  async deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
     await this.ensureInit();
-    await this.sql`DELETE FROM projection_edits WHERE season = ${season} AND espn_id = ${espnId}`;
+    await this.sql`DELETE FROM projection_edits WHERE season = ${season} AND owner = ${owner} AND espn_id = ${espnId}`;
   }
 
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
@@ -1970,7 +1988,10 @@ class FileBackend implements StoreBackend {
         scheduleSnapshots: Array.isArray(doc.scheduleSnapshots) ? doc.scheduleSnapshots : [],
         draftRankingSnapshots: Array.isArray(doc.draftRankingSnapshots) ? doc.draftRankingSnapshots : [],
         keeperScenarios: Array.isArray(doc.keeperScenarios) ? doc.keeperScenarios : [],
-        projectionEdits: Array.isArray(doc.projectionEdits) ? doc.projectionEdits : [],
+        // Rows from before edits were per owner belong to whoever saved them.
+        projectionEdits: Array.isArray(doc.projectionEdits)
+          ? doc.projectionEdits.map((row) => ({ ...row, owner: row.owner ?? row.updatedBy }))
+          : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
         mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
         mockTrades: Array.isArray(doc.mockTrades) ? doc.mockTrades : [],
@@ -2397,27 +2418,27 @@ class FileBackend implements StoreBackend {
     });
   }
 
-  async listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
+  async listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]> {
     await this.ensureInit();
     return this.readDoc().projectionEdits
-      .filter((row) => row.season === season)
+      .filter((row) => row.season === season && row.owner === owner)
       .sort((a, b) => a.espnId - b.espnId);
   }
 
   async saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
     return this.enqueueWrite(() => {
       const doc = this.readDoc();
-      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === row.season && entry.espnId === row.espnId));
+      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === row.season && entry.owner === row.owner && entry.espnId === row.espnId));
       doc.projectionEdits.push(row);
       this.writeDoc(doc);
       return row;
     });
   }
 
-  async deleteProjectionEdit(season: number, espnId: number): Promise<void> {
+  async deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
     await this.enqueueWrite(() => {
       const doc = this.readDoc();
-      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === season && entry.espnId === espnId));
+      doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === season && entry.owner === owner && entry.espnId === espnId));
       this.writeDoc(doc);
     });
   }
@@ -3195,16 +3216,16 @@ export async function deleteMockResult(season: number, owner: string, id: string
   return getBackend().deleteMockResult(season, owner, id);
 }
 
-export async function listProjectionEdits(season: number): Promise<ProjectionEditRow[]> {
-  return getBackend().listProjectionEdits(season);
+export async function listProjectionEdits(season: number, owner: string): Promise<ProjectionEditRow[]> {
+  return getBackend().listProjectionEdits(season, owner);
 }
 
 export async function saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
   return getBackend().saveProjectionEdit(row);
 }
 
-export async function deleteProjectionEdit(season: number, espnId: number): Promise<void> {
-  return getBackend().deleteProjectionEdit(season, espnId);
+export async function deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
+  return getBackend().deleteProjectionEdit(season, owner, espnId);
 }
 
 export async function getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
