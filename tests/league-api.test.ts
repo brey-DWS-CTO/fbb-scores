@@ -1174,6 +1174,22 @@ test('test draft: members pick in a shared copy that never touches the league', 
   assert.equal(latePick.status, 410);
 });
 
+test('test draft: starting the real draft ends it for every joined device', async () => {
+  const live = cleanState();
+  live.keepersRevealed = true;
+  await replaceState(live);
+  assert.equal((await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+  const joined = { ...auth('Joel'), 'x-test-draft': '1' };
+  const before = await request('/api/league/state', { headers: joined });
+  assert.equal((before.body.meta as { testDraft: { serving: boolean } }).testDraft.serving, true);
+
+  assert.equal((await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+  assert.equal(await store.getTestDraft(), null);
+  const after = await request('/api/league/state', { headers: joined });
+  assert.deepEqual((after.body.meta as { testDraft: unknown }).testDraft, { running: false, serving: false });
+  assert.ok((after.body.state as LeagueDynamicState).draft.startedAt);
+});
+
 test('test draft: closed once the real draft starts', async () => {
   const live = cleanState();
   live.keepersRevealed = true;

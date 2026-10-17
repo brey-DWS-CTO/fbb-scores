@@ -208,7 +208,7 @@ function PickRow({
 }
 
 export default function DraftPage() {
-  const { state, meta, dataset, playerPoolQuery } = useDraftData(true);
+  const { state, meta, dataset, playerPoolQuery } = useDraftData(true, testDraftJoined() ? 'test' : 'league');
   const { identity } = useIdentity();
   const teamName = useTeamName();
   const scenarioQuery = useKeeperScenario();

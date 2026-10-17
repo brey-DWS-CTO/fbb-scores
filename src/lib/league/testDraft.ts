@@ -50,11 +50,14 @@ export interface TestDraftMeta {
   serving: boolean;
 }
 
+export type StateSide = 'league' | 'test';
+
 /**
- * Whether a state reply belongs on a screen. A device in the test shows only
- * test replies, and a device out of it shows only league replies, so a stray
- * reply from the other side never flashes onto the board.
+ * Which cache a state reply belongs in. The draft screens of a device in the
+ * test read the test side; every other page reads the league side. A reply
+ * on the wrong side would put the test board on the keeper page, or the
+ * league board in the test.
  */
-export function replyFits(joined: boolean, meta: { testDraft?: TestDraftMeta } | null | undefined): boolean {
-  return joined === (meta?.testDraft?.serving === true);
+export function stateSide(meta: { testDraft?: TestDraftMeta } | null | undefined): StateSide {
+  return meta?.testDraft?.serving === true ? 'test' : 'league';
 }

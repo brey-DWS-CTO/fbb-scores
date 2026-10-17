@@ -622,12 +622,15 @@ function draftReply<T extends { state: LeagueDynamicState }>(res: Response, resu
  */
 router.get('/state', async (req, res) => {
   const viewer = await optionalViewer(req);
-  const test = await getTestDraft();
+  const league = await getState();
+  // Once the real draft starts there is no test draft: every joined device
+  // gets the league back and leaves. It also spares every poll a lookup.
+  const test = league.state.draft.startedAt === null ? await getTestDraft() : null;
   if (inTestDraft(res) && test) {
     res.json(draftReply(res, test, viewer));
     return;
   }
-  const body = redactState(await getState(), viewer);
+  const body = redactState(league, viewer);
   res.json({ ...body, meta: { ...body.meta, testDraft: { running: test !== null, serving: false } } });
 });
 
@@ -1512,6 +1515,8 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
       draft.draft.clock = startPickClock(draft.draft.startedAt);
     }
   });
+  // The real draft closes any test draft, so no phone keeps picking in it.
+  await setTestDraft(null);
   await appendAudit(actor(res), 'draft.started', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });

@@ -170,8 +170,9 @@ const authHeaders = (c: Credentials): Record<string, string> =>
 
 /* ── The shared test draft ──────────────────────────────────────────────────
  * A copy of the league on the server that every member can join. A device
- * that joins sends the test header on state reads and draft writes, and
- * nothing else, so keeper pages and trades still talk to the real league.
+ * that joins sends the test header only from the draft and TV screens, on
+ * their state reads and draft writes. Every other page, keepers and trades
+ * above all, reads and writes the real league.
  * The commissioner's on-device sandbox below wins when both are on. */
 const TEST_DRAFT_KEY = 'fbb-test-draft';
 
@@ -289,19 +290,20 @@ export function exitSandbox(): void {
   }
 }
 
-async function fetchLiveState(credentials?: Credentials | null): Promise<StateResponse> {
+async function fetchLiveState(credentials?: Credentials | null, test = false): Promise<StateResponse> {
   const { data } = await axios.get<StateResponse>('/api/league/state', {
-    headers: { ...(credentials ? authHeaders(credentials) : {}), ...testDraftHeader() },
+    headers: { ...(credentials ? authHeaders(credentials) : {}), ...(test ? testDraftHeader() : {}) },
   });
   return data;
 }
 
 /** Pass credentials so the server can un-redact your own (or, as commissioner,
- * everyone's) keepers before draft day. In test mode, returns the sandbox. */
-export async function fetchLeagueState(credentials?: Credentials | null): Promise<StateResponse> {
+ * everyone's) keepers before draft day. In test mode, returns the sandbox.
+ * `test` asks for the shared test draft; only the draft screens ask. */
+export async function fetchLeagueState(credentials?: Credentials | null, test = false): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) return sandboxResponse(sandbox);
-  return fetchLiveState(credentials);
+  return fetchLiveState(credentials, test);
 }
 
 export async function fetchPinStatus(): Promise<Array<{ owner: string; claimed: boolean }>> {

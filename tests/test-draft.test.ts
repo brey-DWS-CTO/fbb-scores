@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { LeagueDynamicState } from '../src/lib/keeper/types.js';
-import { replyFits, testDraftState } from '../src/lib/league/testDraft.js';
+import { stateSide, testDraftState } from '../src/lib/league/testDraft.js';
 
 const NOW = '2026-10-15T20:00:00.000Z';
 
@@ -45,12 +45,9 @@ test('the pool falls back when the league has none', () => {
   assert.equal(testDraftState(live({ playerPool: undefined }), NOW, 'fallback').draft.playerPoolSnapshotId, 'fallback');
 });
 
-test('a reply shows only on the side the device is on', () => {
-  const testReply = { testDraft: { running: true, serving: true } };
-  const leagueReply = { testDraft: { running: true, serving: false } };
-  assert.equal(replyFits(true, testReply), true);
-  assert.equal(replyFits(true, leagueReply), false);
-  assert.equal(replyFits(false, leagueReply), true);
-  assert.equal(replyFits(false, testReply), false);
-  assert.equal(replyFits(false, null), true);
+test('a reply goes to the test side only when the server served the test', () => {
+  assert.equal(stateSide({ testDraft: { running: true, serving: true } }), 'test');
+  assert.equal(stateSide({ testDraft: { running: true, serving: false } }), 'league');
+  assert.equal(stateSide({}), 'league');
+  assert.equal(stateSide(null), 'league');
 });

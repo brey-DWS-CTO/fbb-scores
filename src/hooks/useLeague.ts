@@ -27,7 +27,7 @@ import { draftIsLive, pollInterval } from '../lib/league/polling.js';
 import { idleForMs, wakeOnActivity } from './useActivity.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
 import type { KeeperScenario } from '../lib/league/keeperScenario.js';
-import { replyFits } from '../lib/league/testDraft.js';
+import { stateSide, type StateSide } from '../lib/league/testDraft.js';
 
 const EMPTY_KEEPER_SCENARIO: KeeperScenario = {};
 
@@ -45,14 +45,16 @@ const EMPTY_STATE: LeagueDynamicState = {
  * src/lib/league/polling.ts for why.
  * Sends the signed-in identity so the server can un-redact what this viewer
  * is allowed to see (own keepers; everything for the commissioner).
+ * `side` 'test' reads the shared test draft. Only the draft and TV screens
+ * ask for it; the league and the test keep separate caches.
  */
-export function useLeagueState(fast = false) {
+export function useLeagueState(fast = false, side: StateSide = 'league') {
   const { identity } = useIdentity();
   const queryClient = useQueryClient();
   useEffect(() => wakeOnActivity(queryClient), [queryClient]);
   const query = useQuery<StateResponse>({
-    queryKey: ['league-state', identity?.owner ?? 'anon'],
-    queryFn: () => fetchLeagueState(identity),
+    queryKey: ['league-state', identity?.owner ?? 'anon', side],
+    queryFn: () => fetchLeagueState(identity, side === 'test'),
     refetchInterval: (current) => pollInterval({
       fast,
       draftLive: draftIsLive(current.state.data?.state),
@@ -65,11 +67,18 @@ export function useLeagueState(fast = false) {
   // The server names who it thinks is asking. When that is not the owner this
   // phone shows, the sign-in has likely run out, and the page would show an
   // empty team under a real name. Check, and sign the phone out if so.
-  // The commish closed the test draft: the server answered with the league,
-  // so this device leaves the test too.
-  const testEnded = query.isSuccess && testDraftJoined() && query.data.meta?.testDraft?.serving !== true;
+  // The test draft is over (the commish ended it, or the real draft began):
+  // the draft screens got the league back, or any page heard it is not
+  // running. Leave, and reload so every screen, the yellow strip included,
+  // drops the test at once.
+  const meta = query.isSuccess ? query.data.meta : undefined;
+  const testEnded = testDraftJoined() && (side === 'test'
+    ? meta !== undefined && stateSide(meta) === 'league'
+    : meta?.testDraft?.running === false);
   useEffect(() => {
-    if (testEnded) leaveTestDraft();
+    if (!testEnded) return;
+    leaveTestDraft();
+    window.location.reload();
   }, [testEnded]);
 
   const serverViewer = query.isSuccess ? query.data.meta?.viewer : undefined;
@@ -90,8 +99,8 @@ export function useLeagueState(fast = false) {
  * League state + the static dataset with commissioner overrides applied.
  * Use this (not the raw leagueDataset import) anywhere rules are computed.
  */
-export function useLeagueData(fast = false) {
-  const q = useLeagueState(fast);
+export function useLeagueData(fast = false, side: StateSide = 'league') {
+  const q = useLeagueState(fast, side);
   const overrides = q.state.overrides;
   // Accepted pick trades are layered on here, so every page that reads pick
   // ownership through this hook sees the same board.
@@ -104,8 +113,8 @@ export function useLeagueData(fast = false) {
 }
 
 /** Draft-only metadata layered over the keeper dataset from an immutable pool. */
-export function useDraftData(fast = false) {
-  const league = useLeagueData(fast);
+export function useDraftData(fast = false, side: StateSide = 'league') {
+  const league = useLeagueData(fast, side);
   const poolId = league.state.draft.playerPoolSnapshotId
     ?? league.meta?.playerPool?.activeSnapshotId
     ?? `dataset-${league.dataset.season}`;
@@ -175,9 +184,8 @@ export function useApplyStateResponse() {
   const { identity } = useIdentity();
   return useCallback(
     (res: StateResponse) => {
-      // A reply from the other side of the test draft never lands on this screen.
-      if (!replyFits(testDraftJoined(), res.meta)) return;
-      qc.setQueryData(['league-state', identity?.owner ?? 'anon'], res);
+      // A test-draft reply goes to the test cache, a league reply to the league one.
+      qc.setQueryData(['league-state', identity?.owner ?? 'anon', stateSide(res.meta)], res);
     },
     [qc, identity?.owner],
   );

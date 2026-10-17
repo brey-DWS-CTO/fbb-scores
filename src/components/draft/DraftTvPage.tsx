@@ -13,7 +13,7 @@ import { recentPicks } from './boardUtils.js';
 
 /** Full-screen wall board for the draft-night TV. Read-only, 3s poll. */
 export default function DraftTvPage() {
-  const { state, meta, dataUpdatedAt, dataset } = useDraftData(true);
+  const { state, meta, dataUpdatedAt, dataset } = useDraftData(true, testDraftJoined() ? 'test' : 'league');
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
   const started = state.draft.startedAt !== null;
   const onClock = board.find((c) => c.onClock) ?? null;
