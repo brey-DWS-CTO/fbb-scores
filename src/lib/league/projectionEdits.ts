@@ -19,7 +19,7 @@
  * Pure. No server, no browser.
  */
 import { computeFpts, round1 } from '../espn/calculations.js';
-import { estimatedBonusPerGame } from './doubleDoubles.js';
+import { DOUBLE_DOUBLE_STAT, TEN_PLUS_STATS, TRIPLE_DOUBLE_STAT, estimatedBonusPerGame } from './doubleDoubles.js';
 import { projectedPerGame, type DraftRankingPlayer, type DraftRankingSnapshot, type ProjectionRow } from './draftRankings.js';
 
 export interface EditableStat {
@@ -169,6 +169,12 @@ export function editedProjection(projection: ProjectionRow | null, edit: Project
     ? scaleToMinutes(base, minutes, new Set(Object.keys(edit.perGame)))
     : { ...(base ?? {}) };
   for (const [id, value] of Object.entries(edit.perGame)) perGame[id] = value;
+  // A source that projects its own double-doubles (Hashtag) fixes them for
+  // the line it was given. Change the line and they are estimated again.
+  if ([MINUTES_STAT, ...TEN_PLUS_STATS].some((id) => edit.perGame[id] !== undefined)) {
+    delete perGame[String(DOUBLE_DOUBLE_STAT)];
+    delete perGame[String(TRIPLE_DOUBLE_STAT)];
+  }
   // The league scores missed shots; they follow from makes and attempts.
   if (perGame['14'] !== undefined && perGame['13'] !== undefined) perGame['23'] = Math.max(0, perGame['14'] - perGame['13']);
   if (perGame['16'] !== undefined && perGame['15'] !== undefined) perGame['24'] = Math.max(0, perGame['16'] - perGame['15']);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { sourceLabel } from '../../lib/league/expertProjections.js';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { POSITIONS, valueBoard, type Position } from '../../lib/league/draftValue.js';
@@ -307,7 +308,7 @@ export default function TiersPage() {
   const scenarioQuery = useKeeperScenario();
   const viewer = identity?.owner ?? null;
   const scenario = scenarioQuery.scenario;
-  const { snapshot, original, edits, loading } = useProjectionData();
+  const { snapshot, original, edits, loading, source } = useProjectionData();
 
   const [position, setPosition] = useState<Position | 'ALL'>('ALL');
   const [hideKept, setHideKept] = useState(false);
@@ -326,8 +327,8 @@ export default function TiersPage() {
     [values, snapshot, keeperSets, edits, original],
   );
   const rows = useMemo(
-    () => buildTierRows(projections, dataset.players, { position, hideKept }),
-    [projections, dataset.players, position, hideKept],
+    () => buildTierRows(projections, dataset.players, { position, hideKept, source: sourceLabel(source) }),
+    [projections, dataset.players, position, hideKept, source],
   );
   const pages = tierPages(rows.length);
   const current = Math.min(page, Math.max(0, pages.length - 1));

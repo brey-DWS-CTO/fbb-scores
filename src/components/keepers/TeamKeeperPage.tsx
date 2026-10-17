@@ -555,12 +555,14 @@ export default function TeamKeeperPage() {
   const result = useMemo(() => resolveTeamKeepers(dataset, owner, selections), [owner, selections, dataset]);
 
   // Commissioner only: the keeper question as a number. This team's keeper
-  // slots are opened, and the room drafts 60 times from the commish's full
-  // view of the league (entered keepers, projections for the rest). The
+  // slots are opened, and the room drafts 60 times from the commish's view
+  // of the league (entered keepers he can see, projections for the rest). The
   // answer per candidate: how often he is gone by the pick his keep costs.
+  // Blind mode keeps the odds: they read only what the commish can see.
+  const oddsForCommish = identity?.isCommissioner === true;
   const { snapshot } = useProjectionData();
   const oddsWorld = useMemo((): { taken: TakenAt; slots: MockSlot[] } | null => {
-    if (!isCommish || !identity || !snapshot) return null;
+    if (!oddsForCommish || !identity || !snapshot) return null;
     const values = valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true });
     if (values.entries.length === 0) return null;
     const world = buildWorld(dataset, {
@@ -569,7 +571,7 @@ export default function TeamKeeperPage() {
     const board = openOwnerBoard(world.board, owner);
     const prepared = prepareMock({ board, values, settings: defaultMockSettings('sharp', OWNERS, 7) });
     return { taken: simulateTakenAt(prepared, 7, 60), slots: board.slots };
-  }, [isCommish, identity, snapshot, dataset, state, scenarioQuery.scenario, owner]);
+  }, [oddsForCommish, identity, snapshot, dataset, state, scenarioQuery.scenario, owner]);
   const keeperOdds = (playerKey: string, round: number | null): KeeperOdds | null => {
     if (!oddsWorld || round === null) return null;
     // A chosen keeper is judged at the pick the engine charged him. Anyone

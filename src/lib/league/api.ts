@@ -1,3 +1,4 @@
+import type { ExpertProjections } from './expertProjections.js';
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockGrade, MockResultRecord } from './mockGrade.js';
 import type { MockStatRow } from './mockStats.js';
@@ -748,6 +749,12 @@ export async function fetchSharedMockResult(id: string): Promise<MockResultRecor
 /** Forget one saved mock draft. */
 export async function deleteMockResult(c: Credentials, id: string): Promise<void> {
   await axios.delete(`/api/league/mock-results/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
+}
+
+/** Hashtag Basketball's lines. Commissioner only. */
+export async function fetchExpertProjections(c: Credentials): Promise<ExpertProjections> {
+  const { data } = await axios.get('/api/league/expert-projections', { headers: authHeaders(c) });
+  return data as ExpertProjections;
 }
 
 /** Your own edits to ESPN's projections. */
