@@ -691,7 +691,7 @@ export async function deleteMockResult(c: Credentials, id: string): Promise<void
   await axios.delete(`/api/league/mock-results/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
 }
 
-/** The commissioner's edits to ESPN's projections. */
+/** Your own edits to ESPN's projections. */
 export async function fetchProjectionEdits(c: Credentials): Promise<ProjectionEdit[]> {
   const { data } = await axios.get('/api/league/projection-edits', { headers: authHeaders(c) });
   return data.edits as ProjectionEdit[];

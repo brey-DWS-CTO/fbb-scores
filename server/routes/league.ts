@@ -894,30 +894,33 @@ router.delete('/mock-results/:id', requireAuth, async (req, res) => {
 
 // ─── Projection edits ────────────────────────────────────────────────────────
 //
-// The commissioner's changes to ESPN's projections, one row per player. The
-// client lays them over the accepted rankings snapshot; the snapshot itself is
-// never touched, so a fresh ESPN fetch keeps every edit on top.
+// Each owner's own changes to ESPN's projections, one row per owner and
+// player. Nobody sees another owner's edits; with none, you see ESPN's line.
+// The owner comes from the sign-in, never the body. The client lays the edits
+// over the accepted rankings snapshot; the snapshot itself is never touched,
+// so a fresh ESPN fetch keeps every edit on top.
 
-/** The two games estimates made before edits had a screen, written once. */
+/** The commissioner's two games estimates made before edits had a screen, written once. */
 async function seedProjectionEdits(season: number, by: string): Promise<void> {
   if (!(await claimSentNotice(`projection-edits-seed-${season}`, season))) return;
   const at = new Date().toISOString();
   for (const seed of SEED_EDITS) {
     const edit: ProjectionEdit = { ...seed, editedAt: at, editedBy: by };
-    await saveProjectionEdit({ season, espnId: seed.espnId, edit, updatedAt: at, updatedBy: by });
+    await saveProjectionEdit({ season, owner: by, espnId: seed.espnId, edit, updatedAt: at, updatedBy: by });
   }
 }
 
-/** GET /api/league/projection-edits — every edit this season. Any owner reads; the projections are league-wide. */
+/** GET /api/league/projection-edits — your own edits this season. */
 router.get('/projection-edits', requireAuth, async (_req, res) => {
   const season = leagueDataset.season;
-  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, res.locals.owner as string);
-  const rows = await listProjectionEdits(season);
+  const owner = res.locals.owner as string;
+  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, owner);
+  const rows = await listProjectionEdits(season, owner);
   res.json({ season, edits: rows.map((row) => row.edit) });
 });
 
-/** PUT /api/league/projection-edits/:espnId — save one player's edit. */
-router.put('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+/** PUT /api/league/projection-edits/:espnId — save one player's edit, for you alone. */
+router.put('/projection-edits/:espnId', requireAuth, async (req, res) => {
   const season = leagueDataset.season;
   let parsed;
   try {
@@ -929,19 +932,19 @@ router.put('/projection-edits/:espnId', requireAuth, requireCommissioner, async 
   const at = new Date().toISOString();
   const by = res.locals.owner as string;
   const edit: ProjectionEdit = { ...parsed, editedAt: at, editedBy: by };
-  await saveProjectionEdit({ season, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
-  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name, games: edit.games, perGame: edit.perGame });
+  await saveProjectionEdit({ season, owner: by, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
+  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name });
   res.json({ edit });
 });
 
-/** DELETE /api/league/projection-edits/:espnId — back to ESPN's projection. */
-router.delete('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+/** DELETE /api/league/projection-edits/:espnId — your line back to ESPN's projection. */
+router.delete('/projection-edits/:espnId', requireAuth, async (req, res) => {
   const espnId = Number(req.params.espnId);
   if (!Number.isInteger(espnId) || espnId <= 0) {
     res.status(400).json({ error: 'That is not a player.' });
     return;
   }
-  await deleteProjectionEdit(leagueDataset.season, espnId);
+  await deleteProjectionEdit(leagueDataset.season, res.locals.owner as string, espnId);
   await appendAudit(actor(res), 'projection_edit.removed', { espnId });
   res.json({ ok: true });
 });

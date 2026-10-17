@@ -263,7 +263,7 @@ export default function ProjectionsPage() {
     }
   };
   const openRow = (row: PlayerProjection) => {
-    if (!isCommish || !identity || row.espnId === null || row.line === null) return;
+    if (!identity || row.espnId === null || row.line === null) return;
     // Opening another player saves the one that was open.
     if (rowEdit && rowEdit.key !== row.key) void commitRow();
     setSaveError(null);
@@ -325,9 +325,8 @@ export default function ProjectionsPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus. {isCommish
-          ? ' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow.'
-          : ' Numbers in yellow are the commish’s changes to ESPN’s projection.'}
+        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus.
+        {' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow and change only your numbers.'}
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet.{' '}
             {isCommish ? <Link to="/admin">Fetch them in Commish Mode.</Link> : 'The commish will load them soon.'}</>
@@ -467,7 +466,7 @@ export default function ProjectionsPage() {
                       return (
                         <td key={column.id} className={classes}>
                           <span className="proj-name">{text}</span>
-                          {isCommish && row.espnId !== null && row.line !== null && !open && (
+                          {row.espnId !== null && row.line !== null && !open && (
                             <button
                               type="button"
                               className={`proj-pencil${row.edit ? ' is-edited' : ''}`}

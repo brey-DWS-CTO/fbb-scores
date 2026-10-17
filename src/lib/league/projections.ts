@@ -77,9 +77,9 @@ export interface PlayerProjection {
   /** His NBA team's games in our play-in weeks, and in our playoff weeks. */
   playInGames: number | null;
   playoffGames: number | null;
-  /** Games ESPN projects him to play, or the commissioner's estimate. */
+  /** Games ESPN projects him to play, or your own estimate. */
   games: number | null;
-  /** The commissioner's edit behind these numbers, if any. */
+  /** Your edit behind these numbers, if any. */
   edit: ProjectionEdit | null;
   /** ESPN's own FPPG and games, kept for an edited player so the screen can compare. */
   espn: { fppg: number | null; games: number | null } | null;

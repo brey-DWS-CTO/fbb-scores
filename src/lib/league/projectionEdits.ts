@@ -1,5 +1,5 @@
 /**
- * The commissioner's edits to ESPN's projections.
+ * An owner's own edits to ESPN's projections. Each owner keeps their own.
  *
  * An edit names a player by ESPN id and changes any of his projected games
  * and per-game stats. Applying it rewrites his projection row in the
