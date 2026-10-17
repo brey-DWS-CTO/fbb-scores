@@ -81,8 +81,8 @@ export interface PlayerProjection {
   games: number | null;
   /** Your edit behind these numbers, if any. */
   edit: ProjectionEdit | null;
-  /** ESPN's own FPPG and games, kept for an edited player so the screen can compare. */
-  espn: { fppg: number | null; games: number | null } | null;
+  /** The unedited line's FPPG and games (ESPN's, or the commish's pick), kept for an edited player so the screen can compare. */
+  espn: { fppg: number | null; games: number | null; label: string } | null;
   line: ProjectedLine | null;
   /** Last season's real per-game line, when ESPN's numbers carry it. */
   lastLine: ProjectedLine | null;
@@ -149,8 +149,8 @@ export function buildProjections(
   snapshot: Pick<DraftRankingSnapshot, 'players' | 'scoringItems'> | null,
   keepers: KeeperSets,
   edits?: ProjectionEdits,
-  /** ESPN's snapshot before edits, to show what an edit changed. */
-  original?: Pick<DraftRankingSnapshot, 'players'> | null,
+  /** The snapshot before edits, to show what an edit changed. */
+  original?: (Pick<DraftRankingSnapshot, 'players'> & { lineLabel?: string }) | null,
 ): PlayerProjection[] {
   const originalById = new Map<number, DraftRankingPlayer>();
   for (const entry of original?.players ?? []) originalById.set(entry.espnId, entry);
@@ -206,6 +206,7 @@ export function buildProjections(
           return {
             fppg: projectedFppg(before, scoringItems),
             games: beforeGames !== undefined && Number.isFinite(beforeGames) ? beforeGames : null,
+            label: original?.lineLabel ?? 'ESPN',
           };
         })()
         : null,
@@ -268,7 +269,7 @@ export const PROJECTION_COLUMNS: readonly ProjectionColumn[] = [
   { id: 'total', label: 'TOTAL', header: 'Projected season points', firstDir: 'desc', value: (row) => row.total },
   { id: 'playInGames', label: 'PI', header: 'Team games in our play-in weeks', firstDir: 'desc', value: (row) => row.playInGames },
   { id: 'playoffGames', label: 'PO', header: 'Team games in our playoff weeks', firstDir: 'desc', value: (row) => row.playoffGames },
-  { id: 'base', label: 'ESPN', header: 'ESPN line, our scoring', firstDir: 'desc', value: (row) => row.base },
+  { id: 'base', label: 'ESPN', header: 'Projected line, our scoring', firstDir: 'desc', value: (row) => row.base },
   { id: 'change', label: 'VS LAST', header: 'Change from last season', firstDir: 'desc', value: (row) => row.change },
   { id: 'bonus', label: '+DD', header: 'Double-double bonus', firstDir: 'desc', value: (row) => row.bonus },
   { id: 'ddOdds', label: 'DD%', header: 'Double-double odds', firstDir: 'desc', value: (row) => row.ddOdds },
@@ -422,10 +423,10 @@ export type Tone = 'good' | 'warn' | 'bad' | null;
 export const CHANGE_STEP = 3;
 
 /** Hover text for an edited player: what was changed and what ESPN said. */
-export function editTitle(row: Pick<PlayerProjection, 'edit' | 'espn'>, source = 'ESPN'): string | null {
+export function editTitle(row: Pick<PlayerProjection, 'edit' | 'espn'>): string | null {
   if (!row.edit) return null;
   const espn = row.espn
-    ? ` ${source}: ${row.espn.fppg?.toFixed(1) ?? 'no'} FPPG over ${row.espn.games ?? 'no'} games.`
+    ? ` ${row.espn.label}: ${row.espn.fppg?.toFixed(1) ?? 'no'} FPPG over ${row.espn.games ?? 'no'} games.`
     : '';
   return `Your edit${row.edit.note ? ` (${row.edit.note})` : ''}.${espn}`;
 }

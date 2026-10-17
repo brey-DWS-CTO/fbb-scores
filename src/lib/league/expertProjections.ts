@@ -95,22 +95,27 @@ const matchKey = (name: string) => {
   return NAME_ALIASES[key] ?? key;
 };
 
-/** Outside lines keyed by ESPN id, and the names that matched nobody. */
+/** Hashtag's team codes where ESPN's differ. */
+const TEAM_ALIASES: Readonly<Record<string, string>> = { GS: 'GSW', NO: 'NOP', NY: 'NYK', PHO: 'PHX', SA: 'SAS' };
+
+/** Outside lines keyed by ESPN id, and the names that matched nobody. Team breaks a tie between two of one name. */
 export function matchExpert(
-  players: readonly Pick<DraftRankingPlayer, 'espnId' | 'fullName'>[],
+  players: readonly (Pick<DraftRankingPlayer, 'espnId' | 'fullName'> & { proTeam?: string })[],
   expert: Pick<ExpertProjections, 'players'>,
 ): { byEspnId: Map<number, ExpertLine>; unmatched: string[] } {
-  const byName = new Map<string, number>();
+  const byName = new Map<string, { espnId: number; proTeam?: string }[]>();
   for (const player of players) {
     const key = nameKey(player.fullName);
-    if (!byName.has(key)) byName.set(key, player.espnId);
+    byName.set(key, [...(byName.get(key) ?? []), { espnId: player.espnId, proTeam: player.proTeam }]);
   }
   const byEspnId = new Map<number, ExpertLine>();
   const unmatched: string[] = [];
   for (const line of expert.players) {
-    const espnId = byName.get(matchKey(line.name));
-    if (espnId === undefined) unmatched.push(line.name);
-    else byEspnId.set(espnId, line);
+    const named = byName.get(matchKey(line.name)) ?? [];
+    const team = TEAM_ALIASES[line.team] ?? line.team;
+    const found = named.find((entry) => entry.proTeam === team) ?? named[0];
+    if (!found) unmatched.push(line.name);
+    else byEspnId.set(found.espnId, line);
   }
   return { byEspnId, unmatched };
 }
@@ -154,16 +159,22 @@ function rowOf(perGame: Readonly<Record<string, number>>, games: number, id: str
   return { id, stats, averageStats: null };
 }
 
+/** A snapshot that names whose lines it holds, when they are not ESPN's. */
+export interface SourcedSnapshot {
+  lineLabel?: string;
+}
+
 /** The snapshot with each matched player's projection taken from the chosen source. */
 export function applyProjectionSource<T extends Pick<DraftRankingSnapshot, 'players'>>(
   snapshot: T,
   expert: Pick<ExpertProjections, 'players'> | null,
   source: ProjectionSource,
-): T {
+): T & SourcedSnapshot {
   if (source === 'espn' || !expert) return snapshot;
   const { byEspnId } = matchExpert(snapshot.players, expert);
   return {
     ...snapshot,
+    lineLabel: sourceLabel(source),
     players: snapshot.players.map((player): DraftRankingPlayer => {
       const line = byEspnId.get(player.espnId);
       if (!line) return player;

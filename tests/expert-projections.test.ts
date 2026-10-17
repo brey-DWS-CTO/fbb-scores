@@ -3,6 +3,7 @@ import test from 'node:test';
 import hashtag from '../server/data/hashtag-projections-2027.json' with { type: 'json' };
 import { bonusOdds } from '../src/lib/league/doubleDoubles.ts';
 import { projectedFppg, projectedPerGame, type ProjectionRow } from '../src/lib/league/draftRankings.ts';
+import { editedProjection } from '../src/lib/league/projectionEdits.ts';
 import {
   applyProjectionSource,
   blendPerGame,
@@ -91,4 +92,25 @@ test('the blend is half and half, with ESPN\'s bonus odds estimated from its lin
 test('the committed Hashtag file reads cleanly', () => {
   assert.equal(hashtag.players.length, 200);
   assert.ok(hashtag.players.every((row) => row.games > 0 && Number.isFinite(row.perGame['0'])));
+});
+
+test('a tie on name goes to the player on Hashtag\'s team, codes translated', () => {
+  const twins = [
+    { espnId: 10, fullName: 'Gary Trent', proTeam: 'MIL' },
+    { espnId: 11, fullName: 'Gary Trent Jr.', proTeam: 'GSW' },
+  ];
+  const line = { name: 'Gary Trent Jr.', team: 'GS', games: 70, perGame: { '0': 12 } };
+  assert.deepEqual([...matchExpert(twins, { players: [line] }).byEspnId.keys()], [11]);
+});
+
+test('editing a Hashtag line re-estimates its double-doubles; games alone keep them', () => {
+  const expert: ExpertProjections = { source: 'hashtag', updated: '2026-10-16', players: parseHashtagPaste(PASTE) };
+  const sourced = applyProjectionSource(snapshot, expert, 'hashtag');
+  assert.equal(sourced.lineLabel, 'Hashtag');
+  const jokic = sourced.players[0].projection as ProjectionRow;
+  const base = { espnId: 3112335, name: 'Nikola Jokic', note: '', editedAt: '', editedBy: 'Brey' };
+  const fewerBoards = projectedPerGame(editedProjection(jokic, { ...base, games: null, perGame: { '6': 4 } }))!;
+  assert.equal(fewerBoards['37'], undefined, 'the bonus is estimated from the new line');
+  const fewerGames = projectedPerGame(editedProjection(jokic, { ...base, games: 50, perGame: {} }))!;
+  assert.equal(fewerGames['37'], 0.8, 'Hashtag\'s rate stands');
 });

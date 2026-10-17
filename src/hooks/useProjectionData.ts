@@ -20,6 +20,11 @@ export function useProjectionData(enabled = true): {
   snapshot: DraftRankingSnapshot | null;
   /** The chosen source's numbers before any edit. */
   original: DraftRankingSnapshot | null;
+  /**
+   * ESPN's numbers with no source swap and no edits. Anything two phones must
+   * agree on (a mock replayed on each phone) reads this, never `snapshot`.
+   */
+  espn: DraftRankingSnapshot | null;
   edits: ProjectionEdits;
   /** Where the lines come from: ESPN for everyone but the commissioner. */
   source: ProjectionSource;
@@ -57,6 +62,7 @@ export function useProjectionData(enabled = true): {
   return {
     snapshot,
     original,
+    espn,
     edits,
     source: expert ? source : 'espn',
     loading: rankings.isLoading || editsQuery.isLoading || expertQuery.isLoading,

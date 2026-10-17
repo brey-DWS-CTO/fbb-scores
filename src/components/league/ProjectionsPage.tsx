@@ -491,7 +491,7 @@ export default function ProjectionsPage() {
                             <button
                               type="button"
                               className={`proj-pencil${row.edit ? ' is-edited' : ''}`}
-                              title={row.edit ? `${editTitle(row, label) ?? 'Edited.'} Click to change.` : 'Change his projection'}
+                              title={row.edit ? `${editTitle(row) ?? 'Edited.'} Click to change.` : 'Change his projection'}
                               aria-label={`Edit ${row.name}`}
                               onClick={() => openRow(row)}
                             >
