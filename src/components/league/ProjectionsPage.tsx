@@ -30,8 +30,8 @@ import { shortName } from '../../lib/league/draftRoom.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import { PROJECTION_EDITS_KEY, useProjectionData } from '../../hooks/useProjectionData.js';
-import { setProjectionSource, useProjectionSource } from '../../hooks/useProjectionSource.js';
-import { PROJECTION_SOURCES, sourceLabel } from '../../lib/league/expertProjections.js';
+import { sourceLabel } from '../../lib/league/expertProjections.js';
+import ProjectionSourceSwitch from './ProjectionSourceSwitch.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
 import { EDITABLE_COLUMNS, cellEdited, cellFollowsMinutes, editedProjection, projectionGames, withCellEdit } from '../../lib/league/projectionEdits.js';
@@ -160,7 +160,6 @@ export default function ProjectionsPage() {
   const isCommish = identity?.isCommissioner === true;
 
   const { snapshot, original, edits, source, compare, compareLabel } = useProjectionData();
-  const pickedSource = useProjectionSource();
   const label = sourceLabel(source);
   const columnLabel = (column: { id: ProjectionColumnId; label: string }) => {
     if (column.id === 'base') return label.toUpperCase();
@@ -385,22 +384,7 @@ export default function ProjectionsPage() {
             </button>
           )}
         </div>
-        {isCommish && (
-          <div className="mock-seg" role="radiogroup" aria-label="Projection source" title="Only you see this. Everyone else uses ESPN.">
-            {PROJECTION_SOURCES.map((choice) => (
-              <button
-                key={choice.id}
-                type="button"
-                role="radio"
-                aria-checked={pickedSource === choice.id}
-                className={`tap-btn mock-seg-btn${pickedSource === choice.id ? ' is-on' : ''}`}
-                onClick={() => { setProjectionSource(choice.id); resetPage(); }}
-              >
-                {choice.label.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
+        <ProjectionSourceSwitch onChange={resetPage} />
         <div className="mock-seg" role="radiogroup" aria-label="Position">
           {(['ALL', ...POSITIONS] as const).map((choice) => (
             <button

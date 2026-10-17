@@ -5181,6 +5181,8 @@ html.theme-light {
 .proj-table-wrap.is-scrolled .proj-name-short { display: inline; }
 .proj-table-wrap.is-scrolled .proj-row:not(.is-editing) button.proj-pencil { display: none; }
 .proj-table-wrap.is-scrolled .proj-col-name { box-shadow: 2px 0 0 var(--panel-border); }
+.proj-source-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.proj-source-caption { color: var(--text-mid); font-size: 0.72rem; font-weight: 700; }
 @media (max-width: 839px) {
   .proj-table-wrap.is-scrolled .proj-row:not(.is-editing) td.proj-col-name,
   .proj-table-wrap.is-scrolled th.proj-col-name { max-width: 118px; overflow: hidden; text-overflow: ellipsis; }

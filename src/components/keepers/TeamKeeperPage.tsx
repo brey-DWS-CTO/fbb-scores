@@ -17,6 +17,7 @@ import { buildWorld } from '../../lib/league/whatIf.js';
 import { defaultMockSettings, prepareMock, type MockSlot } from '../../lib/league/mockDraft.js';
 import { keeperCostSlot, oddsTone, openOwnerBoard, shareGoneBefore, simulateTakenAt, type TakenAt } from '../../lib/league/keeperOdds.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
+import ProjectionSourceSwitch from '../league/ProjectionSourceSwitch.js';
 import { keeperDeadline, nameList, pacificLabel } from '../../lib/league/notifications.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import {
@@ -949,6 +950,7 @@ export default function TeamKeeperPage() {
           Could not load your private scenario. Sign out and back in, then try again.
         </div>
       )}
+      {oddsForCommish && <ProjectionSourceSwitch caption="Keeper odds from" />}
       {locked && !isCommish && !projectionMode && <LockBanner />}
       {identity?.owner === owner && meta?.viewer === owner && !projectionMode && !locked && meta.draftAt && (
         <KeeperStatusBanner
