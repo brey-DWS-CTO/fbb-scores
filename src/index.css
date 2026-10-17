@@ -5173,6 +5173,157 @@ html.theme-light {
 /* ─── Mock draft: on your pick, where your next one is ─── */
 .room-turn.is-mine .room-turn-next { color: var(--text-mid); font-weight: 700; letter-spacing: 0; white-space: nowrap; }
 
+/* ─── Live draft: the shared test draft and the player list ─── */
+.test-draft-strip {
+  display: block;
+  padding: 6px 10px;
+  border-bottom: 2px solid var(--neon-yellow);
+  background: rgba(255,230,0,0.12);
+  color: var(--neon-yellow);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-decoration: none;
+}
+.test-draft-panel { margin-bottom: 12px; padding: 12px 14px; border: 2px dashed var(--neon-yellow); border-radius: 10px; color: var(--neon-yellow); }
+.test-draft-panel .hub-heading { font-size: 0.68rem; }
+.test-draft-panel p { margin: 6px 0 0; color: var(--text-body); font-size: 0.78rem; line-height: 1.45; }
+.test-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.test-draft-actions button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.test-draft-actions button.is-go { border-color: var(--neon-yellow); background: rgba(255,230,0,0.1); color: var(--neon-yellow); }
+.test-draft-actions button.is-danger { border-color: var(--neon-red); color: var(--neon-red); }
+.test-draft-error, .live-room-error { margin-top: 8px; color: var(--neon-red); font-size: 0.76rem; font-weight: 700; }
+.live-room { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; }
+.live-room.is-my-turn { border: 2px solid var(--neon-teal); }
+.live-room-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.live-room-head .hub-heading { color: var(--text-mid); font-size: 0.62rem; }
+.live-room-status { color: var(--text-dim); font-size: 0.72rem; font-weight: 800; text-align: right; }
+.live-room-status.is-on { color: var(--neon-teal); }
+.live-room .room-table td.room-player-col small { display: block; }
+@media (max-width: 839px) {
+  .live-room { padding: 8px; }
+  .live-room .room-filters { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; }
+  .live-room .room-filters .room-search { grid-column: 1 / -1; }
+  .live-room .room-filters .proj-check { grid-column: 1 / -1; }
+  .live-room .room-sort-quick { display: inline-flex; gap: 4px; justify-content: flex-end; }
+  .live-room .room-sort-quick button { min-height: 32px; padding: 0 7px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.58rem; font-weight: 800; }
+  .live-room .room-sort-quick button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+  .live-room .room-table-wrap { max-height: 60vh; }
+  /* DRAFT, GONE and the name stay put while the stats slide under them. */
+  .live-room .room-table .live-room-draft { position: sticky; left: 0; z-index: 3; width: 58px; min-width: 58px; padding: 4px; }
+  .live-room .room-table .live-room-draft .mock-mini-btn { min-height: 34px; padding: 0 6px; font-size: 0.6rem; }
+  .live-room .room-table .live-room-gone { position: sticky; left: 58px; z-index: 3; width: 44px; min-width: 44px; padding: 4px; }
+  .live-room .room-table th.live-room-gone button { padding: 8px 4px; }
+  .live-room .room-table .room-star { position: sticky; left: 0; z-index: 2; }
+  .live-room.is-my-turn .room-table .room-star { left: 58px; }
+  .live-room.is-my-turn .room-table:has(.live-room-gone) .room-star { left: 102px; }
+  .live-room .room-table .room-player-col { position: sticky; left: 30px; z-index: 2; max-width: 150px; min-width: 120px; overflow: hidden; text-overflow: ellipsis; box-shadow: 2px 0 0 var(--panel-border); }
+  .live-room.is-my-turn .room-table .room-player-col { left: 88px; }
+  .live-room.is-my-turn .room-table:has(.live-room-gone) .room-player-col { left: 132px; }
+  .live-room .room-table th.live-room-draft, .live-room .room-table th.live-room-gone, .live-room .room-table th.room-star, .live-room .room-table th.room-player-col { z-index: 5; }
+}
+
+/* ─── Live draft: who is in the room ─── */
+.draft-room-panel { margin-bottom: 12px; padding: 8px 12px; border-radius: 10px; }
+.draft-room-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.draft-room-line .hub-heading { margin-right: 4px; color: var(--text-mid); font-size: 0.6rem; }
+.draft-room-chip {
+  padding: 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--neon-teal) 45%, var(--panel-border));
+  border-radius: 999px;
+  background: rgba(0,255,204,0.06);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.draft-room-chip.is-me { border-color: var(--neon-teal); color: var(--neon-teal); }
+.live-room-writein { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--neon-teal); font-size: 0.74rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
+/* ─── Live draft: the room on a phone, the card, the queue, sound ─── */
+.live-phone-tabs { display: none; }
+.live-sound-btn {
+  padding: 6px 10px;
+  border: 2px solid var(--panel-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.live-sound-btn.is-on { border-color: var(--neon-teal); color: var(--neon-teal); }
+.live-card { margin-bottom: 10px; padding: 10px 12px; border: 2px solid var(--neon-teal); border-radius: 10px; }
+.live-room-queue { margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 10px; }
+.live-room-queue .room-queue-list li { display: flex; align-items: center; gap: 6px; }
+.live-room-queue .room-queue-name { flex: 1; min-width: 0; overflow: hidden; border: 0; background: none; color: var(--text-hi); font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.live-room-queue-btn.is-on { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.live-room .room-sort-quick.is-always { display: inline-flex; gap: 4px; }
+.live-room .room-sort-quick.is-always button { min-height: 32px; padding: 0 9px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.6rem; font-weight: 800; }
+.live-room .room-sort-quick.is-always button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+.live-room-sub { display: block; }
+.live-empty { margin-bottom: 12px; padding: 14px; border-radius: 10px; color: var(--text-dim); text-align: center; font-size: 0.8rem; }
+@media (max-width: 839px) {
+  /* The app steps aside while the draft runs, as in the mock room. */
+  html.in-live-room .bottom-nav,
+  html.in-live-room .section-tabs { display: none; }
+  html.in-live-room .app-shell-nav { padding-bottom: 68px; }
+  html.in-live-room .live-tab:not(.is-shown) { display: none; }
+  .live-phone-tabs {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 2px solid var(--panel-border);
+    background: var(--nav-bg);
+    backdrop-filter: blur(8px);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .live-phone-tabs button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: 8px 0 10px;
+    border: 0;
+    border-top: 2px solid transparent;
+    margin-top: -2px;
+    background: transparent;
+    color: var(--text-mid);
+    font-size: 0.62rem;
+  }
+  .live-phone-tabs button .hub-heading { font-size: 0.62rem; }
+  .live-phone-tabs button.is-on { color: var(--neon-teal); border-top-color: var(--neon-teal); }
+  .live-phone-tabs button.is-exit { color: var(--text-dim); }
+  /* Names shorten once the list slides sideways, so the stats fit. */
+  .live-room .room-table-wrap.is-scrolled .room-name-full { display: none; }
+  .live-room .room-table-wrap.is-scrolled .room-name-short { display: inline; }
+  .live-room .room-table-wrap.is-scrolled .room-table .room-player-col { min-width: 0; max-width: 104px; }
+  .live-room .room-table-wrap.is-scrolled .live-room-sub,
+  .live-room .room-table-wrap.is-scrolled .room-taken { display: none; }
+  .live-room .room-table .room-star { width: 30px; min-width: 30px; padding: 0; }
+  .live-card { padding: 8px 10px; }
+  .live-card .room-card-name { font-size: 1.05rem; }
+}
+.stats-gate { padding: 18px; border: 2px solid var(--neon-yellow); border-radius: 12px; color: var(--neon-yellow); text-align: center; }
+.stats-gate .hub-heading { font-size: 0.72rem; }
+.stats-gate p { margin: 8px 0 14px; color: var(--text-body); font-size: 0.85rem; }
+.stats-gate-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: var(--neon-teal); color: #001a14; font-weight: 800; text-decoration: none; }
+.draft-room-notes { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; color: var(--text-dim); font-size: 0.7rem; font-weight: 700; }
+
 /* ─── Mock draft with a friend: the invite panel, and a friend's clock ─── */
 .mock-friend { display: grid; gap: 10px; margin-bottom: 12px; }
 .mock-friend-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 0.82rem; }
