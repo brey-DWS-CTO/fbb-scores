@@ -401,13 +401,21 @@ test('risk shading moves the least certain players a few places and leaves stead
   const at = (name: string) => values.entries.find((entry) => entry.player.fullName === name)!;
   const davis = at('Anthony Davis');
   assert.equal(davis.fppgLow, 42.1);
-  assert.ok(davis.riskRank - davis.rank >= 3 && davis.riskRank - davis.rank <= 8, `Davis ${davis.rank} -> ${davis.riskRank}`);
+  // Shading always costs him value. Since a missed game stopped costing a
+  // whole game (2026-10-17) his neighbours are the other hurt stars, shaded
+  // too, so his place barely moves.
+  assert.ok(davis.riskValue! < davis.seasonValue!, 'shading costs Davis value');
+  assert.ok(Math.abs(davis.riskRank - davis.rank) <= 8, `Davis ${davis.rank} -> ${davis.riskRank}`);
   const sabonis = at('Domantas Sabonis');
   assert.ok(sabonis.riskRank > sabonis.rank, `Sabonis ${sabonis.rank} -> ${sabonis.riskRank}`);
   for (const steady of ['Nikola Jokic', 'Jalen Johnson']) assert.ok(at(steady).riskRank <= at(steady).rank, steady);
-  // A light touch: nobody in the top 60 moves more than ten places.
-  for (const entry of values.entries.filter((e) => e.rank <= 60)) {
-    assert.ok(Math.abs(entry.riskRank - entry.rank) <= 10, `${entry.player.name} ${entry.rank} -> ${entry.riskRank}`);
+  // A light touch: nobody in the top 50 moves more than fifteen places. The
+  // 20s and 30s sit closer together since the hurt stars rose into them, so
+  // Trae Young (39.8 projected, 30.6 low) slides about thirteen. Past 50 the
+  // board is flatter still, and a big swing like Ty Jerome's (34.3 projected,
+  // 22.5 low) moves him about sixteen.
+  for (const entry of values.entries.filter((e) => e.rank <= 50)) {
+    assert.ok(Math.abs(entry.riskRank - entry.rank) <= 15, `${entry.player.name} ${entry.rank} -> ${entry.riskRank}`);
   }
   assert.deepEqual(values.entries.map((e) => e.riskRank).sort((a, b) => a - b), values.entries.map((_, i) => i + 1));
 });
@@ -419,4 +427,19 @@ test('a season lost to injury does not count as a swing', () => {
   const dame = values.entries.find((entry) => entry.player.fullName === 'Damian Lillard')!;
   assert.ok(dame.fppgLow !== null && dame.fppgLow > 30, `fppgLow ${dame.fppgLow}`);
   assert.ok(Math.abs(dame.riskRank - dame.rank) <= 10, `Lillard ${dame.rank} -> ${dame.riskRank}`);
+});
+
+test('a missed game is a wash: he earns his margin only in the games he plays', async () => {
+  const { seasonMargin } = await import('../src/lib/league/draftValue.ts');
+  // 40 a game over a 20 replacement across 70 games, half of them played.
+  assert.equal(seasonMargin(40, 70, 20, 70, 0.5), 700);
+  // The old way charged the 35 missed games as zeros: 40 * 70 * 0.5 - 20 * 70 = 0.
+  assert.ok(seasonMargin(40, 70, 20, 70, 0.5) > 40 * 70 * 0.5 - 20 * 70);
+  // Below replacement, fewer games never help.
+  assert.equal(seasonMargin(15, 70, 20, 70, 0.5), -350);
+  // Davis, hurt half his seasons, now sits far above a healthy fill-in big.
+  const values = valueBoard(dataset.players, liveFixture, { schedule: leagueSchedule2027, projectionsOnly: true });
+  const at = (name: string) => values.entries.find((entry) => entry.player.fullName === name)!;
+  assert.ok(at('Anthony Davis').rank < 20, `Davis #${at('Anthony Davis').rank}`);
+  assert.ok(at('Anthony Davis').rank < at('Neemias Queta').rank - 80);
 });
