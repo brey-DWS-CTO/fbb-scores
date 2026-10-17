@@ -3075,6 +3075,10 @@ router.post('/shared-mocks/:id/results', requireAuth, async (req, res, next) => 
         continue;
       }
       const keep = isCommissionerOwner(who) ? null : MEMBER_MOCK_LIMIT;
+      // Your own phone grades you on your own numbers, so your own post
+      // takes over your record. Another phone's grade of you only fills a
+      // gap, since it is on the room's numbers.
+      if (who === owner) await deleteMockResult(leagueDataset.season, who, record.id);
       await saveMockResult({ season: leagueDataset.season, owner: who, id: record.id, result: record, createdAt: record.finishedAt }, keep);
       saved.push(who);
     }

@@ -224,8 +224,15 @@ test('a finished mock saves a grade to both people\'s Past mocks', async () => {
   assert.deepEqual(derek[0].vs, ['Kyle']);
   const kyle = asRecord((await request('/api/league/mock-results', { headers: auth('Kyle') })).body).results as Array<Record<string, unknown>>;
   assert.deepEqual(kyle[0].vs, ['Derek']);
-  // Sent twice, the same draft saves once.
-  await request(`/api/league/shared-mocks/${room.id}/results`, { method: 'POST', headers: auth('Derek'), body: JSON.stringify({ results }) });
-  assert.equal((asRecord((await request('/api/league/mock-results', { headers: auth('Derek') })).body).results as unknown[]).length, 1);
+  // Sent again from your own phone, your own grade takes over your record (it
+  // is on your numbers); the other person's record stays as it was.
+  const own = results.map((entry) => (entry.owner === 'Derek' ? { ...entry, grade: grade(2) } : { ...entry, grade: grade(9) }));
+  await request(`/api/league/shared-mocks/${room.id}/results`, { method: 'POST', headers: auth('Derek'), body: JSON.stringify({ results: own }) });
+  const derekAgain = asRecord((await request('/api/league/mock-results', { headers: auth('Derek') })).body).results as Array<Record<string, unknown>>;
+  assert.equal(derekAgain.length, 1);
+  assert.equal((derekAgain[0].grade as { rank: number }).rank, 2);
+  const kyleAgain = asRecord((await request('/api/league/mock-results', { headers: auth('Kyle') })).body).results as Array<Record<string, unknown>>;
+  assert.equal(kyleAgain.length, 1);
+  assert.equal((kyleAgain[0].grade as { rank: number }).rank, 4, 'another phone never overwrites your record');
   assert.equal((await request(`/api/league/shared-mocks/${room.id}/results`, { method: 'POST', headers: auth('Amy'), body: JSON.stringify({ results }) })).status, 403);
 });

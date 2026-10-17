@@ -63,10 +63,13 @@ function SharedMockScreen({ id }: { id: string }) {
   const viewer = identity?.owner ?? null;
   const draftData = useDraftData();
   const { dataset } = draftData;
-  // ESPN's numbers alone, no source swap and no edits: every phone must rank
-  // the players the same way, or the computer teams draft differently on
-  // each one and the two replays come apart.
-  const { espn: snapshot, loading: projectionsLoading } = useProjectionData();
+  // The room drafts on ESPN's numbers alone, no source swap and no edits:
+  // every phone must rank the players the same way, or the computer teams
+  // draft differently on each one and the two replays come apart. Your own
+  // screen still shows your numbers (your source, your edits), and your
+  // grade follows your screen.
+  const { espn: snapshot, snapshot: shown, edits, original, source, loading: projectionsLoading } = useProjectionData();
+  const ownNumbers = source !== 'espn' || Object.keys(edits).length > 0;
 
   const queryKey = useMemo(() => ['mock-room', id, viewer ?? 'anon'] as const, [id, viewer]);
   const roomQuery = useQuery({
@@ -124,9 +127,14 @@ function SharedMockScreen({ id }: { id: string }) {
     }
     return { keepers, status };
   }, [board]);
-  const projections = useMemo((): ReadonlyMap<string, PlayerProjection> =>
+  // What the room runs on, and what this person sees. The same when they
+  // have no source swap and no edits.
+  const roomProjections = useMemo((): ReadonlyMap<string, PlayerProjection> =>
     new Map(buildProjections(values, snapshot, kept).map((row) => [row.key, row])),
   [values, snapshot, kept]);
+  const projections = useMemo((): ReadonlyMap<string, PlayerProjection> =>
+    (ownNumbers ? new Map(buildProjections(values, shown, kept, edits, original).map((row) => [row.key, row])) : roomProjections),
+  [ownNumbers, values, shown, kept, edits, original, roomProjections]);
   const owners = useMemo(() => dataset.teams.map((team) => team.owner), [dataset.teams]);
   const mode = room?.mode ?? 'sharp';
   const seed = room?.seed ?? 0;
@@ -147,11 +155,13 @@ function SharedMockScreen({ id }: { id: string }) {
   }, [id, viewer]);
 
   // The last pick lands: every person's grade, saved to each one's Past
-  // mocks from whichever phone gets here first. The same draft saves once.
+  // mocks from whichever phone gets here first. Your own grade is on your
+  // numbers; the others' are on the room's, until their own phone grades
+  // them on theirs and takes over their record.
   const onFinished = useCallback((finished: { choices: Record<number, string>; grade: MockGrade; board: SavedBoard }) => {
     if (!identity || !room || !prepared) return;
     const players = new Map<string, GradePlayer>();
-    for (const [key, row] of projections) players.set(key, { name: row.name, positions: row.positions, total: row.total, fppg: row.fppg, adp: row.adp });
+    for (const [key, row] of roomProjections) players.set(key, { name: row.name, positions: row.positions, total: row.total, fppg: row.fppg, adp: row.adp });
     const picks = replayLive(prepared, room.seed, room.people, finished.choices).picks;
     const results = room.people.map((owner) => ({
       owner,
@@ -167,7 +177,7 @@ function SharedMockScreen({ id }: { id: string }) {
         queryClient.invalidateQueries({ queryKey: ['mock-stats'] }),
       ]))
       .catch(() => { /* the grade still shows; it just is not kept */ });
-  }, [identity, room, prepared, projections, queryClient]);
+  }, [identity, room, prepared, roomProjections, queryClient]);
 
   const controls = useMemo((): SharedRoomControls | null => {
     if (!room || !identity) return null;
@@ -305,6 +315,11 @@ function SharedMockScreen({ id }: { id: string }) {
     <div className="mock-page">
       {head}
       {error && <div className="mock-note mock-note-bad">{error}</div>}
+      {ownNumbers && (
+        <div className="mock-note mock-note-dim">
+          Your screen shows your projections and your grade follows them. The room drafts on ESPN&apos;s numbers, so RK is ESPN&apos;s board.
+        </div>
+      )}
       {loading || !prepared || !controls ? (
         <div className="mock-note">Loading the draft…</div>
       ) : (

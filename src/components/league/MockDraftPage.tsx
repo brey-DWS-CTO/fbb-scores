@@ -657,7 +657,8 @@ function MockDraftScreen() {
                 </button>
                 {openResult === record.id && (
                   <>
-                    <MockGradeCard grade={record.grade} person={record.owner} />
+                    {/* The row above already shows the letter and the line. */}
+                    <MockGradeCard grade={record.grade} person={record.owner} headline={false} />
                     <SavedMockBoard board={record.board} person={record.owner} />
                     <button type="button" className="tap-btn mock-mini-btn" onClick={() => forget(record.id)}>FORGET THIS ONE</button>
                   </>
