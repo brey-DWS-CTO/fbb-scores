@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useIdentity } from '../../hooks/useLeague.js';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, oddsKeeperThere, type LiveChoices } from '../../lib/league/liveMock.js';
 import type { MockCandidate, MockMode, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
@@ -117,6 +118,9 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 
  */
 export default function DraftRoom({ prepared, values, projections, projectedTrades, person, seed, mode, saved, onProgress, onNewDraft, onFinished, shared }: Props) {
   const navigate = useNavigate();
+  // Play-in and playoff games (PI, PO) are the commissioner's columns only.
+  const { identity } = useIdentity();
+  const showPostseason = identity?.isCommissioner === true;
   // Everyone whose picks stop the replay: the person alone, or the whole table.
   const people = shared?.people ?? person;
   // Only the first render restores; after that the room owns its state.
@@ -455,8 +459,10 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
       return `${candidate.playerName} ${projection?.name ?? ''} ${projection?.proTeam ?? ''}`.toLowerCase().includes(needle);
     })
     .sort((a, b) => {
-      const x = rowValue(a, sort.key);
-      const y = rowValue(b, sort.key);
+      // A member never sees PI or PO, so a sort on them falls back to the board.
+      const key = !showPostseason && (sort.key === 'pi' || sort.key === 'po') ? 'rank' : sort.key;
+      const x = rowValue(a, key);
+      const y = rowValue(b, key);
       if (x === null || y === null) return x === y ? a.valueRank - b.valueRank : x === null ? 1 : -1;
       return (x - y) * sort.dir || a.valueRank - b.valueRank;
     })
@@ -882,8 +888,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                     {sortHead('fppg', 'FPPG')}
                     {sortHead('total', 'TOTAL', 'Projected season points')}
                     {sortHead('games', 'GP')}
-                    {sortHead('pi', 'PI', 'Team games in our play-in weeks')}
-                    {sortHead('po', 'PO', 'Team games in our playoff weeks')}
+                    {showPostseason && sortHead('pi', 'PI', 'Team games in our play-in weeks')}
+                    {showPostseason && sortHead('po', 'PO', 'Team games in our playoff weeks')}
                     {sortHead('pts', 'PTS')}
                     {sortHead('reb', 'REB')}
                     {sortHead('ast', 'AST')}
@@ -950,8 +956,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
-                        <PostseasonCell games={projection?.playInGames} />
-                        <PostseasonCell games={projection?.playoffGames} />
+                        {showPostseason && <PostseasonCell games={projection?.playInGames} />}
+                        {showPostseason && <PostseasonCell games={projection?.playoffGames} />}
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -982,7 +988,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                   <tr>
                     <th className="room-slot-col">Slot</th>
                     <th className="room-player-col">Player</th>
-                    {['FPPG', 'TOTAL', 'GP', 'PI', 'PO', 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
+                    {['FPPG', 'TOTAL', 'GP', ...(showPostseason ? ['PI', 'PO'] : []), 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
                       <th key={label} className="room-num"><span className="room-th">{label}</span></th>
                     ))}
                   </tr>
@@ -1007,8 +1013,8 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                         <td className="room-num room-strong">{candidate ? one(projection?.fppg) : '–'}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num">{projection?.games ?? '–'}</td>
-                        <PostseasonCell games={projection?.playInGames} />
-                        <PostseasonCell games={projection?.playoffGames} />
+                        {showPostseason && <PostseasonCell games={projection?.playInGames} />}
+                        {showPostseason && <PostseasonCell games={projection?.playoffGames} />}
                         <td className="room-num">{one(line?.min)}</td>
                         <td className="room-num">{one(line?.pts)}</td>
                         <td className="room-num">{one(line?.reb)}</td>
