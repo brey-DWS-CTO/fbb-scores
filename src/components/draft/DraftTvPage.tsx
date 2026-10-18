@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 
 import { useDraftData } from '../../hooks/useLeague.js';
-import { sandboxActive } from '../../lib/league/api.js';
+import { sandboxActive, testDraftJoined } from '../../lib/league/api.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import NavIcon from '../league/NavIcon.js';
@@ -13,7 +13,8 @@ import { recentPicks } from './boardUtils.js';
 
 /** Full-screen wall board for the draft-night TV. Read-only, 3s poll. */
 export default function DraftTvPage() {
-  const { state, meta, dataUpdatedAt, dataset } = useDraftData(true);
+  const [side] = useState(() => testDraftJoined() ? 'test' as const : 'league' as const);
+  const { state, meta, dataUpdatedAt, dataset } = useDraftData(true, side);
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
   const started = state.draft.startedAt !== null;
   const onClock = board.find((c) => c.onClock) ?? null;
@@ -168,7 +169,7 @@ export default function DraftTvPage() {
           >
             EXIT TV
           </Link>
-          {sandboxActive() && (
+          {(sandboxActive() || meta?.testDraft?.serving === true) && (
             <div
               style={{
                 color: 'var(--neon-yellow)',
