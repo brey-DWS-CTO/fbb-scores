@@ -213,7 +213,7 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
       <div className="mock-note mock-note-dim">
         {identity?.impersonatedBy
           ? `${person}'s rankings stay closed while you act as them, so nothing fills this queue. Sign in as ${person} to see it.`
-          : 'Tap ☆ beside a player, or QUEUE on his card. Your saved rankings fill this when it is empty. If a called clock runs out on your pick, you get the top one still there.'}
+          : 'Tap ☆ beside a player, or QUEUE on his card. Your saved rankings fill this when it is empty. If a called clock runs out on your pick, or the commish puts you on auto, you get the top one still there.'}
       </div>
     ) : (
       <ol className="room-queue-list">

@@ -1392,6 +1392,16 @@ test('a team on auto picks from its list, then the board order, and the next tea
   // Off again stops it.
   const joelOff = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: auth(commissioner), body: JSON.stringify({ on: false }) });
   assert.deepEqual((joelOff.body.state as LeagueDynamicState).draft.autoOwners, [third]);
+
+  // A queue the owner set mid-draft beats the saved rankings: undo Joel's pick,
+  // queue someone else, put him back on auto.
+  assert.equal((await request('/api/league/draft/pick/1', { method: 'DELETE', headers: auth(commissioner) })).status, 200);
+  const queued = dataset.players.find((player) => player.key !== weak.key && player.key !== pick2.key && player.key !== afterSecond.picks['3']?.playerKey)!;
+  await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [queued.key] }) });
+  const again = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: auth(commissioner), body: JSON.stringify({ on: true }) });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.equal((again.body.state as LeagueDynamicState).draft.picks['1']?.playerKey, queued.key);
+  await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [] }) });
 });
 
 test('auto waits while the clock is paused, and picks when it resumes', async () => {

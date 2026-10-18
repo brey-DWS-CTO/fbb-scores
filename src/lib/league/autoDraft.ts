@@ -196,7 +196,7 @@ export interface AutoChoice {
  * the first player in `fallback` still available. Null when nobody is left.
  */
 export function nextAutoPick(
-  list: DraftList | null,
+  list: { entries: readonly { playerKey: string | null }[] } | null,
   available: readonly DatasetPlayer[],
   fallback: readonly DatasetPlayer[],
 ): AutoChoice | null {

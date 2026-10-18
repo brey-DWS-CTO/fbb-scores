@@ -1532,6 +1532,9 @@ class AutoStale extends Error {}
 async function runAutoPicks(res: Response, draftPoolDataset: LeagueDataset): Promise<MutateResult | null> {
   let latest: MutateResult | null = null;
   let rankings: DraftRankingSnapshot | null = null;
+  // Each team's live queue, which falls back to its saved rankings. A member
+  // who reorders their queue mid-draft changes what auto takes for them.
+  const queues = await queuesFor(res);
   for (let guard = 0; guard < 200; guard += 1) {
     const current = latest ?? await draftState(res);
     const state = current.state;
@@ -1541,7 +1544,7 @@ async function runAutoPicks(res: Response, draftPoolDataset: LeagueDataset): Pro
     if (!onClock || !isOnAuto(state, onClock.pick.currentOwner)) return latest;
     const owner = onClock.pick.currentOwner;
     const overall = onClock.pick.overall;
-    const list = inTestDraft(res) ? null : await getDraftList(state.season, owner);
+    const list = { entries: (queues[owner] ?? []).map((playerKey) => ({ playerKey })) };
     rankings ??= await resolveCurrentDraftRankings(state);
     const available = availablePlayers(dataset, state);
     const fallback = rankBoard(available, rankings).entries.map((entry) => entry.player);
