@@ -42,6 +42,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     home: '/draft/start',
     tabs: [
       { to: '/draft', label: 'BOARD' },
+      { to: '/my-list', label: 'MY LIST' },
       { to: '/mock', label: 'MOCK DRAFT' },
       { to: '/projections', label: 'PROJECTIONS' },
       { to: '/tiers', label: 'TIERS' },

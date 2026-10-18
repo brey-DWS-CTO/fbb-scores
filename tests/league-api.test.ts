@@ -18,6 +18,8 @@ import type {
   LeagueDynamicState,
 } from '../src/lib/keeper/types.ts';
 import { playerPoolFromDataset } from '../src/lib/league/playerPool.ts';
+import { buildDraftBoard } from '../src/lib/keeper/engine.ts';
+import { rankBoard } from '../src/lib/league/draftRankings.ts';
 import {
   DEFAULT_2027_LEAGUE_MAPPING,
   type RawScheduleSource,
@@ -155,6 +157,7 @@ before(async () => {
 beforeEach(async () => {
   await replaceState(cleanState());
   await store.clearKeeperScenariosForSeason(dataset.season);
+  for (const owner of Object.keys(pins)) await store.setDraftList(dataset.season, owner, null);
 });
 
 after(async () => {
@@ -1278,4 +1281,155 @@ test('48 simultaneous pick submissions cannot overwrite a pick or draft a player
   assert.ok(presence.every((reply) => reply.status === 200));
   const present = await request('/api/league/draft-room', { method: 'POST', headers: auth(commissioner) });
   assert.deepEqual([...(present.body.owners as string[])].sort(), [...owners].sort());
+});
+
+// ─── Private lists and auto picks ────────────────────────────────────────────
+
+/** The player the board's own order wants least, so a list naming him is unmistakable. */
+function leastWanted() {
+  const entries = rankBoard(dataset.players, null).entries.filter((entry) => entry.source !== 'none');
+  const player = entries[entries.length - 1]?.player;
+  assert.ok(player);
+  return player;
+}
+
+test('a draft list is its owner\'s alone: not another member\'s, not the commissioner\'s, not acting as them', async () => {
+  const weak = leastWanted();
+  const saved = await request('/api/league/draft-list', {
+    method: 'PUT',
+    headers: auth('Joel'),
+    body: JSON.stringify({ text: `1. ${weak.fullName ?? weak.name}\n2. Nobody Real\n\n3. ${weak.fullName ?? weak.name}` }),
+  });
+  assert.equal(saved.status, 200);
+  const list = saved.body.list as { entries: Array<{ rank: number; name: string; playerKey: string | null }> };
+  assert.equal(list.entries.length, 2, 'a repeated name counts once');
+  assert.equal(list.entries[0].playerKey, weak.key);
+  assert.equal(list.entries[1].playerKey, null);
+
+  const own = await request('/api/league/draft-list', { headers: auth('Joel') });
+  assert.equal((own.body.list as { entries: unknown[] }).entries.length, 2);
+  const ryan = await request('/api/league/draft-list', { headers: auth('Ryan') });
+  assert.equal(ryan.body.list, null);
+  const commish = await request('/api/league/draft-list', { headers: auth(commissioner) });
+  assert.equal(commish.body.list, null);
+
+  const seat = await request('/api/league/act-as/Joel', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(seat.status, 200);
+  const asJoel = { 'content-type': 'application/json', 'x-session': String(seat.body.session) };
+  const peek = await request('/api/league/draft-list', { headers: asJoel });
+  assert.equal(peek.status, 403);
+  const overwrite = await request('/api/league/draft-list', { method: 'PUT', headers: asJoel, body: JSON.stringify({ text: 'x' }) });
+  assert.equal(overwrite.status, 403);
+  assert.equal((await store.getDraftList(dataset.season, 'Joel'))?.entries.length, 2);
+
+  // The commissioner learns who has a list, never what is on it.
+  const status = await request('/api/league/draft/auto', { headers: auth(commissioner) });
+  assert.deepEqual(status.body, { autoOwners: [], listOwners: ['Joel'] });
+  assert.equal((await request('/api/league/draft/auto', { headers: auth('Joel') })).status, 403);
+
+  const cleared = await request('/api/league/draft-list', { method: 'DELETE', headers: auth('Joel') });
+  assert.equal(cleared.body.list, null);
+  assert.equal(await store.getDraftList(dataset.season, 'Joel'), null);
+  const nothing = await request('/api/league/draft-list', { method: 'PUT', headers: auth('Joel'), body: JSON.stringify({ text: '\n\n' }) });
+  assert.equal(nothing.body.list, null);
+});
+
+test('a team on auto picks from its list, then the board order, and the next team on auto follows', async () => {
+  const weak = leastWanted();
+  await request('/api/league/draft-list', {
+    method: 'PUT',
+    headers: auth('Joel'),
+    body: JSON.stringify({ text: `${weak.fullName ?? weak.name}` }),
+  });
+  const next = cleanState();
+  next.keepersRevealed = true;
+  next.draft.startedAt = '2026-10-18T21:00:00.000Z';
+  await replaceState(next);
+  const board = buildDraftBoard(dataset, next);
+  assert.equal(board[0].pick.currentOwner, 'Joel');
+  const second = board[1].pick.currentOwner;
+  const third = board[2].pick.currentOwner;
+
+  const memberTry = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ on: true }) });
+  assert.equal(memberTry.status, 403);
+  const unknown = await request('/api/league/draft/auto/Nobody', { method: 'POST', headers: auth(commissioner), body: JSON.stringify({ on: true }) });
+  assert.equal(unknown.status, 404);
+
+  // Third on auto before his turn: nothing happens yet.
+  const thirdOn = await request(`/api/league/draft/auto/${third}`, { method: 'POST', headers: auth(commissioner), body: JSON.stringify({ on: true }) });
+  assert.equal(thirdOn.status, 200);
+  assert.deepEqual((thirdOn.body.state as LeagueDynamicState).draft.picks, {});
+
+  // Joel on auto while on the clock: his pick lands now, from his list.
+  const joelOn = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: auth(commissioner), body: JSON.stringify({ on: true }) });
+  assert.equal(joelOn.status, 200);
+  const afterJoel = (joelOn.body.state as LeagueDynamicState).draft;
+  assert.deepEqual(afterJoel.autoOwners, [third, 'Joel']);
+  assert.equal(afterJoel.picks['1']?.playerKey, weak.key);
+  assert.equal(afterJoel.picks['1']?.auto, true);
+  assert.equal(afterJoel.picks['1']?.enteredBy, 'Joel');
+  assert.equal(afterJoel.picks['2'], undefined, 'the second team picks for itself');
+
+  // Second picks by hand; third is on auto with no list, so the board's best goes next.
+  const best = rankBoard(dataset.players.filter((player) => player.key !== weak.key), null).entries[0].player;
+  const pick2 = dataset.players.find((player) => player.key !== weak.key && player.key !== best.key);
+  assert.ok(pick2);
+  const manual = await request('/api/league/draft/pick', {
+    method: 'POST',
+    headers: auth(second as keyof typeof pins),
+    body: JSON.stringify({ overallPick: 2, playerKey: pick2.key, playerName: pick2.name }),
+  });
+  assert.equal(manual.status, 200, JSON.stringify(manual.body));
+  const afterSecond = (manual.body.state as LeagueDynamicState).draft;
+  assert.equal(afterSecond.picks['2']?.playerKey, pick2.key);
+  assert.equal(afterSecond.picks['3']?.auto, true);
+  assert.equal(afterSecond.picks['3']?.enteredBy, third);
+  assert.ok(afterSecond.picks['3']?.playerKey, 'the third team got a pick from the board order');
+  assert.notEqual(afterSecond.picks['3']?.playerKey, weak.key);
+  assert.equal(afterSecond.picks['4'], undefined);
+  assert.equal(buildDraftBoard(dataset, manual.body.state as LeagueDynamicState).find((cell) => cell.onClock)?.pick.overall, 4);
+
+  // Off again stops it.
+  const joelOff = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: auth(commissioner), body: JSON.stringify({ on: false }) });
+  assert.deepEqual((joelOff.body.state as LeagueDynamicState).draft.autoOwners, [third]);
+});
+
+test('auto waits while the clock is paused, and picks when it resumes', async () => {
+  const next = cleanState();
+  next.keepersRevealed = true;
+  next.draft.startedAt = '2026-10-18T21:00:00.000Z';
+  next.draft.clock = { pickStartedAt: next.draft.startedAt, pausedAt: next.draft.startedAt, pausedMs: 0, call: null };
+  await replaceState(next);
+  const on = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: auth(commissioner), body: JSON.stringify({ on: true }) });
+  assert.equal(on.status, 200);
+  assert.deepEqual((on.body.state as LeagueDynamicState).draft.picks, {});
+  const resumed = await request('/api/league/draft/clock/resume', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(resumed.status, 200);
+  assert.equal((resumed.body.state as LeagueDynamicState).draft.picks['1']?.auto, true);
+});
+
+test('in the test draft an auto pick takes the board order and never a member\'s list', async () => {
+  const weak = leastWanted();
+  await request('/api/league/draft-list', { method: 'PUT', headers: auth('Joel'), body: JSON.stringify({ text: weak.fullName ?? weak.name }) });
+  const live = cleanState();
+  live.keepersRevealed = true;
+  await replaceState(live);
+  const started = await request('/api/league/test-draft/start', { method: 'POST', headers: auth(commissioner) });
+  assert.equal(started.status, 200);
+  const startedAt = (started.body.state as LeagueDynamicState).draft.startedAt!;
+  const inTest = { ...auth(commissioner), 'x-test-draft': '1', 'x-test-draft-started-at': startedAt };
+
+  const status = await request('/api/league/draft/auto', { headers: inTest });
+  assert.deepEqual(status.body, { autoOwners: [], listOwners: [] });
+  const on = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: inTest, body: JSON.stringify({ on: true }) });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  const pick = (on.body.state as LeagueDynamicState).draft.picks['1'];
+  assert.equal(pick?.auto, true);
+  assert.notEqual(pick?.playerKey, weak.key, 'the list stays private even from the test board');
+
+  // The league itself is untouched.
+  const league = await store.getState();
+  assert.deepEqual(league.state.draft.picks, {});
+  assert.equal(league.state.draft.autoOwners, undefined);
+  await request('/api/league/test-draft/end', { method: 'POST', headers: auth(commissioner) });
 });

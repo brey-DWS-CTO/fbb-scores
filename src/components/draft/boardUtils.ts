@@ -69,6 +69,8 @@ export interface CellDisplay {
   isKeeper: boolean;
   keeperRound: number | null; // keeper tier round, when the fill is a keeper pre-fill
   enteredBy: string | null;
+  /** The server made the pick for a team on auto. */
+  auto: boolean;
 }
 
 export function cellDisplay(cell: BoardCell): CellDisplay | null {
@@ -82,6 +84,7 @@ export function cellDisplay(cell: BoardCell): CellDisplay | null {
       isKeeper: true,
       keeperRound: cell.keeper.round,
       enteredBy: null,
+      auto: false,
     };
   }
   if (cell.selection) {
@@ -95,6 +98,7 @@ export function cellDisplay(cell: BoardCell): CellDisplay | null {
       isKeeper: cell.selection.isKeeper === true,
       keeperRound: null,
       enteredBy: cell.selection.enteredBy ?? null,
+      auto: cell.selection.auto === true,
     };
   }
   return null;

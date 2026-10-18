@@ -41,6 +41,7 @@ import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
 import LiveRoom from './LiveRoom.js';
+import AutoPanel from './AutoPanel.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
@@ -193,7 +194,9 @@ function PickRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ color: '#fff', fontWeight: 700 }}>{d.name}</span>
             <PosChip positions={d.positions} />
-            {d.enteredBy && (
+            {d.auto ? (
+              <span className="auto-tag">AUTO</span>
+            ) : d.enteredBy && (
               <span style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>by {d.enteredBy}</span>
             )}
           </div>
@@ -706,6 +709,9 @@ export default function DraftPage() {
                 </div>
                 <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
                   {teamName(onClock.pick.currentOwner)}
+                  {(boardState.draft.autoOwners ?? []).includes(onClock.pick.currentOwner) && (
+                    <span className="auto-tag" style={{ marginLeft: 8 }}>ON AUTO</span>
+                  )}
                 </div>
                 <div style={{ color: 'var(--text-soft)' }}>
                   Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall
@@ -800,6 +806,17 @@ export default function DraftPage() {
           </div>
         )}
       </div>
+
+      {started && identity?.isCommissioner && (
+        <div className={tabClass('players')}>
+          <AutoPanel
+            room={room}
+            owners={dataset.teams.map((team) => team.owner)}
+            autoOwners={boardState.draft.autoOwners ?? []}
+            onClockOwner={onClock?.pick.currentOwner ?? null}
+          />
+        </div>
+      )}
 
       {started && poolReady && onClock && identity && (
         <div className={tabClass('players')}>

@@ -54,6 +54,12 @@ export default function DraftStartPage() {
         )}
       </Link>
 
+      <Link to="/my-list" className="tap-btn start-btn start-btn-list">
+        <span className="start-btn-icon" aria-hidden="true"><NavIcon name="ballot" size="1.4em" /></span>
+        <span className="start-btn-title hub-heading">MY LIST</span>
+        <span className="start-btn-sub">Names, best first, for picks made while you are away. Only you see it.</span>
+      </Link>
+
       <div className="start-row">
         <Link to="/projections" className="tap-btn start-btn start-btn-small">
           <span aria-hidden="true"><NavIcon name="chart" size="1.3em" /></span>

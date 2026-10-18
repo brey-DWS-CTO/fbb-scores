@@ -30,6 +30,8 @@ import type {
   ScoringItem,
 } from './draftRankings.js';
 import type { KeeperScenario } from './keeperScenario.js';
+import type { DraftList } from './autoDraft.js';
+import { withAuto } from './autoDraft.js';
 import type { Rulebook } from './rulebook.js';
 import type {
   HistoryConflict,
@@ -342,6 +344,54 @@ export async function verifyPin(
 /** Replace your own PIN (used for the forced change on a temporary PIN). */
 export async function changePin(c: Credentials, newPin: string): Promise<void> {
   await axios.post('/api/league/change-pin', { pin: newPin }, { headers: authHeaders(c) });
+}
+
+/* ── Private auto-pick lists ────────────────────────────────────────────────
+ * A member's list of names, best first, for picks made while they are away.
+ * Only its owner can read it. Never cached under a shared key. */
+export interface DraftListResponse {
+  season: number;
+  list: DraftList | null;
+}
+
+export async function fetchDraftList(c: Credentials): Promise<DraftListResponse> {
+  const { data } = await axios.get<DraftListResponse>('/api/league/draft-list', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Save the list as typed, one name a line. An empty text clears it. */
+export async function saveDraftList(c: Credentials, text: string): Promise<DraftListResponse> {
+  const { data } = await axios.put<DraftListResponse>('/api/league/draft-list', { text }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function clearDraftList(c: Credentials): Promise<DraftListResponse> {
+  const { data } = await axios.delete<DraftListResponse>('/api/league/draft-list', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Who is on auto and who has a list saved. Names only. Commissioner only. */
+export async function fetchAutoStatus(c: Credentials, room: DraftRoom): Promise<{ autoOwners: string[]; listOwners: string[] }> {
+  const sandbox = readSandbox();
+  if (sandbox) return { autoOwners: sandbox.state.draft.autoOwners ?? [], listOwners: [] };
+  const { data } = await axios.get('/api/league/draft/auto', { headers: draftHeaders(c, room) });
+  return data;
+}
+
+/**
+ * Put a team on auto or take it off (commissioner only). The server makes the
+ * team's pick at once when it is on the clock. The on-device sandbox only
+ * records the flag; it has no server to pick for anyone.
+ */
+export async function setAutoDraft(c: Credentials, owner: string, on: boolean, room: DraftRoom): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.draft.autoOwners = withAuto(s.draft.autoOwners, owner, on);
+    });
+  }
+  const { data } = await axios.post(`/api/league/draft/auto/${encodeURIComponent(owner)}`, { on }, { headers: draftHeaders(c, room) });
+  return data;
 }
 
 export async function fetchKeeperScenario(c: Credentials): Promise<KeeperScenarioResponse> {

@@ -5366,6 +5366,73 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   .proj-export-word { display: none; }
 }
 
+/* ─── My list: a private list of names, and the commish's auto switches ─── */
+.start-btn-list { min-height: 96px; border-color: var(--neon-yellow); color: var(--neon-yellow); background: color-mix(in srgb, var(--neon-yellow) 6%, var(--panel-bg)); }
+.start-btn-list .start-btn-sub { color: var(--text-soft); }
+.my-list-page .panel { margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; }
+.my-list-how p { margin: 0; color: var(--text-body); font-size: 0.82rem; line-height: 1.5; }
+.my-list-how p + p { margin-top: 8px; }
+.my-list-dim { color: var(--text-dim) !important; font-size: 0.74rem !important; }
+.my-list-form .rule-edit-label { display: block; }
+/* 16px text keeps phones from zooming in on tap. */
+.my-list-text { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 240px; font-size: 16px; line-height: 1.6; }
+.my-list-count { margin-top: 8px; color: var(--text-dim); font-size: 0.72rem; font-weight: 700; }
+.my-list-actions { display: flex; gap: 8px; margin-top: 10px; }
+.my-list-save { min-height: 52px; font-size: 0.85rem; border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.08); }
+.my-list-save:disabled { border-color: var(--panel-border); color: var(--text-dim); background: transparent; }
+.my-list-clear { flex: 0 0 auto; min-height: 52px; padding: 0 16px; }
+.my-list-clear.is-armed { border-color: var(--neon-red); color: var(--neon-red); background: rgba(255,34,34,0.1); }
+.my-list-missing { border-color: var(--neon-yellow); }
+.my-list-missing .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
+.my-list-missing p { margin: 6px 0 0; color: var(--text-body); font-size: 0.76rem; line-height: 1.45; }
+.my-list-missing ul { margin: 8px 0 0; padding-left: 18px; color: var(--text-hi); font-size: 0.82rem; line-height: 1.6; }
+.my-list-saved .hub-heading { font-size: 0.62rem; color: var(--text-mid); }
+.my-list-saved ol { list-style: none; margin: 8px 0 0; padding: 0; }
+.my-list-saved li { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--panel-border); font-size: 0.86rem; color: var(--text-hi); }
+.my-list-saved li:last-child { border-bottom: 0; }
+.my-list-saved li small { color: var(--text-dim); font-size: 0.66rem; }
+.my-list-saved li.is-missing .my-list-name { color: var(--text-dim); text-decoration: line-through; }
+.my-list-rank { min-width: 2em; color: var(--text-mid); font-weight: 800; font-size: 0.74rem; text-align: right; }
+.my-list-name { font-weight: 700; }
+.auto-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--neon-yellow);
+  border-radius: 4px;
+  color: var(--neon-yellow);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+.auto-panel { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; border-color: color-mix(in srgb, var(--neon-yellow) 45%, var(--panel-border)); }
+.auto-panel-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.auto-panel-head .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
+.auto-panel-note { color: var(--text-dim); font-size: 0.7rem; line-height: 1.4; }
+.auto-panel-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; margin-top: 8px; }
+.auto-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 9px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--chip-bg);
+  color: var(--text-soft);
+  font-family: inherit;
+  text-align: left;
+}
+.auto-chip-name { font-size: 0.8rem; font-weight: 800; color: var(--text-hi); }
+.auto-chip-state { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; color: var(--text-dim); }
+.auto-chip-list { font-size: 0.56rem; font-weight: 700; letter-spacing: 0.05em; color: var(--text-ghost); }
+.auto-chip-list.has-list { color: var(--neon-teal); }
+.auto-chip.is-on { border-color: var(--neon-yellow); background: rgba(255,230,0,0.1); }
+.auto-chip.is-on .auto-chip-state { color: var(--neon-yellow); }
+.auto-chip.is-clock { box-shadow: inset 3px 0 0 var(--neon-teal); }
+.auto-chip:disabled { opacity: 0.6; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
