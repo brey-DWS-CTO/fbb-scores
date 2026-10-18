@@ -375,6 +375,30 @@ export async function clearDraftList(c: Credentials): Promise<DraftListResponse>
   return data;
 }
 
+/** Who the signed-in member may enter rankings for: other members, for a steward; nobody otherwise. */
+export async function fetchDraftListAccess(c: Credentials): Promise<{ stewardFor: string[] }> {
+  const { data } = await axios.get('/api/league/draft-list/access', { headers: authHeaders(c) });
+  return data;
+}
+
+const forPath = (owner: string) => `/api/league/draft-list/for/${encodeURIComponent(owner)}`;
+
+/** Another member's rankings, for a steward. */
+export async function fetchDraftListFor(c: Credentials, owner: string): Promise<DraftListResponse> {
+  const { data } = await axios.get<DraftListResponse>(forPath(owner), { headers: authHeaders(c) });
+  return data;
+}
+
+export async function saveDraftListFor(c: Credentials, owner: string, text: string): Promise<DraftListResponse> {
+  const { data } = await axios.put<DraftListResponse>(forPath(owner), { text }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function clearDraftListFor(c: Credentials, owner: string): Promise<DraftListResponse> {
+  const { data } = await axios.delete<DraftListResponse>(forPath(owner), { headers: authHeaders(c) });
+  return data;
+}
+
 /** Who is on auto and who has a list saved. Names only. Commissioner only. */
 export async function fetchAutoStatus(c: Credentials, room: DraftRoom): Promise<{ autoOwners: string[]; listOwners: string[] }> {
   const sandbox = readSandbox();

@@ -312,7 +312,7 @@ import {
 import { getNbaWatch } from '../lib/nbaWatchService.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
-import { draftListOwners, getDraftList, setDraftList } from '../lib/leagueStore.js';
+import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -1507,6 +1507,70 @@ router.delete('/draft-list', requireAuth, async (_req, res) => {
   const { state } = await getState();
   await setDraftList(state.season, owner, null);
   res.json({ season: state.season, list: null });
+});
+
+// ─── A steward enters rankings for others ───────────────────────────────────
+//
+// One trusted member (config: rankingsSteward) may open any other member's
+// rankings and save them on their behalf, for someone who cannot be at the
+// draft and does not want to use the app. The commissioner is never a steward
+// and acting as the steward does not make one. Each save is logged with a
+// count of names, never the names.
+
+/** The signed-in steward, or a 403. */
+function stewardFor(res: Response, target: string): string {
+  const owner = listOwner(res);
+  if (!isRankingsSteward(owner)) throw new HttpError(403, 'Only a rankings steward can open another member\'s rankings');
+  if (!isKnownOwner(target)) throw new HttpError(404, `Unknown owner: ${target}`);
+  if (target === owner) throw new HttpError(400, 'Use your own rankings page for your own team');
+  return owner;
+}
+
+/** GET /api/league/draft-list/access — who the signed-in member may enter rankings for. */
+router.get('/draft-list/access', requireAuth, async (_req, res) => {
+  const owner = res.locals.owner as string;
+  const steward = !res.locals.actingBy && isRankingsSteward(owner);
+  res.json({ stewardFor: steward ? OWNERS.filter((entry) => entry !== owner) : [] });
+});
+
+/** GET /api/league/draft-list/for/:owner — another member's rankings, for a steward. */
+router.get('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  stewardFor(res, target);
+  const { state } = await getState();
+  res.json({ season: state.season, owner: target, list: await getDraftList(state.season, target) });
+});
+
+/** PUT /api/league/draft-list/for/:owner — save another member's rankings, for a steward. */
+router.put('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const steward = stewardFor(res, target);
+  const text = (req.body as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') {
+    res.status(400).json({ error: 'Send the list as text, one name a line' });
+    return;
+  }
+  if (text.length > DRAFT_LIST_MAX_CHARS) {
+    res.status(400).json({ error: 'That list is too long. Names only, one a line.' });
+    return;
+  }
+  const { state } = await getState();
+  const dataset = currentDataset(state, await resolveDraftDataset(state));
+  const list = buildDraftList(text, dataset.players, new Date().toISOString());
+  const saved = list.entries.length > 0 ? list : null;
+  await setDraftList(state.season, target, saved);
+  await appendAudit(steward, 'draft_list.saved_for', { owner: target, names: saved?.entries.length ?? 0 });
+  res.json({ season: state.season, owner: target, list: saved });
+});
+
+/** DELETE /api/league/draft-list/for/:owner — clear another member's rankings, for a steward. */
+router.delete('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const steward = stewardFor(res, target);
+  const { state } = await getState();
+  await setDraftList(state.season, target, null);
+  await appendAudit(steward, 'draft_list.cleared_for', { owner: target });
+  res.json({ season: state.season, owner: target, list: null });
 });
 
 /**
