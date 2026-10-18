@@ -807,6 +807,21 @@ export default function DraftPage() {
         )}
       </div>
 
+      {/* The pick that just landed, one line, as in the mock room. */}
+      {started && allPicks[0] && (
+        <div
+          key={allPicks[0].overall}
+          className={`panel room-latest live-latest${allPicks[0].owner === identity?.owner ? ' is-mine' : ''}`}
+          aria-live="polite"
+        >
+          <span className="room-upcoming-num">{allPicks[0].label}</span>
+          <span className="live-latest-text">
+            <strong>{allPicks[0].owner}</strong> takes <strong>{allPicks[0].playerName}</strong>{' '}
+            <small style={{ color: positionColor(allPicks[0].positions), fontWeight: 800 }}>{allPicks[0].positions.join('/')}</small>
+          </span>
+        </div>
+      )}
+
       {started && identity?.isCommissioner && (
         <div className={tabClass('players')}>
           <AutoPanel
