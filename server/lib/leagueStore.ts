@@ -486,6 +486,8 @@ interface StoreBackend {
   mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
   touchPresence(room: string, owner: string, at: string): Promise<void>;
   listPresence(room: string, since: string): Promise<PresenceRow[]>;
+  setDraftQueue(room: string, owner: string, keys: string[]): Promise<void>;
+  getDraftQueues(room: string): Promise<Record<string, string[]>>;
   getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario>;
   setKeeperScenarioTarget(
     season: number,
@@ -911,6 +913,13 @@ class NeonBackend implements StoreBackend {
       updated_by text not null,
       primary key (season, owner, espn_id)
     )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_queues (
+      room text not null,
+      owner text not null,
+      keys jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (room, owner)
+    )`;
     await this.sql`CREATE TABLE IF NOT EXISTS draft_presence (
       room text not null,
       owner text not null,
@@ -1050,6 +1059,19 @@ class NeonBackend implements StoreBackend {
     const rows = (await this.sql`SELECT owner, seen_at FROM draft_presence
       WHERE room = ${room} AND seen_at >= ${since}`) as Array<{ owner: string; seen_at: string | Date }>;
     return rows.map((row) => ({ owner: row.owner, seenAt: new Date(row.seen_at).toISOString() }));
+  }
+
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO draft_queues (room, owner, keys, updated_at)
+      VALUES (${room}, ${owner}, ${JSON.stringify(keys)}::jsonb, now())
+      ON CONFLICT (room, owner) DO UPDATE SET keys = EXCLUDED.keys, updated_at = now()`;
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, keys FROM draft_queues WHERE room = ${room}`) as Array<{ owner: string; keys: string[] }>;
+    return Object.fromEntries(rows.map((row) => [row.owner, Array.isArray(row.keys) ? row.keys : []]));
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -2111,6 +2133,8 @@ interface FileDoc {
   testDraft?: { state: LeagueDynamicState; version: number; updatedAt: string } | null;
   /** Who has a draft page open, by room. */
   draftPresence?: Array<PresenceRow & { room: string }>;
+  /** Each owner's draft queue, by room. */
+  draftQueues?: Array<{ room: string; owner: string; keys: string[] }>;
 }
 
 /** Every list a fresh document starts with. */
@@ -2209,6 +2233,7 @@ class FileBackend implements StoreBackend {
         sessions: Array.isArray(doc.sessions) ? doc.sessions : [],
         testDraft: doc.testDraft ?? null,
         draftPresence: Array.isArray(doc.draftPresence) ? doc.draftPresence : [],
+        draftQueues: Array.isArray(doc.draftQueues) ? doc.draftQueues : [],
       };
     } catch {
       // A missing or unreadable file starts empty. Every list must be present,
@@ -2295,6 +2320,20 @@ class FileBackend implements StoreBackend {
     return (this.readDoc().draftPresence ?? [])
       .filter((row) => row.room === room && row.seenAt >= since)
       .map(({ owner, seenAt }) => ({ owner, seenAt }));
+  }
+
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.draftQueues = [...(doc.draftQueues ?? []).filter((row) => !(row.room === room && row.owner === owner)), { room, owner, keys }];
+      this.writeDoc(doc);
+    });
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    return Object.fromEntries((this.readDoc().draftQueues ?? []).filter((row) => row.room === room).map((row) => [row.owner, row.keys]));
   }
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
     await this.ensureInit();
@@ -3131,6 +3170,16 @@ export async function mutateTestDraft(
 /** Mark an owner as having the draft page open in this room. */
 export async function touchPresence(room: string, owner: string, at: string): Promise<void> {
   return getBackend().touchPresence(room, owner, at);
+}
+
+/** Save an owner's draft queue for this room. */
+export async function setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+  return getBackend().setDraftQueue(room, owner, keys);
+}
+
+/** Every owner's draft queue in this room. */
+export async function getDraftQueues(room: string): Promise<Record<string, string[]>> {
+  return getBackend().getDraftQueues(room);
 }
 
 /** Owners who checked in to this room since `since`. */

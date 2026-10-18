@@ -21,11 +21,16 @@ test('two minutes sounds once as the pick crosses it', () => {
   assert.deepEqual(draftCues(look({ mine: true, elapsedMs: TWO_MINUTES_MS + 100 }), look({ mine: true, elapsedMs: TWO_MINUTES_MS + 600 })), []);
 });
 
-test('CLOCK called on you sounds once; on someone else it is quiet', () => {
+test('CLOCK sounds once on every phone, whoever is picking', () => {
   const at = '2026-10-18T21:03:00.000Z';
   assert.deepEqual(draftCues(look({ mine: true }), look({ mine: true, calledAt: at })), ['clock']);
   assert.deepEqual(draftCues(look({ mine: true, calledAt: at }), look({ mine: true, calledAt: at })), []);
-  assert.deepEqual(draftCues(look(), look({ calledAt: at })), []);
+  assert.deepEqual(draftCues(look(), look({ calledAt: at })), ['clock']);
+  assert.deepEqual(draftCues(look({ calledAt: at }), look({ calledAt: at, elapsedMs: 900 })), []);
+});
+
+test('someone else at two minutes is quiet', () => {
+  assert.deepEqual(draftCues(look({ elapsedMs: TWO_MINUTES_MS - 100 }), look({ elapsedMs: TWO_MINUTES_MS + 100 })), []);
 });
 
 test('stats lock for members while the real draft runs or in the test, never for the commish', () => {

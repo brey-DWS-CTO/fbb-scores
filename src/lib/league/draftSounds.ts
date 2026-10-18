@@ -1,6 +1,7 @@
 /**
  * When the live draft makes a sound on your phone: your pick comes up, your
- * pick has run two minutes, and someone calls CLOCK on you. The screen takes
+ * pick has run two minutes, and anyone calls CLOCK, on any team. A CLOCK
+ * call is heard by the whole table, the same as when it is shouted. The screen takes
  * a look every half second; this says which sounds the change between two
  * looks earns.
  *
@@ -28,11 +29,11 @@ export interface ClockLook {
  * in the middle of your pick stays quiet.
  */
 export function draftCues(before: ClockLook | null, after: ClockLook): DraftCue[] {
-  if (before === null || !after.mine || after.overall === null) return [];
-  const samePick = before.mine && before.overall === after.overall;
+  if (before === null || after.overall === null) return [];
+  const samePick = before.overall === after.overall;
   const cues: DraftCue[] = [];
-  if (!samePick) cues.push('up');
-  if (samePick && before.elapsedMs < TWO_MINUTES_MS && after.elapsedMs >= TWO_MINUTES_MS) cues.push('two-minutes');
+  if (after.mine && !(samePick && before.mine)) cues.push('up');
+  if (after.mine && samePick && before.elapsedMs < TWO_MINUTES_MS && after.elapsedMs >= TWO_MINUTES_MS) cues.push('two-minutes');
   if (after.calledAt !== null && after.calledAt !== (samePick ? before.calledAt : null)) cues.push('clock');
   return cues;
 }
