@@ -32,6 +32,7 @@ import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
+import EspnPushPanel from './EspnPushPanel.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
   ACTION_BUTTON,
@@ -662,6 +663,10 @@ export default function DraftPage() {
           </div>
         )}
       </div>
+
+      {started && !onClock && identity?.isCommissioner && (
+        <EspnPushPanel board={board} teams={dataset.teams} teamNames={state.teamNames} />
+      )}
 
       {started && !onClock && (
         <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
