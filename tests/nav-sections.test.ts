@@ -12,8 +12,8 @@ test('members see six sections, the commish seven', () => {
 
 test('everyone sees the mock draft, projections and tiers', () => {
   const draft = (sections: typeof member) => sections.find((section) => section.id === 'draft')!.tabs.map((tab) => tab.to);
-  assert.deepEqual(draft(member), ['/draft', '/my-list', '/mock', '/projections', '/tiers']);
-  assert.deepEqual(draft(commish), ['/draft', '/my-list', '/mock', '/projections', '/tiers']);
+  assert.deepEqual(draft(member), ['/draft', '/my-rankings', '/mock', '/projections', '/tiers']);
+  assert.deepEqual(draft(commish), ['/draft', '/my-rankings', '/mock', '/projections', '/tiers']);
 });
 
 test('the phone bar holds five sections until keepers go public, then four', () => {
@@ -28,7 +28,7 @@ test('every old page address finds its section', () => {
     ['/keepers/Brey', 'keepers'],
     ['/draft', 'draft'],
     ['/mock', 'draft'],
-    ['/my-list', 'draft'],
+    ['/my-rankings', 'draft'],
     ['/projections', 'draft'],
     ['/tiers', 'draft'],
     ['/trades', 'trades'],

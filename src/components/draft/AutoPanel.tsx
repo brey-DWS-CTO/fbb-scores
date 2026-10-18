@@ -14,10 +14,10 @@ interface Props {
 
 /**
  * The commissioner's auto switches, one per team. A team on auto has its
- * picks made by the server: from its own private list, or the board's order
- * once the list runs out. The commish sees who has a list, never what is on
- * it. In the test draft every auto pick takes the board's order, so nobody's
- * real list shows on a practice board.
+ * picks made by the server: from its own private rankings, or the board's
+ * order once they run out. The commish sees who has rankings, never what is
+ * in them. In the test draft every auto pick takes the board's order, so
+ * nobody's real rankings show on a practice board.
  */
 export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Props) {
   const { identity } = useIdentity();
@@ -56,8 +56,8 @@ export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Pr
         <span className="hub-heading">AUTO PICK</span>
         <span className="auto-panel-note">
           {room.side === 'test'
-            ? 'Test draft: auto takes the best player left. Nobody’s list is used here.'
-            : 'A team on auto picks from its own list, then the best player left. You never see the list.'}
+            ? 'Test draft: auto takes the best player left. Nobody’s rankings are used here.'
+            : 'A team on auto picks from its own rankings, then the best player left. You never see them.'}
         </span>
       </div>
       <div className="auto-panel-chips">
@@ -72,12 +72,12 @@ export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Pr
               aria-pressed={on}
               disabled={busy !== null}
               onClick={() => toggle(owner)}
-              title={on ? `Take ${owner} off auto` : `Put ${owner} on auto${hasList ? ' (has a list)' : ' (no list: best available)'}`}
+              title={on ? `Take ${owner} off auto` : `Put ${owner} on auto${hasList ? ' (has rankings)' : ' (no rankings: best available)'}`}
             >
               <span className="auto-chip-name">{owner}</span>
               <span className="auto-chip-state">{busy === owner ? '…' : on ? 'AUTO' : 'OFF'}</span>
               {room.side === 'league' && (
-                <span className={`auto-chip-list${hasList ? ' has-list' : ''}`}>{hasList ? 'LIST' : 'NO LIST'}</span>
+                <span className={`auto-chip-list${hasList ? ' has-list' : ''}`}>{hasList ? 'RANKINGS' : 'NO RANKINGS'}</span>
               )}
             </button>
           );

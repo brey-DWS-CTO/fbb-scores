@@ -8,12 +8,12 @@ import { apiErrorMessage, clearDraftList, fetchDraftList, saveDraftList } from '
 import { DRAFT_LIST_MAX, listToText, parseListText, type DraftList } from '../../lib/league/autoDraft.js';
 
 /**
- * A member's private list for the draft: names, best first, one a line. If
- * they cannot be there and the commish puts their team on auto, each pick
- * takes the top name still available. Nobody else ever sees the list, the
- * commish included.
+ * A member's private rankings for the draft: names, best first, one a line.
+ * If they cannot be there and the commish puts their team on auto, each pick
+ * takes the top name still available. Nobody else ever sees the rankings,
+ * the commish included.
  */
-export default function MyListPage() {
+export default function MyRankingsPage() {
   const { identity } = useIdentity();
   const { state } = useLeagueData();
   const [saved, setSaved] = useState<DraftList | null>(null);
@@ -45,7 +45,7 @@ export default function MyListPage() {
   if (!identity) {
     return (
       <main className="rules-page">
-        <SignInPanel reason="Sign in to keep a draft list." />
+        <SignInPanel reason="Sign in to keep your rankings." />
       </main>
     );
   }
@@ -67,7 +67,7 @@ export default function MyListPage() {
       const missing = response.list?.entries.filter((entry) => !entry.playerKey).length ?? 0;
       setNotice(response.list
         ? `Saved. ${response.list.entries.length} name${response.list.entries.length === 1 ? '' : 's'}${missing ? `, ${missing} not in the pool` : ''}.`
-        : 'Your list is empty.');
+        : 'Your rankings are empty.');
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
@@ -85,7 +85,7 @@ export default function MyListPage() {
       const response = await clearDraftList(identity);
       setSaved(response.list);
       setText('');
-      setNotice('List cleared.');
+      setNotice('Rankings cleared.');
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
@@ -99,9 +99,9 @@ export default function MyListPage() {
         <div>
           <h1 className="hub-heading glow-teal">
             <NavIcon name="ballot" size={18} className="icon-in-heading" />
-            MY LIST
+            MY RANKINGS
           </h1>
-          <p>Your picks if you cannot be there. Nobody else sees it, the commish included.</p>
+          <p>Your picks if you cannot be there. Nobody else sees them, the commish included.</p>
         </div>
         <IdentityChip />
       </header>
@@ -110,7 +110,7 @@ export default function MyListPage() {
         <p>
           Type or paste player names, best first, one a line. Numbers are fine.
           If you miss the draft and the commish puts your team on auto, each of your
-          picks takes the top name on this list still available. When the list runs
+          picks takes the top name on your rankings still available. When they run
           out, you get the best player left on the board.
         </p>
         <p className="my-list-dim">
@@ -142,7 +142,7 @@ export default function MyListPage() {
         </div>
         <div className="my-list-actions">
           <button type="button" className="vote-btn my-list-save" disabled={busy || !loaded || !dirty} onClick={save}>
-            {busy ? 'SAVING…' : 'SAVE LIST'}
+            {busy ? 'SAVING…' : 'SAVE RANKINGS'}
           </button>
           {saved && (
             <button
