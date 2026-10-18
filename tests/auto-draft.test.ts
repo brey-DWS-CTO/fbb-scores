@@ -56,10 +56,11 @@ test('the text becomes names in order, blanks and repeats dropped', () => {
 
 test('a list matches full names, short names, unique last names and initials', () => {
   const list = buildDraftList(
-    '1. Nikola Jokić\n2. L. Doncic\n3. Wembanyama\n4. J. Jackson\n5. Jackson\n6. Somebody Made Up',
+    '1. Nikola Jokić\n2. L. Doncic\n3. Wembanyama\n4. J. Jackson\n5. Jackson\n6. Somebody Made Up\n7. jokic',
     pool,
     '2026-10-17T00:00:00.000Z',
   );
+  assert.equal(list.entries.length, 6, 'the same player spelled two ways keeps his first line');
   assert.deepEqual(list.entries.map((entry) => [entry.rank, entry.playerKey]), [
     [1, 'jokic'],
     [2, 'doncic'],

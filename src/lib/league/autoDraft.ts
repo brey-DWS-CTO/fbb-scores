@@ -127,18 +127,27 @@ export function matchPlayer(name: string, index: NameIndex): DatasetPlayer | nul
   return only(byInitial) ?? only(sameLast);
 }
 
-/** A saved list: every typed name, matched to the pool where it can be. */
+/**
+ * A saved list: every typed name, matched to the pool where it can be. A
+ * player named twice in different spellings keeps his first line only.
+ */
 export function buildDraftList(text: string, players: readonly DatasetPlayer[], updatedAt: string): DraftList {
   const index = indexPlayers(players);
-  const entries = parseListText(text).map((name, position): DraftListEntry => {
+  const seen = new Set<string>();
+  const entries: DraftListEntry[] = [];
+  for (const name of parseListText(text)) {
     const player = matchPlayer(name, index);
-    return {
-      rank: position + 1,
+    if (player) {
+      if (seen.has(player.key)) continue;
+      seen.add(player.key);
+    }
+    entries.push({
+      rank: entries.length + 1,
       name,
       playerKey: player?.key ?? null,
       playerName: player ? player.fullName ?? player.name : null,
-    };
-  });
+    });
+  }
   return { entries, updatedAt };
 }
 
