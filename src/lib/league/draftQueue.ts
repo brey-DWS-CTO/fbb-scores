@@ -7,8 +7,23 @@
  * Pure. No server, no browser.
  */
 
-/** More than a draft's worth of names is a mistake, not a queue. */
-export const MAX_QUEUE = 60;
+/** Room for a whole rankings list; a queue longer than that is a mistake. */
+export const MAX_QUEUE = 300;
+
+/**
+ * A queue built from saved rankings: the matched players, best first. The
+ * draft page fills an empty queue with it, and the server reads it for an
+ * owner who never touched their queue, so a clock that runs out takes the
+ * top ranked player still there.
+ */
+export function queueFromRankings(entries: readonly { playerKey: string | null }[]): string[] {
+  const keys: string[] = [];
+  for (const entry of entries) {
+    if (entry.playerKey && !keys.includes(entry.playerKey)) keys.push(entry.playerKey);
+    if (keys.length >= MAX_QUEUE) break;
+  }
+  return keys;
+}
 
 /** A queue from a request: player keys, no repeats, at most MAX_QUEUE. Null when it is not a list of keys. */
 export function cleanQueue(raw: unknown): string[] | null {

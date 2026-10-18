@@ -38,8 +38,12 @@ const MEMBER_QUICK_SORTS: ReadonlyArray<readonly [RoomSortKey, string]> = [
   ['pos', 'POS'],
 ];
 
-/** The viewer's queue, kept on this device only. */
-function useQueue(storageKey: string): [string[], (update: (current: string[]) => string[]) => void] {
+/**
+ * The viewer's queue, kept on this device. While it is empty the viewer's
+ * saved rankings stand in, and the first change starts from them. The server
+ * reads an empty queue the same way, so the phone and the clock agree.
+ */
+function useQueue(storageKey: string, seed: readonly string[] | null): [string[], (update: (current: string[]) => string[]) => void] {
   const [queue, setQueue] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -49,6 +53,8 @@ function useQueue(storageKey: string): [string[], (update: (current: string[]) =
       return [];
     }
   });
+  const seeded = queue.length === 0 && seed !== null && seed.length > 0;
+  const effective = useMemo(() => (seeded ? [...seed!] : queue), [seeded, seed, queue]);
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(queue));
@@ -56,7 +62,10 @@ function useQueue(storageKey: string): [string[], (update: (current: string[]) =
       /* ignore */
     }
   }, [storageKey, queue]);
-  return [queue, (update) => setQueue((current) => update(current))];
+  const update = (fn: (current: string[]) => string[]) => {
+    setQueue((current) => fn(current.length === 0 && seed && seed.length > 0 ? [...seed] : current));
+  };
+  return [effective, update];
 }
 
 interface Props {
@@ -78,6 +87,8 @@ interface Props {
   gone: ReadonlyMap<string, number> | null;
   /** Where this device keeps the viewer's queue. */
   queueKey: string;
+  /** The viewer's saved rankings as player keys, best first. Null while unknown or when there are none. */
+  rankings: readonly string[] | null;
   /** Open the form for a player the pool does not have. */
   onWriteIn: () => void;
 }
@@ -88,7 +99,7 @@ interface Props {
  * column sorts and how often each player is gone before his next pick.
  * Members get names, positions and teams, nothing more.
  */
-export default function LiveRoom({ room, board, everyone, available, onClock, person, canDraft, showStats, projections, gone, queueKey, onWriteIn }: Props) {
+export default function LiveRoom({ room, board, everyone, available, onClock, person, canDraft, showStats, projections, gone, queueKey, rankings, onWriteIn }: Props) {
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const [sort, setSort] = useState<RoomSort>(showStats ? DEFAULT_ROOM_SORT : MEMBER_ROOM_SORT);
@@ -99,7 +110,7 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [queue, setQueue] = useQueue(queueKey);
+  const [queue, setQueue] = useQueue(queueKey, rankings);
   // The server keeps a copy: when a called clock runs out on your pick, it
   // takes the top player still there, even with this phone asleep.
   const queueText = JSON.stringify(queue);
@@ -188,8 +199,22 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
   // the stats would have filled.
   const queueContent = (
     <>
+    {rankings && rankings.length > 0 && (
+      <button
+        type="button"
+        className="tap-btn mock-mini-btn live-room-load-rankings"
+        onClick={() => setQueue(() => [...rankings])}
+        title="Put the queue back to your saved rankings"
+      >
+        RESET TO RANKINGS
+      </button>
+    )}
     {queued.length === 0 ? (
-      <div className="mock-note mock-note-dim">Tap ☆ beside a player, or QUEUE on his card. If a called clock runs out on your pick, you get the top one still there.</div>
+      <div className="mock-note mock-note-dim">
+        {identity?.impersonatedBy
+          ? `${person}'s rankings stay closed while you act as them, so nothing fills this queue. Sign in as ${person} to see it.`
+          : 'Tap ☆ beside a player, or QUEUE on his card. Your saved rankings fill this when it is empty. If a called clock runs out on your pick, or the commish puts you on auto, you get the top one still there.'}
+      </div>
     ) : (
       <ol className="room-queue-list">
         {queued.map((key, index) => {

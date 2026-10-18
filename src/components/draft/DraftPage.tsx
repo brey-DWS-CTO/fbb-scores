@@ -14,6 +14,7 @@ import {
 import {
   apiErrorMessage,
   checkInDraftRoom,
+  fetchDraftList,
   clearKeeperScenario,
   endTestDraft,
   exitSandbox,
@@ -28,6 +29,7 @@ import {
 import { clockExpired } from '../../lib/league/draftClock.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { PRESENCE_POLL_MS, roomChanges } from '../../lib/league/presence.js';
+import { queueFromRankings } from '../../lib/league/draftQueue.js';
 import {
   projectedPlayerKeys,
   stateWithKeeperScenario,
@@ -41,6 +43,7 @@ import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
 import LiveRoom from './LiveRoom.js';
+import { AutoButton, AutoChips } from './AutoPanel.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
@@ -193,7 +196,9 @@ function PickRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ color: '#fff', fontWeight: 700 }}>{d.name}</span>
             <PosChip positions={d.positions} />
-            {d.enteredBy && (
+            {d.auto ? (
+              <span className="auto-tag">AUTO</span>
+            ) : d.enteredBy && (
               <span style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>by {d.enteredBy}</span>
             )}
           </div>
@@ -422,6 +427,18 @@ export default function DraftPage() {
     return () => window.clearInterval(tick);
   }, [identity, clock, onClock, applyState, inSandbox, room]);
   const skippedCells = board.filter((cell) => cell.skipped);
+
+  // The viewer's saved rankings fill an empty queue, in the test draft too:
+  // it is their own screen. Theirs alone, so never for the commish in a
+  // member's seat.
+  const rankingsQuery = useQuery({
+    queryKey: ['draft-list-keys', identity?.owner ?? 'anon'],
+    queryFn: async () => queueFromRankings((await fetchDraftList(identity!)).list?.entries ?? []),
+    enabled: started && identity !== null && !identity.impersonatedBy && !inSandbox,
+    staleTime: 60_000,
+    refetchInterval: 30_000,
+  });
+  const rankingKeys = rankingsQuery.data ?? null;
 
   // A chime when your pick comes up, beeps at two minutes, an alarm on CLOCK.
   const { soundOn, setSoundOn } = useDraftSounds({
@@ -742,6 +759,7 @@ export default function DraftPage() {
                 </button>
               )}
               <ClockControls room={room} clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
+              <AutoButton room={room} owner={onClock.pick.currentOwner} autoOwners={boardState.draft.autoOwners ?? []} />
             </div>
             {skippedCells.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
@@ -769,6 +787,7 @@ export default function DraftPage() {
                 ))}
               </div>
             )}
+            <AutoChips room={room} autoOwners={boardState.draft.autoOwners ?? []} />
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>
@@ -830,6 +849,7 @@ export default function DraftPage() {
             projections={projections}
             gone={gone}
             queueKey={`fbb-live-queue-${identity.owner}-${inTestDraft ? 'test' : 'league'}`}
+            rankings={rankingKeys}
             onWriteIn={() => {
               setPickWriteIn(true);
               setPickTarget(onClock);
