@@ -5250,7 +5250,36 @@ html.theme-light {
 .draft-room-chip.is-me { border-color: var(--neon-teal); color: var(--neon-teal); }
 .live-room-writein { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--neon-teal); font-size: 0.74rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
 /* ─── Live draft: the room on a phone, the card, the queue, sound ─── */
-.live-phone-tabs { display: none; }
+/* The room's own bar: pinned to the bottom of the screen on a laptop too. */
+.live-phone-tabs {
+  position: sticky;
+  bottom: 8px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 16px;
+  overflow: hidden;
+  border: 2px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--nav-bg);
+  backdrop-filter: blur(8px);
+}
+.live-phone-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 0; background: transparent; color: var(--text-mid); cursor: pointer; }
+.live-phone-tabs button .hub-heading { font-size: 0.66rem; }
+.live-phone-tabs button.is-on { color: var(--neon-teal); background: rgba(0,255,204,0.08); }
+.live-phone-tabs button.is-exit { color: var(--text-dim); }
+html.in-live-room .live-tab:not(.is-shown) { display: none; }
+.live-room-writein { display: block; }
+.live-room-more { display: block; margin-top: 10px; min-height: 40px; padding: 0 14px; border: 1px solid var(--panel-border); border-radius: 8px; background: transparent; color: var(--text-soft); font-size: 0.72rem; font-weight: 800; }
+.live-room-side { display: none; }
+.live-room-side .hub-heading { margin-bottom: 8px; color: var(--text-mid); font-size: 0.62rem; }
+@media (min-width: 840px) {
+  /* Members have no stat columns, so their queue takes the right side. */
+  .live-room:not(.has-stats) .live-room-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 38%); gap: 14px; align-items: start; }
+  .live-room:not(.has-stats) .live-room-side { display: block; position: sticky; top: 12px; margin: 0; }
+  .live-room:not(.has-stats) .live-room-queue-btn,
+  .live-room:not(.has-stats) .live-room-queue-fold { display: none; }
+}
 .live-sound-btn {
   padding: 6px 10px;
   border: 2px solid var(--panel-border);
@@ -5277,9 +5306,11 @@ html.theme-light {
   html.in-live-room .bottom-nav,
   html.in-live-room .section-tabs { display: none; }
   html.in-live-room .app-shell-nav { padding-bottom: 68px; }
-  html.in-live-room .live-tab:not(.is-shown) { display: none; }
   .live-phone-tabs {
     position: fixed;
+    margin: 0;
+    border-width: 2px 0 0;
+    border-radius: 0;
     bottom: 0;
     left: 0;
     right: 0;
@@ -5294,6 +5325,7 @@ html.theme-light {
   .live-phone-tabs button {
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
     align-items: center;
     gap: 2px;
     min-height: 56px;

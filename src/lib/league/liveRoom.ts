@@ -31,7 +31,7 @@ export const MEMBER_ROOM_SORT: RoomSort = { key: 'name', dir: 1 };
 function textOf(player: DatasetPlayer, key: TextSortKey): string {
   if (key === 'team') return player.proTeam.toUpperCase();
   if (key === 'pos') return player.positions.join('/');
-  return (player.fullName ?? player.name).split(/\s+/).slice(-1)[0] ?? player.name;
+  return player.fullName ?? player.name;
 }
 
 /** Who already has a player, and with which pick. */

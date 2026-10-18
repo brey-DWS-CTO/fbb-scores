@@ -2,7 +2,7 @@ import type { DraftRoom } from '../../lib/league/testDraft.js';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { BoardCell, DatasetPlayer } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
-import { apiErrorMessage, submitDraftPick } from '../../lib/league/api.js';
+import { apiErrorMessage, saveDraftQueue, submitDraftPick } from '../../lib/league/api.js';
 import { moveQueued, shortName, toggleQueued } from '../../lib/league/draftRoom.js';
 import { POSITIONS } from '../../lib/league/draftValue.js';
 import {
@@ -100,6 +100,16 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [queue, setQueue] = useQueue(queueKey);
+  // The server keeps a copy: when a called clock runs out on your pick, it
+  // takes the top player still there, even with this phone asleep.
+  const queueText = JSON.stringify(queue);
+  useEffect(() => {
+    if (!identity) return;
+    const save = window.setTimeout(() => {
+      void saveDraftQueue(identity, room, JSON.parse(queueText) as string[]).catch(() => undefined);
+    }, 500);
+    return () => window.clearTimeout(save);
+  }, [identity, room, queueText]);
   const [showQueue, setShowQueue] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -174,6 +184,35 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
   const quickSorts = showStats ? [...STAT_QUICK_SORTS, ...(showGone ? [['gone', 'GONE'] as const] : [])] : MEMBER_QUICK_SORTS;
   const card = selected ? byKey.get(selected) ?? null : null;
 
+  // The queue: a fold on a phone, and for members on a wide screen the column
+  // the stats would have filled.
+  const queueContent = (
+    <>
+    {queued.length === 0 ? (
+      <div className="mock-note mock-note-dim">Tap ☆ beside a player, or QUEUE on his card. If a called clock runs out on your pick, you get the top one still there.</div>
+    ) : (
+      <ol className="room-queue-list">
+        {queued.map((key, index) => {
+          const player = byKey.get(key)!;
+          return (
+            <li key={key}>
+              <span className="room-upcoming-num">{index + 1}</span>
+              <button type="button" className="room-queue-name" onClick={() => look(key)}>{player.fullName ?? player.name}</button>
+              <small style={{ color: positionColor(player.positions), fontWeight: 800 }}>{player.positions.join('/')}</small>
+              {canDraft && (
+                <button type="button" className="tap-btn mock-mini-btn is-primary" disabled={busyKey !== null} onClick={() => draft(player)}>DRAFT</button>
+              )}
+              <button type="button" className="room-icon-btn" aria-label="Move up" disabled={index === 0} onClick={() => setQueue((current) => moveQueued(current, key, -1))}>↑</button>
+              <button type="button" className="room-icon-btn" aria-label="Move down" disabled={index === queued.length - 1} onClick={() => setQueue((current) => moveQueued(current, key, 1))}>↓</button>
+              <button type="button" className="room-icon-btn" aria-label="Take off my queue" onClick={() => setQueue((current) => toggleQueued(current, key))}>✕</button>
+            </li>
+          );
+        })}
+      </ol>
+    )}
+    </>
+  );
+
   return (
     <section className={`panel live-room${canDraft ? ' is-my-turn' : ''}${showStats ? ' has-stats' : ''}`} aria-label="Players">
       <div className="live-room-head">
@@ -219,32 +258,9 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
         <input className="hub-input room-search" type="search" placeholder="Search for a player" value={search} onChange={(event) => setSearch(event.target.value)} />
         <label className="proj-check"><input type="checkbox" checked={showDrafted} onChange={(event) => setShowDrafted(event.target.checked)} /> Show drafted</label>
       </div>
-      {showQueue && (
-        <div className="live-room-queue">
-          {queued.length === 0 ? (
-            <div className="mock-note mock-note-dim">Tap ☆ beside a player, or QUEUE on his card. Your queue stays on this phone.</div>
-          ) : (
-            <ol className="room-queue-list">
-              {queued.map((key, index) => {
-                const player = byKey.get(key)!;
-                return (
-                  <li key={key}>
-                    <span className="room-upcoming-num">{index + 1}</span>
-                    <button type="button" className="room-queue-name" onClick={() => look(key)}>{player.fullName ?? player.name}</button>
-                    <small style={{ color: positionColor(player.positions), fontWeight: 800 }}>{player.positions.join('/')}</small>
-                    {canDraft && (
-                      <button type="button" className="tap-btn mock-mini-btn is-primary" disabled={busyKey !== null} onClick={() => draft(player)}>DRAFT</button>
-                    )}
-                    <button type="button" className="room-icon-btn" aria-label="Move up" disabled={index === 0} onClick={() => setQueue((current) => moveQueued(current, key, -1))}>↑</button>
-                    <button type="button" className="room-icon-btn" aria-label="Move down" disabled={index === queued.length - 1} onClick={() => setQueue((current) => moveQueued(current, key, 1))}>↓</button>
-                    <button type="button" className="room-icon-btn" aria-label="Take off my queue" onClick={() => setQueue((current) => toggleQueued(current, key))}>✕</button>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </div>
-      )}
+      {showQueue && <div className="live-room-queue live-room-queue-fold">{queueContent}</div>}
+      <div className="live-room-body">
+      <div className="live-room-list">
       {error && <div className="live-room-error" role="alert">{error}</div>}
       <div className={`room-table-wrap${scrolled ? ' is-scrolled' : ''}`} onScroll={onListScroll}>
         <table className="room-table">
@@ -359,7 +375,7 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
         </table>
       </div>
       {rows.length > visibleCount && (
-        <button type="button" className="tap-btn" onClick={() => setVisibleCount((count) => count + 150)}>
+        <button type="button" className="tap-btn live-room-more" onClick={() => setVisibleCount((count) => count + 150)}>
           SHOW MORE PLAYERS ({visibleCount} OF {rows.length})
         </button>
       )}
@@ -369,6 +385,14 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
           Not in the list? Write him in
         </button>
       )}
+      </div>
+      {!showStats && (
+        <aside className="live-room-side live-room-queue" aria-label="My queue">
+          <div className="hub-heading">MY QUEUE{queued.length ? ` · ${queued.length}` : ''}</div>
+          {queueContent}
+        </aside>
+      )}
+      </div>
     </section>
   );
 }

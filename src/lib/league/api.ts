@@ -222,6 +222,11 @@ export async function endTestDraft(c: Credentials): Promise<void> {
 }
 
 /** Check in to the draft room and hear who else is there. A device in the test checks in to the test's room. */
+/** Save the signed-in owner's queue, so a clock that runs out takes the top player still there. */
+export async function saveDraftQueue(c: Credentials, room: DraftRoom, keys: readonly string[]): Promise<void> {
+  await axios.post('/api/league/draft/queue', { keys }, { headers: draftHeaders(c, room) });
+}
+
 export async function checkInDraftRoom(c: Credentials, room: DraftRoom): Promise<{ room: 'league' | 'test'; owners: string[] }> {
   const { data } = await axios.post('/api/league/draft-room', {}, { headers: draftHeaders(c, room) });
   return data;

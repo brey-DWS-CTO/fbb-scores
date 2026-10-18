@@ -51,9 +51,9 @@ function play(cue: DraftCue): void {
 }
 
 /**
- * Sounds for the person on the clock: a chime when their pick comes up, beeps
- * at two minutes, an alarm when someone calls CLOCK on them. Phones that can
- * also buzz. The person can turn it off; the choice stays on this phone.
+ * Draft sounds: a chime when your pick comes up and beeps at two minutes on
+ * it, and an alarm on every phone whenever anyone calls CLOCK. Phones that
+ * can also buzz. The person can turn it off; the choice stays on this phone.
  */
 export function useDraftSounds(input: {
   enabled: boolean;
