@@ -5449,6 +5449,23 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .my-list-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
 .my-list-upload span { color: var(--text-dim); font-size: 0.7rem; line-height: 1.4; }
 .my-list-upload-btn { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border-color: var(--neon-purple); color: var(--neon-purple); background: color-mix(in srgb, var(--neon-purple) 8%, transparent); }
+.my-list-form .rule-edit-label { position: relative; }
+.my-list-form.is-dragging { border-color: var(--neon-teal); box-shadow: 0 0 0 2px rgba(0,255,204,0.25); }
+.my-list-form.is-dragging .my-list-text { border-style: dashed; border-color: var(--neon-teal); }
+.my-list-drop {
+  position: absolute;
+  inset: 24px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0,255,204,0.08);
+  color: var(--neon-teal);
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+}
 .my-list-left { border-color: var(--neon-teal); color: var(--text-body); font-size: 0.82rem; font-weight: 700; }
 .my-list-left.is-out { border-color: var(--neon-yellow); color: var(--neon-yellow); }
 .auto-tag {

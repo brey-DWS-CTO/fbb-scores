@@ -26,6 +26,7 @@ export default function MyRankingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const load = useCallback(async () => {
     if (!identity) return;
@@ -159,12 +160,28 @@ export default function MyRankingsPage() {
       {error && <p className="rules-draft-error">{error}</p>}
       {!error && notice && <p className="rules-draft-note">{notice}</p>}
 
-      <section className="panel my-list-form">
+      <section
+        className={`panel my-list-form${dragging ? ' is-dragging' : ''}`}
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes('Files')) return;
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(event) => {
+          if (!event.dataTransfer.types.includes('Files')) return;
+          event.preventDefault();
+          setDragging(false);
+          void onFile(event.dataTransfer.files[0]);
+        }}
+      >
         <div className="my-list-upload">
           <button type="button" className="vote-btn my-list-upload-btn" disabled={busy || !loaded} onClick={() => fileInput.current?.click()}>
             UPLOAD A FILE
           </button>
-          <span>Excel, CSV or text. Names in any column; it fills the box below.</span>
+          <span>Excel, CSV or text, or drop the file on the box below. Names in any column.</span>
           <input ref={fileInput} type="file" accept={RANKINGS_FILE_ACCEPT} hidden onChange={(event) => void onFile(event.target.files?.[0])} />
         </div>
         <label className="rule-edit-label" htmlFor="my-list-text">
@@ -179,6 +196,7 @@ export default function MyRankingsPage() {
             onChange={(event) => setText(event.target.value)}
             disabled={!loaded && !error}
           />
+          {dragging && <div className="my-list-drop" aria-hidden="true">DROP IT HERE</div>}
         </label>
         <div className="my-list-count">
           {typed.length} name{typed.length === 1 ? '' : 's'} typed
