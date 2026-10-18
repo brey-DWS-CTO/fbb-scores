@@ -29,7 +29,9 @@ export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Pr
     queryKey: ['draft-auto', identity?.owner ?? 'anon', room.side],
     queryFn: () => fetchAutoStatus(identity!, room),
     enabled: identity !== null,
-    staleTime: 15_000,
+    staleTime: 10_000,
+    // A member may save rankings while this page is open; look again every few seconds.
+    refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
   if (!identity?.isCommissioner) return null;
@@ -58,6 +60,7 @@ export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Pr
           {room.side === 'test'
             ? 'Test draft: auto takes the best player left. Nobody’s rankings are used here.'
             : 'A team on auto picks from its own rankings, then the best player left. You never see them.'}
+          {' '}Tap a team to turn auto on or off.
         </span>
       </div>
       <div className="auto-panel-chips">
@@ -75,7 +78,7 @@ export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Pr
               title={on ? `Take ${owner} off auto` : `Put ${owner} on auto${hasList ? ' (has rankings)' : ' (no rankings: best available)'}`}
             >
               <span className="auto-chip-name">{owner}</span>
-              <span className="auto-chip-state">{busy === owner ? '…' : on ? 'AUTO' : 'OFF'}</span>
+              <span className="auto-chip-state">{busy === owner ? '…' : on ? 'AUTO ON · TAP TO STOP' : 'OFF · TAP FOR AUTO'}</span>
               {room.side === 'league' && (
                 <span className={`auto-chip-list${hasList ? ' has-list' : ''}`}>{hasList ? 'RANKINGS' : 'NO RANKINGS'}</span>
               )}

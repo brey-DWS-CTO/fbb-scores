@@ -5487,7 +5487,7 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .auto-panel-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
 .auto-panel-head .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
 .auto-panel-note { color: var(--text-dim); font-size: 0.7rem; line-height: 1.4; }
-.auto-panel-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; margin-top: 8px; }
+.auto-panel-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 8px; }
 .auto-chip {
   display: flex;
   flex-direction: column;
