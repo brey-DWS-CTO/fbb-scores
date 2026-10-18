@@ -44,18 +44,16 @@ function useAutoSwitch(room: DraftRoom) {
  * Turning it on makes that team's pick at once, from its own rankings and
  * then the best player left, and keeps picking for it until it is turned off.
  * The commish sees whether the team has rankings, never what is in them. In
- * the test draft every auto pick takes the board's order.
+ * the test draft it does the same, so a rehearsal shows what draft day will do.
  */
 export function AutoButton({ room, owner, autoOwners }: { room: DraftRoom; owner: string; autoOwners: readonly string[] }) {
   const { commish, busy, error, listOwners, flip } = useAutoSwitch(room);
   if (!commish) return null;
   const on = autoOwners.includes(owner);
-  const hasList = room.side === 'league' && listOwners.has(owner);
-  const title = room.side === 'test'
-    ? 'Test draft: auto takes the best player left. Nobody’s rankings are used here.'
-    : hasList
-      ? `${owner} has rankings. Auto picks from them, then the best player left. You never see them.`
-      : `${owner} has no rankings. Auto takes the best player left.`;
+  const hasList = listOwners.has(owner);
+  const title = hasList
+    ? `${owner} has rankings. Auto picks from them, then the best player left. You never see them.`
+    : `${owner} has no rankings. Auto takes the best player left.`;
   return (
     <>
       <button
