@@ -73,9 +73,9 @@ test('keepers count as taken', () => {
   assert.deepEqual(takenOnBoard(board).get('luka'), { label: '1.1', owner: 'Kyle', keeper: true });
 });
 
-test('members sort by last name, team or position, with no numbers', () => {
+test('members sort by first name, team or position, with no numbers', () => {
   const byName = roomRows({ ...base, sort: { key: 'name', dir: 1 }, available: [player('a', ['C'], 'den'), player('b', ['PG'], 'bos')].map((p, i) => ({ ...p, fullName: i ? 'Jaylen Brown' : 'Aaron Gordon' })), taken: new Map() });
-  assert.deepEqual(byName.map((row) => row.player.fullName), ['Jaylen Brown', 'Aaron Gordon']);
+  assert.deepEqual(byName.map((row) => row.player.fullName), ['Aaron Gordon', 'Jaylen Brown']);
   const byTeam = roomRows({ ...base, sort: nextRoomSort({ key: 'name', dir: 1 }, 'team'), available: [jokic, sga, luka], taken: new Map() });
   assert.deepEqual(byTeam.map((row) => row.player.proTeam), ['den', 'lal', 'okc']);
 });

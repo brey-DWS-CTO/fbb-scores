@@ -134,6 +134,8 @@ import {
   getTestDraft,
   listPresence,
   touchPresence,
+  getDraftQueues,
+  setDraftQueue,
   mutateTestDraft,
   setTestDraft,
   TestDraftMissingError,
@@ -150,6 +152,7 @@ import {
 } from '../lib/leagueStore.js';
 import { TEST_DRAFT_HEADER, TEST_DRAFT_SESSION_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
 import { inRoom, PRESENCE_WINDOW_MS } from '../../src/lib/league/presence.js';
+import { cleanQueue, firstQueued } from '../../src/lib/league/draftQueue.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
 import {
@@ -595,6 +598,7 @@ const TEST_DRAFT_ROUTES = [
   /^\/draft\/auto(\/[^/]+)?$/,
   /^\/test-draft\/(start|end)$/,
   /^\/draft-room$/,
+  /^\/draft\/queue$/,
 ];
 
 router.use((req, res, next) => {
@@ -1386,15 +1390,50 @@ router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, 
  * change and when a screen reports the countdown hit zero. Returns the
  * yielded pick, or null when nothing changed.
  */
-function settleClock(draft: LeagueDynamicState, dataset: LeagueDataset, now: string): number | null {
+function settleClock(
+  draft: LeagueDynamicState,
+  dataset: LeagueDataset,
+  now: string,
+  queues: Readonly<Record<string, string[]>>,
+): { overall: number; playerKey: string | null } | null {
   const clock = draft.draft.clock;
   if (!clock || draft.draft.startedAt === null || !clockExpired(clock, now)) return null;
   const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
   if (!onClock) return null;
+  // Time is up: the team takes the top player in its queue who is still there.
+  const owner = onClock.pick.currentOwner;
+  const available = availablePlayers(dataset, draft);
+  const key = firstQueued(queues[owner], new Set(available.map((player) => player.key)));
+  const player = key ? available.find((entry) => entry.key === key) ?? null : null;
+  if (player) {
+    draft.draft.picks[String(onClock.pick.overall)] = {
+      playerKey: player.key,
+      playerName: player.name,
+      proTeam: player.proTeam,
+      positions: player.positions,
+      isKeeper: false,
+      enteredBy: `${owner} (queue)`,
+      timestamp: now,
+      ...pickTiming(clock, now),
+    };
+    draft.draft.clock = startPickClock(now);
+    return { overall: onClock.pick.overall, playerKey: player.key };
+  }
+  // An empty queue yields the pick, rule 2.3.2.1.
   const next = yieldPick({ clock, skipped: draft.draft.skipped }, onClock.pick.overall, now);
   draft.draft.clock = next.clock;
   draft.draft.skipped = next.skipped;
-  return onClock.pick.overall;
+  return { overall: onClock.pick.overall, playerKey: null };
+}
+
+/** Every queue in the room this request is for. */
+const queuesFor = (res: Response) => getDraftQueues(inTestDraft(res) ? 'test' : 'league');
+
+/** Audit what a clock running out did. */
+async function auditSettled(res: Response, settled: { overall: number; playerKey: string | null } | null, at: string): Promise<void> {
+  if (!settled) return;
+  if (settled.playerKey) await auditDraft(res, 'draft.pick_from_queue', { overallPick: settled.overall, playerKey: settled.playerKey, at });
+  else await auditDraft(res, 'draft.pick_yielded', { overallPick: settled.overall, at });
 }
 
 // ─── Auto picks from private lists ───────────────────────────────────────────
@@ -1553,8 +1592,8 @@ router.post('/draft/auto/:owner', requireAuth, requireCommissioner, async (req, 
     draft.draft.autoOwners = withAuto(draft.draft.autoOwners, owner, on);
   });
   await auditDraft(res, on ? 'draft.auto_on' : 'draft.auto_off', { owner });
-  const settled = on ? await runAutoPicks(res, draftPoolDataset) : null;
-  res.json(draftReply(res, settled ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
+  const auto = on ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1566,13 +1605,15 @@ router.post('/draft/clock/expire', requireAuth, async (_req, res) => {
   const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
-  let yielded: number | null = null;
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
   const result = await mutateDraft(res, (draft) => {
-    yielded = settleClock(draft, currentDataset(draft, draftPoolDataset), now);
+    settled = settleClock(draft, currentDataset(draft, draftPoolDataset), now, queues);
   });
-  if (yielded !== null) await auditDraft(res, 'draft.pick_yielded', { overallPick: yielded, at: now });
-  const settled = yielded !== null ? await runAutoPicks(res, draftPoolDataset) : null;
-  res.json(draftReply(res, settled ?? result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
+  await auditSettled(res, settled, now);
+  // The clock moved on; the team now up may be on auto.
+  const auto = settled !== null ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
 });
 
 /**
@@ -1618,12 +1659,14 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     player = found;
   }
   const timestamp = new Date().toISOString();
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
   const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
     const dataset = currentDataset(draft, draftPoolDataset);
-    settleClock(draft, dataset, timestamp);
+    settled = settleClock(draft, dataset, timestamp, queues);
     const board = buildDraftBoard(dataset, draft);
     const onClock = board.find((cell) => cell.onClock);
     // A yielded pick is its owner's to fill any time, rule 2.3.2.2.
@@ -1667,6 +1710,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       draft.draft.clock = startPickClock(timestamp, isPaused(draft.draft.clock));
     }
   });
+  await auditSettled(res, settled, timestamp);
   await auditDraft(res, 'draft.pick', {
     overallPick,
     playerKey: player.key,
@@ -1677,8 +1721,8 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     writeIn,
   });
   // The next team may be on auto; its pick lands before this reply goes out.
-  const settled = await runAutoPicks(res, draftPoolDataset);
-  res.json(draftReply(res, settled ?? result, { owner: authedOwner, isCommissioner }));
+  const auto = await runAutoPicks(res, draftPoolDataset);
+  res.json(draftReply(res, auto ?? result, { owner: authedOwner, isCommissioner }));
 });
 
 /**
@@ -1731,8 +1775,8 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
   // The real draft closes any test draft, so no phone keeps picking in it.
   await setTestDraft(null);
   await appendAudit(actor(res), 'draft.started', null);
-  const settled = await runAutoPicks(res, await resolveDraftDataset(result.state));
-  res.json(redactState(settled ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
+  const auto = await runAutoPicks(res, await resolveDraftDataset(result.state));
+  res.json(redactState(auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1748,10 +1792,12 @@ router.post('/draft/clock/call', requireAuth, async (_req, res) => {
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
   let calledOn = '';
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
   const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) throw new HttpError(409, 'The draft has not started');
     const dataset = currentDataset(draft, draftPoolDataset);
-    settleClock(draft, dataset, now);
+    settled = settleClock(draft, dataset, now, queues);
     const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock) ?? null;
     const check = canCallClock({ clock: draft.draft.clock, picks: draft.draft.picks, onClock, caller, isCommissioner, now });
     if (!check.ok) {
@@ -1769,8 +1815,10 @@ router.post('/draft/clock/call', requireAuth, async (_req, res) => {
     calledOn = onClock!.pick.currentOwner;
     draft.draft.clock = callClock(draft.draft.clock!, caller, now);
   });
+  await auditSettled(res, settled, now);
   await auditDraft(res, 'draft.clock_called', { on: calledOn, at: now });
-  res.json(draftReply(res, result, { owner: caller, isCommissioner }));
+  const auto = settled !== null ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: caller, isCommissioner }));
 });
 
 /** POST /api/league/draft/clock/pause — freeze the pick timer and any CLOCK (commissioner only). */
@@ -1792,8 +1840,8 @@ router.post('/draft/clock/resume', requireAuth, requireCommissioner, async (_req
     draft.draft.clock = resumeClock(draft.draft.clock, now);
   });
   await auditDraft(res, 'draft.clock_resumed', { at: now });
-  const settled = await runAutoPicks(res, await resolveDraftDataset(result.state));
-  res.json(draftReply(res, settled ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
+  const auto = await runAutoPicks(res, await resolveDraftDataset(result.state));
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1839,6 +1887,21 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
   });
   await appendAudit(actor(res), 'draft.reset', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/draft/queue — save the signed-in owner's queue. When a
+ * called CLOCK runs out on their pick, they take the top player still there.
+ * The test draft keeps its own queues.
+ */
+router.post('/draft/queue', requireAuth, async (req, res) => {
+  const keys = cleanQueue((req.body as { keys?: unknown } | undefined)?.keys);
+  if (!keys) {
+    res.status(400).json({ error: 'keys must be a list of player keys' });
+    return;
+  }
+  await setDraftQueue(inTestDraft(res) ? 'test' : 'league', res.locals.owner as string, keys);
+  res.json({ ok: true, keys });
 });
 
 /**

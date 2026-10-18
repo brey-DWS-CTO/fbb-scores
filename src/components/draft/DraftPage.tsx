@@ -465,7 +465,7 @@ export default function DraftPage() {
             type="button"
             aria-pressed={soundOn}
             onClick={() => setSoundOn(!soundOn)}
-            title="Sound when you are up, at two minutes, and when CLOCK is called on you"
+            title="Sound when you are up, at two minutes on your pick, and whenever CLOCK is called"
           >
             {soundOn ? 'SOUND ON' : 'SOUND OFF'}
           </button>

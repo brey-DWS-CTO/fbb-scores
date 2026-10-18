@@ -1433,3 +1433,33 @@ test('in the test draft an auto pick takes the board order and never a member\'s
   assert.equal(league.state.draft.autoOwners, undefined);
   await request('/api/league/test-draft/end', { method: 'POST', headers: auth(commissioner) });
 });
+
+test('a called clock that runs out takes the top queued player still there', async () => {
+  const next = cleanState();
+  next.keepersRevealed = true;
+  await replaceState(next);
+  assert.equal((await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+  const [first, second] = [dataset.players[0]!, dataset.players[1]!];
+  const saved = await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [first.key, second.key] }) });
+  assert.equal(saved.status, 200);
+  assert.equal((await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: 'nope' }) })).status, 400);
+
+  await store.mutateState((draft) => {
+    if (draft.draft.clock) draft.draft.clock = { ...draft.draft.clock, pickStartedAt: new Date(Date.now() - 125_000).toISOString() };
+  });
+  assert.equal((await request('/api/league/draft/clock/call', { method: 'POST', headers: auth('Ryan') })).status, 200);
+  await store.mutateState((draft) => {
+    const clock = draft.draft.clock!;
+    draft.draft.clock = { ...clock, call: { ...clock.call!, atElapsedMs: clock.call!.atElapsedMs - 31_000 } };
+  });
+  const expired = await request('/api/league/draft/clock/expire', { method: 'POST', headers: auth('Ryan') });
+  assert.equal(expired.status, 200);
+  const after = (expired.body.state as LeagueDynamicState).draft;
+  assert.equal(after.picks['1']?.playerKey, first.key);
+  assert.equal(after.picks['1']?.enteredBy, 'Joel (queue)');
+  assert.equal(after.picks['1']?.clockCalledBy, 'Ryan');
+  assert.equal(after.skipped?.['1'], undefined, 'a queued pick is not a skipped one');
+  assert.equal(after.clock?.call, null);
+
+  await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [] }) });
+});

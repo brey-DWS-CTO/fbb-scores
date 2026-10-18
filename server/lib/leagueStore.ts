@@ -496,6 +496,8 @@ interface StoreBackend {
   setDraftList(season: number, owner: string, list: DraftList | null): Promise<void>;
   /** Who has a list saved. Names only, never the lists. */
   draftListOwners(season: number): Promise<string[]>;
+  setDraftQueue(room: string, owner: string, keys: string[]): Promise<void>;
+  getDraftQueues(room: string): Promise<Record<string, string[]>>;
   getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario>;
   setKeeperScenarioTarget(
     season: number,
@@ -921,6 +923,13 @@ class NeonBackend implements StoreBackend {
       updated_by text not null,
       primary key (season, owner, espn_id)
     )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_queues (
+      room text not null,
+      owner text not null,
+      keys jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (room, owner)
+    )`;
     await this.sql`CREATE TABLE IF NOT EXISTS draft_presence (
       room text not null,
       owner text not null,
@@ -1091,6 +1100,19 @@ class NeonBackend implements StoreBackend {
     await this.ensureInit();
     const rows = (await this.sql`SELECT owner FROM draft_lists WHERE season = ${season} ORDER BY owner`) as Array<{ owner: string }>;
     return rows.map((row) => row.owner);
+  }
+
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO draft_queues (room, owner, keys, updated_at)
+      VALUES (${room}, ${owner}, ${JSON.stringify(keys)}::jsonb, now())
+      ON CONFLICT (room, owner) DO UPDATE SET keys = EXCLUDED.keys, updated_at = now()`;
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, keys FROM draft_queues WHERE room = ${room}`) as Array<{ owner: string; keys: string[] }>;
+    return Object.fromEntries(rows.map((row) => [row.owner, Array.isArray(row.keys) ? row.keys : []]));
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -2154,6 +2176,8 @@ interface FileDoc {
   draftPresence?: Array<PresenceRow & { room: string }>;
   /** Each member's private auto-pick list. */
   draftLists?: Array<{ season: number; owner: string; list: DraftList }>;
+  /** Each owner's draft queue, by room. */
+  draftQueues?: Array<{ room: string; owner: string; keys: string[] }>;
 }
 
 /** Every list a fresh document starts with. */
@@ -2253,6 +2277,7 @@ class FileBackend implements StoreBackend {
         testDraft: doc.testDraft ?? null,
         draftPresence: Array.isArray(doc.draftPresence) ? doc.draftPresence : [],
         draftLists: Array.isArray(doc.draftLists) ? doc.draftLists : [],
+        draftQueues: Array.isArray(doc.draftQueues) ? doc.draftQueues : [],
       };
     } catch {
       // A missing or unreadable file starts empty. Every list must be present,
@@ -2357,12 +2382,26 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.draftQueues = [...(doc.draftQueues ?? []).filter((row) => !(row.room === room && row.owner === owner)), { room, owner, keys }];
+      this.writeDoc(doc);
+    });
+  }
+
   async draftListOwners(season: number): Promise<string[]> {
     await this.ensureInit();
     return (this.readDoc().draftLists ?? [])
       .filter((entry) => entry.season === season)
       .map((entry) => entry.owner)
       .sort();
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    return Object.fromEntries((this.readDoc().draftQueues ?? []).filter((row) => row.room === room).map((row) => [row.owner, row.keys]));
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -3215,6 +3254,16 @@ export async function setDraftList(season: number, owner: string, list: DraftLis
 /** Who has a list saved this season. Names only. */
 export async function draftListOwners(season: number): Promise<string[]> {
   return getBackend().draftListOwners(season);
+}
+
+/** Save an owner's draft queue for this room. */
+export async function setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+  return getBackend().setDraftQueue(room, owner, keys);
+}
+
+/** Every owner's draft queue in this room. */
+export async function getDraftQueues(room: string): Promise<Record<string, string[]>> {
+  return getBackend().getDraftQueues(room);
 }
 
 /** Owners who checked in to this room since `since`. */
