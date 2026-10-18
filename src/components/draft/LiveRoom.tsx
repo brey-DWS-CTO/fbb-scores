@@ -204,9 +204,9 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
         type="button"
         className="tap-btn mock-mini-btn live-room-load-rankings"
         onClick={() => setQueue(() => [...rankings])}
-        title="Replace the queue with your saved rankings"
+        title="Put the queue back to your saved rankings"
       >
-        LOAD MY RANKINGS
+        RESET TO RANKINGS
       </button>
     )}
     {queued.length === 0 ? (
