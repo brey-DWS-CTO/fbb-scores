@@ -1419,7 +1419,7 @@ test('auto waits while the clock is paused, and picks when it resumes', async ()
   assert.equal((resumed.body.state as LeagueDynamicState).draft.picks['1']?.auto, true);
 });
 
-test('in the test draft an auto pick takes the board order and never a member\'s list', async () => {
+test('in the test draft an auto pick reads the member\'s rankings, and the league stays untouched', async () => {
   const weak = leastWanted();
   await request('/api/league/draft-list', { method: 'PUT', headers: auth('Joel'), body: JSON.stringify({ text: weak.fullName ?? weak.name }) });
   const live = cleanState();
@@ -1431,12 +1431,12 @@ test('in the test draft an auto pick takes the board order and never a member\'s
   const inTest = { ...auth(commissioner), 'x-test-draft': '1', 'x-test-draft-started-at': startedAt };
 
   const status = await request('/api/league/draft/auto', { headers: inTest });
-  assert.deepEqual(status.body, { autoOwners: [], listOwners: [] });
+  assert.deepEqual(status.body, { autoOwners: [], listOwners: ['Joel'] });
   const on = await request('/api/league/draft/auto/Joel', { method: 'POST', headers: inTest, body: JSON.stringify({ on: true }) });
   assert.equal(on.status, 200, JSON.stringify(on.body));
   const pick = (on.body.state as LeagueDynamicState).draft.picks['1'];
   assert.equal(pick?.auto, true);
-  assert.notEqual(pick?.playerKey, weak.key, 'the list stays private even from the test board');
+  assert.equal(pick?.playerKey, weak.key, 'the rehearsal takes the same player draft day would');
 
   // The league itself is untouched.
   const league = await store.getState();

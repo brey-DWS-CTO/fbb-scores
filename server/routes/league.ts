@@ -1428,14 +1428,13 @@ function settleClock(
 
 /** Every queue in the room this request is for. */
 /**
- * Every queue in the room this request is for. In the league an owner who
- * never touched their queue is read from their saved rankings instead, so a
- * clock that runs out takes their top ranked player still there. The test
- * draft keeps rankings out, as the auto picks do.
+ * Every queue in the room this request is for. An owner with nothing queued
+ * is read from their saved rankings instead, so a clock that runs out, or
+ * auto, takes their top ranked player still there. The test draft reads the
+ * same rankings: a rehearsal that ignored them would prove nothing.
  */
 async function queuesFor(res: Response): Promise<Record<string, string[]>> {
-  if (inTestDraft(res)) return getDraftQueues('test');
-  const queues = await getDraftQueues('league');
+  const queues = await getDraftQueues(inTestDraft(res) ? 'test' : 'league');
   // No queue, or an empty one: either way there is nothing queued.
   const missing = OWNERS.filter((owner) => !queues[owner]?.length);
   const lists = await Promise.all(missing.map((owner) => getDraftList(leagueDataset.season, owner)));
@@ -1459,8 +1458,7 @@ async function auditSettled(res: Response, settled: { overall: number; playerKey
 // member, not the commissioner, not the commissioner acting as that member.
 // When the commissioner puts a team on auto, the server makes its picks from
 // that list, and from the board's own order once the list runs dry. The test
-// draft is a copy everybody watches, so lists stay out of it: an auto pick
-// there takes the board's order only.
+// draft reads the same lists, so a rehearsal shows what draft day will do.
 
 /** The signed-in member, and never the commissioner wearing their seat. */
 function listOwner(res: Response): string {
@@ -1581,7 +1579,7 @@ router.get('/draft/auto', requireAuth, requireCommissioner, async (_req, res) =>
   const { state } = await draftState(res);
   res.json({
     autoOwners: state.draft.autoOwners ?? [],
-    listOwners: inTestDraft(res) ? [] : await draftListOwners(state.season),
+    listOwners: await draftListOwners(state.season),
   });
 });
 
