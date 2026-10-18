@@ -61,6 +61,31 @@ export default function MyRankingsPage() {
     );
   }
 
+  // The commissioner in a member's seat. Their rankings stay closed to him,
+  // so the page says why instead of showing a form that cannot save.
+  if (identity.impersonatedBy) {
+    return (
+      <main className="rules-page my-list-page">
+        <header className="rules-page-header">
+          <div>
+            <h1 className="hub-heading glow-teal">
+              <NavIcon name="ballot" size={18} className="icon-in-heading" />
+              MY RANKINGS
+            </h1>
+          </div>
+          <IdentityChip />
+        </header>
+        <section className="panel my-list-closed">
+          <div className="hub-heading">CLOSED WHILE ACTING AS {identity.owner.toUpperCase()}</div>
+          <p>
+            {identity.owner}'s rankings are theirs alone. Nobody else sees them, the commish included, not even from their seat.
+            To test this page as a member, sign out and sign in as them with their PIN.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   const dirty = loaded && text.trim() !== listToText(saved).trim();
   const unmatched = saved?.entries.filter((entry) => !entry.playerKey) ?? [];
   const matched = (saved?.entries.length ?? 0) - unmatched.length;

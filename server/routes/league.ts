@@ -1448,7 +1448,7 @@ async function auditSettled(res: Response, settled: { overall: number; playerKey
 /** The signed-in member, and never the commissioner wearing their seat. */
 function listOwner(res: Response): string {
   if (res.locals.actingBy) {
-    throw new HttpError(403, "A member's list is theirs alone. It stays closed while you act as them.");
+    throw new HttpError(403, "A member's rankings are theirs alone. They stay closed while you act as them.");
   }
   return res.locals.owner as string;
 }
