@@ -33,13 +33,38 @@ export interface DraftList {
   updatedAt: string;
 }
 
+/** One cell, less its rank or bullet: `12. Nikola Jokic` reads Nikola Jokic. */
+function cleanCell(cell: string): string {
+  return cell
+    .replace(/^\s*[#([]?\s*\d+\s*[.):\]\-–]*\s*/, '')
+    .replace(/^\s*[-–•*]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * The name in a row of cells: the first cell that holds words. A rank, a
+ * number or a blank cell is passed over, so a spreadsheet with the rank in
+ * column A and the name in column B reads the name.
+ */
+export function nameFromCells(cells: readonly unknown[]): string {
+  for (const cell of cells) {
+    if (cell === null || cell === undefined) continue;
+    const text = cleanCell(String(cell instanceof Date ? '' : cell));
+    if (!text || /^[\d.\s%$-]+$/.test(text)) continue;
+    return text;
+  }
+  return '';
+}
+
 /** A line, less its rank, tabs and trailing cells: `12. Nikola Jokic, DEN` reads Nikola Jokic. */
 export function cleanListLine(line: string): string {
-  const unranked = line
-    .replace(/^\s*[#([]?\s*\d+\s*[.):\]\-–]*\s*/, '')
-    .replace(/^\s*[-–•*]\s*/, '');
-  const firstCell = unranked.split(/\t|,|;|\|/)[0] ?? '';
-  return firstCell.replace(/\s+/g, ' ').trim();
+  return nameFromCells(line.split(/\t|,|;|\|/));
+}
+
+/** Spreadsheet rows as list text, one name a line. */
+export function rowsToText(rows: readonly (readonly unknown[])[]): string {
+  return rows.map(nameFromCells).filter(Boolean).join('\n');
 }
 
 /** Lower case, no accents, no punctuation, no suffix: `Jaren Jackson Jr.` reads `jaren jackson`. */
@@ -54,6 +79,9 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+/** A spreadsheet's column heading, which is not a player. */
+const HEADER_WORDS = /^(rank|ranking|rankings|player|players|name|names|player name|overall|pos|position|team|adp)$/i;
+
 /**
  * The names on a pasted list, in order, one per line. Blank lines go; a name
  * typed twice counts once, where it first appears.
@@ -63,7 +91,7 @@ export function parseListText(text: string): string[] {
   const names: string[] = [];
   for (const raw of text.slice(0, DRAFT_LIST_MAX_CHARS).split(/\r?\n/)) {
     const name = cleanListLine(raw);
-    if (!name) continue;
+    if (!name || HEADER_WORDS.test(name)) continue;
     const key = normalizeName(name);
     if (!key || seen.has(key)) continue;
     seen.add(key);

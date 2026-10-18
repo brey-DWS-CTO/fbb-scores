@@ -5426,6 +5426,11 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .my-list-saved li.is-missing .my-list-name { color: var(--text-dim); text-decoration: line-through; }
 .my-list-rank { min-width: 2em; color: var(--text-mid); font-weight: 800; font-size: 0.74rem; text-align: right; }
 .my-list-name { font-weight: 700; }
+.my-list-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.my-list-upload span { color: var(--text-dim); font-size: 0.7rem; line-height: 1.4; }
+.my-list-upload-btn { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border-color: var(--neon-purple); color: var(--neon-purple); background: color-mix(in srgb, var(--neon-purple) 8%, transparent); }
+.my-list-left { border-color: var(--neon-teal); color: var(--text-body); font-size: 0.82rem; font-weight: 700; }
+.my-list-left.is-out { border-color: var(--neon-yellow); color: var(--neon-yellow); }
 .auto-tag {
   display: inline-block;
   padding: 1px 6px;

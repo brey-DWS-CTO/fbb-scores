@@ -6,9 +6,11 @@ import {
   cleanListLine,
   isOnAuto,
   listToText,
+  nameFromCells,
   nextAutoPick,
   normalizeName,
   parseListText,
+  rowsToText,
   withAuto,
 } from '../src/lib/league/autoDraft.ts';
 
@@ -42,6 +44,16 @@ test('a pasted line loses its number, bullet and trailing cells', () => {
   assert.equal(cleanListLine('4\tReggie Jackson\tLAC\tPG'), 'Reggie Jackson');
   assert.equal(cleanListLine('Nikola Jokic, DEN, C'), 'Nikola Jokic');
   assert.equal(cleanListLine('   '), '');
+  // A rank column before the name, a team code after: the name wins.
+  assert.equal(cleanListLine('7	Luka Doncic	LAL'), 'Luka Doncic');
+});
+
+test('spreadsheet rows read the first cell with words in it', () => {
+  assert.equal(nameFromCells([1, 'Nikola Jokic', 'DEN']), 'Nikola Jokic');
+  assert.equal(nameFromCells([null, '', 2.5, '3. Luka Doncic']), 'Luka Doncic');
+  assert.equal(nameFromCells(['Rank', 'Player']), 'Rank', 'a header row still comes through; the pool match flags it');
+  assert.equal(nameFromCells([12, 97.5, null]), '');
+  assert.equal(rowsToText([[1, 'Nikola Jokic'], [2, null], [3, 'Luka Doncic']]), 'Nikola Jokic\nLuka Doncic');
 });
 
 test('names compare without accents, punctuation or suffixes', () => {
@@ -51,7 +63,7 @@ test('names compare without accents, punctuation or suffixes', () => {
 });
 
 test('the text becomes names in order, blanks and repeats dropped', () => {
-  assert.deepEqual(parseListText('1. Jokic\n\n2. Doncic\r\n3. jokic\n4. Wemby'), ['Jokic', 'Doncic', 'Wemby']);
+  assert.deepEqual(parseListText('Player\n1. Jokic\n\n2. Doncic\r\n3. jokic\n4. Wemby'), ['Jokic', 'Doncic', 'Wemby'], 'a column heading is not a player');
 });
 
 test('a list matches full names, short names, unique last names and initials', () => {

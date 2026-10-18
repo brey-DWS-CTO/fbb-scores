@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import IdentityChip from '../league/IdentityChip.js';
 import NavIcon from '../league/NavIcon.js';
 import SignInPanel from '../league/SignInPanel.js';
-import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import { useDraftData, useIdentity } from '../../hooks/useLeague.js';
+import { availablePlayers } from '../../lib/keeper/engine.js';
+import { RANKINGS_FILE_ACCEPT, readRankingsFile } from '../../lib/league/rankingsFile.js';
 import { apiErrorMessage, clearDraftList, fetchDraftList, saveDraftList } from '../../lib/league/api.js';
 import { DRAFT_LIST_MAX, listToText, parseListText, type DraftList } from '../../lib/league/autoDraft.js';
 
@@ -15,7 +17,8 @@ import { DRAFT_LIST_MAX, listToText, parseListText, type DraftList } from '../..
  */
 export default function MyRankingsPage() {
   const { identity } = useIdentity();
-  const { state } = useLeagueData();
+  const { state, dataset } = useDraftData();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState<DraftList | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState('');
@@ -41,6 +44,13 @@ export default function MyRankingsPage() {
   }, [load]);
 
   const typed = useMemo(() => parseListText(text), [text]);
+  const draftOn = state.draft.startedAt !== null && !state.draft.closedAt;
+  // How many of their names are still on the board. Theirs to see, nobody else's.
+  const stillThere = useMemo(() => {
+    if (!draftOn || !saved) return null;
+    const open = new Set(availablePlayers(dataset, state).map((player) => player.key));
+    return saved.entries.filter((entry) => entry.playerKey && open.has(entry.playerKey)).length;
+  }, [draftOn, saved, dataset, state]);
 
   if (!identity) {
     return (
@@ -53,7 +63,26 @@ export default function MyRankingsPage() {
   const dirty = loaded && text.trim() !== listToText(saved).trim();
   const unmatched = saved?.entries.filter((entry) => !entry.playerKey) ?? [];
   const matched = (saved?.entries.length ?? 0) - unmatched.length;
-  const draftOn = state.draft.startedAt !== null && !state.draft.closedAt;
+
+  const onFile = async (file: File | undefined) => {
+    if (!file || busy) return;
+    setError(null);
+    setNotice(null);
+    try {
+      const loaded = await readRankingsFile(file);
+      const names = parseListText(loaded);
+      if (names.length === 0) {
+        setError(`No names found in ${file.name}. Put one name a line, or in one column.`);
+        return;
+      }
+      setText(names.map((name, index) => `${index + 1}. ${name}`).join('\n'));
+      setNotice(`Loaded ${names.length} name${names.length === 1 ? '' : 's'} from ${file.name}. Tap SAVE RANKINGS to keep them.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Could not read ${file.name}`);
+    } finally {
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  };
 
   const save = async () => {
     if (busy) return;
@@ -119,10 +148,25 @@ export default function MyRankingsPage() {
         </p>
       </section>
 
+      {draftOn && saved && stillThere !== null && (
+        <section className={`panel my-list-left${stillThere === 0 ? ' is-out' : ''}`}>
+          {stillThere === 0
+            ? 'Your rankings have run out. If you are on auto, each pick now takes the best player left on the board.'
+            : `${stillThere} of your ${saved.entries.length} names ${stillThere === 1 ? 'is' : 'are'} still on the board.`}
+        </section>
+      )}
+
       {error && <p className="rules-draft-error">{error}</p>}
       {!error && notice && <p className="rules-draft-note">{notice}</p>}
 
       <section className="panel my-list-form">
+        <div className="my-list-upload">
+          <button type="button" className="vote-btn my-list-upload-btn" disabled={busy || !loaded} onClick={() => fileInput.current?.click()}>
+            UPLOAD A FILE
+          </button>
+          <span>Excel, CSV or text. Names in any column; it fills the box below.</span>
+          <input ref={fileInput} type="file" accept={RANKINGS_FILE_ACCEPT} hidden onChange={(event) => void onFile(event.target.files?.[0])} />
+        </div>
         <label className="rule-edit-label" htmlFor="my-list-text">
           Names, best first
           <textarea
