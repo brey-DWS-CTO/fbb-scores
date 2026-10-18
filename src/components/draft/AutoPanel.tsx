@@ -3,23 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DraftRoom } from '../../lib/league/testDraft.js';
 import { apiErrorMessage, fetchAutoStatus, setAutoDraft } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity } from '../../hooks/useLeague.js';
+import { ACTION_BUTTON } from './boardUtils.js';
 
-interface Props {
-  room: DraftRoom;
-  owners: readonly string[];
-  autoOwners: readonly string[];
-  /** The team on the clock, so its chip can say so. */
-  onClockOwner: string | null;
-}
-
-/**
- * The commissioner's auto switches, one per team. A team on auto has its
- * picks made by the server: from its own private rankings, or the board's
- * order once they run out. The commish sees who has rankings, never what is
- * in them. In the test draft every auto pick takes the board's order, so
- * nobody's real rankings show on a practice board.
- */
-export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Props) {
+/** The commissioner's auto switch and status. Only he can flip it. */
+function useAutoSwitch(room: DraftRoom) {
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
   const queryClient = useQueryClient();
@@ -28,18 +15,16 @@ export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Pr
   const status = useQuery({
     queryKey: ['draft-auto', identity?.owner ?? 'anon', room.side],
     queryFn: () => fetchAutoStatus(identity!, room),
-    enabled: identity !== null,
+    enabled: identity?.isCommissioner === true,
     staleTime: 10_000,
     // A member may save rankings while this page is open; look again every few seconds.
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
-  if (!identity?.isCommissioner) return null;
   const listOwners = new Set(status.data?.listOwners ?? []);
 
-  const toggle = async (owner: string) => {
-    if (busy) return;
-    const on = !autoOwners.includes(owner);
+  const flip = async (owner: string, on: boolean) => {
+    if (!identity || busy) return;
     setBusy(owner);
     setError(null);
     try {
@@ -51,42 +36,69 @@ export default function AutoPanel({ room, owners, autoOwners, onClockOwner }: Pr
       setBusy(null);
     }
   };
+  return { commish: identity?.isCommissioner === true, busy, error, listOwners, flip };
+}
 
+/**
+ * One button in the clock panel: auto on or off for the team on the clock.
+ * Turning it on makes that team's pick at once, from its own rankings and
+ * then the best player left, and keeps picking for it until it is turned off.
+ * The commish sees whether the team has rankings, never what is in them. In
+ * the test draft every auto pick takes the board's order.
+ */
+export function AutoButton({ room, owner, autoOwners }: { room: DraftRoom; owner: string; autoOwners: readonly string[] }) {
+  const { commish, busy, error, listOwners, flip } = useAutoSwitch(room);
+  if (!commish) return null;
+  const on = autoOwners.includes(owner);
+  const hasList = room.side === 'league' && listOwners.has(owner);
+  const title = room.side === 'test'
+    ? 'Test draft: auto takes the best player left. Nobody’s rankings are used here.'
+    : hasList
+      ? `${owner} has rankings. Auto picks from them, then the best player left. You never see them.`
+      : `${owner} has no rankings. Auto takes the best player left.`;
   return (
-    <section className="panel auto-panel" aria-label="Auto pick">
-      <div className="auto-panel-head">
-        <span className="hub-heading">AUTO PICK</span>
-        <span className="auto-panel-note">
-          {room.side === 'test'
-            ? 'Test draft: auto takes the best player left. Nobody’s rankings are used here.'
-            : 'A team on auto picks from its own rankings, then the best player left. You never see them.'}
-          {' '}Tap a team to turn auto on or off.
-        </span>
-      </div>
-      <div className="auto-panel-chips">
-        {owners.map((owner) => {
-          const on = autoOwners.includes(owner);
-          const hasList = room.side === 'league' && listOwners.has(owner);
-          return (
-            <button
-              key={owner}
-              type="button"
-              className={`tap-btn auto-chip${on ? ' is-on' : ''}${owner === onClockOwner ? ' is-clock' : ''}`}
-              aria-pressed={on}
-              disabled={busy !== null}
-              onClick={() => toggle(owner)}
-              title={on ? `Take ${owner} off auto` : `Put ${owner} on auto${hasList ? ' (has rankings)' : ' (no rankings: best available)'}`}
-            >
-              <span className="auto-chip-name">{owner}</span>
-              <span className="auto-chip-state">{busy === owner ? '…' : on ? 'AUTO ON · TAP TO STOP' : 'OFF · TAP FOR AUTO'}</span>
-              {room.side === 'league' && (
-                <span className={`auto-chip-list${hasList ? ' has-list' : ''}`}>{hasList ? 'RANKINGS' : 'NO RANKINGS'}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      {error && <div className="live-room-error" role="alert">{error}</div>}
-    </section>
+    <>
+      <button
+        className="tap-btn"
+        type="button"
+        disabled={busy !== null}
+        onClick={() => flip(owner, !on)}
+        aria-pressed={on}
+        title={title}
+        style={{
+          ...ACTION_BUTTON,
+          border: `2px solid ${on ? 'var(--neon-yellow)' : 'var(--panel-border)'}`,
+          background: on ? 'rgba(255,230,0,0.12)' : 'transparent',
+          color: on ? 'var(--neon-yellow)' : 'var(--text-soft)',
+        }}
+      >
+        {busy === owner ? '…' : on ? `⚡ AUTO ON · ${owner.toUpperCase()}` : `⚡ AUTO OFF · ${owner.toUpperCase()}`}
+      </button>
+      {error && <div className="live-room-error" role="alert" style={{ gridColumn: '1 / -1' }}>{error}</div>}
+    </>
+  );
+}
+
+/** Every team on auto, each a chip the commish taps to turn off, under NEXT. */
+export function AutoChips({ room, autoOwners }: { room: DraftRoom; autoOwners: readonly string[] }) {
+  const { commish, busy, flip } = useAutoSwitch(room);
+  if (autoOwners.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '0.65rem', color: 'var(--neon-yellow)', fontWeight: 700 }}>ON AUTO:</span>
+      {autoOwners.map((owner) => (
+        <button
+          key={owner}
+          className="tap-btn auto-tag"
+          type="button"
+          disabled={!commish || busy !== null}
+          onClick={() => flip(owner, false)}
+          title={commish ? `Take ${owner} off auto` : `${owner} is on auto`}
+          style={{ padding: '3px 10px', fontSize: '0.72rem', background: 'rgba(255,230,0,0.08)', cursor: commish ? 'pointer' : 'default' }}
+        >
+          {owner}{commish ? ' ✕' : ''}
+        </button>
+      ))}
+    </div>
   );
 }

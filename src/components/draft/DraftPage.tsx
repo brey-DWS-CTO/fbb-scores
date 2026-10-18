@@ -43,7 +43,7 @@ import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
 import LiveRoom from './LiveRoom.js';
-import AutoPanel from './AutoPanel.js';
+import { AutoButton, AutoChips } from './AutoPanel.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
@@ -722,9 +722,6 @@ export default function DraftPage() {
                 </div>
                 <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: 4 }}>
                   {teamName(onClock.pick.currentOwner)}
-                  {(boardState.draft.autoOwners ?? []).includes(onClock.pick.currentOwner) && (
-                    <span className="auto-tag" style={{ marginLeft: 8 }}>ON AUTO</span>
-                  )}
                 </div>
                 <div style={{ color: 'var(--text-soft)' }}>
                   Pick {pickLabel(onClock.pick)} · #{onClock.pick.overall} overall
@@ -761,6 +758,7 @@ export default function DraftPage() {
                 </button>
               )}
               <ClockControls room={room} clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
+              <AutoButton room={room} owner={onClock.pick.currentOwner} autoOwners={boardState.draft.autoOwners ?? []} />
             </div>
             {skippedCells.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
@@ -788,6 +786,7 @@ export default function DraftPage() {
                 ))}
               </div>
             )}
+            <AutoChips room={room} autoOwners={boardState.draft.autoOwners ?? []} />
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>
@@ -832,17 +831,6 @@ export default function DraftPage() {
             <strong>{allPicks[0].owner}</strong> takes <strong>{allPicks[0].playerName}</strong>{' '}
             <small style={{ color: positionColor(allPicks[0].positions), fontWeight: 800 }}>{allPicks[0].positions.join('/')}</small>
           </span>
-        </div>
-      )}
-
-      {started && identity?.isCommissioner && (
-        <div className={tabClass('players')}>
-          <AutoPanel
-            room={room}
-            owners={dataset.teams.map((team) => team.owner)}
-            autoOwners={boardState.draft.autoOwners ?? []}
-            onClockOwner={onClock?.pick.currentOwner ?? null}
-          />
         </div>
       )}
 
