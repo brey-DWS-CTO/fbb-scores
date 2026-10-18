@@ -220,7 +220,11 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
       </button>
     )}
     {queued.length === 0 ? (
-      <div className="mock-note mock-note-dim">Tap ☆ beside a player, or QUEUE on his card. If a called clock runs out on your pick, you get the top one still there.</div>
+      <div className="mock-note mock-note-dim">
+        {identity?.impersonatedBy
+          ? `${person}'s rankings stay closed while you act as them, so nothing fills this queue. Sign in as ${person} to see it.`
+          : 'Tap ☆ beside a player, or QUEUE on his card. Your saved rankings fill this when it is empty. If a called clock runs out on your pick, you get the top one still there.'}
+      </div>
     ) : (
       <ol className="room-queue-list">
         {queued.map((key, index) => {
