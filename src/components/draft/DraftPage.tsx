@@ -14,6 +14,7 @@ import {
 import {
   apiErrorMessage,
   checkInDraftRoom,
+  fetchDraftList,
   clearKeeperScenario,
   endTestDraft,
   exitSandbox,
@@ -28,6 +29,7 @@ import {
 import { clockExpired } from '../../lib/league/draftClock.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { PRESENCE_POLL_MS, roomChanges } from '../../lib/league/presence.js';
+import { queueFromRankings } from '../../lib/league/draftQueue.js';
 import {
   projectedPlayerKeys,
   stateWithKeeperScenario,
@@ -425,6 +427,16 @@ export default function DraftPage() {
     return () => window.clearInterval(tick);
   }, [identity, clock, onClock, applyState, inSandbox, room]);
   const skippedCells = board.filter((cell) => cell.skipped);
+
+  // The viewer's saved rankings fill an empty queue. Theirs alone: not read
+  // for the commish in a member's seat, and never in the test draft.
+  const rankingsQuery = useQuery({
+    queryKey: ['draft-list-keys', identity?.owner ?? 'anon'],
+    queryFn: async () => queueFromRankings((await fetchDraftList(identity!)).list?.entries ?? []),
+    enabled: started && identity !== null && !identity.impersonatedBy && !inTestDraft && !inSandbox,
+    staleTime: 60_000,
+  });
+  const rankingKeys = rankingsQuery.data ?? null;
 
   // A chime when your pick comes up, beeps at two minutes, an alarm on CLOCK.
   const { soundOn, setSoundOn } = useDraftSounds({
@@ -847,6 +859,7 @@ export default function DraftPage() {
             projections={projections}
             gone={gone}
             queueKey={`fbb-live-queue-${identity.owner}-${inTestDraft ? 'test' : 'league'}`}
+            rankings={rankingKeys}
             onWriteIn={() => {
               setPickWriteIn(true);
               setPickTarget(onClock);

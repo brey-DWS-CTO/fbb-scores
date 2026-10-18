@@ -1463,3 +1463,31 @@ test('a called clock that runs out takes the top queued player still there', asy
 
   await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [] }) });
 });
+
+test('a called clock that runs out reads the owner\'s rankings when they never touched their queue', async () => {
+  const weak = leastWanted();
+  await request('/api/league/draft-list', { method: 'PUT', headers: auth('Joel'), body: JSON.stringify({ text: weak.fullName ?? weak.name }) });
+  const next = cleanState();
+  next.keepersRevealed = true;
+  await replaceState(next);
+  assert.equal((await request('/api/league/draft/start', { method: 'POST', headers: auth(commissioner) })).status, 200);
+
+  await store.mutateState((draft) => {
+    if (draft.draft.clock) draft.draft.clock = { ...draft.draft.clock, pickStartedAt: new Date(Date.now() - 125_000).toISOString() };
+  });
+  assert.equal((await request('/api/league/draft/clock/call', { method: 'POST', headers: auth('Ryan') })).status, 200);
+  await store.mutateState((draft) => {
+    const clock = draft.draft.clock!;
+    draft.draft.clock = { ...clock, call: { ...clock.call!, atElapsedMs: clock.call!.atElapsedMs - 31_000 } };
+  });
+  const expired = await request('/api/league/draft/clock/expire', { method: 'POST', headers: auth('Ryan') });
+  assert.equal(expired.status, 200);
+  const after = (expired.body.state as LeagueDynamicState).draft;
+  assert.equal(after.picks['1']?.playerKey, weak.key, 'the top ranked player, not a yield');
+  assert.equal(after.picks['1']?.enteredBy, 'Joel (queue)');
+
+  // A queue the owner did set wins over the rankings.
+  const other = dataset.players.find((player) => player.key !== weak.key)!;
+  await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [other.key] }) });
+  await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [] }) });
+});

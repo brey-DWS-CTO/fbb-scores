@@ -152,7 +152,7 @@ import {
 } from '../lib/leagueStore.js';
 import { TEST_DRAFT_HEADER, TEST_DRAFT_SESSION_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
 import { inRoom, PRESENCE_WINDOW_MS } from '../../src/lib/league/presence.js';
-import { cleanQueue, firstQueued } from '../../src/lib/league/draftQueue.js';
+import { cleanQueue, firstQueued, queueFromRankings } from '../../src/lib/league/draftQueue.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
 import {
@@ -1427,7 +1427,24 @@ function settleClock(
 }
 
 /** Every queue in the room this request is for. */
-const queuesFor = (res: Response) => getDraftQueues(inTestDraft(res) ? 'test' : 'league');
+/**
+ * Every queue in the room this request is for. In the league an owner who
+ * never touched their queue is read from their saved rankings instead, so a
+ * clock that runs out takes their top ranked player still there. The test
+ * draft keeps rankings out, as the auto picks do.
+ */
+async function queuesFor(res: Response): Promise<Record<string, string[]>> {
+  if (inTestDraft(res)) return getDraftQueues('test');
+  const queues = await getDraftQueues('league');
+  // No queue, or an empty one: either way there is nothing queued.
+  const missing = OWNERS.filter((owner) => !queues[owner]?.length);
+  const lists = await Promise.all(missing.map((owner) => getDraftList(leagueDataset.season, owner)));
+  missing.forEach((owner, index) => {
+    const list = lists[index];
+    if (list) queues[owner] = queueFromRankings(list.entries);
+  });
+  return queues;
+}
 
 /** Audit what a clock running out did. */
 async function auditSettled(res: Response, settled: { overall: number; playerKey: string | null } | null, at: string): Promise<void> {
