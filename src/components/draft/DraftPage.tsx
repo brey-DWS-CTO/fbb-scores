@@ -435,6 +435,7 @@ export default function DraftPage() {
     queryFn: async () => queueFromRankings((await fetchDraftList(identity!)).list?.entries ?? []),
     enabled: started && identity !== null && !identity.impersonatedBy && !inTestDraft && !inSandbox,
     staleTime: 60_000,
+    refetchInterval: 30_000,
   });
   const rankingKeys = rankingsQuery.data ?? null;
 

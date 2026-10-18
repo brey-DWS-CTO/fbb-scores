@@ -39,19 +39,11 @@ const MEMBER_QUICK_SORTS: ReadonlyArray<readonly [RoomSortKey, string]> = [
 ];
 
 /**
- * The viewer's queue, kept on this device. A device that has never had a
- * queue starts with the viewer's saved rankings, once they arrive.
+ * The viewer's queue, kept on this device. While it is empty the viewer's
+ * saved rankings stand in, and the first change starts from them. The server
+ * reads an empty queue the same way, so the phone and the clock agree.
  */
 function useQueue(storageKey: string, seed: readonly string[] | null): [string[], (update: (current: string[]) => string[]) => void] {
-  // True until this device has a queue of its own to keep. Until then the
-  // viewer's rankings stand in, and the first change starts from them.
-  const [fresh, setFresh] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(storageKey) === null;
-    } catch {
-      return false;
-    }
-  });
   const [queue, setQueue] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -61,19 +53,17 @@ function useQueue(storageKey: string, seed: readonly string[] | null): [string[]
       return [];
     }
   });
-  const seeded = fresh && queue.length === 0 && seed !== null && seed.length > 0;
+  const seeded = queue.length === 0 && seed !== null && seed.length > 0;
   const effective = useMemo(() => (seeded ? [...seed!] : queue), [seeded, seed, queue]);
   useEffect(() => {
-    if (fresh) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(queue));
     } catch {
       /* ignore */
     }
-  }, [fresh, storageKey, queue]);
+  }, [storageKey, queue]);
   const update = (fn: (current: string[]) => string[]) => {
-    setQueue((current) => fn(fresh && current.length === 0 && seed && seed.length > 0 ? [...seed] : current));
-    setFresh(false);
+    setQueue((current) => fn(current.length === 0 && seed && seed.length > 0 ? [...seed] : current));
   };
   return [effective, update];
 }
