@@ -35,6 +35,7 @@ const pins = {
   [commissioner]: '9000',
   Joel: '1000',
   Ryan: '2000',
+  Dustin: '3000',
 };
 
 type StoreModule = typeof import('../server/lib/leagueStore.ts');
@@ -1500,4 +1501,47 @@ test('a called clock that runs out reads the owner\'s rankings when they never t
   const other = dataset.players.find((player) => player.key !== weak.key)!;
   await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [other.key] }) });
   await request('/api/league/draft/queue', { method: 'POST', headers: auth('Joel'), body: JSON.stringify({ keys: [] }) });
+});
+
+test('a rankings steward enters another member\'s rankings; the commish and the rest cannot', async () => {
+  const weak = leastWanted();
+  const access = await request('/api/league/draft-list/access', { headers: auth('Dustin') });
+  assert.equal(access.status, 200);
+  const stewardFor = access.body.stewardFor as string[];
+  assert.ok(stewardFor.includes('Joel') && !stewardFor.includes('Dustin'), 'everyone but himself');
+  assert.deepEqual((await request('/api/league/draft-list/access', { headers: auth('Joel') })).body, { stewardFor: [] });
+  assert.deepEqual((await request('/api/league/draft-list/access', { headers: auth(commissioner) })).body, { stewardFor: [] });
+
+  const saved = await request('/api/league/draft-list/for/Joel', {
+    method: 'PUT',
+    headers: auth('Dustin'),
+    body: JSON.stringify({ text: weak.fullName ?? weak.name }),
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.owner, 'Joel');
+  assert.equal((await store.getDraftList(dataset.season, 'Joel'))?.entries[0]?.playerKey, weak.key);
+  const joelSees = await request('/api/league/draft-list', { headers: auth('Joel') });
+  assert.equal((joelSees.body.list as { entries: unknown[] }).entries.length, 1, 'it is Joel\'s list now');
+  const read = await request('/api/league/draft-list/for/Joel', { headers: auth('Dustin') });
+  assert.equal((read.body.list as { entries: unknown[] }).entries.length, 1);
+
+  // Not for the commish, not for an ordinary member, not for his own team, not for the commish acting as him.
+  assert.equal((await request('/api/league/draft-list/for/Joel', { headers: auth(commissioner) })).status, 403);
+  assert.equal((await request('/api/league/draft-list/for/Joel', { headers: auth('Ryan') })).status, 403);
+  assert.equal((await request('/api/league/draft-list/for/Dustin', { headers: auth('Dustin') })).status, 400);
+  assert.equal((await request('/api/league/draft-list/for/Nobody', { headers: auth('Dustin') })).status, 404);
+  const seat = await request('/api/league/act-as/Dustin', { method: 'POST', headers: auth(commissioner) });
+  const asDustin = { 'content-type': 'application/json', 'x-session': String(seat.body.session) };
+  assert.equal((await request('/api/league/draft-list/for/Joel', { headers: asDustin })).status, 403);
+  assert.deepEqual((await request('/api/league/draft-list/access', { headers: asDustin })).body, { stewardFor: [] });
+
+  // The log says he saved for Joel and how many names, never which.
+  const audit = await request('/api/league/audit?limit=5', { headers: auth(commissioner) });
+  const rows = JSON.stringify(audit.body);
+  assert.match(rows, /draft_list\.saved_for/);
+  assert.ok(!rows.includes(weak.fullName ?? weak.name), 'no player name in the log');
+
+  const cleared = await request('/api/league/draft-list/for/Joel', { method: 'DELETE', headers: auth('Dustin') });
+  assert.equal(cleared.status, 200);
+  assert.equal(await store.getDraftList(dataset.season, 'Joel'), null);
 });

@@ -5470,6 +5470,12 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .my-list-closed .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
 .my-list-closed p { margin: 6px 0 0; color: var(--text-body); font-size: 0.82rem; line-height: 1.5; }
 .live-room-load-rankings { margin-bottom: 8px; border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.my-list-steward { border-color: var(--neon-purple); }
+.my-list-steward.is-for { background: color-mix(in srgb, var(--neon-purple) 8%, var(--panel-bg)); }
+.my-list-steward .rule-edit-label { display: block; }
+.my-list-steward .hub-input { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 48px; font-size: 16px; padding: 0 12px; }
+.my-list-steward p { margin: 8px 0 0; color: var(--text-body); font-size: 0.8rem; line-height: 1.5; }
+.my-list-steward.is-for p { color: var(--neon-purple); font-weight: 700; }
 .my-list-left { border-color: var(--neon-teal); color: var(--text-body); font-size: 0.82rem; font-weight: 700; }
 .my-list-left.is-out { border-color: var(--neon-yellow); color: var(--neon-yellow); }
 .auto-tag {

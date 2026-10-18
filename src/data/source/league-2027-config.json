@@ -14,7 +14,7 @@
     { "owner": "Patrick", "fullName": "Patrick Akin",     "espnTeamId": 8,  "espnTeamName": "Im HIS daddy",                 "draftPosition": 3 },
     { "owner": "Bryan",   "fullName": "Bryan Russell",    "espnTeamId": 6,  "espnTeamName": "So many RULES",                "draftPosition": 4, "inheritedFrom": "Sam" },
     { "owner": "Kyle",    "fullName": "Kyle Commons",     "espnTeamId": 5,  "espnTeamName": "I Did Something to Some People", "draftPosition": 5 },
-    { "owner": "Dustin",  "fullName": "Dustin Morgan",    "espnTeamId": 9,  "espnTeamName": "The King's Castle",            "draftPosition": 6 },
+    { "owner": "Dustin",  "fullName": "Dustin Morgan",    "espnTeamId": 9,  "espnTeamName": "The King's Castle",            "draftPosition": 6, "rankingsSteward": true },
     { "owner": "Aaron",   "fullName": "Aaron Jensen",     "espnTeamId": 4,  "espnTeamName": "The Hardened Knueppels",       "draftPosition": 7, "originalMember": true },
     { "owner": "Derek",   "fullName": "Derek McCoy",      "espnTeamId": 3,  "espnTeamName": "Just Super Team",              "draftPosition": 8 },
     { "owner": "Brey",    "fullName": "Brey Funkhouser",  "espnTeamId": 7,  "espnTeamName": "Mamu, There Goes That Amen",   "draftPosition": 9, "originalMember": true, "isCommissioner": true },

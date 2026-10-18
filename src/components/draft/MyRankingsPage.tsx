@@ -6,7 +6,16 @@ import SignInPanel from '../league/SignInPanel.js';
 import { useDraftData, useIdentity } from '../../hooks/useLeague.js';
 import { availablePlayers } from '../../lib/keeper/engine.js';
 import { RANKINGS_FILE_ACCEPT, readRankingsFile } from '../../lib/league/rankingsFile.js';
-import { apiErrorMessage, clearDraftList, fetchDraftList, saveDraftList } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  clearDraftList,
+  clearDraftListFor,
+  fetchDraftList,
+  fetchDraftListAccess,
+  fetchDraftListFor,
+  saveDraftList,
+  saveDraftListFor,
+} from '../../lib/league/api.js';
 import { DRAFT_LIST_MAX, listToText, parseListText, type DraftList } from '../../lib/league/autoDraft.js';
 
 /**
@@ -27,17 +36,26 @@ export default function MyRankingsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // A steward may enter rankings for another team. '' is their own.
+  const [stewardFor, setStewardFor] = useState<string[]>([]);
+  const [forOwner, setForOwner] = useState('');
 
   const load = useCallback(async () => {
     if (!identity) return;
+    setLoaded(false);
     try {
-      const response = await fetchDraftList(identity);
+      const response = forOwner ? await fetchDraftListFor(identity, forOwner) : await fetchDraftList(identity);
       setSaved(response.list);
       setText(listToText(response.list));
       setLoaded(true);
     } catch (e) {
       setError(apiErrorMessage(e));
     }
+  }, [identity, forOwner]);
+
+  useEffect(() => {
+    if (!identity || identity.impersonatedBy) return;
+    fetchDraftListAccess(identity).then((access) => setStewardFor(access.stewardFor)).catch(() => undefined);
   }, [identity]);
 
   useEffect(() => {
@@ -116,7 +134,7 @@ export default function MyRankingsPage() {
     setError(null);
     setNotice(null);
     try {
-      const response = await saveDraftList(identity, text);
+      const response = forOwner ? await saveDraftListFor(identity, forOwner, text) : await saveDraftList(identity, text);
       setSaved(response.list);
       setText(listToText(response.list));
       const missing = response.list?.entries.filter((entry) => !entry.playerKey).length ?? 0;
@@ -137,7 +155,7 @@ export default function MyRankingsPage() {
     setError(null);
     setNotice(null);
     try {
-      const response = await clearDraftList(identity);
+      const response = forOwner ? await clearDraftListFor(identity, forOwner) : await clearDraftList(identity);
       setSaved(response.list);
       setText('');
       setNotice('Rankings cleared.');
@@ -160,6 +178,34 @@ export default function MyRankingsPage() {
         </div>
         <IdentityChip />
       </header>
+
+      {stewardFor.length > 0 && (
+        <section className={`panel my-list-steward${forOwner ? ' is-for' : ''}`}>
+          <label className="rule-edit-label" htmlFor="my-list-for">
+            Entering rankings for
+            <select
+              id="my-list-for"
+              className="hub-input"
+              value={forOwner}
+              disabled={busy}
+              onChange={(event) => {
+                setForOwner(event.target.value);
+                setNotice(null);
+                setError(null);
+                setArmed(false);
+              }}
+            >
+              <option value="">Me ({identity.owner})</option>
+              {stewardFor.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+            </select>
+          </label>
+          <p>
+            {forOwner
+              ? `You are entering ${forOwner}'s rankings. They save under ${forOwner}'s name and drive ${forOwner}'s auto picks. The commish still cannot see them.`
+              : 'You are trusted to enter rankings for other teams. Pick a team to work on theirs.'}
+          </p>
+        </section>
+      )}
 
       <section className="panel my-list-how">
         <p>
@@ -256,7 +302,7 @@ export default function MyRankingsPage() {
 
       {saved && (
         <section className="panel my-list-saved">
-          <div className="hub-heading">SAVED · {saved.entries.length}</div>
+          <div className="hub-heading">SAVED{forOwner ? ` FOR ${forOwner.toUpperCase()}` : ''} · {saved.entries.length}</div>
           <ol>
             {saved.entries.map((entry) => (
               <li key={entry.rank} className={entry.playerKey ? '' : 'is-missing'}>

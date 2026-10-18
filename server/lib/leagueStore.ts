@@ -430,6 +430,8 @@ export interface ConfigTeam {
   draftPosition: number;
   originalMember?: boolean;
   isCommissioner?: boolean;
+  /** May read and save other members' private rankings for them. Never the commissioner. */
+  rankingsSteward?: boolean;
 }
 
 export const CONFIG_TEAMS = leagueConfig.teams as ConfigTeam[];
@@ -450,6 +452,15 @@ export function isKnownOwner(owner: string): boolean {
 
 export function isCommissionerOwner(owner: string): boolean {
   return COMMISSIONERS.has(owner);
+}
+
+const RANKINGS_STEWARDS = new Set(
+  CONFIG_TEAMS.filter((t) => t.rankingsSteward === true && t.isCommissioner !== true).map((t) => t.owner),
+);
+
+/** A trusted member who enters rankings for others. The commissioner never is one; he stays blind. */
+export function isRankingsSteward(owner: string): boolean {
+  return RANKINGS_STEWARDS.has(owner);
 }
 
 function defaultState(): LeagueDynamicState {
