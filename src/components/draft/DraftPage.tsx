@@ -428,12 +428,13 @@ export default function DraftPage() {
   }, [identity, clock, onClock, applyState, inSandbox, room]);
   const skippedCells = board.filter((cell) => cell.skipped);
 
-  // The viewer's saved rankings fill an empty queue. Theirs alone: not read
-  // for the commish in a member's seat, and never in the test draft.
+  // The viewer's saved rankings fill an empty queue, in the test draft too:
+  // it is their own screen. Theirs alone, so never for the commish in a
+  // member's seat.
   const rankingsQuery = useQuery({
     queryKey: ['draft-list-keys', identity?.owner ?? 'anon'],
     queryFn: async () => queueFromRankings((await fetchDraftList(identity!)).list?.entries ?? []),
-    enabled: started && identity !== null && !identity.impersonatedBy && !inTestDraft && !inSandbox,
+    enabled: started && identity !== null && !identity.impersonatedBy && !inSandbox,
     staleTime: 60_000,
     refetchInterval: 30_000,
   });
