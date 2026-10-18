@@ -5250,23 +5250,43 @@ html.theme-light {
 .draft-room-chip.is-me { border-color: var(--neon-teal); color: var(--neon-teal); }
 .live-room-writein { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--neon-teal); font-size: 0.74rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
 /* ─── Live draft: the room on a phone, the card, the queue, sound ─── */
-/* The room's own bar: pinned to the bottom of the screen on a laptop too. */
+/* The room's own bar: a solid strip along the bottom of the screen, the
+   same on a laptop as on a phone. On a laptop it starts where the sidebar
+   ends, and the page leaves room under the last row for it. */
 .live-phone-tabs {
-  position: sticky;
-  bottom: 8px;
-  z-index: 30;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  margin-top: 16px;
-  overflow: hidden;
-  border: 2px solid var(--panel-border);
-  border-radius: 12px;
-  background: var(--nav-bg);
-  backdrop-filter: blur(8px);
+  border-top: 2px solid var(--panel-border);
+  background: var(--dark-bg);
+  padding-bottom: env(safe-area-inset-bottom);
 }
-.live-phone-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 0; background: transparent; color: var(--text-mid); cursor: pointer; }
+.live-phone-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 0; border-top: 2px solid transparent; margin-top: -2px; background: transparent; color: var(--text-mid); cursor: pointer; }
 .live-phone-tabs button .hub-heading { font-size: 0.66rem; }
-.live-phone-tabs button.is-on { color: var(--neon-teal); background: rgba(0,255,204,0.08); }
+.live-phone-tabs button.is-on { color: var(--neon-teal); border-top-color: var(--neon-teal); }
+@media (min-width: 840px) {
+  .live-phone-tabs { left: 216px; }
+  html.nav-collapsed .live-phone-tabs { left: 64px; }
+  html.in-live-room .app-shell-nav { padding-bottom: 60px; }
+}
+/* The pick that just landed, one line, as in the mock room. */
+.live-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text-body);
+  animation: room-latest-in 0.35s ease-out;
+}
+.live-latest .live-latest-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .live-latest { animation: none; } }
 .live-phone-tabs button.is-exit { color: var(--text-dim); }
 html.in-live-room .live-tab:not(.is-shown) { display: none; }
 .live-room-writein { display: block; }
