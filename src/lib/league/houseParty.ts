@@ -304,6 +304,8 @@ export interface RosterPlayer {
   name: string;
   /** ESPN's team code. */
   proTeam: string;
+  /** ESPN's athlete id, for matching a box score. The key is `p<id>` when this is missing. */
+  espnId?: number | null;
 }
 
 /** Every owner's players, by owner. */

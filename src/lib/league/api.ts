@@ -8,6 +8,7 @@ import type { SharedMockRoom } from './sharedMock.js';
 import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
 import type { FavoritesByOwner, HouseParty, NbaGame, RostersByOwner, RsvpAnswer } from './houseParty.js';
+import type { GuestScore } from './partyScore.js';
 import axios from 'axios';
 import { TEST_DRAFT_HEADER, draftRoomHeaders, type DraftRoom, type TestDraftMeta } from './testDraft.js';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
@@ -1920,6 +1921,30 @@ export async function cancelHouseParty(c: Credentials, id: string): Promise<Part
 }
 
 /** What a share link shows. No sign-in needed. */
+export interface PartyScoreResponse {
+  partyId: string;
+  now: string;
+  /** False before the first tip-off; then there are no games and no guests. */
+  started: boolean;
+  games: Array<{
+    id: string;
+    state: 'pre' | 'in' | 'post';
+    detail: string;
+    home: string;
+    away: string;
+    homeScore: number | null;
+    awayScore: number | null;
+  }>;
+  guests: GuestScore[];
+  error: string | null;
+}
+
+/** Every guest's points in the party's games, once they have started. */
+export async function fetchPartyScore(c: Credentials, id: string): Promise<PartyScoreResponse> {
+  const { data } = await axios.get<PartyScoreResponse>(`/api/league/parties/${encodeURIComponent(id)}/score`, { headers: authHeaders(c) });
+  return data;
+}
+
 export interface PublicParty {
   party: {
     id: string;

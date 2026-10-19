@@ -21,10 +21,12 @@ const pins: Record<string, string> = {
 
 type StoreModule = typeof import('../server/lib/leagueStore.ts');
 type ScoreboardModule = typeof import('../server/lib/scoreboardService.ts');
+type BoxScoreModule = typeof import('../server/lib/boxScoreService.ts');
 
 let tempRoot = '';
 let store: StoreModule;
 let scoreboard: ScoreboardModule;
+let boxScores: BoxScoreModule;
 let server: Server;
 let baseUrl = '';
 let SEASON = 2027;
@@ -55,6 +57,8 @@ const GAMES: NbaGame[] = [
   game('g2', 'DEN', 'MIN', soon(32)),
   game('g3', 'SAC', 'PHX', soon(72)),
   { ...game('g0', 'BOS', 'MIA', soon(-30)), state: 'post' },
+  // Tipped off an hour ago and still going: a party on it has started but is not over.
+  { ...game('g5', 'DEN', 'LAL', soon(-1)), state: 'in', detail: '3rd 5:12', homeScore: 88, awayScore: 80 },
 ];
 
 const partyOf = (body: unknown) => (body as { party: HouseParty }).party;
@@ -71,13 +75,16 @@ before(async () => {
   const appUrl = pathToFileURL(path.join(tempRoot, 'server', 'app.ts')).href;
   const storeUrl = pathToFileURL(path.join(tempRoot, 'server', 'lib', 'leagueStore.ts')).href;
   const boardUrl = pathToFileURL(path.join(tempRoot, 'server', 'lib', 'scoreboardService.ts')).href;
-  const [{ default: app }, storeModule, boardModule] = await Promise.all([
+  const boxUrl = pathToFileURL(path.join(tempRoot, 'server', 'lib', 'boxScoreService.ts')).href;
+  const [{ default: app }, storeModule, boardModule, boxModule] = await Promise.all([
     import(appUrl),
     import(storeUrl) as Promise<StoreModule>,
     import(boardUrl) as Promise<ScoreboardModule>,
+    import(boxUrl) as Promise<BoxScoreModule>,
   ]);
   store = storeModule;
   scoreboard = boardModule;
+  boxScores = boxModule;
   SEASON = (await store.getState()).state.season;
   for (const [owner, pin] of Object.entries(pins)) await store.setPin(owner, pin);
   scoreboard.pinScoreboard(GAMES);
@@ -151,7 +158,7 @@ test('WATCH carries the games, favorites, every owner\'s roster and the parties'
   const watch = await request('/api/league/watch', { headers: auth('Kyle') });
   assert.equal(watch.status, 200);
   const body = watch.body as { games: NbaGame[]; favorites: unknown; rosters: Record<string, unknown[]>; parties: unknown[]; error: null };
-  assert.deepEqual(body.games.map((row) => row.id), ['g1', 'g2', 'g3', 'g0']);
+  assert.deepEqual(body.games.map((row) => row.id), ['g1', 'g2', 'g3', 'g0', 'g5']);
   assert.deepEqual(body.favorites, { Kyle: { first: 'GSW', second: null } });
   assert.ok(Object.keys(body.rosters).length >= 10, 'one roster an owner, empty before the draft');
   assert.deepEqual(body.parties, []);
@@ -251,4 +258,39 @@ test('the host edits and calls off; a guest may not; the commish may', async () 
 
   const gone = await post('Kyle', '/api/league/parties/nope1234/rsvp', { answer: 'in' });
   assert.equal(gone.status, 404);
+});
+
+// ─── The scoreboard ─────────────────────────────────────────────────────────
+
+test('a party that has not tipped off has no scoreboard; one that has shows every guest', async () => {
+  boxScores.pinBoxScores([{
+    gameId: 'g5',
+    state: 'in',
+    detail: '3rd 5:12',
+    home: 'DEN',
+    away: 'LAL',
+    homeScore: 88,
+    awayScore: 80,
+    lines: [],
+  }]);
+  const later = partyOf((await post('Kyle', '/api/league/parties', { gameIds: ['g1'], hosting: true, note: '' })).body);
+  const quiet = await request(`/api/league/parties/${later.id}/score`, { headers: auth('Amy') });
+  assert.equal(quiet.status, 200);
+  assert.deepEqual(quiet.body, { ...(quiet.body as object), started: false, games: [], guests: [] });
+
+  const tonight = partyOf((await post('Kyle', '/api/league/parties', { gameIds: ['g5'], hosting: true, note: '' })).body);
+  await post('Amy', `/api/league/parties/${tonight.id}/rsvp`, { answer: 'in' });
+  const live = await request(`/api/league/parties/${tonight.id}/score`, { headers: auth('Amy') });
+  assert.equal(live.status, 200);
+  const body = live.body as { started: boolean; games: Array<{ id: string; state: string; homeScore: number }>; guests: Array<{ owner: string; total: number; players: unknown[] }>; error: null };
+  assert.equal(body.started, true);
+  assert.equal(body.error, null);
+  assert.deepEqual(body.games.map((row) => [row.id, row.state, row.homeScore]), [['g5', 'in', 88]]);
+  assert.deepEqual(body.guests.map((guest) => [guest.owner, guest.total]).sort(), [['Amy', 0], ['Kyle', 0]]);
+
+  const anon = await request(`/api/league/parties/${tonight.id}/score`);
+  assert.equal(anon.status, 401);
+  const missing = await request('/api/league/parties/nope/score', { headers: auth('Amy') });
+  assert.equal(missing.status, 404);
+  boxScores.forgetBoxScores();
 });

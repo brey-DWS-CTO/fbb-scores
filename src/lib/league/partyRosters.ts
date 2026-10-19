@@ -25,7 +25,7 @@ export function leagueRosters(dataset: LeagueDataset, state: LeagueDynamicState)
     const owner = cell.pick.currentOwner;
     const kept = cell.keeper?.player;
     if (kept) {
-      add(owner, { key: kept.key, name: kept.fullName ?? kept.name, proTeam: kept.proTeam });
+      add(owner, { key: kept.key, name: kept.fullName ?? kept.name, proTeam: kept.proTeam, espnId: kept.espnId });
       continue;
     }
     const pick = cell.selection;
@@ -35,6 +35,7 @@ export function leagueRosters(dataset: LeagueDataset, state: LeagueDynamicState)
       key: pick.playerKey,
       name: pick.playerName ?? known?.fullName ?? known?.name ?? pick.playerKey,
       proTeam: pick.proTeam ?? known?.proTeam ?? '',
+      espnId: known?.espnId ?? null,
     });
   }
   return rosters;

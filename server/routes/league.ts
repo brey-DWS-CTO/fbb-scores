@@ -331,6 +331,8 @@ import {
   type PartyProblem,
 } from '../../src/lib/league/houseParty.js';
 import { leagueRosters } from '../../src/lib/league/partyRosters.js';
+import { LEAGUE_SCORING, partyScores, partyStarted } from '../../src/lib/league/partyScore.js';
+import { getBoxScores } from '../lib/boxScoreService.js';
 import {
   clearPartiesForSeason,
   getParty,
@@ -5121,6 +5123,49 @@ router.delete('/parties', requireAuth, requireCommissioner, async (_req, res, ne
   try {
     await clearPartiesForSeason(leagueDataset.season);
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/league/parties/:id/score — what every guest's players are doing
+ * in the party's games, in league points. Before the first tip-off it says
+ * so and asks ESPN nothing. Scoring comes from the active draft rankings
+ * snapshot, or the league's own table when none has been accepted.
+ */
+router.get('/parties/:id/score', requireAuth, async (req, res, next) => {
+  try {
+    const party = (await getParty(String(req.params.id))) as HouseParty | null;
+    if (!party || party.season !== leagueDataset.season) {
+      res.status(404).json({ error: 'No such party' });
+      return;
+    }
+    const now = new Date();
+    if (!partyStarted(party, now)) {
+      res.json({ partyId: party.id, now: now.toISOString(), started: false, games: [], guests: [], error: null });
+      return;
+    }
+    const [read, { state }] = await Promise.all([getBoxScores(party.games.map((game) => game.id), now), getState()]);
+    const rosters = leagueRosters(currentDataset(state), state);
+    const snapshot = await resolveCurrentDraftRankings(state);
+    const scoring = snapshot.scoringItems.length > 0 ? snapshot.scoringItems : LEAGUE_SCORING;
+    res.json({
+      partyId: party.id,
+      now: now.toISOString(),
+      started: true,
+      games: read.boxScores.map((box) => ({
+        id: box.gameId,
+        state: box.state,
+        detail: box.detail,
+        home: box.home,
+        away: box.away,
+        homeScore: box.homeScore,
+        awayScore: box.awayScore,
+      })),
+      guests: partyScores(party, rosters, read.boxScores, scoring),
+      error: read.error,
+    });
   } catch (err) {
     next(err);
   }
