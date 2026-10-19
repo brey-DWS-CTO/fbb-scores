@@ -16,6 +16,8 @@ interface ScoreboardEvent {
   date?: string;
   competitions?: Array<{
     date?: string;
+    /** False when ESPN has only a placeholder time (TBD). */
+    timeValid?: boolean;
     competitors?: Array<{ homeAway?: string; team?: { abbreviation?: string } }>;
   }>;
 }
@@ -29,6 +31,8 @@ export function readScoreboard(events: readonly ScoreboardEvent[] | undefined): 
     const comp = event.competitions?.[0];
     const tipoff = comp?.date ?? event.date;
     if (!comp || !tipoff || !Number.isFinite(Date.parse(tipoff))) continue;
+    // A placeholder time would make a fake early day. Better no game than a wrong one.
+    if (comp.timeValid === false) continue;
     const home = comp.competitors?.find((c) => c.homeAway === 'home')?.team?.abbreviation;
     const away = comp.competitors?.find((c) => c.homeAway === 'away')?.team?.abbreviation;
     if (!home || !away) continue;

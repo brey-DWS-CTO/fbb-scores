@@ -142,6 +142,7 @@ test('the public scoreboard reads into games with normalized team codes', async 
     { date: '2026-10-24T19:00Z', competitions: [{ date: '2026-10-24T19:00Z', competitors: [{ homeAway: 'home', team: { abbreviation: 'GS' } }, { homeAway: 'away', team: { abbreviation: 'NY' } }] }] },
     { competitions: [{ competitors: [{ homeAway: 'home', team: { abbreviation: 'LAL' } }] }] },
     { date: '2026-10-24T02:00Z', competitions: [{ competitors: [{ homeAway: 'home', team: { abbreviation: 'UTAH' } }, { homeAway: 'away', team: { abbreviation: 'WSH' } }] }] },
+    { date: '2026-10-24T01:00Z', competitions: [{ timeValid: false, competitors: [{ homeAway: 'home', team: { abbreviation: 'MIA' } }, { homeAway: 'away', team: { abbreviation: 'ORL' } }] }] },
   ]);
   assert.deepEqual(games, [
     { home: 'UTA', away: 'WAS', tipoff: '2026-10-24T02:00:00.000Z' },
