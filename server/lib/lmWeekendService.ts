@@ -17,9 +17,11 @@ import {
   checkLmAdd,
   earlyDays,
   lmAddAllowed,
+  lmAddText,
   lmAddWindow,
   pacific,
   waiverHourFor,
+  waiverChangeText,
   waiverHourToHold,
   type DayGame,
   type EarlyDay,
@@ -39,6 +41,7 @@ import {
 } from './espnLm.js';
 import { appendAudit, listLmAddRequests, listTransactions, saveLmAddRequest } from './leagueStore.js';
 import { gamesForDays, gamesOn } from './nbaDay.js';
+import { postToSlack } from './slack.js';
 
 const dataset = rawDataset as unknown as LeagueDataset;
 
@@ -101,6 +104,7 @@ async function keepWaiverHour(config: EspnLmConfig, now: Date): Promise<LmClockR
     was: current,
     result: note,
   });
+  await postToSlack(waiverChangeText(target, date, current, result.ok, note));
   return { target, current, changed: result.ok, note };
 }
 
@@ -127,9 +131,16 @@ async function attemptAdd(config: EspnLmConfig, request: LmAddRequest, by: strin
   const note = describeWrite(result);
   await appendAudit(by, 'lm.add', { id: request.id, owner: request.owner, playerId: request.playerId, playerName: request.playerName, result: note });
   const updatedAt = new Date().toISOString();
-  if (result.ok && !result.dryRun) return { ...request, status: 'added', note, updatedAt, handledBy: by };
+  if (result.ok && !result.dryRun) {
+    const added: LmAddRequest = { ...request, status: 'added', note, updatedAt, handledBy: by };
+    await postToSlack(lmAddText(added));
+    return added;
+  }
   if (result.dryRun) return { ...request, note: 'dry run: nothing sent to ESPN', updatedAt };
-  if (result.authFailed) return { ...request, note, updatedAt };
+  if (result.authFailed) {
+    await postToSlack(`LM add for ${request.owner} (${request.playerName}) could not be sent: ${note}`);
+    return { ...request, note, updatedAt };
+  }
   // ESPN refused the move itself. Almost always no roster spot yet.
   const status: LmAddRequest['status'] = request.status === 'failsafe' ? 'failsafe' : 'waiting-for-drop';
   return { ...request, status, note, updatedAt };
@@ -146,7 +157,10 @@ async function runAdds(config: EspnLmConfig, now: Date): Promise<LmClockRun['add
     let next = request;
     if (request.forDate === pt.date && request.status !== 'failsafe') {
       if (window.open) next = await attemptAdd(config, request, null);
-      else next = { ...request, status: 'failsafe', note: 'Not added before the first tip. His points count today; the add goes through for tomorrow.', updatedAt: now.toISOString() };
+      else {
+        next = { ...request, status: 'failsafe', note: 'Not added before the first tip. His points count today; the add goes through for tomorrow.', updatedAt: now.toISOString() };
+        await postToSlack(lmAddText(next));
+      }
     } else if (request.forDate < pt.date) {
       // Yesterday's miss, or an earlier one: keep trying each run.
       next = await attemptAdd(config, { ...request, status: 'failsafe' }, null);
