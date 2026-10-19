@@ -20,6 +20,7 @@ import { useProjectionData } from '../../hooks/useProjectionData.js';
 import IdentityChip from './IdentityChip.js';
 import SignInPanel from './SignInPanel.js';
 import NavIcon from './NavIcon.js';
+import { shortName } from '../../lib/league/format.js';
 
 // Eight tier colours, repeated past tier 8. Neighbours never match, and the
 // tier number sits on every band, so colour is never the only clue.
@@ -148,7 +149,7 @@ function Row({
   const high = scales.x(row.fppgHigh);
   const dot = scales.x(row.fppg);
   const keeper = row.tag === 'open' ? '' : ' K';
-  const name = layout.narrow ? row.shortName : row.name;
+  const name = shortName(row.name);
   const labelWidth = measure(name + keeper);
   const barLeft = Math.min(low, high, dot);
   const barRight = Math.max(low, high, dot);
@@ -211,7 +212,7 @@ function TierPopup({ row, onClose }: { row: TierRow; onClose: () => void }) {
       >
         <div className="tier-popup-head">
           <div>
-            <h2 id={titleId}>{row.name}</h2>
+            <h2 id={titleId}>{shortName(row.name)}</h2>
             <p>{row.proTeam} · {row.positions.join('/') || '—'} · Tier {row.tier} · #{row.rank}{row.adp !== null ? ` · ADP ${row.adp.toFixed(1)}` : ''}</p>
           </div>
           <button ref={closeRef} type="button" className="tap-btn account-close" aria-label="Close" onClick={onClose}>×</button>

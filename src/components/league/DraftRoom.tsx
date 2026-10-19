@@ -12,10 +12,10 @@ import {
   queuedPick,
   replaySaved,
   rosterBySlot,
-  shortName,
   toggleQueued,
   upcomingPicks,
 } from '../../lib/league/draftRoom.js';
+import { shortName } from '../../lib/league/format.js';
 import NavIcon from './NavIcon.js';
 import MockGradeCard from './MockGradeCard.js';
 import MockBoardGrid, { KeeperChip } from './MockBoardGrid.js';
@@ -642,7 +642,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
           <li key={key} className={taken ? 'is-taken' : ''}>
             <span className="room-upcoming-num">{index + 1}</span>
             <button type="button" className="room-queue-name" onClick={() => look(key)}>
-              {candidate?.playerName ?? key}<small>{candidate?.positions.join('/')}{taken ? ` · gone ${taken.label}` : ''}</small>
+              {candidate ? shortName(candidate.playerName) : key}<small>{candidate?.positions.join('/')}{taken ? ` · gone ${taken.label}` : ''}</small>
             </button>
             <button type="button" className="room-icon-btn" aria-label="Move up" disabled={index === 0} onClick={() => setQueue((current) => moveQueued(current, key, -1))}>↑</button>
             <button type="button" className="room-icon-btn" aria-label="Move down" disabled={index === queue.length - 1} onClick={() => setQueue((current) => moveQueued(current, key, 1))}>↓</button>
@@ -750,7 +750,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
                   <span>
-                    Paused at your keeper: <strong>{atMyKeeper.playerName}</strong>
+                    Paused at your keeper: <strong>{shortName(atMyKeeper.playerName)}</strong>
                     {keeperOdds !== null && (
                       <small className="room-keeper-odds">
                         Without the keep, he is still here at this pick <strong>{pct(keeperOdds)}</strong> of the time.
@@ -830,7 +830,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
           return (
             <div key={last.overall} className={`panel room-latest is-tappable${last.owner === person ? ' is-mine' : ''}`} aria-live="polite" onClick={() => look(last.playerKey)}>
               <span className="room-upcoming-num">{last.label}</span>
-              <span><strong>{last.owner}</strong> {last.how === 'keeper' ? 'keeps' : 'takes'} <strong>{last.playerName ?? 'nobody'}</strong> <small><Pos positions={last.positions} /></small></span>
+              <span><strong>{last.owner}</strong> {last.how === 'keeper' ? 'keeps' : 'takes'} <strong>{last.playerName ? shortName(last.playerName) : 'nobody'}</strong> <small><Pos positions={last.positions} /></small></span>
             </div>
           );
         })()}
@@ -944,10 +944,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                         </td>
                         <td className="room-player-col">
                           <span className="room-player-line">
-                            <span className="room-player-name">
-                              <span className="room-name-full">{fullName}</span>
-                              <span className="room-name-short">{shortName(fullName)}</span>
-                            </span>
+                            <span className="room-player-name" title={fullName}>{shortName(fullName)}</span>
                             {/* On a phone the team goes and the position stays whole. */}
                             <small className="room-player-sub"><span className="room-player-team">{projection?.proTeam ?? ''} – </span><Pos positions={candidate.positions} /></small>
                             {taken && (
@@ -1069,7 +1066,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                 {[...shownPicks].reverse().map((pick) => (
                   <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                     <span className="room-upcoming-num">{pick.label}</span>
-                    <span className="room-player-name">{pick.playerName ?? 'nobody'}</span>
+                    <span className="room-player-name">{pick.playerName ? shortName(pick.playerName) : 'nobody'}</span>
                     <small><Pos positions={pick.positions} /></small>
                     {pick.how === 'keeper'
                       ? <span><KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></span>
@@ -1115,7 +1112,7 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
               <li key={pick.overall} className={`${pick.owner === person ? 'is-mine' : ''}${pick.how === 'keeper' ? ' is-keeper' : ''} is-tappable`} onClick={() => look(pick.playerKey)}>
                 <span className="room-upcoming-num">{pick.label}</span>
                 <span>
-                  {pick.playerName ?? 'nobody'} <small><Pos positions={pick.positions} /></small>
+                  {pick.playerName ? shortName(pick.playerName) : 'nobody'} <small><Pos positions={pick.positions} /></small>
                   {pick.how === 'keeper' && <> <KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></>}
                 </span>
                 <span className="room-update-owner">{pick.owner}</span>
