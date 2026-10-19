@@ -33,6 +33,7 @@ import {
 } from './leagueStore.js';
 import { sendMail, type MailContent } from './mailer.js';
 import { shameEmailCopy, type DuesBoard } from '../../src/lib/league/dues.js';
+import { dueAnnouncements } from '../../src/lib/league/announcements.js';
 
 const leagueDataset = rawDataset as unknown as LeagueDataset;
 
@@ -104,17 +105,23 @@ function tradeLink(origin: string): string {
   return `${origin}/trades`;
 }
 
-/** An offer landed in someone's inbox. Mails the person who has to answer. */
-export function notifyTradeOffered(proposal: PickTradeProposal, origin: string): void {
+/**
+ * An offer landed in someone's inbox, or the proposer changed it and sent it
+ * again. Mails the person who has to answer.
+ */
+export function notifyTradeOffered(proposal: PickTradeProposal, origin: string, revised = false): void {
   const theirs = sideLabel(proposal.offer);
   const yours = sideLabel(proposal.request);
-  queueMail('trade offered', () =>
+  const headline = revised
+    ? `${proposal.proposer} changed the trade offer`
+    : `${proposal.proposer} offered you a trade`;
+  queueMail(revised ? 'trade revised' : 'trade offered', () =>
     mailTo(
       proposal.recipient,
       {
-        subject: `${proposal.proposer} offered you a trade`,
+        subject: headline,
         preheader: describeTrade(proposal, leagueDataset),
-        heading: `${proposal.proposer} offered you a trade`,
+        heading: headline,
         lines: [
           `${proposal.proposer} sends you ${theirs}.`,
           `${proposal.proposer} wants ${yours} back.`,
@@ -185,6 +192,25 @@ export function notifyTradeAccepted(
       origin,
     ),
   );
+
+  // Everyone else hears the trade went through, so no deal happens quietly.
+  queueMail('trade announced', async () => {
+    const book = await addressBook();
+    const content: MailContent = {
+      subject: `Trade: ${proposal.proposer} and ${proposal.recipient}`,
+      preheader: describeTrade(proposal, leagueDataset),
+      heading: 'A trade went through',
+      lines: [
+        `${proposal.proposer} gets ${sideLabel(proposal.request)}.`,
+        `${proposal.recipient} gets ${sideLabel(proposal.offer)}.`,
+      ],
+      action: { label: 'SEE LEAGUE ACTIVITY', href: `${origin}/league` },
+    };
+    for (const [owner, address] of book) {
+      if (owner === proposal.proposer || owner === proposal.recipient) continue;
+      await sendMail(address, content, origin, 'notify');
+    }
+  });
 
   // The member who accepted gets no trade mail, because they were there. They
   // do get one when their own keepers went with it.
@@ -393,6 +419,37 @@ export interface ReminderRun {
   due: number;
   /** How many actually went out on this run. */
   sent: number;
+  /** One-time announcements that went out on this run. */
+  announced?: number;
+}
+
+// ─── Announcements ───────────────────────────────────────────────────────────
+
+/**
+ * One-time league news, each member once. Claimed before sending, like the
+ * reminders: a failed send is not retried, so nobody ever gets it twice.
+ */
+export async function runAnnouncements(now: Date, origin: string): Promise<number> {
+  const season = leagueDataset.season;
+  const book = await addressBook();
+  const due = dueAnnouncements({ now, owners: [...book.keys()], alreadySent: await listSentNotices(season) });
+  let sent = 0;
+  for (const item of due) {
+    const address = book.get(item.owner);
+    if (!address) continue;
+    if (!(await claimSentNotice(item.key, season))) continue;
+    const a = item.announcement;
+    const content: MailContent = {
+      subject: a.subject,
+      preheader: a.preheader,
+      heading: a.heading,
+      lines: a.lines,
+      action: { label: a.actionLabel, href: `${origin}${a.actionPath}` },
+    };
+    const result = await sendMail(address, content, origin, 'notify');
+    if (result.ok) sent += 1;
+  }
+  return sent;
 }
 
 /**
@@ -403,20 +460,15 @@ export interface ReminderRun {
  * worse than missing one, and the app itself still shows the deadline.
  */
 export async function runDueReminders(now: Date, origin: string): Promise<ReminderRun> {
+  const announced = await runAnnouncements(now, origin);
   // Most hours of the year nothing can be due. Say so without a query, so
   // the database can stay asleep.
-  if (!anyReminderWindowOpen(now, new Date(DRAFT_AT_ISO))) return { due: 0, sent: 0 };
+  if (!anyReminderWindowOpen(now, new Date(DRAFT_AT_ISO))) return { due: 0, sent: 0, announced };
   const { state } = await getState();
   const book = await addressBook();
   const withKeepers = Object.entries(state.keepers)
     .filter(([, selections]) => selections.length > 0)
     .map(([owner]) => owner);
-  const keeperNames = Object.fromEntries(
-    Object.entries(state.keepers).map(([owner, selections]) => [
-      owner,
-      selections.map((selection) => selection.playerName),
-    ]),
-  );
 
   const due = dueReminders({
     now,
@@ -424,7 +476,6 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
     season: state.season,
     owners: [...book.keys()],
     ownersWithKeepers: withKeepers,
-    keeperNames,
     alreadySent: await listSentNotices(state.season),
   });
 
@@ -437,5 +488,5 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
     const result = await sendMail(address, reminderContent(reminder, origin), origin, 'notify');
     if (result.ok) sent += 1;
   }
-  return { due: due.length, sent };
+  return { due: due.length, sent, announced };
 }

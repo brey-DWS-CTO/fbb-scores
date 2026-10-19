@@ -33,6 +33,8 @@ import type {
 } from '../../src/lib/keeper/types.js';
 import {
   canAnswer,
+  canRevise,
+  reviseProposal,
   checkProposalAgainstState,
   checkProposalShape,
   datasetForState,
@@ -78,6 +80,7 @@ import {
   getKeeperScenario,
   readAudit,
   isKnownOwner,
+  isCommissionerOwner,
   setKeeperScenarioTarget,
   DRAFT_AT_ISO,
   PlayerPoolAcceptError,
@@ -104,6 +107,7 @@ import {
   RulebookSignError,
   CONFIG_TEAMS,
   deleteRulebookSignature,
+  foldLatestRulebookVersion,
   listRulebookSignatures,
   insertRulebookSignature,
   listDues,
@@ -125,11 +129,89 @@ import {
   listMockResults,
   findMockResult,
   saveMockResult,
+  listMockFinishes,
+  listMockTrades,
+  saveMockTrade,
+  deleteMockTrade,
+  getTestDraft,
+  listPresence,
+  touchPresence,
+  getDraftQueues,
+  setDraftQueue,
+  mutateTestDraft,
+  setTestDraft,
+  TestDraftMissingError,
+  getSharedMock,
+  listSharedMocks,
+  listOpenSharedMocks,
+  insertSharedMock,
+  updateSharedMock,
+  SharedMockWriteError,
   type KeeperSelection,
   type LeagueDynamicState,
+  type MutateResult,
+  type StateResult,
 } from '../lib/leagueStore.js';
+import { TEST_DRAFT_HEADER, TEST_DRAFT_SESSION_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
+import { inRoom, PRESENCE_WINDOW_MS } from '../../src/lib/league/presence.js';
+import { cleanQueue, firstQueued, queueFromRankings } from '../../src/lib/league/draftQueue.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
-import { MEMBER_MOCK_LIMIT, parseMockResult } from '../../src/lib/league/mockGrade.js';
+import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
+import {
+  MAX_PEOPLE,
+  clockHasRunOut,
+  joinSharedMock,
+  namesOf,
+  newSharedMock,
+  openSharedMock,
+  othersAt,
+  parseSharedMockRoom,
+  pickInSharedMock,
+  quitSharedMock,
+  sharedMockBoard,
+  sharedMockId,
+  sharedMockPhase,
+  showsFor,
+  startOpenSharedMock,
+  type SharedMockRoom,
+} from '../../src/lib/league/sharedMock.js';
+import {
+  NO_FACTS,
+  canReveal,
+  coversAllProps,
+  earnedCount,
+  earnedFrom,
+  firstGuessToRecord,
+  markSeen,
+  unseenAchievements,
+  guessHit,
+  guessNear,
+  hiddenCount,
+  hiddenKeepers,
+  ledgerOf,
+  pickReveal,
+  revealsLeft,
+  revealsReady,
+  stampEarned,
+  standings,
+  type AchievementLedger,
+  type OwnerFacts,
+} from '../../src/lib/league/achievements.js';
+import {
+  canRemoveProp,
+  canSettleProp,
+  normalizeProp,
+  parsePropInput,
+  parseResult,
+  propsLocked,
+  sameProp,
+  takeSide,
+  visibleProps,
+  type PropBet,
+  type PropSide,
+} from '../../src/lib/league/propBets.js';
+import { mockStats } from '../../src/lib/league/mockStats.js';
+import { MAX_MOCK_TRADES, mockTradeId, type MockTrade } from '../../src/lib/league/mockTrades.js';
 import { LINK_TTL_MINUTES } from '../../src/lib/league/auth.js';
 import {
   DUES_ACTIONS,
@@ -177,6 +259,7 @@ import {
   type VoteChoice,
 } from '../../src/lib/league/polls.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
+import hashtagProjections from '../data/hashtag-projections-2027.json' with { type: 'json' };
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
 import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
 import type { Rulebook } from '../../src/lib/league/rulebook.js';
@@ -235,6 +318,10 @@ import {
   prepareDraftRankingCandidate,
   resolveCurrentDraftRankings,
 } from '../lib/draftRankingService.js';
+import { getNbaWatch } from '../lib/nbaWatchService.js';
+import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
+import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
+import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -379,6 +466,15 @@ function requireCommissioner(_req: Request, res: Response, next: NextFunction): 
 
 // ─── Keeper secrecy ──────────────────────────────────────────────────────────
 //
+// The commissioner sees every keeper unless he has gone blind (Commish Mode),
+// which makes him a member for keeper secrecy so achievement reveals work for
+// him too. Every check below asks this, never isCommissioner alone.
+
+function seesAllKeepers(state: LeagueDynamicState, isCommissioner: boolean): boolean {
+  return isCommissioner && state.commishBlind !== true;
+}
+
+//
 // Until draft day (DRAFT_AT), each owner may see only their OWN keepers; the
 // commissioner sees everything. Enforced here — every response that carries
 // league state passes through redactState() so the raw payload never leaks.
@@ -440,31 +536,134 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
     },
     viewer: viewer.owner,
     isCommissioner: viewer.isCommissioner,
+    revealsReady: revealsReadyFor(state, viewer),
+    /** The commissioner chose not to see other teams' keepers. Only ever true for him. */
+    commishBlind: viewer.isCommissioner && state.commishBlind === true,
   };
+}
+
+/** Keeper reveals this viewer could spend now. Drives the VAULT badge. */
+function revealsReadyFor(state: LeagueDynamicState, viewer: Viewer): number {
+  if (!viewer.owner || seesAllKeepers(state, viewer.isCommissioner) || state.keepersRevealed === true) return 0;
+  const ledger = ledgerOf(state.achievements);
+  const reveals = ledger.reveals[viewer.owner] ?? [];
+  const left = revealsLeft(earnedCount(ledger.earned[viewer.owner]), reveals.length);
+  return revealsReady(left, hiddenCount(hiddenKeepers(viewer.owner, OWNERS, state.keepers, reveals)));
+}
+
+/**
+ * The keepers this owner has revealed, team by team, as they stand now. A
+ * revealed player the team has since dropped is left out.
+ */
+function revealedKeepersFor(state: LeagueDynamicState, owner: string): Record<string, KeeperSelection[]> {
+  const shown = ledgerOf(state.achievements).reveals[owner] ?? [];
+  const out: Record<string, KeeperSelection[]> = {};
+  for (const target of new Set(shown.map((r) => r.target))) {
+    if (target === owner) continue;
+    const keys = new Set(shown.filter((r) => r.target === target).map((r) => r.playerKey));
+    const kept = (state.keepers[target] ?? []).filter((k) => keys.has(k.playerKey));
+    if (kept.length > 0) out[target] = kept;
+  }
+  return out;
 }
 
 function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer: Viewer) {
   const meta = stateMeta(result.state, viewer);
   let keepers = result.state.keepers;
-  if (!meta.revealed && !viewer.isCommissioner) {
-    keepers =
-      viewer.owner && result.state.keepers[viewer.owner]
-        ? { [viewer.owner]: result.state.keepers[viewer.owner] }
-        : {};
+  if (!meta.revealed && !seesAllKeepers(result.state, viewer.isCommissioner)) {
+    // Your own keepers, plus only the ones you have revealed with achievements.
+    keepers = viewer.owner ? revealedKeepersFor(result.state, viewer.owner) : {};
+    if (viewer.owner && result.state.keepers[viewer.owner]) {
+      keepers[viewer.owner] = result.state.keepers[viewer.owner];
+    }
   }
   // Pending offers are between two members. Accepted trades are league news,
   // so the ledger itself is never redacted.
   const proposals = expireStale(proposalsOf(result.state), new Date().toISOString()).proposals;
-  return {
-    ...result,
-    state: {
-      ...result.state,
-      keepers,
-      pickTransfers: transfersOf(result.state),
-      pickTradeProposals: visibleProposals(proposals, viewer.owner, viewer.isCommissioner),
-    },
-    meta,
+  const state: LeagueDynamicState = {
+    ...result.state,
+    keepers,
+    pickTransfers: transfersOf(result.state),
+    pickTradeProposals: visibleProposals(proposals, viewer.owner, viewer.isCommissioner),
   };
+  // Whose keepers each owner has revealed is theirs alone. Prop bets have
+  // their own route, so they stay out of the poll payload.
+  delete state.achievements;
+  delete state.propBets;
+  return { ...result, state, meta };
+}
+
+// ─── The shared test draft ───────────────────────────────────────────────────
+//
+// A device that has joined the test sends x-test-draft: 1. On the draft
+// routes below that header swaps the league for the test copy, which lives in
+// its own row and writes nothing to the audit log. Any other write carrying it
+// is refused, so a joined device can never touch the real league by mistake.
+
+const TEST_DRAFT_ROUTES = [
+  /^\/state$/,
+  /^\/draft\/pick(\/\d+)?$/,
+  /^\/draft\/clock\/(expire|call|pause|resume)$/,
+  /^\/draft\/auto(\/[^/]+)?$/,
+  /^\/test-draft\/(start|end)$/,
+  /^\/draft-room$/,
+  /^\/draft\/queue$/,
+];
+
+router.use((req, res, next) => {
+  if (req.header(TEST_DRAFT_HEADER) !== '1') {
+    next();
+    return;
+  }
+  if (TEST_DRAFT_ROUTES.some((route) => route.test(req.path))) {
+    res.locals.testDraft = true;
+    res.locals.testDraftStartedAt = req.header(TEST_DRAFT_SESSION_HEADER);
+    next();
+    return;
+  }
+  if (req.method === 'GET') {
+    next();
+    return;
+  }
+  res.status(409).json({ error: 'Leave the test draft before you change the league' });
+});
+
+const inTestDraft = (res: Response): boolean => res.locals.testDraft === true;
+
+/** The league, or the test draft for a device in the test. */
+async function draftState(res: Response): Promise<StateResult> {
+  if (!inTestDraft(res)) return getState();
+  const test = await getTestDraft();
+  if (!test) throw new HttpError(410, 'The test draft has ended');
+  return test;
+}
+
+/** Change the league, or the test draft for a device in the test. */
+async function mutateDraft(res: Response, fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+  if (!inTestDraft(res)) return mutateState(fn);
+  try {
+    return await mutateTestDraft((draft) => {
+      if (!res.locals.testDraftStartedAt || draft.draft.startedAt !== res.locals.testDraftStartedAt) {
+        throw new HttpError(409, 'The test draft changed. Refresh before making a pick.');
+      }
+      fn(draft);
+    });
+  } catch (error) {
+    if (error instanceof TestDraftMissingError) throw new HttpError(410, 'The test draft has ended');
+    throw error;
+  }
+}
+
+/** Test picks stay out of the league's audit log. */
+async function auditDraft(res: Response, action: string, detail: unknown): Promise<void> {
+  if (!inTestDraft(res)) await appendAudit(actor(res), action, detail);
+}
+
+/** A state reply that says whether it came from the test draft. */
+function draftReply<T extends { state: LeagueDynamicState }>(res: Response, result: T, viewer: Viewer) {
+  const body = redactState(result, viewer);
+  if (!inTestDraft(res)) return body;
+  return { ...body, meta: { ...body.meta, testDraft: { running: true, serving: true } } };
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -475,7 +674,16 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
  */
 router.get('/state', async (req, res) => {
   const viewer = await optionalViewer(req);
-  res.json(redactState(await getState(), viewer));
+  const league = await getState();
+  // Once the real draft starts there is no test draft: every joined device
+  // gets the league back and leaves. It also spares every poll a lookup.
+  const test = league.state.draft.startedAt === null ? await getTestDraft() : null;
+  if (inTestDraft(res) && test) {
+    res.json(draftReply(res, test, viewer));
+    return;
+  }
+  const body = redactState(league, viewer);
+  res.json({ ...body, meta: { ...body.meta, testDraft: { running: test !== null, serving: false } } });
 });
 
 /** GET /api/league/player-pool — active or draft-pinned pool. */
@@ -748,11 +956,28 @@ router.post('/team-names/accept', requireAuth, requireCommissioner, async (req, 
 // pool. Any signed-in owner reads them, for the mock draft and projections.
 // Only the commissioner fetches or accepts new ones.
 
+// ─── Award odds and depth charts ─────────────────────────────────────────────
+
+/** GET /api/league/nba-watch — Kalshi award odds and ESPN depth charts. `?fresh=1` reads them again. */
+router.get('/nba-watch', requireAuth, requireCommissioner, async (req, res) => {
+  try {
+    res.json(await getNbaWatch(req.query.fresh === '1'));
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : 'Could not read the odds or depth charts.' });
+  }
+});
+
 // ─── Mock draft history ──────────────────────────────────────────────────────
 //
 // Each signed-in member keeps their own finished, graded mocks. The owner
 // comes from the sign-in, never the body. The commissioner keeps every one;
 // everyone else keeps their latest ten.
+
+/** GET /api/league/mock-stats — every owner's finished mocks and best grade. Everyone sees it. */
+router.get('/mock-stats', requireAuth, async (_req, res) => {
+  const finishes = await listMockFinishes(leagueDataset.season);
+  res.json({ stats: mockStats(OWNERS, finishes) });
+});
 
 /** GET /api/league/mock-results — your saved mocks, newest first. */
 router.get('/mock-results', requireAuth, async (_req, res) => {
@@ -801,30 +1026,33 @@ router.delete('/mock-results/:id', requireAuth, async (req, res) => {
 
 // ─── Projection edits ────────────────────────────────────────────────────────
 //
-// The commissioner's changes to ESPN's projections, one row per player. The
-// client lays them over the accepted rankings snapshot; the snapshot itself is
-// never touched, so a fresh ESPN fetch keeps every edit on top.
+// Each owner's own changes to ESPN's projections, one row per owner and
+// player. Nobody sees another owner's edits; with none, you see ESPN's line.
+// The owner comes from the sign-in, never the body. The client lays the edits
+// over the accepted rankings snapshot; the snapshot itself is never touched,
+// so a fresh ESPN fetch keeps every edit on top.
 
-/** The two games estimates made before edits had a screen, written once. */
+/** The commissioner's two games estimates made before edits had a screen, written once. */
 async function seedProjectionEdits(season: number, by: string): Promise<void> {
   if (!(await claimSentNotice(`projection-edits-seed-${season}`, season))) return;
   const at = new Date().toISOString();
   for (const seed of SEED_EDITS) {
     const edit: ProjectionEdit = { ...seed, editedAt: at, editedBy: by };
-    await saveProjectionEdit({ season, espnId: seed.espnId, edit, updatedAt: at, updatedBy: by });
+    await saveProjectionEdit({ season, owner: by, espnId: seed.espnId, edit, updatedAt: at, updatedBy: by });
   }
 }
 
-/** GET /api/league/projection-edits — every edit this season. Any owner reads; the projections are league-wide. */
+/** GET /api/league/projection-edits — your own edits this season. */
 router.get('/projection-edits', requireAuth, async (_req, res) => {
   const season = leagueDataset.season;
-  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, res.locals.owner as string);
-  const rows = await listProjectionEdits(season);
+  const owner = res.locals.owner as string;
+  if (res.locals.isCommissioner === true) await seedProjectionEdits(season, owner);
+  const rows = await listProjectionEdits(season, owner);
   res.json({ season, edits: rows.map((row) => row.edit) });
 });
 
-/** PUT /api/league/projection-edits/:espnId — save one player's edit. */
-router.put('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+/** PUT /api/league/projection-edits/:espnId — save one player's edit, for you alone. */
+router.put('/projection-edits/:espnId', requireAuth, async (req, res) => {
   const season = leagueDataset.season;
   let parsed;
   try {
@@ -836,21 +1064,29 @@ router.put('/projection-edits/:espnId', requireAuth, requireCommissioner, async 
   const at = new Date().toISOString();
   const by = res.locals.owner as string;
   const edit: ProjectionEdit = { ...parsed, editedAt: at, editedBy: by };
-  await saveProjectionEdit({ season, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
-  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name, games: edit.games, perGame: edit.perGame });
+  await saveProjectionEdit({ season, owner: by, espnId: edit.espnId, edit, updatedAt: at, updatedBy: by });
+  await appendAudit(actor(res), 'projection_edit.saved', { espnId: edit.espnId, name: edit.name });
   res.json({ edit });
 });
 
-/** DELETE /api/league/projection-edits/:espnId — back to ESPN's projection. */
-router.delete('/projection-edits/:espnId', requireAuth, requireCommissioner, async (req, res) => {
+/** DELETE /api/league/projection-edits/:espnId — your line back to ESPN's projection. */
+router.delete('/projection-edits/:espnId', requireAuth, async (req, res) => {
   const espnId = Number(req.params.espnId);
   if (!Number.isInteger(espnId) || espnId <= 0) {
     res.status(400).json({ error: 'That is not a player.' });
     return;
   }
-  await deleteProjectionEdit(leagueDataset.season, espnId);
+  await deleteProjectionEdit(leagueDataset.season, res.locals.owner as string, espnId);
   await appendAudit(actor(res), 'projection_edit.removed', { espnId });
   res.json({ ok: true });
+});
+
+/**
+ * GET /api/league/expert-projections — Hashtag Basketball's lines, for the
+ * commissioner's ESPN, Hashtag or Blend switch. Nobody else sees them.
+ */
+router.get('/expert-projections', requireAuth, requireCommissioner, (_req, res) => {
+  res.json(hashtagProjections);
 });
 
 /** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */
@@ -1027,6 +1263,23 @@ router.put('/keeper-scenario/:target', requireAuth, async (req, res) => {
     (req.body as { selections?: unknown } | undefined)?.selections,
   );
   validateKeeperSelections(current.state, target, selections);
+  // SCOUT counts the first guess only, so keep it before this save can replace it.
+  if (!ledgerOf(current.state.achievements).firstGuesses[viewer]?.[target]) {
+    const saved = (await getKeeperScenario(current.state.season, viewer))[target] ?? [];
+    const at = new Date().toISOString();
+    await mutateState((draft) => {
+      const ledger = ledgerOf(draft.achievements);
+      const guess = firstGuessToRecord(
+        ledger.firstGuesses[viewer]?.[target],
+        saved.map((sel) => sel.playerKey),
+        selections.map((sel) => sel.playerKey),
+        at,
+      );
+      if (!guess) return;
+      ledger.firstGuesses[viewer] = { ...(ledger.firstGuesses[viewer] ?? {}), [target]: guess };
+      draft.achievements = ledger;
+    });
+  }
   const scenario = await setKeeperScenarioTarget(
     current.state.season,
     viewer,
@@ -1087,6 +1340,10 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
   );
 
   const result = await mutateState((draft) => {
+    // Blind, he cannot see what he would overwrite.
+    if (authedOwner !== target && !seesAllKeepers(draft, isCommissioner)) {
+      throw new HttpError(409, "Turn off blind mode in Commish Mode to edit another team's keepers");
+    }
     if (draft.locks.keepersLocked && !isCommissioner) {
       throw new HttpError(423, 'Keepers are locked');
     }
@@ -1095,6 +1352,23 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
   });
   await appendAudit(actor(res), 'keepers.set', { target, selections: clean });
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
+});
+
+/**
+ * POST /api/league/commish-blind — the commissioner stops (or starts) seeing
+ * other teams' keepers, so achievement reveals work for him too.
+ */
+router.post('/commish-blind', requireAuth, requireCommissioner, async (req, res) => {
+  const blind = (req.body as { blind?: unknown } | undefined)?.blind;
+  if (typeof blind !== 'boolean') {
+    res.status(400).json({ error: 'Send blind: true or false' });
+    return;
+  }
+  const result = await mutateState((draft) => {
+    draft.commishBlind = blind;
+  });
+  await appendAudit(actor(res), 'commish.blind', { blind });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /** POST /api/league/keeper-visibility — reveal or hide all keeper names. */
@@ -1125,16 +1399,293 @@ router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, 
  * change and when a screen reports the countdown hit zero. Returns the
  * yielded pick, or null when nothing changed.
  */
-function settleClock(draft: LeagueDynamicState, dataset: LeagueDataset, now: string): number | null {
+function settleClock(
+  draft: LeagueDynamicState,
+  dataset: LeagueDataset,
+  now: string,
+  queues: Readonly<Record<string, string[]>>,
+): { overall: number; playerKey: string | null } | null {
   const clock = draft.draft.clock;
   if (!clock || draft.draft.startedAt === null || !clockExpired(clock, now)) return null;
   const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
   if (!onClock) return null;
+  // Time is up: the team takes the top player in its queue who is still there.
+  const owner = onClock.pick.currentOwner;
+  const available = availablePlayers(dataset, draft);
+  const key = firstQueued(queues[owner], new Set(available.map((player) => player.key)));
+  const player = key ? available.find((entry) => entry.key === key) ?? null : null;
+  if (player) {
+    draft.draft.picks[String(onClock.pick.overall)] = {
+      playerKey: player.key,
+      playerName: player.name,
+      proTeam: player.proTeam,
+      positions: player.positions,
+      isKeeper: false,
+      enteredBy: `${owner} (queue)`,
+      timestamp: now,
+      ...pickTiming(clock, now),
+    };
+    draft.draft.clock = startPickClock(now);
+    return { overall: onClock.pick.overall, playerKey: player.key };
+  }
+  // An empty queue yields the pick, rule 2.3.2.1.
   const next = yieldPick({ clock, skipped: draft.draft.skipped }, onClock.pick.overall, now);
   draft.draft.clock = next.clock;
   draft.draft.skipped = next.skipped;
-  return onClock.pick.overall;
+  return { overall: onClock.pick.overall, playerKey: null };
 }
+
+/** Every queue in the room this request is for. */
+/**
+ * Every queue in the room this request is for. An owner with nothing queued
+ * is read from their saved rankings instead, so a clock that runs out, or
+ * auto, takes their top ranked player still there. The test draft reads the
+ * same rankings: a rehearsal that ignored them would prove nothing.
+ */
+async function queuesFor(res: Response): Promise<Record<string, string[]>> {
+  const queues = await getDraftQueues(inTestDraft(res) ? 'test' : 'league');
+  // No queue, or an empty one: either way there is nothing queued.
+  const missing = OWNERS.filter((owner) => !queues[owner]?.length);
+  const lists = await Promise.all(missing.map((owner) => getDraftList(leagueDataset.season, owner)));
+  missing.forEach((owner, index) => {
+    const list = lists[index];
+    if (list) queues[owner] = queueFromRankings(list.entries);
+  });
+  return queues;
+}
+
+/** Audit what a clock running out did. */
+async function auditSettled(res: Response, settled: { overall: number; playerKey: string | null } | null, at: string): Promise<void> {
+  if (!settled) return;
+  if (settled.playerKey) await auditDraft(res, 'draft.pick_from_queue', { overallPick: settled.overall, playerKey: settled.playerKey, at });
+  else await auditDraft(res, 'draft.pick_yielded', { overallPick: settled.overall, at });
+}
+
+// ─── Auto picks from private lists ───────────────────────────────────────────
+//
+// A member saves a list of names, best first. Nobody else reads it: not another
+// member, not the commissioner, not the commissioner acting as that member.
+// When the commissioner puts a team on auto, the server makes its picks from
+// that list, and from the board's own order once the list runs dry. The test
+// draft reads the same lists, so a rehearsal shows what draft day will do.
+
+/** The signed-in member, and never the commissioner wearing their seat. */
+function listOwner(res: Response): string {
+  if (res.locals.actingBy) {
+    throw new HttpError(403, "A member's rankings are theirs alone. They stay closed while you act as them.");
+  }
+  return res.locals.owner as string;
+}
+
+/** GET /api/league/draft-list — your own private list. */
+router.get('/draft-list', requireAuth, async (_req, res) => {
+  const owner = listOwner(res);
+  const { state } = await getState();
+  res.json({ season: state.season, list: await getDraftList(state.season, owner) });
+});
+
+/** PUT /api/league/draft-list — save your list. Body: { text: string }, one name a line. */
+router.put('/draft-list', requireAuth, async (req, res) => {
+  const owner = listOwner(res);
+  const text = (req.body as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') {
+    res.status(400).json({ error: 'Send the list as text, one name a line' });
+    return;
+  }
+  if (text.length > DRAFT_LIST_MAX_CHARS) {
+    res.status(400).json({ error: 'That list is too long. Names only, one a line.' });
+    return;
+  }
+  const { state } = await getState();
+  const dataset = currentDataset(state, await resolveDraftDataset(state));
+  const list = buildDraftList(text, dataset.players, new Date().toISOString());
+  if (list.entries.length === 0) {
+    await setDraftList(state.season, owner, null);
+    res.json({ season: state.season, list: null });
+    return;
+  }
+  await setDraftList(state.season, owner, list);
+  res.json({ season: state.season, list });
+});
+
+/** DELETE /api/league/draft-list — clear your list. */
+router.delete('/draft-list', requireAuth, async (_req, res) => {
+  const owner = listOwner(res);
+  const { state } = await getState();
+  await setDraftList(state.season, owner, null);
+  res.json({ season: state.season, list: null });
+});
+
+// ─── A steward enters rankings for others ───────────────────────────────────
+//
+// One trusted member (config: rankingsSteward) may open any other member's
+// rankings and save them on their behalf, for someone who cannot be at the
+// draft and does not want to use the app. The commissioner is never a steward
+// and acting as the steward does not make one. Each save is logged with a
+// count of names, never the names.
+
+/** The signed-in steward, or a 403. */
+function stewardFor(res: Response, target: string): string {
+  const owner = listOwner(res);
+  if (!isRankingsSteward(owner)) throw new HttpError(403, 'Only a rankings steward can open another member\'s rankings');
+  if (!isKnownOwner(target)) throw new HttpError(404, `Unknown owner: ${target}`);
+  if (target === owner) throw new HttpError(400, 'Use your own rankings page for your own team');
+  return owner;
+}
+
+/** GET /api/league/draft-list/access — who the signed-in member may enter rankings for. */
+router.get('/draft-list/access', requireAuth, async (_req, res) => {
+  const owner = res.locals.owner as string;
+  const steward = !res.locals.actingBy && isRankingsSteward(owner);
+  res.json({ stewardFor: steward ? OWNERS.filter((entry) => entry !== owner) : [] });
+});
+
+/** GET /api/league/draft-list/for/:owner — another member's rankings, for a steward. */
+router.get('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  stewardFor(res, target);
+  const { state } = await getState();
+  res.json({ season: state.season, owner: target, list: await getDraftList(state.season, target) });
+});
+
+/** PUT /api/league/draft-list/for/:owner — save another member's rankings, for a steward. */
+router.put('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const steward = stewardFor(res, target);
+  const text = (req.body as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') {
+    res.status(400).json({ error: 'Send the list as text, one name a line' });
+    return;
+  }
+  if (text.length > DRAFT_LIST_MAX_CHARS) {
+    res.status(400).json({ error: 'That list is too long. Names only, one a line.' });
+    return;
+  }
+  const { state } = await getState();
+  const dataset = currentDataset(state, await resolveDraftDataset(state));
+  const list = buildDraftList(text, dataset.players, new Date().toISOString());
+  const saved = list.entries.length > 0 ? list : null;
+  await setDraftList(state.season, target, saved);
+  await appendAudit(steward, 'draft_list.saved_for', { owner: target, names: saved?.entries.length ?? 0 });
+  res.json({ season: state.season, owner: target, list: saved });
+});
+
+/** DELETE /api/league/draft-list/for/:owner — clear another member's rankings, for a steward. */
+router.delete('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const steward = stewardFor(res, target);
+  const { state } = await getState();
+  await setDraftList(state.season, target, null);
+  await appendAudit(steward, 'draft_list.cleared_for', { owner: target });
+  res.json({ season: state.season, owner: target, list: null });
+});
+
+/**
+ * GET /api/league/draft/auto — who is on auto, and who has a list saved
+ * (commissioner only). Names only; no list is ever read here.
+ */
+router.get('/draft/auto', requireAuth, requireCommissioner, async (_req, res) => {
+  const { state } = await draftState(res);
+  res.json({
+    autoOwners: state.draft.autoOwners ?? [],
+    listOwners: await draftListOwners(state.season),
+  });
+});
+
+/** The board moved under an auto pick; somebody else got there first. Nothing to do. */
+class AutoStale extends Error {}
+
+/**
+ * Picks for every team on auto until a team that picks for itself is on the
+ * clock, or the clock is paused. Runs after anything that can put a new team
+ * on the clock. Returns the latest state, or null when nothing was picked.
+ */
+async function runAutoPicks(res: Response, draftPoolDataset: LeagueDataset): Promise<MutateResult | null> {
+  let latest: MutateResult | null = null;
+  let rankings: DraftRankingSnapshot | null = null;
+  // Each team's live queue, which falls back to its saved rankings. A member
+  // who reorders their queue mid-draft changes what auto takes for them.
+  const queues = await queuesFor(res);
+  for (let guard = 0; guard < 200; guard += 1) {
+    const current = latest ?? await draftState(res);
+    const state = current.state;
+    if (state.draft.startedAt === null || state.draft.closedAt || isPaused(state.draft.clock)) return latest;
+    const dataset = currentDataset(state, draftPoolDataset);
+    const onClock = buildDraftBoard(dataset, state).find((cell) => cell.onClock);
+    if (!onClock || !isOnAuto(state, onClock.pick.currentOwner)) return latest;
+    const owner = onClock.pick.currentOwner;
+    const overall = onClock.pick.overall;
+    const list = { entries: (queues[owner] ?? []).map((playerKey) => ({ playerKey })) };
+    rankings ??= await resolveCurrentDraftRankings(state);
+    const available = availablePlayers(dataset, state);
+    const fallback = rankBoard(available, rankings).entries.map((entry) => entry.player);
+    const choice = nextAutoPick(list, available, fallback);
+    if (!choice) return latest;
+    const { player } = choice;
+    const timestamp = new Date().toISOString();
+    try {
+      latest = await mutateDraft(res, (draft) => {
+        const live = currentDataset(draft, draftPoolDataset);
+        const cell = buildDraftBoard(live, draft).find((entry) => entry.onClock);
+        if (!cell || cell.pick.overall !== overall || cell.pick.currentOwner !== owner) throw new AutoStale();
+        if (!isOnAuto(draft, owner) || isPaused(draft.draft.clock)) throw new AutoStale();
+        if (!availablePlayers(live, draft).some((entry) => entry.key === player.key)) throw new AutoStale();
+        draft.draft.picks[String(overall)] = {
+          playerKey: player.key,
+          playerName: player.name,
+          proTeam: player.proTeam,
+          positions: player.positions,
+          isKeeper: false,
+          enteredBy: owner,
+          auto: true,
+          timestamp,
+          ...pickTiming(draft.draft.clock, timestamp),
+        };
+        draft.draft.clock = startPickClock(timestamp, isPaused(draft.draft.clock));
+      });
+    } catch (error) {
+      if (error instanceof AutoStale) return latest;
+      throw error;
+    }
+    await auditDraft(res, 'draft.pick', {
+      overallPick: overall,
+      playerKey: player.key,
+      playerName: player.name,
+      proTeam: player.proTeam,
+      positions: player.positions,
+      isKeeper: false,
+      writeIn: false,
+      auto: true,
+    });
+  }
+  return latest;
+}
+
+/**
+ * POST /api/league/draft/auto/:owner — put a team on auto, or take it off
+ * (commissioner only). Body: { on: boolean }. Putting a team on auto while it
+ * is on the clock makes its pick at once.
+ */
+router.post('/draft/auto/:owner', requireAuth, requireCommissioner, async (req, res) => {
+  const owner = routeParam(req.params.owner);
+  if (!isKnownOwner(owner)) {
+    res.status(404).json({ error: `Unknown owner: ${owner}` });
+    return;
+  }
+  const on = (req.body as { on?: unknown } | undefined)?.on;
+  if (typeof on !== 'boolean') {
+    res.status(400).json({ error: 'on must be true or false' });
+    return;
+  }
+  const current = await draftState(res);
+  const draftPoolDataset = await resolveDraftDataset(current.state);
+  const result = await mutateDraft(res, (draft) => {
+    draft.draft.autoOwners = withAuto(draft.draft.autoOwners, owner, on);
+  });
+  await auditDraft(res, on ? 'draft.auto_on' : 'draft.auto_off', { owner });
+  const auto = on ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
 
 /**
  * POST /api/league/draft/clock/expire — a screen saw the countdown hit zero.
@@ -1142,15 +1693,18 @@ function settleClock(draft: LeagueDynamicState, dataset: LeagueDataset, now: str
  * does nothing when time is still left or the pick already moved on.
  */
 router.post('/draft/clock/expire', requireAuth, async (_req, res) => {
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
-  let yielded: number | null = null;
-  const result = await mutateState((draft) => {
-    yielded = settleClock(draft, currentDataset(draft, draftPoolDataset), now);
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
+  const result = await mutateDraft(res, (draft) => {
+    settled = settleClock(draft, currentDataset(draft, draftPoolDataset), now, queues);
   });
-  if (yielded !== null) await appendAudit(actor(res), 'draft.pick_yielded', { overallPick: yielded, at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
+  await auditSettled(res, settled, now);
+  // The clock moved on; the team now up may be on auto.
+  const auto = settled !== null ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
 });
 
 /**
@@ -1175,7 +1729,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
 
   const authedOwner = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   // A write-in is a player the locked pool does not have: name, team and position typed in.
   const writeIn = body.writeIn === true;
@@ -1196,12 +1750,14 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     player = found;
   }
   const timestamp = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
     const dataset = currentDataset(draft, draftPoolDataset);
-    settleClock(draft, dataset, timestamp);
+    settled = settleClock(draft, dataset, timestamp, queues);
     const board = buildDraftBoard(dataset, draft);
     const onClock = board.find((cell) => cell.onClock);
     // A yielded pick is its owner's to fill any time, rule 2.3.2.2.
@@ -1245,7 +1801,8 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       draft.draft.clock = startPickClock(timestamp, isPaused(draft.draft.clock));
     }
   });
-  await appendAudit(actor(res), 'draft.pick', {
+  await auditSettled(res, settled, timestamp);
+  await auditDraft(res, 'draft.pick', {
     overallPick,
     playerKey: player.key,
     playerName: player.name,
@@ -1254,7 +1811,9 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     isKeeper: false,
     writeIn,
   });
-  res.json(redactState(result, { owner: authedOwner, isCommissioner }));
+  // The next team may be on auto; its pick lands before this reply goes out.
+  const auto = await runAutoPicks(res, draftPoolDataset);
+  res.json(draftReply(res, auto ?? result, { owner: authedOwner, isCommissioner }));
 });
 
 /**
@@ -1266,7 +1825,7 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
     res.status(400).json({ error: 'Invalid overallPick' });
     return;
   }
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     const was = draft.draft.picks[String(overallPick)];
     delete draft.draft.picks[String(overallPick)];
     if (was?.skipped) {
@@ -1277,8 +1836,8 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
       draft.draft.clock = startPickClock(new Date().toISOString(), isPaused(draft.draft.clock));
     }
   });
-  await appendAudit(actor(res), 'draft.pick_cleared', { overallPick });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.pick_cleared', { overallPick });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1304,8 +1863,11 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
       draft.draft.clock = startPickClock(draft.draft.startedAt);
     }
   });
+  // The real draft closes any test draft, so no phone keeps picking in it.
+  await setTestDraft(null);
   await appendAudit(actor(res), 'draft.started', null);
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  const auto = await runAutoPicks(res, await resolveDraftDataset(result.state));
+  res.json(redactState(auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1317,14 +1879,16 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
 router.post('/draft/clock/call', requireAuth, async (_req, res) => {
   const caller = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
   let calledOn = '';
-  const result = await mutateState((draft) => {
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) throw new HttpError(409, 'The draft has not started');
     const dataset = currentDataset(draft, draftPoolDataset);
-    settleClock(draft, dataset, now);
+    settled = settleClock(draft, dataset, now, queues);
     const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock) ?? null;
     const check = canCallClock({ clock: draft.draft.clock, picks: draft.draft.picks, onClock, caller, isCommissioner, now });
     if (!check.ok) {
@@ -1342,30 +1906,33 @@ router.post('/draft/clock/call', requireAuth, async (_req, res) => {
     calledOn = onClock!.pick.currentOwner;
     draft.draft.clock = callClock(draft.draft.clock!, caller, now);
   });
-  await appendAudit(actor(res), 'draft.clock_called', { on: calledOn, at: now });
-  res.json(redactState(result, { owner: caller, isCommissioner }));
+  await auditSettled(res, settled, now);
+  await auditDraft(res, 'draft.clock_called', { on: calledOn, at: now });
+  const auto = settled !== null ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: caller, isCommissioner }));
 });
 
 /** POST /api/league/draft/clock/pause — freeze the pick timer and any CLOCK (commissioner only). */
 router.post('/draft/clock/pause', requireAuth, requireCommissioner, async (_req, res) => {
   const now = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
     draft.draft.clock = pauseClock(draft.draft.clock, now);
   });
-  await appendAudit(actor(res), 'draft.clock_paused', { at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.clock_paused', { at: now });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /** POST /api/league/draft/clock/resume — let the clock run again (commissioner only). */
 router.post('/draft/clock/resume', requireAuth, requireCommissioner, async (_req, res) => {
   const now = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
     draft.draft.clock = resumeClock(draft.draft.clock, now);
   });
-  await appendAudit(actor(res), 'draft.clock_resumed', { at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.clock_resumed', { at: now });
+  const auto = await runAutoPicks(res, await resolveDraftDataset(result.state));
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1411,6 +1978,55 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
   });
   await appendAudit(actor(res), 'draft.reset', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/draft/queue — save the signed-in owner's queue. When a
+ * called CLOCK runs out on their pick, they take the top player still there.
+ * The test draft keeps its own queues.
+ */
+router.post('/draft/queue', requireAuth, async (req, res) => {
+  const keys = cleanQueue((req.body as { keys?: unknown } | undefined)?.keys);
+  if (!keys) {
+    res.status(400).json({ error: 'keys must be a list of player keys' });
+    return;
+  }
+  await setDraftQueue(inTestDraft(res) ? 'test' : 'league', res.locals.owner as string, keys);
+  res.json({ ok: true, keys });
+});
+
+/**
+ * POST /api/league/draft-room — the draft page checks in every few seconds
+ * and gets back who else has it open. The test draft has its own room.
+ */
+router.post('/draft-room', requireAuth, async (_req, res) => {
+  const room = inTestDraft(res) ? 'test' : 'league';
+  const now = Date.now();
+  await touchPresence(room, res.locals.owner as string, new Date(now).toISOString());
+  const rows = await listPresence(room, new Date(now - PRESENCE_WINDOW_MS).toISOString());
+  res.json({ room, owners: inRoom(rows, now, OWNERS) });
+});
+
+/**
+ * POST /api/league/test-draft/start — open the shared test draft, or start it
+ * over (commissioner only). Members join it from their draft page.
+ */
+router.post('/test-draft/start', requireAuth, requireCommissioner, async (_req, res) => {
+  const { state } = await getState();
+  if (state.draft.startedAt !== null) throw new HttpError(409, 'The real draft has started. Test drafts are closed.');
+  await setTestDraft(testDraftState(state, new Date().toISOString(), FALLBACK_PLAYER_POOL.id));
+  await appendAudit(actor(res), 'test-draft.started', null);
+  const test = await getTestDraft();
+  if (!test) throw new HttpError(500, 'The test draft did not save');
+  res.locals.testDraft = true;
+  res.json(draftReply(res, test, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/** POST /api/league/test-draft/end — close the test draft for everyone (commissioner only). */
+router.post('/test-draft/end', requireAuth, requireCommissioner, async (_req, res) => {
+  await setTestDraft(null);
+  await appendAudit(actor(res), 'test-draft.ended', null);
+  res.json({ ok: true });
 });
 
 /**
@@ -1930,6 +2546,28 @@ router.post('/rulebook/sign-request', requireAuth, requireCommissioner, async (r
  * one member's signature on the revision in force, so they can sign again.
  * Audited, since a signature is otherwise never touched.
  */
+/**
+ * POST /api/league/rulebook/fold — fold the newest revision into the one
+ * before it, so a fix everyone already understands costs nobody a second
+ * signature (commissioner only). Body: { versionId } of the newest, as the
+ * page showed it. Refused once anyone has signed the newest.
+ */
+router.post('/rulebook/fold', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const versionId = (req.body as { versionId?: unknown }).versionId;
+    if (typeof versionId !== 'string' || !versionId) throw new HttpError(400, 'versionId is required');
+    const result = await foldLatestRulebookVersion(RULEBOOK_SEASON, versionId);
+    await appendAudit(actor(res), 'rulebook-fold', result);
+    res.json(result);
+  } catch (err) {
+    if (err instanceof RulebookPublishError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
 router.delete('/rulebook/signatures/:owner', requireAuth, requireCommissioner, async (req, res, next) => {
   try {
     const owner = String(req.params.owner);
@@ -2561,7 +3199,7 @@ router.post('/pick-trades/preview', requireAuth, async (req, res, next) => {
     res.json(
       previewProposal(currentDataset(state), state, input, {
         owner,
-        isCommissioner: isCommish,
+        isCommissioner: seesAllKeepers(state, isCommish),
         revealed: state.keepersRevealed === true,
       }),
     );
@@ -2643,6 +3281,466 @@ router.post('/pick-trades', requireAuth, async (req, res, next) => {
     });
     // After the answer, never before it. The offer is saved either way.
     notifyTradeOffered(proposal, appOrigin(req));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Mock draft with a friend ────────────────────────────────────────────────
+//
+// Two people at one table, or more, and the rest of the room computers. The
+// room lives here so every phone sees the same draft; the rules are in
+// src/lib/league/sharedMock.ts. Only the people asked to a room can read or
+// change it. Each phone replays the draft itself; the server never does.
+
+/** The season's rooms this owner was asked to and has not cleared, newest first. */
+async function sharedMocksFor(owner: string): Promise<SharedMockRoom[]> {
+  const rows = await listSharedMocks(leagueDataset.season, owner);
+  return rows
+    .map((row) => parseSharedMockRoom(row.room))
+    .filter((room): room is SharedMockRoom => room !== null && showsFor(room, owner));
+}
+
+/** A room by its id, or null. The caller decides who may see it. */
+async function sharedMockById(id: string): Promise<SharedMockRoom | null> {
+  const row = await getSharedMock(id);
+  return row ? parseSharedMockRoom(row.room) : null;
+}
+
+/** Change one room and answer with it. A rule broken on the way is a 409 in plain words. */
+async function changeSharedMock(
+  res: Response,
+  id: string,
+  mutate: (room: SharedMockRoom, at: string) => SharedMockRoom,
+): Promise<void> {
+  const at = new Date().toISOString();
+  try {
+    const row = await updateSharedMock(id, (value) => {
+      const room = parseSharedMockRoom(value);
+      if (!room) throw new HttpError(500, 'That mock cannot be read.');
+      return mutate(room, at);
+    }, at);
+    res.json({ room: row.room, now: at });
+  } catch (err) {
+    if (err instanceof SharedMockWriteError) {
+      res.status(err.code === 'not-found' ? 404 : 409).json({ error: err.code === 'not-found' ? 'No such mock.' : err.message });
+      return;
+    }
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    if (err instanceof Error) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+}
+
+/** The open rooms still waiting to start, which anyone may join. */
+async function openSharedMocks(): Promise<SharedMockRoom[]> {
+  const rows = await listOpenSharedMocks(leagueDataset.season);
+  return rows
+    .map((row) => parseSharedMockRoom(row.room))
+    .filter((room): room is SharedMockRoom => room !== null && room.open === true && sharedMockPhase(room) === 'waiting');
+}
+
+/**
+ * GET /api/league/shared-mocks — the mocks you are in and have not cleared,
+ * plus any open room waiting for people, so the mock page can offer it.
+ */
+router.get('/shared-mocks', requireAuth, async (_req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const mine = await sharedMocksFor(owner);
+    const seen = new Set(mine.map((room) => room.id));
+    const open = (await openSharedMocks()).filter((room) => !seen.has(room.id));
+    res.json({ rooms: [...mine, ...open], now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/open — open a room anyone may join. One
+ * open room in the league at a time, and you start it when you are ready.
+ */
+router.post('/shared-mocks/open', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const mode = body.mode === 'sharp' || body.mode === 'realistic' ? body.mode : null;
+    if (!mode) {
+      res.status(400).json({ error: 'Pick a room: sharp or normal.' });
+      return;
+    }
+    const waiting = (await openSharedMocks())[0];
+    if (waiting) {
+      res.status(409).json({ error: `${waiting.host}'s room is already open. Join it instead.` });
+      return;
+    }
+    const busy = (room: SharedMockRoom) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+    const mine = (await sharedMocksFor(owner)).find(busy);
+    if (mine) {
+      res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const room = openSharedMock({ id: sharedMockId(at, Math.random()), season: leagueDataset.season, host: owner, mode, at });
+    await insertSharedMock({ id: room.id, season: room.season, room, version: 0, updatedAt: at });
+    res.json({ room, now: at });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks — ask somebody to a mock. One open mock a person. */
+router.post('/shared-mocks', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const guest = typeof body.with === 'string' ? body.with : '';
+    if (!OWNERS.includes(guest) || guest === owner) {
+      res.status(400).json({ error: 'Pick somebody in the league to draft with.' });
+      return;
+    }
+    const mode = body.mode === 'sharp' || body.mode === 'realistic' ? body.mode : null;
+    if (!mode) {
+      res.status(400).json({ error: 'Pick a room: sharp or normal.' });
+      return;
+    }
+    const open = (room: SharedMockRoom) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+    const mine = (await sharedMocksFor(owner)).find(open);
+    if (mine) {
+      res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+      return;
+    }
+    const theirs = (await sharedMocksFor(guest)).find((room) => sharedMockPhase(room) === 'live');
+    if (theirs) {
+      res.status(409).json({ error: `${guest} is in a mock right now.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const room = newSharedMock({
+      id: sharedMockId(at, Math.random()),
+      season: leagueDataset.season,
+      host: owner,
+      guests: [guest],
+      mode,
+      at,
+    });
+    await insertSharedMock({ id: room.id, season: room.season, room, version: 0, updatedAt: at });
+    res.json({ room, now: at });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/league/shared-mocks/:id — one room, for the people in it, with
+ * their real keepers, which they show each other by sitting down. Anyone may
+ * look at an open room that is still waiting, so the link invites, but the
+ * keepers come only once they are in.
+ */
+router.get('/shared-mocks/:id', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const room = await sharedMockById(routeParam(req.params.id));
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    const inRoom = room.people.includes(owner);
+    if (!inRoom && !(room.open === true && sharedMockPhase(room) === 'waiting')) {
+      res.status(403).json({ error: `This mock is ${namesOf(room.people)}'s.` });
+      return;
+    }
+    const keepers: Record<string, KeeperSelection[]> = {};
+    if (inRoom) {
+      const { state } = await getState();
+      for (const person of room.people) keepers[person] = (state.keepers[person] ?? []).map((keeper) => ({ ...keeper }));
+    }
+    res.json({ room, keepers, now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks/:id/start — the host starts an open room. */
+router.post('/shared-mocks/:id/start', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const { state } = await getState();
+    const dataset = currentDataset(state);
+    await changeSharedMock(res, routeParam(req.params.id), (current, at) => startOpenSharedMock(current, owner, at, () => ({
+      board: sharedMockBoard(dataset, state, current.people),
+      seed: Math.floor(Math.random() * 100_000),
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/join — take your seat. When the last
+ * person sits down the draft starts: the board is built here, from the
+ * league as it stands, and frozen into the room.
+ */
+router.post('/shared-mocks/:id/join', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const id = routeParam(req.params.id);
+    const room = await sharedMockById(id);
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    if (!room.open && !room.people.includes(owner)) {
+      res.status(403).json({ error: 'You were not asked to this mock.' });
+      return;
+    }
+    if (room.open && !room.people.includes(owner)) {
+      const busy = (entry: SharedMockRoom) => entry.id !== room.id && (sharedMockPhase(entry) === 'waiting' || sharedMockPhase(entry) === 'live');
+      const mine = (await sharedMocksFor(owner)).find(busy);
+      if (mine) {
+        res.status(409).json({ error: `You have a mock open with ${namesOf(othersAt(mine, owner))}. Quit it first.` });
+        return;
+      }
+    }
+    // Everything the board needs is read first, so the write itself stays quick.
+    const { state } = await getState();
+    const dataset = currentDataset(state);
+    await changeSharedMock(res, id, (current, at) => joinSharedMock(current, owner, at, () => ({
+      board: sharedMockBoard(dataset, state, current.people),
+      seed: Math.floor(Math.random() * 100_000),
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** The pick and player a body names, or null with the complaint sent. */
+function sharedPickBody(req: Request, res: Response): { overall: number; playerKey: string } | null {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const overall = Number(body.overall);
+  const playerKey = typeof body.playerKey === 'string' ? body.playerKey.trim() : '';
+  if (!Number.isInteger(overall) || overall <= 0 || playerKey === '' || playerKey.length > 80) {
+    res.status(400).json({ error: 'Say which pick and which player.' });
+    return null;
+  }
+  return { overall, playerKey };
+}
+
+/** POST /api/league/shared-mocks/:id/pick — your pick, on your clock. */
+router.post('/shared-mocks/:id/pick', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const pick = sharedPickBody(req, res);
+    if (!pick) return;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) =>
+      pickInSharedMock(room, owner, pick.overall, pick.playerKey, at, 'pick'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/expire — the clock ran out, so the room
+ * makes the pick. The person on the clock may say so the moment it hits
+ * zero; anyone else at the table a few seconds later.
+ */
+router.post('/shared-mocks/:id/expire', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const pick = sharedPickBody(req, res);
+    if (!pick) return;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) => {
+      if (!clockHasRunOut(room, owner, Date.parse(at))) throw new Error('Time is not up yet.');
+      return pickInSharedMock(room, owner, pick.overall, pick.playerKey, at, 'auto');
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/shared-mocks/:id/quit — leave. A draft under way ends for everyone. */
+router.post('/shared-mocks/:id/quit', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    await changeSharedMock(res, routeParam(req.params.id), (room, at) => quitSharedMock(room, owner, at));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/shared-mocks/:id/results — the grades, one per person,
+ * from whichever phone finishes the replay first. Each lands in that
+ * person's Past mocks and counts in Mocks done. The same draft saves once.
+ */
+router.post('/shared-mocks/:id/results', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const room = await sharedMockById(routeParam(req.params.id));
+    if (!room) {
+      res.status(404).json({ error: 'No such mock.' });
+      return;
+    }
+    if (!room.joined.includes(owner)) {
+      res.status(403).json({ error: 'You are not in this mock.' });
+      return;
+    }
+    if (sharedMockPhase(room) !== 'finished') {
+      res.status(409).json({ error: 'This mock is not finished.' });
+      return;
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const results = Array.isArray(body.results) ? body.results.slice(0, MAX_PEOPLE) : [];
+    const saved: string[] = [];
+    for (const entry of results) {
+      const who = typeof (entry as { owner?: unknown })?.owner === 'string' ? (entry as { owner: string }).owner : '';
+      if (!room.joined.includes(who)) continue;
+      let record: MockResultRecord;
+      try {
+        record = parseMockResult(who, { ...(entry as Record<string, unknown>), vs: othersAt(room, who) });
+      } catch {
+        continue;
+      }
+      const keep = isCommissionerOwner(who) ? null : MEMBER_MOCK_LIMIT;
+      // Your own phone grades you on your own numbers, so your own post
+      // takes over your record. Another phone's grade of you only fills a
+      // gap, since it is on the room's numbers.
+      if (who === owner) await deleteMockResult(leagueDataset.season, who, record.id);
+      await saveMockResult({ season: leagueDataset.season, owner: who, id: record.id, result: record, createdAt: record.finishedAt }, keep);
+      saved.push(who);
+    }
+    res.json({ saved });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Mock trades ─────────────────────────────────────────────────────────────
+//
+// An offer the member builds and keeps for themselves, to draft off in the
+// mock draft. It never reaches the other owner and sends no email. Only the
+// owner from the sign-in can read, add or delete theirs.
+
+/** GET /api/league/pick-trades/mock — your mock trades, oldest first. */
+router.get('/pick-trades/mock', requireAuth, async (_req, res) => {
+  res.json({ trades: await listMockTrades(leagueDataset.season, res.locals.owner as string) });
+});
+
+/** POST /api/league/pick-trades/mock — keep a trade as a mock. Same checks as a real offer; nothing is sent. */
+router.post('/pick-trades/mock', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const input: ProposalInput = {
+      proposer: owner,
+      recipient: typeof body.recipient === 'string' ? body.recipient : '',
+      offer: parsePickRefs(body.offer, 'offer', leagueDataset.season),
+      request: parsePickRefs(body.request, 'request', leagueDataset.season),
+      note: typeof body.note === 'string' ? body.note.trim().slice(0, MAX_TRADE_NOTE) : '',
+    };
+    const { state } = await getState();
+    const check = checkProposalAgainstState(currentDataset(state), state, input);
+    if (!check.ok) {
+      res.status(409).json({ error: check.message, code: check.reason });
+      return;
+    }
+    const existing = await listMockTrades(leagueDataset.season, owner);
+    if (existing.length >= MAX_MOCK_TRADES) {
+      res.status(409).json({ error: `Keep it to ${MAX_MOCK_TRADES} mock trades. Delete one first.` });
+      return;
+    }
+    const at = new Date().toISOString();
+    const trade: MockTrade = {
+      id: mockTradeId(owner, at),
+      season: leagueDataset.season,
+      owner,
+      recipient: input.recipient,
+      offer: input.offer,
+      request: input.request,
+      note: input.note,
+      createdAt: at,
+    };
+    await saveMockTrade(trade);
+    res.json({ trade });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** DELETE /api/league/pick-trades/mock/:id — drop one of your mock trades. */
+router.delete('/pick-trades/mock/:id', requireAuth, async (req, res) => {
+  await deleteMockTrade(leagueDataset.season, res.locals.owner as string, routeParam(req.params.id));
+  res.json({ ok: true });
+});
+
+/**
+ * POST /pick-trades/:id/revise — the member who sent an offer changes it and
+ * sends it again. Same partner, new picks and note. Every check a new offer
+ * gets runs again inside the write, and the other member is mailed.
+ */
+router.post('/pick-trades/:id/revise', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const isCommish = res.locals.isCommissioner === true;
+    const id = routeParam(req.params.id);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const version = typeof body.version === 'number' ? body.version : NaN;
+    const offer = parsePickRefs(body.offer, 'offer', leagueDataset.season);
+    const want = parsePickRefs(body.request, 'request', leagueDataset.season);
+    const note = typeof body.note === 'string' ? body.note.trim().slice(0, MAX_TRADE_NOTE) : '';
+
+    const now = new Date().toISOString();
+    const outcomes: TradeOutcome[] = [];
+    const result = await mutateState((draft) => {
+      outcomes.length = 0;
+      const proposals = expireStale(proposalsOf(draft), now).proposals;
+      draft.pickTradeProposals = proposals;
+      const index = proposals.findIndex((p) => p.id === id);
+      if (index === -1) {
+        outcomes.push({ refusal: { status: 404, message: 'No such offer' } });
+        return;
+      }
+      const current = proposals[index];
+      const allowed = canRevise(current, owner, version);
+      if (!allowed.ok) {
+        outcomes.push({
+          refusal: {
+            status: allowed.reason === 'not-yours-to-answer' ? 403 : 409,
+            message: allowed.message ?? '',
+            code: allowed.reason,
+          },
+        });
+        return;
+      }
+      const input: ProposalInput = { proposer: owner, recipient: current.recipient, offer, request: want, note };
+      const shape = checkProposalShape(leagueDataset, input, tradeWindow(draft) !== 'in-season');
+      const check = shape.ok ? checkProposalAgainstState(currentDataset(draft), draft, input) : shape;
+      if (!check.ok) {
+        outcomes.push({ refusal: { status: 409, message: check.message ?? '', code: check.reason } });
+        return;
+      }
+      const revised = reviseProposal(current, input, now);
+      draft.pickTradeProposals = proposals.map((p, i) => (i === index ? revised : p));
+      outcomes.push({ proposal: revised });
+    });
+
+    if (sendOutcome(res, outcomes[0])) return;
+    const proposal = outcomes[0]?.proposal;
+    if (!proposal) throw new HttpError(500, 'The offer could not be saved');
+    await appendAudit(actor(res), 'pick-trade.revised', {
+      proposalId: proposal.id,
+      recipient: proposal.recipient,
+      offer: proposal.offer,
+      request: proposal.request,
+    });
+    res.json({ proposal, ...redactState(result, { owner, isCommissioner: isCommish }) });
+    notifyTradeOffered(proposal, appOrigin(req), true);
   } catch (err) {
     next(err);
   }
@@ -3252,7 +4350,13 @@ router.get('/history/versions/:id', async (req, res, next) => {
 router.get('/audit', requireAuth, requireCommissioner, async (req, res) => {
   const parsed = parseInt(String(req.query.limit ?? '50'), 10);
   const limit = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 200) : 50;
-  res.json(await readAudit(limit));
+  const [rows, { state }] = await Promise.all([readAudit(limit), getState()]);
+  // Blind means blind: the log would otherwise name every keeper saved.
+  if (!seesAllKeepers(state, true) && state.keepersRevealed !== true) {
+    res.json(rows.map((row) => (row.action === 'keepers.set' ? { ...row, detail: { target: (row.detail as { target?: unknown } | null)?.target ?? null } } : row)));
+    return;
+  }
+  res.json(rows);
 });
 
 // ─── Error handler ───────────────────────────────────────────────────────────
@@ -3414,6 +4518,374 @@ router.put('/games-caps/:matchupPeriod', requireAuth, requireCommissioner, async
     next(err);
   }
 });
+
+// ─── Achievements ────────────────────────────────────────────────────────────
+//
+// Each achievement buys one look at one keeper. What an owner has done is read
+// from the league's own records every time, then stamped into the ledger so it
+// sticks. See src/lib/league/achievements.ts.
+
+/** What owners have done, from the records. Everyone by default; one owner for a quick check. */
+async function achievementFacts(
+  state: LeagueDynamicState,
+  who: readonly string[] = OWNERS,
+): Promise<Record<string, OwnerFacts>> {
+  const season = leagueDataset.season;
+  const [signatures, polls, dues, finishes, mocks] = await Promise.all([
+    listRulebookSignatures(RULEBOOK_SEASON),
+    seasonPolls(),
+    listDues(DUES_SEASON),
+    listMockFinishes(season),
+    Promise.all(who.map((owner) => listMockResults(season, owner))),
+  ]);
+  // The same counts the MOCKS DONE table shows, from the log that is never trimmed.
+  const mockRows = new Map(mockStats(OWNERS, finishes).map((row) => [row.owner, row]));
+  const ledger = ledgerOf(state.achievements);
+  const proposals = proposalsOf(state);
+  const props = allProps(state);
+  const facts: Record<string, OwnerFacts> = {};
+  who.forEach((owner, i) => {
+    const saved = mocks[i].map((row) => row.result as Partial<MockResultRecord> | null);
+    const visible = visibleProps(props, [owner]);
+    const sides = visible.filter((p) => p.takes.some((t) => t.owner === owner)).length;
+    const mine = proposals.filter((p) => p.proposer === owner);
+    // A commissioner who sees every keeper proves nothing by guessing.
+    const guesses = seesAllKeepers(state, isCommissionerOwner(owner)) ? { hits: 0, near: 0 } : keeperGuessScore(state, ledger, owner);
+    facts[owner] = {
+      ...NO_FACTS,
+      signedRulebook: signatures.some((sig) => sig.owner === owner),
+      drewSignature: signatures.some((sig) => sig.owner === owner && Boolean(sig.drawing)),
+      mocksFinished: mockRows.get(owner)?.mocks ?? 0,
+      bestMockGrade: mockRows.get(owner)?.bestGrade ?? null,
+      bestSteal: Math.max(0, ...saved.map((r) => r?.grade?.steal?.by ?? 0)),
+      mockedWithTrade: saved.some((r) => (r?.tradesOn?.length ?? 0) > 0),
+      tradesOffered: mine.length,
+      offersRevised: mine.filter((p) => Boolean(p.revisedAt)).length,
+      offersClosed: mine.filter((p) => p.status === 'accepted').length,
+      offersTaken: proposals.filter((p) => p.recipient === owner && p.status === 'accepted').length,
+      propBetsSet: props.filter((p) => p.createdBy === owner).length,
+      propSidesTaken: sides,
+      allPropsCovered: coversAllProps(visible.length, sides),
+      votesCast: polls.filter((poll) => poll.votes.some((v) => v.owner === owner)).length,
+      pollsOpened: polls.filter((poll) => poll.proposedBy === owner).length,
+      scoutHits: guesses.hits,
+      closeCalls: guesses.near,
+      // Marking it sent is not enough; the collector has to confirm it.
+      duesPaid: dues.some((row) => row.owner === owner && row.verifiedAt !== null),
+    };
+  });
+  return facts;
+}
+
+/** Teams whose keepers this owner named on the first saved guess: all of them, or at least one. */
+function keeperGuessScore(state: LeagueDynamicState, ledger: AchievementLedger, owner: string): { hits: number; near: number } {
+  const guesses = Object.entries(ledger.firstGuesses[owner] ?? {}).filter(([target]) => target !== owner);
+  const reveals = ledger.reveals[owner] ?? [];
+  let hits = 0;
+  let near = 0;
+  for (const [target, guess] of guesses) {
+    const actual = (state.keepers[target] ?? []).map((k) => k.playerKey);
+    const revealedAt = reveals.find((r) => r.target === target)?.at ?? null;
+    if (guessHit(guess, actual, revealedAt)) hits += 1;
+    if (guessNear(guess, actual, revealedAt)) near += 1;
+  }
+  return { hits, near };
+}
+
+/**
+ * Guesses saved before first-guess tracking shipped count as the first. Copy
+ * them into the ledger once, so a later edit cannot replace them.
+ */
+async function seedFirstGuesses(state: LeagueDynamicState, who: readonly string[] = OWNERS): Promise<boolean> {
+  if (state.keepersRevealed === true) return false;
+  const ledger = ledgerOf(state.achievements);
+  const scenarios = await Promise.all(who.map((owner) => getKeeperScenario(state.season, owner)));
+  const at = new Date().toISOString();
+  const missing: Array<{ owner: string; target: string; keys: string[] }> = [];
+  who.forEach((owner, i) => {
+    for (const [target, sels] of Object.entries(scenarios[i])) {
+      if (target === owner || sels.length === 0 || ledger.firstGuesses[owner]?.[target]) continue;
+      missing.push({ owner, target, keys: sels.map((s) => s.playerKey) });
+    }
+  });
+  if (missing.length === 0) return false;
+  await mutateState((draft) => {
+    const next = ledgerOf(draft.achievements);
+    for (const m of missing) {
+      const guess = firstGuessToRecord(next.firstGuesses[m.owner]?.[m.target], m.keys, [], at);
+      if (guess) next.firstGuesses[m.owner] = { ...(next.firstGuesses[m.owner] ?? {}), [m.target]: guess };
+    }
+    draft.achievements = next;
+  });
+  return true;
+}
+
+/** Stamp anything new, for everyone or just the owners named. Writes only when something changed. */
+async function syncAchievements(
+  who: readonly string[] = OWNERS,
+): Promise<{ state: LeagueDynamicState; facts: Record<string, OwnerFacts> }> {
+  let current = await getState();
+  if (await seedFirstGuesses(current.state, who)) current = await getState();
+  const facts = await achievementFacts(current.state, who);
+  const at = new Date().toISOString();
+  const before = ledgerOf(current.state.achievements);
+  const changed = who.some((owner) => stampEarned(before.earned[owner], earnedFrom(facts[owner]), at) !== null);
+  if (!changed) return { state: current.state, facts };
+  const result = await mutateState((draft) => {
+    const ledger = ledgerOf(draft.achievements);
+    for (const owner of who) {
+      const next = stampEarned(ledger.earned[owner], earnedFrom(facts[owner]), at);
+      if (next) ledger.earned[owner] = next;
+    }
+    draft.achievements = ledger;
+  });
+  return { state: result.state, facts };
+}
+
+function revealState(state: LeagueDynamicState, ledger: AchievementLedger, owner: string, isCommissioner: boolean) {
+  const earned = ledger.earned[owner] ?? {};
+  const reveals = ledger.reveals[owner] ?? [];
+  const left = revealsLeft(earnedCount(earned), reveals.length);
+  const hidden = hiddenKeepers(owner, OWNERS, state.keepers, reveals);
+  const check = canReveal({
+    keepersPublic: state.keepersRevealed === true,
+    isCommissioner: seesAllKeepers(state, isCommissioner),
+    left,
+    hidden: hiddenCount(hidden),
+  });
+  return { earned, reveals, left, hidden, check };
+}
+
+function achievementsPayload(
+  state: LeagueDynamicState,
+  facts: Record<string, OwnerFacts>,
+  owner: string,
+  isCommissioner: boolean,
+) {
+  const ledger = ledgerOf(state.achievements);
+  const mine = revealState(state, ledger, owner, isCommissioner);
+  // One card per team, with only the keepers this owner has been shown.
+  const teams = [...new Set(mine.reveals.map((r) => r.target))].map((target) => {
+    const kept = state.keepers[target] ?? [];
+    const shown = mine.reveals.filter((r) => r.target === target);
+    return {
+      target,
+      keeping: kept.length,
+      shown: shown.map((r) => {
+        const still = kept.find((k) => k.playerKey === r.playerKey);
+        return { playerKey: r.playerKey, at: r.at, playerName: still?.playerName ?? null };
+      }),
+      lastAt: shown[shown.length - 1].at,
+    };
+  });
+  return {
+    you: {
+      owner,
+      earned: mine.earned,
+      facts: facts[owner] ?? NO_FACTS,
+      left: mine.left,
+      check: mine.check,
+      teams,
+    },
+    standings: standings(OWNERS, ledger),
+    keepersPublic: state.keepersRevealed === true,
+  };
+}
+
+/** GET /api/league/achievements — what you have earned, your reveals, and the league board. */
+router.get('/achievements', requireAuth, async (_req, res) => {
+  const { state, facts } = await syncAchievements();
+  res.json(achievementsPayload(state, facts, res.locals.owner as string, res.locals.isCommissioner === true));
+});
+
+/**
+ * GET /api/league/achievements/news — achievements you have earned and not
+ * been shown yet. The app asks after every change you make, so it checks only
+ * you. The commissioner acting as someone gets nothing, so the real member
+ * still sees their own toast.
+ */
+router.get('/achievements/news', requireAuth, async (_req, res) => {
+  const owner = res.locals.owner as string;
+  if (res.locals.actingBy) {
+    res.json({ fresh: [], left: 0, canReveal: false });
+    return;
+  }
+  const { state } = await syncAchievements([owner]);
+  const ledger = ledgerOf(state.achievements);
+  const mine = revealState(state, ledger, owner, res.locals.isCommissioner === true);
+  res.json({ fresh: unseenAchievements(ledger, owner), left: mine.left, canReveal: mine.check.ok });
+});
+
+/** POST /api/league/achievements/seen — the toast for these was shown. */
+router.post('/achievements/seen', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  if (res.locals.actingBy) {
+    res.json({ ok: true });
+    return;
+  }
+  const raw = (req.body as { ids?: unknown } | undefined)?.ids;
+  const ids = Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string').slice(0, 50) : [];
+  await mutateState((draft) => {
+    const ledger = ledgerOf(draft.achievements);
+    ledger.seen[owner] = markSeen(ledger.seen[owner], ids);
+    draft.achievements = ledger;
+  });
+  res.json({ ok: true });
+});
+
+/** POST /api/league/achievements/reveal — spend one reveal on one keeper of a random team. */
+router.post('/achievements/reveal', requireAuth, async (_req, res) => {
+  const owner = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner === true;
+  const { facts } = await syncAchievements();
+  let shown: { target: string; playerKey: string } | null = null;
+  const result = await mutateState((draft) => {
+    const ledger = ledgerOf(draft.achievements);
+    const mine = revealState(draft, ledger, owner, isCommissioner);
+    if (!mine.check.ok) throw new HttpError(409, mine.check.message ?? 'No reveal to spend');
+    const pick = pickReveal(mine.hidden, Math.random);
+    if (!pick) throw new HttpError(409, 'No keeper to show');
+    shown = pick;
+    ledger.reveals[owner] = [...mine.reveals, { ...pick, at: new Date().toISOString() }];
+    draft.achievements = ledger;
+  });
+  await appendAudit(actor(res), 'achievement.reveal', { target: (shown as { target: string } | null)?.target ?? null });
+  res.json({ ...achievementsPayload(result.state, facts, owner, isCommissioner), revealed: shown });
+});
+
+// ─── Prop bets ───────────────────────────────────────────────────────────────
+//
+// Over/unders on league members. Open to every member; setting and taking
+// sides lock when the draft starts. Nobody ever sees a prop about themselves,
+// so every read and write here filters by the viewer and anyone acting
+// through them. See src/lib/league/propBets.ts.
+
+/** Most props one member may set, so the page stays readable. */
+const MAX_PROPS_PER_MEMBER = 30;
+
+/** Who must not see a prop: the member, and the commissioner acting as them. */
+function propBlind(res: Response): string[] {
+  const owner = res.locals.owner as string;
+  const by = res.locals.actingBy as string | null | undefined;
+  return by ? [owner, by] : [owner];
+}
+
+function allProps(state: LeagueDynamicState): PropBet[] {
+  return (state.propBets ?? []).map(normalizeProp);
+}
+
+function propPayload(state: LeagueDynamicState, res: Response) {
+  return {
+    props: visibleProps(allProps(state), propBlind(res)),
+    locked: propsLocked(state.draft.startedAt),
+    owners: OWNERS,
+  };
+}
+
+/** GET /api/league/prop-bets — every prop you are allowed to see. */
+router.get('/prop-bets', requireAuth, async (_req, res) => {
+  const { state } = await getState();
+  res.json(propPayload(state, res));
+});
+
+/** POST /api/league/prop-bets — set a new line. */
+router.post('/prop-bets', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const parsed = parsePropInput((req.body ?? {}) as Record<string, unknown>, OWNERS, propBlind(res));
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.message, field: parsed.field });
+    return;
+  }
+  const at = new Date().toISOString();
+  const id = `pb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const result = await mutateState((draft) => {
+    if (propsLocked(draft.draft.startedAt)) throw new HttpError(409, 'The draft has started. Props are locked.');
+    const props = allProps(draft);
+    if (props.some((p) => sameProp(p, parsed.input))) throw new HttpError(409, 'That prop is already up.');
+    if (props.filter((p) => p.createdBy === owner).length >= MAX_PROPS_PER_MEMBER) {
+      throw new HttpError(409, `You have set ${MAX_PROPS_PER_MEMBER} props. Take one down first.`);
+    }
+    draft.propBets = [...props, { id, ...parsed.input, createdBy: owner, createdAt: at, takes: [] }];
+    // Stamp BOOKIE now, so taking the prop down later cannot lose it.
+    const ledger = ledgerOf(draft.achievements);
+    const next = stampEarned(ledger.earned[owner], ['prop-bet'], at);
+    if (next) ledger.earned[owner] = next;
+    draft.achievements = ledger;
+  });
+  // The words stay out of the log. The commissioner reads it, and some props are about him.
+  await appendAudit(actor(res), 'prop-bet.set', { id });
+  res.json(propPayload(result.state, res));
+});
+
+/** A prop the caller may see. One about them answers 404, as if it did not exist. */
+function findProp(state: LeagueDynamicState, id: string, res: Response): PropBet {
+  const prop = visibleProps(allProps(state), propBlind(res)).find((p) => p.id === id);
+  if (!prop) throw new HttpError(404, 'No such prop');
+  return prop;
+}
+
+function replaceProp(state: LeagueDynamicState, next: PropBet): void {
+  state.propBets = allProps(state).map((p) => (p.id === next.id ? next : p));
+}
+
+/** POST /api/league/prop-bets/:id/take — take the over or the under, or `null` to step off. */
+router.post('/prop-bets/:id/take', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const raw = (req.body as { side?: unknown } | undefined)?.side;
+  if (raw !== 'over' && raw !== 'under' && raw !== null) {
+    res.status(400).json({ error: 'Pick over or under' });
+    return;
+  }
+  const side: PropSide | null = raw;
+  const id = String(req.params.id);
+  const result = await mutateState((draft) => {
+    if (propsLocked(draft.draft.startedAt)) throw new HttpError(409, 'The draft has started. Sides are locked.');
+    replaceProp(draft, takeSide(findProp(draft, id, res), owner, side, new Date().toISOString()));
+  });
+  await appendAudit(actor(res), 'prop-bet.take', { id, side });
+  res.json(propPayload(result.state, res));
+});
+
+/** POST /api/league/prop-bets/:id/result — enter the final count, or `null` to clear it. */
+router.post('/prop-bets/:id/result', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner === true;
+  const parsed = parseResult((req.body as { result?: unknown } | undefined)?.result);
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.message });
+    return;
+  }
+  const id = String(req.params.id);
+  const result = await mutateState((draft) => {
+    const prop = findProp(draft, id, res);
+    if (!canSettleProp(prop, owner, isCommissioner)) {
+      throw new HttpError(403, 'Only whoever set it, or the commissioner, enters the result');
+    }
+    replaceProp(draft, { ...prop, result: parsed.value, settledBy: owner, settledAt: new Date().toISOString() });
+  });
+  await appendAudit(actor(res), 'prop-bet.result', { id, result: parsed.value });
+  res.json(propPayload(result.state, res));
+});
+
+/** DELETE /api/league/prop-bets/:id — the setter or a commissioner takes it down. */
+router.delete('/prop-bets/:id', requireAuth, async (req, res) => {
+  const owner = res.locals.owner as string;
+  const isCommissioner = res.locals.isCommissioner === true;
+  const id = String(req.params.id);
+  const result = await mutateState((draft) => {
+    const prop = findProp(draft, id, res);
+    if (!canRemoveProp(prop, owner, isCommissioner)) {
+      throw new HttpError(403, 'Only whoever set it, or the commissioner, can take it down');
+    }
+    if (propsLocked(draft.draft.startedAt) && !isCommissioner) {
+      throw new HttpError(409, 'The draft has started. Props are locked.');
+    }
+    draft.propBets = allProps(draft).filter((p) => p.id !== id);
+  });
+  await appendAudit(actor(res), 'prop-bet.removed', { id });
+  res.json(propPayload(result.state, res));
+});
+
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;

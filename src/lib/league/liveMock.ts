@@ -14,6 +14,14 @@ import { createMockRun, prepareMock, runSeed, type MockCandidate, type MockPick,
 /** The person's picks, by overall pick number. */
 export type LiveChoices = Readonly<Record<number, string>>;
 
+/** One person at the table, or everyone at it in a mock with a friend. */
+export type People = string | readonly string[];
+
+/** Whether an owner is a person at the table, not a computer team. */
+export function isPerson(people: People, owner: string): boolean {
+  return typeof people === 'string' ? owner === people : people.includes(owner);
+}
+
 export interface LiveState {
   run: MockRun;
   /** Every pick made so far, fixed slots and the other teams' picks included. */
@@ -24,13 +32,17 @@ export interface LiveState {
   over: boolean;
 }
 
-/** Rebuild the draft from the seed and the person's choices, up to the next choice needed. */
-export function replayLive(prepared: PreparedMock, seed: number, person: string, choices: LiveChoices): LiveState {
+/**
+ * Rebuild the draft from the seed and the people's choices, up to the next
+ * choice needed. With two people at the table the replay stops at whichever
+ * of them is up next without a choice saved.
+ */
+export function replayLive(prepared: PreparedMock, seed: number, people: People, choices: LiveChoices): LiveState {
   const run = createMockRun(prepared, seed);
   let waitingOn: MockSlot | null = null;
   for (let slot = run.nextSlot(); slot; slot = run.nextSlot()) {
     const live = !slot.keeper && !slot.made;
-    if (live && slot.pick.currentOwner === person) {
+    if (live && isPerson(people, slot.pick.currentOwner)) {
       const chosen = choices[slot.pick.overall];
       if (chosen === undefined) {
         waitingOn = slot;

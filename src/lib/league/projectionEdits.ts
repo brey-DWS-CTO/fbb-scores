@@ -1,5 +1,5 @@
 /**
- * The commissioner's edits to ESPN's projections.
+ * An owner's own edits to ESPN's projections. Each owner keeps their own.
  *
  * An edit names a player by ESPN id and changes any of his projected games
  * and per-game stats. Applying it rewrites his projection row in the
@@ -11,10 +11,15 @@
  * exactly the per-game line, ratios included. Missed shots (ESPN stats 23
  * and 24, which this league scores) follow from makes and attempts.
  *
+ * Minutes move the line. When an edit changes a player's minutes, every
+ * counting stat the commissioner did not type himself follows them, a little
+ * less than one for one: more floor time comes with a slower pace of
+ * production. Percentages stay put because makes and attempts move together.
+ *
  * Pure. No server, no browser.
  */
 import { computeFpts, round1 } from '../espn/calculations.js';
-import { estimatedBonusPerGame } from './doubleDoubles.js';
+import { DOUBLE_DOUBLE_STAT, TEN_PLUS_STATS, TRIPLE_DOUBLE_STAT, estimatedBonusPerGame } from './doubleDoubles.js';
 import { projectedPerGame, type DraftRankingPlayer, type DraftRankingSnapshot, type ProjectionRow } from './draftRankings.js';
 
 export interface EditableStat {
@@ -100,6 +105,54 @@ export function parseProjectionEdit(espnId: number, body: unknown): Pick<Project
   return { espnId, name, games, perGame, note };
 }
 
+// ─── Minutes ────────────────────────────────────────────────────────────────
+
+/** ESPN stat id for minutes a game. */
+export const MINUTES_STAT = '40';
+
+/**
+ * How hard production per minute fades as minutes grow. 1 would be straight
+ * proportional; 0.85 means 14% more minutes brings about 12% more of each
+ * counting stat. Change it here and nowhere else.
+ */
+export const MINUTES_EROSION = 0.85;
+
+/** The per-game stats that follow minutes. Percentages do not: makes and attempts move together. */
+export const FOLLOWS_MINUTES: readonly string[] = ['0', '6', '3', '2', '1', '17', '11', '13', '14', '15', '16'];
+
+/** The ratio a counting stat scales by when minutes go from one number to another. */
+export function minutesFactor(from: number, to: number): number {
+  if (!(from > 0) || !(to > 0)) return 1;
+  return Math.pow(to / from, MINUTES_EROSION);
+}
+
+/**
+ * A per-game line rescaled to new minutes. Any stat id in `pinned` keeps the
+ * value it has. Scaled values are rounded to a tenth, the same grain as a
+ * typed edit, so what the commissioner sees is what gets stored.
+ */
+export function scaleToMinutes(
+  perGame: Readonly<Record<string, number>>,
+  minutes: number,
+  pinned: ReadonlySet<string> = new Set(),
+): Record<string, number> {
+  const factor = minutesFactor(perGame[MINUTES_STAT] ?? 0, minutes);
+  const scaled: Record<string, number> = { ...perGame, [MINUTES_STAT]: minutes };
+  if (factor === 1) return scaled;
+  for (const id of FOLLOWS_MINUTES) {
+    const value = perGame[id];
+    if (value === undefined || pinned.has(id)) continue;
+    scaled[id] = Math.round(value * factor * 10) / 10;
+  }
+  return scaled;
+}
+
+/** True when this stat of an edited player moved because his minutes did, not because it was typed. */
+export function cellFollowsMinutes(edit: Pick<ProjectionEdit, 'perGame'> | null, statId: string): boolean {
+  if (!edit || edit.perGame[MINUTES_STAT] === undefined) return false;
+  return FOLLOWS_MINUTES.includes(statId) && edit.perGame[statId] === undefined;
+}
+
 // ─── Applying edits ─────────────────────────────────────────────────────────
 
 /** ESPN's games for a projection, or null. */
@@ -111,8 +164,17 @@ export function projectionGames(projection: ProjectionRow | null): number | null
 /** The projection row with an edit laid over it. */
 export function editedProjection(projection: ProjectionRow | null, edit: ProjectionEdit): ProjectionRow | null {
   const base = projectedPerGame(projection);
-  const perGame: Record<string, number> = { ...(base ?? {}) };
+  const minutes = edit.perGame[MINUTES_STAT];
+  const perGame: Record<string, number> = base && minutes !== undefined
+    ? scaleToMinutes(base, minutes, new Set(Object.keys(edit.perGame)))
+    : { ...(base ?? {}) };
   for (const [id, value] of Object.entries(edit.perGame)) perGame[id] = value;
+  // A source that projects its own double-doubles (Hashtag) fixes them for
+  // the line it was given. Change the line and they are estimated again.
+  if ([MINUTES_STAT, ...TEN_PLUS_STATS].some((id) => edit.perGame[id] !== undefined)) {
+    delete perGame[String(DOUBLE_DOUBLE_STAT)];
+    delete perGame[String(TRIPLE_DOUBLE_STAT)];
+  }
   // The league scores missed shots; they follow from makes and attempts.
   if (perGame['14'] !== undefined && perGame['13'] !== undefined) perGame['23'] = Math.max(0, perGame['14'] - perGame['13']);
   if (perGame['16'] !== undefined && perGame['15'] !== undefined) perGame['24'] = Math.max(0, perGame['16'] - perGame['15']);

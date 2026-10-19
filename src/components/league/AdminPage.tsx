@@ -538,7 +538,7 @@ export default function AdminPage() {
                     </span>
                     {priorYear && (
                       <span
-                        title={p.keeper.zeroGp2026 ? "Didn't play in 2026 — 3rd-round rule" : '≤25 GP in 2026 — 2025 average used'}
+                        title={p.keeper.zeroGp2026 && !p.keeper.usesPriorYear ? "Didn't play in 2026 and no earlier average: 3rd-round rule" : '≤25 GP in 2026: 2025 average used'}
                         style={{
                           border: '1px solid rgba(255,230,0,0.5)',
                           color: 'var(--neon-yellow)',

@@ -1,8 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DatasetPlayer, KeeperSelection, PickTradeProposal } from '../../lib/keeper/types.js';
-import { deleteMockResult, fetchMockResults, fetchPickTrades, saveMockResult } from '../../lib/league/api.js';
+import {
+  apiErrorMessage,
+  deleteMockResult,
+  fetchMockResults,
+  fetchMockStats,
+  fetchMockTrades,
+  fetchPickTrades,
+  fetchSharedMocks,
+  joinSharedMockRoom,
+  openSharedMockRoom,
+  quitSharedMockRoom,
+  saveMockResult,
+} from '../../lib/league/api.js';
+import { MAX_PEOPLE, namesOf, onTheClock, othersAt, sharedMockPhase } from '../../lib/league/sharedMock.js';
+import ShareButton from './ShareButton.js';
+import { isMockTradeId, mockTradeProposal } from '../../lib/league/mockTrades.js';
+import type { SavedBoard } from '../../lib/league/mockBoard.js';
+import SavedMockBoard from './SavedMockBoard.js';
 import { gradeSummary, mockResultId } from '../../lib/league/mockGrade.js';
 import MockGradeCard from './MockGradeCard.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
@@ -16,7 +33,7 @@ import {
 } from '../../lib/league/mockDraft.js';
 import { describeTrade } from '../../lib/league/pickTrades.js';
 import { buildProjections, type PlayerProjection } from '../../lib/league/projections.js';
-import { mockSaveKey, parseMockSave, type MockSave } from '../../lib/league/draftRoom.js';
+import { finishedDraftNoLongerFits, mockSaveKey, parseMockSave, type MockSave } from '../../lib/league/draftRoom.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { buildWorld, privateTrades, switchableTrades, tradeConflicts } from '../../lib/league/whatIf.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
@@ -61,14 +78,15 @@ export default function MockDraftPage() {
 
 function MockDraftScreen() {
   const { identity } = useIdentity();
-  const { state, dataset, meta } = useDraftData();
+  const draftData = useDraftData();
+  const { state, dataset, meta } = draftData;
   const scenarioQuery = useKeeperScenario();
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
   const signedIn = viewer !== null;
 
-  // ESPN's numbers with the commissioner's projection edits laid over them.
-  const { snapshot, original, edits } = useProjectionData();
+  // ESPN's numbers with your own projection edits laid over them.
+  const { snapshot, original, edits, loading: projectionsLoading } = useProjectionData();
   const tradesQuery = useQuery({
     queryKey: ['pick-trades', viewer ?? 'anon'],
     queryFn: () => fetchPickTrades(identity as NonNullable<typeof identity>),
@@ -83,14 +101,17 @@ function MockDraftScreen() {
   const acting = Boolean(identity?.impersonatedBy);
   const [saved] = useState(() => (acting ? null : readSave(viewer)));
   const [mode, setMode] = useState<MockMode>(saved?.mode ?? 'sharp');
-  const [seed, setSeed] = useState(saved?.seed ?? 7);
+  // A finished draft gets a new seed, so the next one is a different draft.
+  const [seed, setSeed] = useState(saved && !saved.finished ? saved.seed : Math.floor(Math.random() * 100_000));
   const [tradesOn, setTradesOn] = useState<string[]>(saved?.tradesOn ?? []);
   const [tryKeepers, setTryKeepers] = useState(saved?.tryKeepers ?? false);
   const [tryPicks, setTryPicks] = useState<[string, string]>(saved?.tryPicks ?? ['', '']);
   const [useEntered, setUseEntered] = useState(saved?.useEntered ?? true);
   const [guessInstead, setGuessInstead] = useState<string[]>(saved?.guessInstead ?? []);
-  const [progress, setProgress] = useState<RoomProgress | null>(() => (saved
-    ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft }
+  // A finished draft is in Past mocks already. Coming back to the page
+  // starts a fresh one rather than reopening the old grade.
+  const [progress, setProgress] = useState<RoomProgress | null>(() => (saved && !saved.finished
+    ? { started: saved.started, choices: saved.choices, queue: saved.queue, clockLeft: saved.clockLeft, finished: false }
     : null));
   const onProgress = useCallback((next: RoomProgress) => setProgress(next), []);
 
@@ -102,18 +123,55 @@ function MockDraftScreen() {
     enabled: identity !== null,
     staleTime: 30_000,
   });
-  const onFinished = useCallback((finished: { choices: Record<number, string>; grade: MockGrade }) => {
+  const onFinished = useCallback((finished: { choices: Record<number, string>; grade: MockGrade; board: SavedBoard }) => {
     if (!identity) return;
     const id = mockResultId(identity.owner, seed, mode, finished.choices);
-    void saveMockResult(identity, { id, seed, mode, grade: finished.grade })
-      .then(() => queryClient.invalidateQueries({ queryKey: ['mock-results'] }))
+    void saveMockResult(identity, { id, seed, mode, grade: finished.grade, board: finished.board, tradesOn })
+      .then(() => Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['mock-results'] }),
+        queryClient.invalidateQueries({ queryKey: ['mock-stats'] }),
+      ]))
       .catch(() => { /* the grade still shows; it just is not kept */ });
-  }, [identity, seed, mode, queryClient]);
+  }, [identity, seed, mode, tradesOn, queryClient]);
   const forget = (id: string) => {
     if (!identity) return;
     void deleteMockResult(identity, id).then(() => queryClient.invalidateQueries({ queryKey: ['mock-results'] }));
   };
   const [openResult, setOpenResult] = useState<string | null>(null);
+  // Everyone's count of finished mocks and best grade.
+  const statsQuery = useQuery({
+    queryKey: ['mock-stats'],
+    queryFn: () => fetchMockStats(identity as NonNullable<typeof identity>),
+    enabled: identity !== null,
+    staleTime: 30_000,
+  });
+  // Mocks with a friend: the ones you were asked to, and the one you are in.
+  const navigate = useNavigate();
+  const roomsQuery = useQuery({
+    queryKey: ['mock-rooms', viewer ?? 'anon'],
+    queryFn: () => fetchSharedMocks(identity as NonNullable<typeof identity>),
+    enabled: identity !== null,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
+  });
+  const rooms = useMemo(() => roomsQuery.data?.rooms ?? [], [roomsQuery.data]);
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [friendError, setFriendError] = useState<string | null>(null);
+  const friendAct = async (call: () => Promise<unknown>, then?: () => void) => {
+    if (!identity) return;
+    setFriendBusy(true);
+    setFriendError(null);
+    try {
+      await call();
+      await queryClient.invalidateQueries({ queryKey: ['mock-rooms'] });
+      then?.();
+    } catch (caught) {
+      setFriendError(apiErrorMessage(caught));
+    } finally {
+      setFriendBusy(false);
+    }
+  };
   useEffect(() => {
     if (!viewer || acting) return;
     const save: MockSave = {
@@ -124,6 +182,7 @@ function MockDraftScreen() {
       choices: progress?.choices ?? {},
       queue: progress?.queue ?? [],
       clockLeft: progress?.clockLeft ?? null,
+      finished: progress?.finished ?? false,
       tradesOn,
       tryKeepers,
       tryPicks,
@@ -139,8 +198,20 @@ function MockDraftScreen() {
   const toggleGuessInstead = (owner: string) =>
     setGuessInstead((current) => (current.includes(owner) ? current.filter((entry) => entry !== owner) : [...current, owner]));
 
+  // Mock trades from the trade page join your real offers as switches.
+  const mockTradesQuery = useQuery({
+    queryKey: ['mock-trades', viewer ?? 'anon'],
+    queryFn: () => fetchMockTrades(identity as NonNullable<typeof identity>),
+    enabled: signedIn,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+  });
   const fetchedProposals = tradesQuery.data?.proposals;
-  const proposals = useMemo((): PickTradeProposal[] => fetchedProposals ?? [], [fetchedProposals]);
+  const fetchedMocks = mockTradesQuery.data;
+  const proposals = useMemo(
+    (): PickTradeProposal[] => [...(fetchedProposals ?? []), ...(fetchedMocks ?? []).map(mockTradeProposal)],
+    [fetchedProposals, fetchedMocks],
+  );
   const scenario = scenarioQuery.scenario;
 
   const values = useMemo(
@@ -173,13 +244,22 @@ function MockDraftScreen() {
   }, [ownCandidates, tryKeepers, tryPicks]);
 
   const now = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [], useEntered, guessInstead }),
-    [dataset, viewer, state, scenario, proposals, useEntered, guessInstead],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn: [], useEntered, guessInstead, keeperCounts: meta?.keeperStatus }),
+    [dataset, viewer, state, scenario, proposals, useEntered, guessInstead, meta?.keeperStatus],
   );
   const whatIf = useMemo(
-    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead }),
-    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead],
+    () => buildWorld(dataset, { viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead, keeperCounts: meta?.keeperStatus }),
+    [dataset, viewer, state, scenario, proposals, tradesOn, ownKeepers, useEntered, guessInstead, meta?.keeperStatus],
   );
+
+  // Picks a switched-on trade moves: traded only if that offer goes through.
+  // Each pick a switched-on trade moves, and who holds it now, before that trade.
+  const projectedTrades = useMemo((): ReadonlyMap<number, string> => {
+    const before = new Map(now.board.slots.map((slot) => [slot.pick.overall, slot.pick.currentOwner]));
+    return new Map(whatIf.board.slots
+      .filter((slot) => before.get(slot.pick.overall) !== slot.pick.currentOwner)
+      .map((slot) => [slot.pick.overall, before.get(slot.pick.overall) ?? slot.pick.currentOwner]));
+  }, [now.board, whatIf.board]);
 
   const owners = useMemo(() => dataset.teams.map((team) => team.owner), [dataset.teams]);
   const settings = useMemo(() => defaultMockSettings(mode, owners, seed), [mode, owners, seed]);
@@ -194,6 +274,25 @@ function MockDraftScreen() {
       `${slot.pick.currentOwner}${slot.keeper ? '=' + slot.keeper.playerKey : slot.made ? '+' + slot.made.playerKey : ''}`).join(',')}`,
     [seed, mode, whatIf.board],
   );
+
+  // A saved draft is replayed pick by pick on the board these build. Replaying
+  // on half the data drops picks that no longer fit, so wait for all of it.
+  const loading = draftData.isLoading || draftData.playerPoolQuery.isLoading || projectionsLoading
+    || tradesQuery.isLoading || mockTradesQuery.isLoading || scenarioQuery.isLoading;
+
+  // A finished draft the board has moved under (a keeper or a trade since)
+  // would reopen half done. Start a new one; the old one is in Past mocks.
+  const staleFinish = useMemo(
+    () => !loading && viewer !== null && livePrepared !== null && progress?.finished === true
+      && finishedDraftNoLongerFits(livePrepared, seed, viewer, progress),
+    [loading, viewer, livePrepared, progress, seed],
+  );
+  const [boardMoved, setBoardMoved] = useState(false);
+  if (staleFinish) {
+    setProgress(null);
+    setSeed((seed * 7919 + 1) % 100_000);
+    setBoardMoved(true);
+  }
 
   if (!viewer) {
     return (
@@ -232,6 +331,117 @@ function MockDraftScreen() {
     ownKeepers !== null ? 'trying a different pair of your own' : null,
   ].filter(Boolean).join(' · ');
 
+  // Draft with a friend: your open mock, the invites waiting on you, and a
+  // way to ask somebody. One open mock a person, so the form hides while
+  // you have one.
+  const busy = (room: typeof rooms[number]) => sharedMockPhase(room) === 'waiting' || sharedMockPhase(room) === 'live';
+  const myRoom = rooms.find((room) => room.people.includes(viewer) && busy(room));
+  const anyOpen = rooms.find((room) => room.open === true && sharedMockPhase(room) === 'waiting');
+  const friendPanel = identity && (
+    <section className="panel mock-friend">
+      <div className="hub-heading mock-sub" style={{ marginTop: 0 }}>DRAFT WITH FRIENDS</div>
+      {rooms.map((room) => {
+        const phase = sharedMockPhase(room);
+        const inRoom = room.people.includes(viewer);
+        const others = namesOf(othersAt(room, viewer));
+        const link = `/mock/with/${room.id}`;
+        const asked = !room.open && phase === 'waiting' && !room.joined.includes(viewer);
+        const clockOwner = onTheClock(room);
+        const quit = () => friendAct(() => quitSharedMockRoom(identity, room.id));
+        return (
+          <div key={room.id} className="mock-friend-row">
+            <span>
+              {room.open && phase === 'waiting' && !inRoom && (
+                <><strong>{room.host}</strong>&apos;s room is open: {namesOf(room.people)}. {room.people.length} of {MAX_PEOPLE} seats, {roomLabel(room.mode)} room.</>
+              )}
+              {room.open && phase === 'waiting' && inRoom && room.host === viewer && (
+                <>Your room is open: {namesOf(room.people)}. Start it when you are ready.</>
+              )}
+              {room.open && phase === 'waiting' && inRoom && room.host !== viewer && (
+                <>You are in <strong>{room.host}</strong>&apos;s room: {namesOf(room.people)}. Waiting for {room.host} to start it.</>
+              )}
+              {phase === 'waiting' && asked && <><strong>{room.host}</strong> wants a mock with you. {roomLabel(room.mode) === 'sharp' ? 'Sharp' : 'Normal'} room.</>}
+              {!room.open && phase === 'waiting' && !asked && <>Waiting for <strong>{others}</strong> to join.</>}
+              {phase === 'live' && (
+                <>
+                  Your mock with <strong>{others}</strong> is on.
+                  {clockOwner ? (clockOwner === viewer ? ' Your pick!' : ` ${clockOwner} is on the clock.`) : ''}
+                </>
+              )}
+              {phase === 'finished' && <>Your mock with <strong>{others}</strong> is done. The grade is in Past mocks.</>}
+              {phase === 'ended' && <><strong>{room.endedBy}</strong> {room.startedAt ? 'left your mock, so it ended' : room.open ? 'closed the room' : 'passed on your mock'}.</>}
+            </span>
+            <span className="mock-friend-actions">
+              {room.open && phase === 'waiting' && !inRoom && room.people.length < MAX_PEOPLE && (
+                <button
+                  type="button"
+                  className="tap-btn mock-mini-btn is-primary"
+                  disabled={friendBusy || myRoom !== undefined}
+                  title={myRoom ? 'Quit your own mock first.' : undefined}
+                  onClick={() => friendAct(() => joinSharedMockRoom(identity, room.id), () => navigate(link))}
+                >
+                  JOIN
+                </button>
+              )}
+              {room.open && phase === 'waiting' && inRoom && (
+                <>
+                  <Link className="tap-btn mock-mini-btn is-primary" to={link}>{room.host === viewer ? 'OPEN' : 'OPEN'}</Link>
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>
+                    {room.host === viewer ? 'CLOSE' : 'LEAVE'}
+                  </button>
+                </>
+              )}
+              {asked && (
+                <>
+                  <button
+                    type="button"
+                    className="tap-btn mock-mini-btn is-primary"
+                    disabled={friendBusy}
+                    onClick={() => friendAct(() => joinSharedMockRoom(identity, room.id), () => navigate(link))}
+                  >
+                    JOIN
+                  </button>
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>NO THANKS</button>
+                </>
+              )}
+              {!room.open && phase === 'waiting' && !asked && (
+                <>
+                  <ShareButton url={`${window.location.origin}${link}`} title={`Mock draft with ${viewer}`} />
+                  <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>CANCEL</button>
+                </>
+              )}
+              {phase === 'live' && <Link className="tap-btn mock-mini-btn is-primary" to={link}>OPEN</Link>}
+              {phase === 'finished' && <Link className="tap-btn mock-mini-btn" to={link}>SEE IT</Link>}
+              {(phase === 'finished' || phase === 'ended') && (
+                <button type="button" className="tap-btn mock-mini-btn" disabled={friendBusy} onClick={quit}>DISMISS</button>
+              )}
+            </span>
+          </div>
+        );
+      })}
+      {!myRoom && !anyOpen && (
+        <div className="mock-friend-form">
+          <button
+            type="button"
+            className="tap-btn mock-mini-btn is-primary"
+            disabled={friendBusy}
+            onClick={() => friendAct(async () => {
+              const { room } = await openSharedMockRoom(identity, mode);
+              navigate(`/mock/with/${room.id}`);
+            })}
+          >
+            OPEN A ROOM
+          </button>
+          <span className="mock-note mock-note-dim" style={{ margin: 0 }}>Anyone can join. You start it when you are ready. Up to {MAX_PEOPLE} people; the {roomLabel(mode)} room.</span>
+        </div>
+      )}
+      {friendError && <div className="mock-note mock-note-bad">{friendError}</div>}
+      <div className="mock-note mock-note-dim">
+        Everyone drafts their own real team; the other teams are computers. Two minutes a pick. The clock keeps running if someone walks away.
+      </div>
+    </section>
+  );
+
   // Before a live draft starts, the setup sits on top and open: keepers and
   // trades change the board, and changing them later restarts the draft.
   const setupFirst = !progress?.started;
@@ -244,7 +454,7 @@ function MockDraftScreen() {
         <section className="panel mock-assumptions">
         <div className="hub-heading mock-sub">THEIR KEEPERS</div>
         {/* Members never see others' entered keepers before the reveal. */}
-        {!revealed && isCommish && (
+        {!revealed && isCommish && meta?.commishBlind !== true && (
           <>
             <label className="mock-use-entered">
               <input type="checkbox" checked={useEntered} onChange={(event) => setUseEntered(event.target.checked)} />
@@ -299,7 +509,7 @@ function MockDraftScreen() {
           <div className="hub-heading mock-sub">PENDING TRADES</div>
           {switchable.length === 0 && (
             <div className="mock-note">
-              No pending offer of yours to try. <Link to="/trades">Send one</Link> and it shows up here as a switch.
+              No pending offer or mock trade of yours to try. On the <Link to="/trades">trade page</Link>, send one or tap SAVE AS MOCK and it shows up here as a switch.
             </div>
           )}
           <ul className="mock-switches">
@@ -317,6 +527,7 @@ function MockDraftScreen() {
                       onChange={() => toggleTrade(proposal.id)}
                     />
                     <span>
+                      {isMockTradeId(proposal.id) && <span className="mock-tag mock-tag-mock">MOCK</span>}{' '}
                       <strong>{proposal.proposer} to {proposal.recipient}:</strong> {describeTrade(proposal, dataset)}
                       {blockedBy && !on && blocker && (
                         <small> Moves a pick the {blocker.proposer} to {blocker.recipient} offer already moves. Only one can be on.</small>
@@ -415,14 +626,21 @@ function MockDraftScreen() {
       </section>
       )}
 
+      {setupFirst && friendPanel}
       {setupFirst && setup}
 
-      {livePrepared ? (
+      {boardMoved && !progress?.started && (
+        <div className="mock-note">Keepers or trades changed since your last mock, so a new draft is ready. The last one is in Past mocks.</div>
+      )}
+      {loading || staleFinish ? (
+        <div className="mock-note">Loading your draft…</div>
+      ) : livePrepared ? (
         <DraftRoom
           key={liveKey}
           prepared={livePrepared}
           values={values}
           projections={projections}
+          projectedTrades={projectedTrades}
           person={viewer}
           seed={seed}
           mode={mode}
@@ -439,6 +657,7 @@ function MockDraftScreen() {
       )}
 
       {!setupFirst && setup}
+      {!setupFirst && friendPanel}
 
       <details className="commish-fold mock-history">
         <summary className="hub-heading">
@@ -455,12 +674,17 @@ function MockDraftScreen() {
                   <span className={`mock-grade-letter grade-${record.grade.grade[0].toLowerCase()}`}>{record.grade.grade}</span>
                   <span className="mock-history-line">
                     {gradeSummary(record.grade)}
-                    <small>{new Date(record.finishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {roomLabel(record.mode)} room</small>
+                    <small>
+                      {new Date(record.finishedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {roomLabel(record.mode)} room
+                      {record.vs && record.vs.length > 0 ? ` · with ${namesOf(record.vs)}` : ''}
+                    </small>
                   </span>
                 </button>
                 {openResult === record.id && (
                   <>
-                    <MockGradeCard grade={record.grade} person={record.owner} />
+                    {/* The row above already shows the letter and the line. */}
+                    <MockGradeCard grade={record.grade} person={record.owner} headline={false} />
+                    <SavedMockBoard board={record.board} person={record.owner} />
                     <button type="button" className="tap-btn mock-mini-btn" onClick={() => forget(record.id)}>FORGET THIS ONE</button>
                   </>
                 )}
@@ -468,6 +692,29 @@ function MockDraftScreen() {
             ))}
           </ol>
         )}
+      </details>
+
+      <details className="commish-fold mock-history mock-stats">
+        <summary className="hub-heading">
+          MOCKS DONE
+          <small>Every owner&apos;s finished mocks and best grade.</small>
+        </summary>
+        <table className="mock-grade-table mock-stats-table">
+          <thead><tr><th>Team</th><th className="room-num">Mocks</th><th className="room-num">Best</th></tr></thead>
+          <tbody>
+            {(statsQuery.data ?? []).map((row) => (
+              <tr key={row.owner} className={row.owner === viewer ? 'is-mine' : ''}>
+                <td>{row.owner}</td>
+                <td className="room-num">{row.mocks}</td>
+                <td className="room-num">
+                  {row.bestGrade
+                    ? <span className={`mock-grade-letter grade-${row.bestGrade[0].toLowerCase()}`}>{row.bestGrade}</span>
+                    : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </details>
     </div>
   );

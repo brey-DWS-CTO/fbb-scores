@@ -320,6 +320,86 @@ test('a stale tab cannot accept an offer that changed', async () => {
   assert.equal(await ownerOfPick(7, 'Amy'), 'Amy');
 });
 
+const revise = (owner: string, id: string, version: number, offer: PickRef[], want: PickRef[], note = 'Better deal.') =>
+  request(`/api/league/pick-trades/${encodeURIComponent(id)}/revise`, {
+    method: 'POST',
+    headers: auth(owner),
+    body: JSON.stringify({ version, offer, request: want, note }),
+  });
+
+test('the sender changes an offer and resends it; the old version can no longer be accepted', async () => {
+  const proposal = asRecord(
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
+  ).proposal as PickTradeProposal;
+
+  const changed = await revise('Amy', proposal.id, proposal.version, [ref(6, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  const revised = asRecord(changed.body).proposal as PickTradeProposal;
+  assert.equal(revised.id, proposal.id, 'the same offer, not a second one');
+  assert.equal(revised.version, proposal.version + 1);
+  assert.deepEqual(revised.offer, [ref(6, 'Amy')]);
+  assert.equal(revised.note, 'Better deal.');
+  assert.ok(revised.revisedAt);
+
+  const stale = await accept('Kyle', proposal.id, proposal.version);
+  assert.equal(stale.status, 409);
+  assert.equal(asRecord(stale.body).code, 'stale-version');
+
+  assert.equal((await accept('Kyle', proposal.id, revised.version)).status, 200);
+  assert.equal(await ownerOfPick(6, 'Amy'), 'Kyle');
+  assert.equal(await ownerOfPick(7, 'Amy'), 'Amy');
+});
+
+test('only the sender can change an offer, and only while it waits', async () => {
+  const proposal = asRecord(
+    (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,
+  ).proposal as PickTradeProposal;
+
+  const byRecipient = await revise('Kyle', proposal.id, proposal.version, [ref(6, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(byRecipient.status, 403);
+
+  // A change must pass the same checks as a new offer: Amy cannot offer Kyle's pick.
+  const bad = await revise('Amy', proposal.id, proposal.version, [ref(5, 'Kyle')], [ref(4, 'Kyle')]);
+  assert.equal(bad.status, 409);
+
+  assert.equal((await settle('Amy', proposal.id, 'cancel')).status, 200);
+  const late = await revise('Amy', proposal.id, proposal.version + 1, [ref(6, 'Amy')], [ref(4, 'Kyle')]);
+  assert.equal(late.status, 409);
+  assert.equal(asRecord(late.body).code, 'not-pending');
+});
+
+test('a mock trade is kept for its builder alone, never reaches the other side, and deletes', async () => {
+  const saved = await request('/api/league/pick-trades/mock', {
+    method: 'POST',
+    headers: auth('Amy'),
+    body: JSON.stringify({ recipient: 'Kyle', offer: [ref(7, 'Amy')], request: [ref(4, 'Kyle')], note: 'just looking' }),
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const trade = asRecord(saved.body).trade as { id: string; owner: string };
+  assert.ok(trade.id.startsWith('mock:'));
+  assert.equal(trade.owner, 'Amy');
+
+  const amy = (await request('/api/league/pick-trades/mock', { headers: auth('Amy') })).body as { trades: unknown[] };
+  assert.equal(amy.trades.length, 1);
+  const kyle = (await request('/api/league/pick-trades/mock', { headers: auth('Kyle') })).body as { trades: unknown[] };
+  assert.equal(kyle.trades.length, 0, 'the other side never sees it');
+  const kyleOffers = asRecord((await list('Kyle')).body);
+  assert.equal((kyleOffers.proposals as unknown[]).length, 0, 'and it is not an offer');
+
+  const bad = await request('/api/league/pick-trades/mock', {
+    method: 'POST',
+    headers: auth('Amy'),
+    body: JSON.stringify({ recipient: 'Kyle', offer: [ref(5, 'Kyle')], request: [ref(4, 'Kyle')], note: '' }),
+  });
+  assert.equal(bad.status, 409, 'the same checks as a real offer');
+
+  // Kyle cannot delete Amy's; Amy can.
+  await request(`/api/league/pick-trades/mock/${encodeURIComponent(trade.id)}`, { method: 'DELETE', headers: auth('Kyle') });
+  assert.equal(((await request('/api/league/pick-trades/mock', { headers: auth('Amy') })).body as { trades: unknown[] }).trades.length, 1);
+  await request(`/api/league/pick-trades/mock/${encodeURIComponent(trade.id)}`, { method: 'DELETE', headers: auth('Amy') });
+  assert.equal(((await request('/api/league/pick-trades/mock', { headers: auth('Amy') })).body as { trades: unknown[] }).trades.length, 0);
+});
+
 test('pulling an offer beats a later accept', async () => {
   const proposal = asRecord(
     (await propose('Amy', 'Kyle', [ref(7, 'Amy')], [ref(4, 'Kyle')])).body,

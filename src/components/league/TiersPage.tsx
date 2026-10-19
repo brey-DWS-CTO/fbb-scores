@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { sourceLabel } from '../../lib/league/expertProjections.js';
+import ProjectionSourceSwitch from './ProjectionSourceSwitch.js';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { POSITIONS, valueBoard, type Position } from '../../lib/league/draftValue.js';
@@ -307,7 +309,7 @@ export default function TiersPage() {
   const scenarioQuery = useKeeperScenario();
   const viewer = identity?.owner ?? null;
   const scenario = scenarioQuery.scenario;
-  const { snapshot, original, edits, loading } = useProjectionData();
+  const { snapshot, original, edits, loading, source } = useProjectionData();
 
   const [position, setPosition] = useState<Position | 'ALL'>('ALL');
   const [hideKept, setHideKept] = useState(false);
@@ -326,8 +328,8 @@ export default function TiersPage() {
     [values, snapshot, keeperSets, edits, original],
   );
   const rows = useMemo(
-    () => buildTierRows(projections, dataset.players, { position, hideKept }),
-    [projections, dataset.players, position, hideKept],
+    () => buildTierRows(projections, dataset.players, { position, hideKept, source: sourceLabel(source) }),
+    [projections, dataset.players, position, hideKept, source],
   );
   const pages = tierPages(rows.length);
   const current = Math.min(page, Math.max(0, pages.length - 1));
@@ -356,6 +358,7 @@ export default function TiersPage() {
       </div>
 
       <section className="panel mock-controls proj-controls">
+        <ProjectionSourceSwitch onChange={() => setPage(0)} />
         <div className="mock-seg" role="radiogroup" aria-label="Position">
           {(['ALL', ...POSITIONS] as const).map((choice) => (
             <button

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import SignInPanel from './SignInPanel.js';
 import NavIcon from './NavIcon.js';
@@ -10,9 +10,13 @@ import {
   acceptPickTrade,
   apiErrorMessage,
   cancelPickTrade,
+  deleteMockTrade,
+  fetchMockTrades,
+  saveMockTrade,
   fetchPickTrades,
   previewPickTrade,
   rejectPickTrade,
+  revisePickTrade,
   sendPickTrade,
   type PickTradesResponse,
 } from '../../lib/league/api.js';
@@ -42,8 +46,10 @@ import {
   type TradeAsset,
   type TradePreview,
 } from '../../lib/league/pickTrades.js';
+import { mockTradeProposal, type MockTrade } from '../../lib/league/mockTrades.js';
 
-type Tab = 'inbox' | 'sent' | 'done';
+/** Open offers either way, your mock trades, and everything that is over. */
+type Tab = 'active' | 'mock' | 'done';
 
 const formatDay = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -363,6 +369,7 @@ function TradeCard({
   onAccept,
   onReject,
   onCancel,
+  onEdit,
 }: {
   proposal: PickTradeProposal;
   owner: string;
@@ -374,6 +381,7 @@ function TradeCard({
   onAccept: (p: PickTradeProposal) => void;
   onReject: (p: PickTradeProposal) => void;
   onCancel: (p: PickTradeProposal) => void;
+  onEdit: (p: PickTradeProposal) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<TradePreview | null>(null);
@@ -412,6 +420,7 @@ function TradeCard({
         <span className="hub-heading trade-status">{STATUS_LABEL[proposal.status]}</span>
         <span className="trade-meta">
           {mine ? `to ${proposal.recipient}` : `from ${proposal.proposer}`} · {formatDay(proposal.createdAt)}
+          {proposal.revisedAt ? ` · changed ${formatDay(proposal.revisedAt)}` : ''}
         </span>
       </div>
 
@@ -497,6 +506,11 @@ function TradeCard({
 
       {pending && (mine || isCommish) && (
         <div className="trade-actions trade-actions-thin">
+          {mine && (
+            <button type="button" className="trade-pull tap-btn" disabled={busy} onClick={() => onEdit(proposal)}>
+              CHANGE AND RESEND
+            </button>
+          )}
           <button
             type="button"
             className="trade-pull tap-btn"
@@ -520,7 +534,7 @@ export default function TradesPage() {
   const { identity } = useIdentity();
   const { state, dataset, refetch } = useLeagueData();
   const [data, setData] = useState<PickTradesResponse | null>(null);
-  const [tab, setTab] = useState<Tab>('inbox');
+  const [tab, setTab] = useState<Tab>('active');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -548,13 +562,20 @@ export default function TradesPage() {
   const [note, setNote] = useState('');
   const [preview, setPreview] = useState<TradePreview | null>(null);
   const [sendWarning, setSendWarning] = useState<KeeperResetWarning | null>(null);
+  // The offer being changed, when the composer is open on one already sent.
+  const [editing, setEditing] = useState<PickTradeProposal | null>(null);
+  // The mock trade being sent for real, when the composer is open on one.
+  const [fromMock, setFromMock] = useState<MockTrade | null>(null);
+  const [mocks, setMocks] = useState<MockTrade[]>([]);
 
   const owner = identity?.owner ?? '';
 
   const load = useCallback(async () => {
     if (!identity) return;
     try {
-      setData(await fetchPickTrades(identity));
+      const [trades, mine] = await Promise.all([fetchPickTrades(identity), fetchMockTrades(identity)]);
+      setMocks(mine);
+      setData(trades);
     } catch (e) {
       setError(apiErrorMessage(e));
     }
@@ -617,6 +638,41 @@ export default function TradesPage() {
     setNote('');
     setPreview(null);
     setSendWarning(null);
+    setEditing(null);
+    setFromMock(null);
+  };
+
+  // Open the composer on a mock trade, to review it and send it for real.
+  const startFromMock = (trade: MockTrade) => {
+    resetComposer();
+    setFromMock(trade);
+    setComposing(true);
+    setPartner(trade.recipient);
+    setGive(trade.offer);
+    setGet(trade.request);
+    setNote(trade.note);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Keep the trade for yourself: nothing is sent, nobody is mailed.
+  const keepAsMock = () =>
+    act(async () => {
+      await saveMockTrade(identity, { recipient: partner, offer: give, request: get, note });
+      resetComposer();
+      setTab('mock');
+    });
+
+  // Open the composer on an offer already sent, picks and message filled in.
+  const startEdit = (proposal: PickTradeProposal) => {
+    setEditing(proposal);
+    setComposing(true);
+    setPartner(proposal.recipient);
+    setGive(proposal.offer);
+    setGet(proposal.request);
+    setNote(proposal.note);
+    setPreview(null);
+    setSendWarning(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const review = () =>
@@ -626,9 +682,15 @@ export default function TradesPage() {
 
   const send = () =>
     act(async () => {
-      await sendPickTrade(identity, { recipient: partner, offer: give, request: get, note });
+      if (editing) {
+        await revisePickTrade(identity, editing.id, { version: editing.version, offer: give, request: get, note });
+      } else {
+        await sendPickTrade(identity, { recipient: partner, offer: give, request: get, note });
+        // Sent for real: the mock it came from has done its job.
+        if (fromMock) await deleteMockTrade(identity, fromMock.id);
+      }
       resetComposer();
-      setTab('sent');
+      setTab('active');
     });
 
   // Only the sender's own picks and own keepers. Warning about the other
@@ -648,7 +710,9 @@ export default function TradesPage() {
     (p) => p.status === 'pending' && p.proposer !== owner && p.recipient !== owner,
   );
   const done = proposals.filter((p) => p.status !== 'pending');
-  const shown = tab === 'inbox' ? inbox : tab === 'sent' ? [...sent, ...stuck] : done;
+  // Offers waiting on you first, then yours waiting on them.
+  const active = [...inbox, ...sent, ...stuck];
+  const shown = tab === 'active' ? active : tab === 'done' ? done : [];
   const ready = partner !== '' && give.length > 0 && get.length > 0;
 
   return (
@@ -685,11 +749,22 @@ export default function TradesPage() {
 
       {composing && (
         <div className="rule-edit-form">
+          {fromMock && (
+            <p className="rule-edit-hint">
+              Sending your mock trade with {fromMock.recipient} for real. Review it, then send. It leaves your mocks once it goes.
+            </p>
+          )}
+          {editing && (
+            <p className="rule-edit-hint">
+              Changing your offer to {editing.recipient}. Resending replaces it and emails {editing.recipient}.
+            </p>
+          )}
           <label className="rule-edit-label">
             Trade with
             <select
               className="hub-input rule-edit-input"
               value={partner}
+              disabled={editing !== null}
               onChange={(e) => {
                 setPartner(e.target.value);
                 setGet([]);
@@ -765,13 +840,27 @@ export default function TradesPage() {
                 disabled={busy}
                 onClick={askBeforeSending}
               >
-                {busy ? 'SENDING...' : `SEND IT TO ${partner.toUpperCase()}`}
+                {busy ? 'SENDING...' : `${editing ? 'RESEND' : 'SEND'} IT TO ${partner.toUpperCase()}`}
+              </button>
+            )}
+            {!editing && !fromMock && (
+              <button
+                type="button"
+                className="rule-edit-cancel tap-btn"
+                disabled={busy || !ready}
+                onClick={() => void keepAsMock()}
+                title="Keep it for yourself and draft off it in the mock draft. Nothing is sent."
+              >
+                SAVE AS MOCK
               </button>
             )}
             <button type="button" className="rule-edit-cancel tap-btn" onClick={resetComposer}>
               CANCEL
             </button>
           </div>
+          {!editing && !fromMock && (
+            <p className="rule-edit-hint">SAVE AS MOCK keeps it for you alone. Nothing goes to {partner || 'the other team'} and nobody is emailed.</p>
+          )}
 
           {sendWarning && (
             <KeeperResetDialog
@@ -792,20 +881,21 @@ export default function TradesPage() {
         <button
           type="button"
           className="rules-tool tap-btn"
-          aria-pressed={tab === 'inbox'}
-          onClick={() => setTab('inbox')}
+          aria-pressed={tab === 'active'}
+          onClick={() => setTab('active')}
         >
-          INBOX
+          ACTIVE
+          {/* The badge counts only offers waiting on you to answer. */}
           {inbox.length > 0 && <span className="audit-badge">{inbox.length}</span>}
         </button>
         <button
           type="button"
           className="rules-tool tap-btn"
-          aria-pressed={tab === 'sent'}
-          onClick={() => setTab('sent')}
+          aria-pressed={tab === 'mock'}
+          onClick={() => setTab('mock')}
         >
-          SENT
-          {sent.length > 0 && <span className="audit-badge">{sent.length}</span>}
+          MOCK
+          {mocks.length > 0 && <span className="audit-badge">{mocks.length}</span>}
         </button>
         <button
           type="button"
@@ -836,15 +926,38 @@ export default function TradesPage() {
             onAccept={(p) => act(() => acceptPickTrade(identity, p.id, p.version))}
             onReject={(p) => act(() => rejectPickTrade(identity, p.id))}
             onCancel={(p) => act(() => cancelPickTrade(identity, p.id))}
+            onEdit={startEdit}
           />
         ))}
-        {shown.length === 0 && (
+        {tab === 'mock' && mocks.map((trade) => (
+          <article key={trade.id} className="panel trade-card trade-mock">
+            <div className="trade-head">
+              <span className="hub-heading trade-status">MOCK</span>
+              <span className="trade-meta">with {trade.recipient} · {formatDay(trade.createdAt)} · only you see this</span>
+            </div>
+            <TradeSummary proposal={mockTradeProposal(trade)} reader={owner} order={dataset} season={trade.season} />
+            {trade.note && <p className="trade-note">&ldquo;{trade.note}&rdquo;</p>}
+            <div className="trade-actions trade-actions-thin">
+              <button type="button" className="trade-pull tap-btn" disabled={busy} onClick={() => startFromMock(trade)}>
+                SEND FOR REAL
+              </button>
+              <button type="button" className="trade-pull tap-btn" disabled={busy} onClick={() => void act(() => deleteMockTrade(identity, trade.id))}>
+                DELETE
+              </button>
+            </div>
+          </article>
+        ))}
+        {tab === 'mock' && (
           <div className="panel rules-empty">
-            {tab === 'inbox'
-              ? 'Nobody has offered you a trade.'
-              : tab === 'sent'
-                ? 'You have no offers out.'
-                : 'No trades have been made in the app yet.'}
+            {mocks.length === 0 ? 'No mock trades. Build a trade and tap SAVE AS MOCK. ' : ''}
+            Switch mock trades on in the <Link to="/mock">mock draft</Link> setup to draft off them.
+          </div>
+        )}
+        {tab !== 'mock' && shown.length === 0 && (
+          <div className="panel rules-empty">
+            {tab === 'active'
+              ? 'No open offers, to you or from you.'
+              : 'No trades have been made in the app yet.'}
           </div>
         )}
         {/* The league's own trade record, so SETTLED is never a dead end. */}

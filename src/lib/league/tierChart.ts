@@ -58,6 +58,8 @@ export interface TierRow {
 export interface TierChartOptions {
   position?: Position | 'ALL';
   hideKept?: boolean;
+  /** Whose lines the projection is: ESPN unless the commissioner picked another. */
+  source?: string;
 }
 
 // ─── Natural breaks ─────────────────────────────────────────────────────────
@@ -152,12 +154,12 @@ function lastSeasonGames(player: DatasetPlayer | undefined): number | null {
 }
 
 /** Every number we hold for his points per game. The projection comes first. */
-export function estimatesFor(row: PlayerProjection, player: DatasetPlayer | undefined): FppgEstimate[] {
+export function estimatesFor(row: PlayerProjection, player: DatasetPlayer | undefined, source = 'ESPN'): FppgEstimate[] {
   if (row.fppg === null) return [];
   const out: FppgEstimate[] = [
-    { label: row.edit ? 'Commish projection' : 'ESPN projection', fppg: row.fppg },
+    { label: row.edit ? 'Your projection' : `${source} projection`, fppg: row.fppg },
   ];
-  if (row.edit && row.espn?.fppg != null) out.push({ label: 'ESPN projection', fppg: row.espn.fppg });
+  if (row.edit && row.espn?.fppg != null) out.push({ label: `${source} projection`, fppg: row.espn.fppg });
   if (row.lastSeason !== null) out.push({ label: 'Last season', fppg: row.lastSeason });
   if (player?.prior) out.push({ label: 'Season before', fppg: player.prior.avg });
   return out;
@@ -189,7 +191,7 @@ export function buildTierRows(
 
   return ranked.map((row, index) => {
     const player = byKey.get(row.key);
-    const estimates = estimatesFor(row, player);
+    const estimates = estimatesFor(row, player, options.source);
     const values = estimates.map((estimate) => estimate.fppg);
     return {
       key: row.key,

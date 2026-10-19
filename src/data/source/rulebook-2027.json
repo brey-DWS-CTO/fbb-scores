@@ -644,7 +644,7 @@
             {
               "id": "keepers.picktrade.rounds.maxAway",
               "legacyNumber": "4.4.1.2",
-              "text": "Each team may trade away at most two of its own picks for any one draft. Passing on a pick you got in a trade does not count.",
+              "text": "During the season, each team may trade away at most two of its own picks for any one draft. Passing on a pick you got in a trade does not count. Before and during the draft there is no limit.",
               "settings": [
                 "picktrade.maxTradedAwayPerYear"
               ]
@@ -660,7 +660,7 @@
             {
               "id": "keepers.picktrade.maxPerRound",
               "legacyNumber": "4.4.3",
-              "text": "Each team may hold at most 2 picks in any one round of a draft.",
+              "text": "During the season, each team may hold at most 2 picks in any one round of a draft. Before and during the draft there is no limit.",
               "settings": [
                 "picktrade.maxPerRound"
               ],

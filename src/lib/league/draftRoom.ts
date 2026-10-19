@@ -7,7 +7,7 @@
  * Pure. No server, no browser. Storage is passed in.
  */
 import { fillsSlot, type Position, type RosterSettings, type StarterSlot } from './draftValue.js';
-import { replayLive, type LiveChoices, type LiveState } from './liveMock.js';
+import { replayLive, type LiveChoices, type LiveState, type People } from './liveMock.js';
 import type { MockCandidate, MockKeeper, MockMode, MockPick, MockSlot, PreparedMock } from './mockDraft.js';
 
 // ─── Who is up ──────────────────────────────────────────────────────────────
@@ -212,6 +212,8 @@ export interface MockSave {
   queue: string[];
   /** Seconds left on the person's clock when they left, if it was running. */
   clockLeft: number | null;
+  /** The last pick landed. */
+  finished: boolean;
   /** The what-if switches that shape the board. */
   tradesOn: string[];
   tryKeepers: boolean;
@@ -257,6 +259,7 @@ export function parseMockSave(raw: string | null): MockSave | null {
     choices,
     queue: isStringList(save.queue) ? save.queue : [],
     clockLeft: typeof save.clockLeft === 'number' && save.clockLeft >= 0 ? save.clockLeft : null,
+    finished: save.finished === true,
     tradesOn: isStringList(save.tradesOn) ? save.tradesOn : [],
     tryKeepers: save.tryKeepers === true,
     tryPicks,
@@ -274,7 +277,7 @@ export function parseMockSave(raw: string | null): MockSave | null {
 export function replaySaved(
   prepared: PreparedMock,
   seed: number,
-  person: string,
+  people: People,
   choices: LiveChoices,
 ): { live: LiveState; choices: Record<number, string>; dropped: number } {
   const kept: Record<number, string> = { ...choices };
@@ -282,7 +285,7 @@ export function replaySaved(
   let dropped = 0;
   for (;;) {
     try {
-      return { live: replayLive(prepared, seed, person, kept), choices: kept, dropped };
+      return { live: replayLive(prepared, seed, people, kept), choices: kept, dropped };
     } catch {
       const last = order.pop();
       if (last === undefined) throw new Error('The mock draft cannot be replayed');
@@ -290,4 +293,20 @@ export function replaySaved(
       dropped += 1;
     }
   }
+}
+
+/**
+ * A finished draft that no longer replays in full on today's board, because a
+ * keeper or a trade changed after it. Reopening it would land the person in
+ * the middle of a draft they already finished, so the page starts a new one
+ * instead. The finished one is already in Past mocks.
+ */
+export function finishedDraftNoLongerFits(
+  prepared: PreparedMock,
+  seed: number,
+  person: string,
+  saved: { finished?: boolean; choices: LiveChoices },
+): boolean {
+  if (saved.finished !== true) return false;
+  return replaySaved(prepared, seed, person, saved.choices).dropped > 0;
 }

@@ -4073,6 +4073,8 @@ th.schedule-col-active {
   border-width: 0 7px 7px 0;
   border-color: transparent var(--neon-yellow) transparent transparent;
 }
+/* A cell that moved because his minutes did: yellow like a typed one, no corner. */
+.proj-table td.proj-cell-scaled { color: var(--neon-yellow) !important; font-weight: 600; }
 .proj-cell-input {
   width: 64px;
   padding: 3px 4px;
@@ -4393,8 +4395,6 @@ html.theme-light {
 .room-clock .room-share { margin-left: auto; }
 .room-queue-toggle { margin-left: auto; }
 .room-queue-fold { display: none; }
-/* DRAFT and GONE BY NEXT lead the row on a phone and trail it on a wide screen. */
-.room-draft-lead, .room-gone-lead { display: none; }
 .room-name-short { display: none; }
 .room-sort-quick { display: none; }
 .mock-shared .room-grade { margin-top: 10px; }
@@ -4503,21 +4503,17 @@ html.theme-light {
 
   /* The queue folds open above the list. The right column stays put away. */
   .room .room-queue-fold { display: block; padding: 8px 10px; margin-bottom: 8px; }
-  /* The queue star stays, pinned between GONE and the name. */
-  .room .room-table .room-star { position: sticky; left: 0; z-index: 3; width: 30px; min-width: 30px; padding: 4px 0; }
-  .room .room-table .room-star button { padding: 2px 4px; }
-  .room .room-table th.room-star { z-index: 5; }
+  /* No queue star in the list: it costs the names their room. Tap a player and queue him from his card. */
+  .room .room-table .room-star { display: none; }
 
   /* DRAFT, GONE and the name pin on the left; the stats slide under them. */
   .room .room-draft-lead, .room .room-gone-lead { display: table-cell; position: sticky; z-index: 3; }
-  .room .room-gone-trail, .room .room-draft-trail { display: none; }
   .room .room-table .room-draft-lead { left: 0; width: 56px; min-width: 56px; padding: 4px; }
   .room .room-table .room-draft-lead .mock-mini-btn { min-height: 32px; padding: 0 6px; font-size: 0.6rem; width: 100%; }
   .room .room-table .room-gone-lead { left: 56px; width: 44px; min-width: 44px; padding: 4px; font-size: 0.72rem; }
   .room .room-table th.room-gone-lead button { padding: 8px 4px; }
-  .room .room-table .room-player-col { position: sticky; left: 30px; z-index: 3; min-width: 0; }
-  .room .room-table.is-my-turn .room-star { left: 100px; }
-  .room .room-table.is-my-turn .room-player-col { left: 130px; }
+  .room .room-table .room-player-col { position: sticky; left: 0; z-index: 3; min-width: 0; }
+  .room .room-table.is-my-turn .room-player-col { left: 100px; }
   /* Scrolled sideways, the name column eases narrower instead of snapping. */
   .room .room-table td.room-player-col, .room .room-table th.room-player-col { transition: max-width 0.22s ease; }
   .room .room-table th { z-index: 4; }
@@ -4918,6 +4914,754 @@ html.theme-light {
 /* On a player line, after his game. */
 .score-player-proj { color: var(--neon-teal); font-weight: 700; white-space: nowrap; }
 .score-player.is-bench .score-player-proj { color: var(--text-dim); }
+/* ─── Finished mock: tap a team in the standings to see its roster ─── */
+.mock-grade-team { text-decoration: underline dotted; text-underline-offset: 3px; }
+.mock-grade-table tr.is-tappable:hover td { background: color-mix(in srgb, var(--neon-teal) 8%, transparent); }
+/* "See the board" scrolls here; the pinned clock must not cover it. */
+.room-view-anchor { scroll-margin-top: calc(var(--room-clock-h, 0px) + 8px); }
+/* A team's roster is short: it slides sideways for the stats, and an up or down swipe on it moves the page. */
+@media (max-width: 839px) {
+  .room .room-roster-wrap { max-height: none; min-height: 0; overscroll-behavior-y: auto; }
+}
+
+/* ─── AWARDS and DEPTH CHARTS pages (commish) ─── */
+.nba-watch-actions { display: flex; align-items: center; gap: 10px; }
+.nba-awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.nba-award { padding: 12px 14px; border-radius: 10px; }
+.nba-award-head, .nba-depth-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; color: var(--neon-teal); font-size: 0.78rem; margin-bottom: 8px; }
+.nba-award-head small, .nba-depth-head small { color: var(--text-dim); font-size: 0.62rem; letter-spacing: 0.02em; }
+.nba-award-list { list-style: none; margin: 0; padding: 0; font-size: 0.8rem; }
+.nba-award-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 6px; align-items: start; padding: 4px 0; border-bottom: 1px solid var(--cell-border); }
+.nba-award-list li:last-child { border-bottom: 0; }
+.nba-award-rank { color: var(--text-dim); font-size: 0.7rem; padding-top: 1px; }
+.nba-award-name { color: var(--text-body); font-weight: 700; }
+.nba-award-name small { display: block; color: var(--text-dim); font-weight: 600; font-size: 0.66rem; }
+.nba-award-odds { text-align: right; }
+.nba-award-odds strong { color: var(--text-max); font-variant-numeric: tabular-nums; }
+.nba-award-odds small { display: block; color: var(--text-dim); font-size: 0.62rem; font-variant-numeric: tabular-nums; }
+.nba-award-thin { margin-top: 6px; font-size: 0.66rem; }
+.nba-depth-filters { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 260px); gap: 8px; margin-bottom: 10px; }
+.nba-depth-filters .hub-input { min-height: 38px; }
+.nba-depth-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; }
+.nba-team { padding: 10px 12px; border-radius: 10px; }
+.nba-team-head { color: var(--text-mid); font-size: 0.78rem; margin-bottom: 6px; }
+.nba-team-head strong { color: var(--neon-orange); margin-right: 4px; }
+.nba-team-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.74rem; }
+.nba-team-table th { color: var(--text-dim); font-size: 0.6rem; font-weight: 800; text-align: left; padding: 3px 4px; }
+.nba-team-table thead th:first-child, .nba-team-table tbody th { width: 30px; }
+.nba-team-table td { padding: 4px; border-top: 1px solid var(--cell-border); vertical-align: top; color: var(--text-body); }
+.nba-team-table tbody tr td:nth-child(2) { font-weight: 800; color: var(--text-max); }
+.nba-depth-name { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.nba-depth-name.is-match { outline: 2px solid var(--neon-teal); outline-offset: 1px; border-radius: 4px; }
+.nba-name-short { display: none; }
+.nba-injury { padding: 0 4px; border: 1px solid var(--neon-yellow); border-radius: 4px; color: var(--neon-yellow); font-size: 0.56rem; font-weight: 800; line-height: 1.5; }
+.nba-injury.is-out { border-color: var(--neon-red); color: var(--neon-red); }
+.nba-badge { padding: 0 4px; border-radius: 4px; background: color-mix(in srgb, var(--neon-teal) 18%, transparent); color: var(--neon-teal); font-size: 0.56rem; font-weight: 800; line-height: 1.5; white-space: nowrap; }
+@media (max-width: 839px) {
+  .nba-watch .schedule-page-header { flex-wrap: wrap; }
+  .nba-depth-filters { grid-template-columns: 1fr 1fr; }
+  .nba-depth-grid { grid-template-columns: 1fr; }
+  .nba-team-table { font-size: 0.7rem; }
+  .nba-name-full { display: none; }
+  .nba-name-short { display: inline; }
+}
+
+/* ─── LEAGUE HQ activity log ─── */
+.league-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.league-activity li { padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 8px; }
+.league-activity-head { display: flex; align-items: baseline; gap: 8px; color: var(--text-hi); font-size: 0.85rem; }
+.league-activity-head span { margin-left: auto; color: var(--text-dim); font-size: 0.7rem; white-space: nowrap; }
+.league-activity-line { color: var(--text-body); font-size: 0.8rem; margin-top: 2px; }
+
+/* ─── Mock draft, wide screen: the keeper pause gets the clock column's full width ─── */
+@media (min-width: 840px) {
+  .room-turn.is-keeper { flex-wrap: wrap; row-gap: 10px; padding: 12px; }
+  .room-turn.is-keeper > span { flex: 1 1 100%; line-height: 1.45; }
+  .room-turn.is-keeper > .mock-mini-btn { flex: 1 1 auto; margin-left: 0; }
+  .room-turn.is-keeper .room-keeper-odds { margin-top: 6px; font-size: 0.74rem; line-height: 1.45; }
+}
+
+/* ─── Mock draft results list: a traded pick says whose it was; a projected trade is dashed ─── */
+.room-update-owner .board-traded-tag { display: block; margin-top: 2px; font-size: 0.55rem; width: fit-content; margin-left: auto; }
+.board-traded-tag.is-projected { background: transparent; color: var(--neon-yellow); border: 1px dashed var(--neon-yellow); }
+
+/* ─── Mock draft board: a filled cell is always a dark position color, so its words stay light in either theme ─── */
+.room-grid td[style] .room-grid-name { color: #f4f4fb; }
+.room-grid td[style] .room-grid-label { color: rgba(244, 244, 251, 0.72); }
+
+/* ─── Achievements and prop bets ─────────────────────────────────────── */
+.achieve-page .panel, .props-page .props-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+}
+.achieve-title { color: var(--neon-teal); font-size: 0.62rem; }
+.achieve-muted { color: var(--text-dim); font-size: 0.66rem; }
+.achieve-reveal { border-color: rgba(204,0,255,0.55); }
+.achieve-ready { display: flex; align-items: baseline; gap: 8px; }
+.achieve-ready-count { color: var(--text-max); font-size: 1.8rem; font-weight: 900; line-height: 1; }
+.achieve-ready-label { color: var(--neon-purple); font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; }
+.achieve-reveal-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; }
+.achieve-seen { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.achieve-seen-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--cell-bg);
+}
+.achieve-seen-new { border-color: var(--neon-yellow); box-shadow: 0 0 0 1px var(--neon-yellow); }
+.achieve-seen-team { color: var(--neon-yellow); font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; }
+.achieve-seen-names { color: var(--text-max); font-size: 0.92rem; font-weight: 800; }
+
+.achieve-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.achieve-group { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.achieve-group-label { color: var(--text-dim); font-size: 0.58rem; font-weight: 900; letter-spacing: 0.1em; }
+.achieve-go { min-width: 44px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.achieve-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--text-dim);
+}
+.achieve-done { border-color: rgba(0,255,204,0.45); color: var(--neon-teal); }
+.achieve-icon { flex: none; }
+.achieve-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.achieve-name { color: var(--text-hi); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.06em; }
+.achieve-done .achieve-name { color: var(--neon-teal); }
+.achieve-how { color: var(--text-body); font-size: 0.74rem; }
+.achieve-when { flex: none; color: var(--neon-teal); font-size: 0.66rem; font-weight: 800; }
+.achieve-go {
+  flex: none;
+  padding: 6px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  color: var(--text-mid);
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-decoration: none;
+}
+
+.achieve-board { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.achieve-row {
+  display: grid;
+  grid-template-columns: 5.2em 1fr 2.6em;
+  grid-template-areas: 'owner bar count' 'owner seen seen';
+  align-items: center;
+  gap: 1px 8px;
+  color: var(--text-body);
+  font-size: 0.76rem;
+}
+.achieve-row-me .achieve-row-owner { color: var(--neon-yellow); }
+.achieve-row-owner { grid-area: owner; font-weight: 800; }
+.achieve-bar { grid-area: bar; height: 7px; border-radius: 4px; background: var(--cell-bg); overflow: hidden; }
+.achieve-bar-fill { display: block; height: 100%; background: var(--neon-teal); }
+.achieve-row-count { grid-area: count; text-align: right; font-weight: 800; color: var(--text-hi); }
+.achieve-row-seen { grid-area: seen; font-size: 0.6rem; }
+
+.props-fields { display: grid; grid-template-columns: 1fr 7.5em; gap: 10px; }
+.props-what { grid-column: 1 / -1; }
+/* 16px text keeps phones from zooming in on tap; 48px is a thumb. */
+.props-page .hub-input { width: 100%; box-sizing: border-box; min-height: 48px; font-size: 16px; padding: 0 12px; }
+.props-preview { margin: 0; color: var(--text-max); font-size: 0.9rem; font-weight: 800; }
+.props-problem { margin: 0; }
+.props-add { min-height: 52px; font-size: 0.85rem; }
+.props-group { margin-bottom: 14px; }
+.props-result { margin-left: auto; color: var(--neon-yellow); font-size: 0.6rem; }
+.props-final { margin: 0; color: var(--text-hi); font-size: 0.8rem; font-weight: 800; }
+.props-page .vote-btn { min-height: 52px; font-size: 0.85rem; }
+.props-page .vote-close { min-height: 44px; font-size: 0.66rem; }
+.props-settle { display: flex; gap: 8px; }
+.props-settle .hub-input { flex: 1; }
+.props-settle .tap-btn { min-height: 48px; padding: 0 14px; }
+/* ─── Mock draft, phone: with a card tapped, the corner badge says "Up in 3 picks at 7.9" ─── */
+@media (max-width: 839px) {
+  .room.has-picked .room-mini-clock.is-wait { font-size: 0.66rem; letter-spacing: 0.02em; white-space: nowrap; }
+}
+
+/* ─── Mock draft: a saved mock's board, and everyone's mock counts ─── */
+.saved-mock-board { display: grid; gap: 8px; margin: 10px 0; justify-items: start; }
+.saved-mock-board .room-grid-wrap { width: 100%; }
+.mock-stats-table { margin-top: 8px; }
+.mock-stats-table .mock-grade-letter { font-size: 0.85rem; }
+
+/* ─── Achievement unlock toast, keeper reveal reel, confetti ──────────── */
+.unlock-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(3px);
+  animation: unlock-fade 0.2s ease-out;
+}
+.unlock-card {
+  position: relative;
+  z-index: 1002;
+  width: min(360px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 18px 18px;
+  border: 2px solid var(--neon-yellow);
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 230, 0, 0.18), var(--panel-bg) 60%);
+  box-shadow: 0 0 0 4px rgba(255, 230, 0, 0.12), 0 0 48px rgba(255, 230, 0, 0.35);
+  text-align: center;
+  animation: unlock-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.unlock-burst {
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--neon-yellow);
+  background: repeating-conic-gradient(rgba(255, 230, 0, 0.22) 0 12deg, transparent 12deg 30deg);
+  animation: unlock-rays 6s linear infinite;
+}
+.unlock-burst .nav-icon { animation: unlock-rays 6s linear infinite reverse; filter: drop-shadow(0 0 10px rgba(255, 230, 0, 0.8)); }
+.unlock-heading {
+  margin: 0;
+  color: var(--neon-yellow);
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 14px rgba(255, 230, 0, 0.6);
+}
+.unlock-names { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.unlock-names li { color: var(--text-max); font-size: 1rem; font-weight: 900; letter-spacing: 0.06em; }
+.unlock-names .unlock-more { color: var(--text-dim); font-size: 0.75rem; }
+.unlock-prize {
+  margin: 4px 0 2px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 255, 204, 0.12);
+  border: 1px solid var(--neon-teal);
+  color: var(--neon-teal);
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  animation: unlock-pulse 1.2s ease-in-out infinite;
+}
+.unlock-go, .unlock-later {
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-family: inherit;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+.unlock-go {
+  border: none;
+  background: var(--neon-yellow);
+  color: #111;
+  font-size: 0.95rem;
+  box-shadow: 0 0 22px rgba(255, 230, 0, 0.45);
+}
+.unlock-later {
+  min-height: 44px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--text-mid);
+  font-size: 0.72rem;
+}
+
+.confetti { position: fixed; inset: 0; z-index: 1001; pointer-events: none; overflow: hidden; }
+.confetti-piece {
+  position: absolute;
+  top: -16px;
+  width: 7px;
+  height: 13px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confetti-fall 2.8s cubic-bezier(0.3, 0.6, 0.5, 1) forwards;
+}
+.confetti-wide { width: 11px; height: 7px; }
+.confetti-ball { width: 22px; height: 22px; border-radius: 50%; opacity: 1; }
+
+.reveal-page { display: flex; justify-content: center; }
+.reveal-stage {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0 32px;
+  text-align: center;
+}
+.reveal-kicker { color: var(--neon-purple); font-size: 0.75rem; letter-spacing: 0.12em; }
+.reveal-reel {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 10px;
+  border: 2px solid var(--neon-purple);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(204, 0, 255, 0.14), var(--panel-bg) 40%, var(--panel-bg) 60%, rgba(204, 0, 255, 0.14));
+  box-shadow: inset 0 0 24px rgba(204, 0, 255, 0.25);
+}
+.reveal-reel-name { color: var(--text-max); font-size: 2rem; font-weight: 900; letter-spacing: 0.06em; line-height: 1.1; }
+.reveal-reel-keeps { color: var(--text-dim); font-size: 0.7rem; font-weight: 900; letter-spacing: 0.14em; }
+.reveal-spinning .reveal-reel-name { animation: reveal-blur 0.12s linear infinite; }
+.reveal-flipping .reveal-reel, .reveal-done .reveal-reel { border-color: var(--neon-yellow); box-shadow: 0 0 28px rgba(255, 230, 0, 0.4); }
+.reveal-flipping .reveal-reel-name, .reveal-done .reveal-reel-name { color: var(--neon-yellow); }
+
+.reveal-card { position: relative; width: 100%; height: 150px; perspective: 900px; }
+.reveal-card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  backface-visibility: hidden;
+  transition: transform 0.7s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.reveal-card-back {
+  border: 2px dashed var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--text-dim);
+  font-size: 3.4rem;
+  font-weight: 900;
+}
+.reveal-card-front {
+  transform: rotateY(180deg);
+  border: 2px solid var(--neon-yellow);
+  background: radial-gradient(circle at 50% 30%, rgba(255, 230, 0, 0.2), var(--panel-bg) 70%);
+  box-shadow: 0 0 36px rgba(255, 230, 0, 0.35);
+}
+.reveal-card.is-flipped .reveal-card-back { transform: rotateY(-180deg); }
+.reveal-card.is-flipped .reveal-card-front { transform: rotateY(0deg); }
+.reveal-player { color: var(--text-max); font-size: 1.7rem; font-weight: 900; line-height: 1.15; }
+.reveal-of { color: var(--neon-yellow); font-size: 0.66rem; font-weight: 900; letter-spacing: 0.1em; }
+.reveal-actions { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.reveal-hint { margin: 0; }
+
+@keyframes unlock-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes unlock-pop {
+  0% { transform: scale(0.4) rotate(-6deg); opacity: 0; }
+  70% { transform: scale(1.06) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes unlock-rays { to { transform: rotate(360deg); } }
+@keyframes unlock-pulse { 50% { transform: scale(1.06); box-shadow: 0 0 16px rgba(0, 255, 204, 0.4); } }
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--drift), 105vh) rotate(var(--spin)); opacity: 0.85; }
+}
+@keyframes reveal-blur {
+  0% { transform: translateY(-3px); filter: blur(1px); }
+  50% { transform: translateY(3px); filter: blur(2px); }
+  100% { transform: translateY(-3px); filter: blur(1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .unlock-backdrop, .unlock-card, .unlock-burst, .unlock-burst .nav-icon, .unlock-prize,
+  .reveal-spinning .reveal-reel-name { animation: none; }
+  .confetti { display: none; }
+  .reveal-card-face { transition: none; }
+}
+
+/* ─── VAULT: revealed keepers, team by team ───────────────────────────── */
+.achieve-seen-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--neon-yellow);
+  border-radius: 10px;
+  color: var(--neon-yellow);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+.achieve-reveal-bar { align-items: stretch; }
+.vault-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.vault-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  min-width: 0;
+}
+.vault-card.has-shown { border-color: rgba(255, 230, 0, 0.55); }
+.vault-team { color: var(--text-hi); font-size: 0.66rem; font-weight: 900; letter-spacing: 0.08em; }
+.vault-slot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px dashed var(--panel-border);
+  border-radius: 7px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-slot.is-open { border: 1px solid var(--neon-yellow); color: var(--text-max); background: rgba(255, 230, 0, 0.08); }
+.vault-slot.is-gone { font-style: italic; }
+/* ─── Mock trades: tagged in the mock draft setup and on the trade page ─── */
+.mock-tag.mock-tag-mock { border: 1px dashed var(--neon-yellow); color: var(--neon-yellow); background: transparent; }
+.trade-card.trade-mock { border-style: dashed; }
+
+/* ─── Mock draft: on your pick, where your next one is ─── */
+.room-turn.is-mine .room-turn-next { color: var(--text-mid); font-weight: 700; letter-spacing: 0; white-space: nowrap; }
+
+/* ─── Live draft: the shared test draft and the player list ─── */
+.test-draft-strip {
+  display: block;
+  padding: 6px 10px;
+  border-bottom: 2px solid var(--neon-yellow);
+  background: rgba(255,230,0,0.12);
+  color: var(--neon-yellow);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-decoration: none;
+}
+.test-draft-panel { margin-bottom: 12px; padding: 12px 14px; border: 2px dashed var(--neon-yellow); border-radius: 10px; color: var(--neon-yellow); }
+.test-draft-panel .hub-heading { font-size: 0.68rem; }
+.test-draft-panel p { margin: 6px 0 0; color: var(--text-body); font-size: 0.78rem; line-height: 1.45; }
+.test-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.test-draft-actions button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.test-draft-actions button.is-go { border-color: var(--neon-yellow); background: rgba(255,230,0,0.1); color: var(--neon-yellow); }
+.test-draft-actions button.is-danger { border-color: var(--neon-red); color: var(--neon-red); }
+.test-draft-error, .live-room-error { margin-top: 8px; color: var(--neon-red); font-size: 0.76rem; font-weight: 700; }
+.live-room { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; }
+.live-room.is-my-turn { border: 2px solid var(--neon-teal); }
+.live-room-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.live-room-head .hub-heading { color: var(--text-mid); font-size: 0.62rem; }
+.live-room-status { color: var(--text-dim); font-size: 0.72rem; font-weight: 800; text-align: right; }
+.live-room-status.is-on { color: var(--neon-teal); }
+.live-room .room-table td.room-player-col small { display: block; }
+@media (max-width: 839px) {
+  .live-room { padding: 8px; }
+  .live-room .room-filters { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; }
+  .live-room .room-filters .room-search { grid-column: 1 / -1; }
+  .live-room .room-filters .proj-check { grid-column: 1 / -1; }
+  .live-room .room-sort-quick { display: inline-flex; gap: 4px; justify-content: flex-end; }
+  .live-room .room-sort-quick button { min-height: 32px; padding: 0 7px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.58rem; font-weight: 800; }
+  .live-room .room-sort-quick button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+  .live-room .room-table-wrap { max-height: 60vh; }
+  /* DRAFT, GONE and the name stay put while the stats slide under them. */
+  .live-room .room-table .live-room-draft { position: sticky; left: 0; z-index: 3; width: 58px; min-width: 58px; padding: 4px; }
+  .live-room .room-table .live-room-draft .mock-mini-btn { min-height: 34px; padding: 0 6px; font-size: 0.6rem; }
+  .live-room .room-table .live-room-gone { position: sticky; left: 58px; z-index: 3; width: 44px; min-width: 44px; padding: 4px; }
+  .live-room .room-table th.live-room-gone button { padding: 8px 4px; }
+  .live-room .room-table .room-star { position: sticky; left: 0; z-index: 2; }
+  .live-room.is-my-turn .room-table .room-star { left: 58px; }
+  .live-room.is-my-turn .room-table:has(.live-room-gone) .room-star { left: 102px; }
+  .live-room .room-table .room-player-col { position: sticky; left: 30px; z-index: 2; max-width: 150px; min-width: 120px; overflow: hidden; text-overflow: ellipsis; box-shadow: 2px 0 0 var(--panel-border); }
+  .live-room.is-my-turn .room-table .room-player-col { left: 88px; }
+  .live-room.is-my-turn .room-table:has(.live-room-gone) .room-player-col { left: 132px; }
+  .live-room .room-table th.live-room-draft, .live-room .room-table th.live-room-gone, .live-room .room-table th.room-star, .live-room .room-table th.room-player-col { z-index: 5; }
+}
+
+/* ─── Live draft: who is in the room ─── */
+.draft-room-panel { margin-bottom: 12px; padding: 8px 12px; border-radius: 10px; }
+.draft-room-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.draft-room-line .hub-heading { margin-right: 4px; color: var(--text-mid); font-size: 0.6rem; }
+.draft-room-chip {
+  padding: 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--neon-teal) 45%, var(--panel-border));
+  border-radius: 999px;
+  background: rgba(0,255,204,0.06);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.draft-room-chip.is-me { border-color: var(--neon-teal); color: var(--neon-teal); }
+.live-room-writein { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--neon-teal); font-size: 0.74rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
+/* ─── Live draft: the room on a phone, the card, the queue, sound ─── */
+/* The room's own bar: a solid strip along the bottom of the screen, the
+   same on a laptop as on a phone. On a laptop it starts where the sidebar
+   ends, and the page leaves room under the last row for it. */
+.live-phone-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 2px solid var(--panel-border);
+  background: var(--dark-bg);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.live-phone-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 0; border-top: 2px solid transparent; margin-top: -2px; background: transparent; color: var(--text-mid); cursor: pointer; }
+.live-phone-tabs button .hub-heading { font-size: 0.66rem; }
+.live-phone-tabs button.is-on { color: var(--neon-teal); border-top-color: var(--neon-teal); }
+@media (min-width: 840px) {
+  .live-phone-tabs { left: 216px; }
+  html.nav-collapsed .live-phone-tabs { left: 64px; }
+  html.in-live-room .app-shell-nav { padding-bottom: 60px; }
+}
+/* The pick that just landed, one line, as in the mock room. */
+.live-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text-body);
+  animation: room-latest-in 0.35s ease-out;
+}
+.live-latest .live-latest-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .live-latest { animation: none; } }
+.live-phone-tabs button.is-exit { color: var(--text-dim); }
+html.in-live-room .live-tab:not(.is-shown) { display: none; }
+.live-room-writein { display: block; }
+.live-room-more { display: block; margin-top: 10px; min-height: 40px; padding: 0 14px; border: 1px solid var(--panel-border); border-radius: 8px; background: transparent; color: var(--text-soft); font-size: 0.72rem; font-weight: 800; }
+.live-room-side { display: none; }
+.live-room-side .hub-heading { margin-bottom: 8px; color: var(--text-mid); font-size: 0.62rem; }
+@media (min-width: 840px) {
+  /* Members have no stat columns, so their queue takes the right side. */
+  .live-room:not(.has-stats) .live-room-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 38%); gap: 14px; align-items: start; }
+  .live-room:not(.has-stats) .live-room-side { display: block; position: sticky; top: 12px; margin: 0; }
+  .live-room:not(.has-stats) .live-room-queue-btn,
+  .live-room:not(.has-stats) .live-room-queue-fold { display: none; }
+}
+.live-sound-btn {
+  padding: 6px 10px;
+  border: 2px solid var(--panel-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.live-sound-btn.is-on { border-color: var(--neon-teal); color: var(--neon-teal); }
+.live-card { margin-bottom: 10px; padding: 10px 12px; border: 2px solid var(--neon-teal); border-radius: 10px; }
+.live-room-queue { margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 10px; }
+.live-room-queue .room-queue-list li { display: flex; align-items: center; gap: 6px; }
+.live-room-queue .room-queue-name { flex: 1; min-width: 0; overflow: hidden; border: 0; background: none; color: var(--text-hi); font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.live-room-queue-btn.is-on { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.live-room .room-sort-quick.is-always { display: inline-flex; gap: 4px; }
+.live-room .room-sort-quick.is-always button { min-height: 32px; padding: 0 9px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.6rem; font-weight: 800; }
+.live-room .room-sort-quick.is-always button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+.live-room-sub { display: block; }
+.live-empty { margin-bottom: 12px; padding: 14px; border-radius: 10px; color: var(--text-dim); text-align: center; font-size: 0.8rem; }
+@media (max-width: 839px) {
+  /* The app steps aside while the draft runs, as in the mock room. */
+  html.in-live-room .bottom-nav,
+  html.in-live-room .section-tabs { display: none; }
+  html.in-live-room .app-shell-nav { padding-bottom: 68px; }
+  .live-phone-tabs {
+    position: fixed;
+    margin: 0;
+    border-width: 2px 0 0;
+    border-radius: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 2px solid var(--panel-border);
+    background: var(--nav-bg);
+    backdrop-filter: blur(8px);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .live-phone-tabs button {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: 8px 0 10px;
+    border: 0;
+    border-top: 2px solid transparent;
+    margin-top: -2px;
+    background: transparent;
+    color: var(--text-mid);
+    font-size: 0.62rem;
+  }
+  .live-phone-tabs button .hub-heading { font-size: 0.62rem; }
+  .live-phone-tabs button.is-on { color: var(--neon-teal); border-top-color: var(--neon-teal); }
+  .live-phone-tabs button.is-exit { color: var(--text-dim); }
+  /* Names shorten once the list slides sideways, so the stats fit. */
+  .live-room .room-table-wrap.is-scrolled .room-name-full { display: none; }
+  .live-room .room-table-wrap.is-scrolled .room-name-short { display: inline; }
+  .live-room .room-table-wrap.is-scrolled .room-table .room-player-col { min-width: 0; max-width: 104px; }
+  .live-room .room-table-wrap.is-scrolled .live-room-sub,
+  .live-room .room-table-wrap.is-scrolled .room-taken { display: none; }
+  .live-room .room-table .room-star { width: 30px; min-width: 30px; padding: 0; }
+  .live-card { padding: 8px 10px; }
+  .live-card .room-card-name { font-size: 1.05rem; }
+}
+.stats-gate { padding: 18px; border: 2px solid var(--neon-yellow); border-radius: 12px; color: var(--neon-yellow); text-align: center; }
+.stats-gate .hub-heading { font-size: 0.72rem; }
+.stats-gate p { margin: 8px 0 14px; color: var(--text-body); font-size: 0.85rem; }
+.stats-gate-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: var(--neon-teal); color: #001a14; font-weight: 800; text-decoration: none; }
+.draft-room-notes { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; color: var(--text-dim); font-size: 0.7rem; font-weight: 700; }
+
+/* ─── Mock draft with a friend: the invite panel, and a friend's clock ─── */
+.mock-friend { display: grid; gap: 10px; margin-bottom: 12px; }
+.mock-friend-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 0.82rem; }
+.mock-friend-row strong { color: var(--text-max); }
+.mock-friend-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.mock-friend-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mock-friend-form .mock-select { min-width: 160px; }
+.mock-friend-wait { display: grid; gap: 10px; }
+.mock-friend-wait > .hub-heading small { margin-left: 10px; color: var(--text-dim); font-weight: 700; }
+/* The draft is over: a plain way to the next one, beside the board link. */
+.room-done-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.mock-friend-wait .mock-friend-actions { margin-left: 0; }
+a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.room-clock.is-them { border-color: var(--neon-yellow); }
+.room-clock.is-them .room-clock-big { color: var(--neon-yellow); }
+.room-turn.is-them { background: rgba(255, 221, 0, 0.1); color: var(--neon-yellow); font-weight: 900; letter-spacing: 0.06em; }
+.room-mini-clock.is-them { color: var(--neon-yellow); }
+.room-upcoming li.is-them .room-upcoming-row { color: var(--neon-yellow); font-weight: 800; }
+
+/* ─── Projections: room for the numbers on a phone ─── */
+/* Scrolled sideways, names shorten to J. Tatum and the pencil steps aside,
+   as in the mock draft's player list. The open row keeps its UNDO. */
+.proj-name-short { display: none; }
+.proj-table-wrap.is-scrolled .proj-name-full { display: none; }
+.proj-table-wrap.is-scrolled .proj-name-short { display: inline; }
+.proj-table-wrap.is-scrolled .proj-row:not(.is-editing) button.proj-pencil { display: none; }
+.proj-table-wrap.is-scrolled .proj-col-name { box-shadow: 2px 0 0 var(--panel-border); }
+.proj-source-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.proj-source-caption { color: var(--text-mid); font-size: 0.72rem; font-weight: 700; }
+@media (max-width: 839px) {
+  .proj-table-wrap.is-scrolled .proj-row:not(.is-editing) td.proj-col-name,
+  .proj-table-wrap.is-scrolled th.proj-col-name { max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+  /* A slimmer # column and cell padding buy most of another stat column. */
+  .proj-table .proj-col-pos { width: 32px; min-width: 32px; max-width: 32px; }
+  .proj-table th.proj-col-pos span, .proj-table td.proj-col-pos { padding-left: 4px; padding-right: 4px; }
+  .proj-table .proj-col-name { left: 32px; }
+  .proj-table td { padding: 6px 5px; }
+  .proj-table th button { padding: 9px 5px; }
+  .proj-table button.proj-pencil { margin-left: 4px; padding: 0 4px; font-size: 0.72rem; }
+  .proj-export-word { display: none; }
+}
+
+/* ─── My list: a private list of names, and the commish's auto switches ─── */
+.start-btn-list { min-height: 96px; border-color: var(--neon-yellow); color: var(--neon-yellow); background: color-mix(in srgb, var(--neon-yellow) 6%, var(--panel-bg)); }
+.start-btn-list .start-btn-sub { color: var(--text-soft); }
+.my-list-page .panel { margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; }
+.my-list-how p { margin: 0; color: var(--text-body); font-size: 0.82rem; line-height: 1.5; }
+.my-list-how p + p { margin-top: 8px; }
+.my-list-dim { color: var(--text-dim) !important; font-size: 0.74rem !important; }
+.my-list-form .rule-edit-label { display: block; }
+/* 16px text keeps phones from zooming in on tap. */
+.my-list-text { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 240px; font-size: 16px; line-height: 1.6; }
+.my-list-count { margin-top: 8px; color: var(--text-dim); font-size: 0.72rem; font-weight: 700; }
+.my-list-actions { display: flex; gap: 8px; margin-top: 10px; }
+.my-list-save { min-height: 52px; font-size: 0.85rem; border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.08); }
+.my-list-save:disabled { border-color: var(--panel-border); color: var(--text-dim); background: transparent; }
+.my-list-clear { flex: 0 0 auto; min-height: 52px; padding: 0 16px; }
+.my-list-clear.is-armed { border-color: var(--neon-red); color: var(--neon-red); background: rgba(255,34,34,0.1); }
+.my-list-missing { border-color: var(--neon-yellow); }
+.my-list-missing .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
+.my-list-missing p { margin: 6px 0 0; color: var(--text-body); font-size: 0.76rem; line-height: 1.45; }
+.my-list-missing ul { margin: 8px 0 0; padding-left: 18px; color: var(--text-hi); font-size: 0.82rem; line-height: 1.6; }
+.my-list-saved .hub-heading { font-size: 0.62rem; color: var(--text-mid); }
+.my-list-saved ol { list-style: none; margin: 8px 0 0; padding: 0; }
+.my-list-saved li { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--panel-border); font-size: 0.86rem; color: var(--text-hi); }
+.my-list-saved li:last-child { border-bottom: 0; }
+.my-list-saved li small { color: var(--text-dim); font-size: 0.66rem; }
+.my-list-saved li.is-missing .my-list-name { color: var(--text-dim); text-decoration: line-through; }
+.my-list-rank { min-width: 2em; color: var(--text-mid); font-weight: 800; font-size: 0.74rem; text-align: right; }
+.my-list-name { font-weight: 700; }
+.my-list-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.my-list-upload span { color: var(--text-dim); font-size: 0.7rem; line-height: 1.4; }
+.my-list-upload-btn { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border-color: var(--neon-purple); color: var(--neon-purple); background: color-mix(in srgb, var(--neon-purple) 8%, transparent); }
+.my-list-form .rule-edit-label { position: relative; }
+.my-list-form.is-dragging { border-color: var(--neon-teal); box-shadow: 0 0 0 2px rgba(0,255,204,0.25); }
+.my-list-form.is-dragging .my-list-text { border-style: dashed; border-color: var(--neon-teal); }
+.my-list-drop {
+  position: absolute;
+  inset: 24px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0,255,204,0.08);
+  color: var(--neon-teal);
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+}
+.my-list-closed { border-color: var(--neon-yellow); }
+.my-list-closed .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
+.my-list-closed p { margin: 6px 0 0; color: var(--text-body); font-size: 0.82rem; line-height: 1.5; }
+.live-room-load-rankings { margin-bottom: 8px; border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.my-list-steward { border-color: var(--neon-purple); }
+.my-list-steward.is-for { background: color-mix(in srgb, var(--neon-purple) 8%, var(--panel-bg)); }
+.my-list-steward .rule-edit-label { display: block; }
+.my-list-steward .hub-input { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 48px; font-size: 16px; padding: 0 12px; }
+.my-list-steward p { margin: 8px 0 0; color: var(--text-body); font-size: 0.8rem; line-height: 1.5; }
+.my-list-steward.is-for p { color: var(--neon-purple); font-weight: 700; }
+.my-list-left { border-color: var(--neon-teal); color: var(--text-body); font-size: 0.82rem; font-weight: 700; }
+.my-list-left.is-out { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.auto-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--neon-yellow);
+  border-radius: 4px;
+  color: var(--neon-yellow);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

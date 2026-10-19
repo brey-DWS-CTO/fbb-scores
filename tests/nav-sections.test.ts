@@ -7,22 +7,25 @@ const PRESEASON = '2026-10-12';
 /** Opening day of league week 1. */
 const OPENING_DAY = '2026-10-19';
 
-const member = visibleSections(false, PRESEASON);
-const commish = visibleSections(true, PRESEASON);
+const member = visibleSections(false, false, PRESEASON);
+const commish = visibleSections(true, false, PRESEASON);
 
-test('members see six sections, the commish seven', () => {
-  assert.deepEqual(member.map((section) => section.label), ['KEEPERS', 'DRAFT', 'SCORES', 'TRADES', 'LEAGUE', 'RULES']);
-  assert.deepEqual(commish.map((section) => section.label), ['KEEPERS', 'DRAFT', 'SCORES', 'TRADES', 'LEAGUE', 'RULES', 'COMMISH']);
+test('members see seven sections, the commish eight', () => {
+  assert.deepEqual(member.map((section) => section.label), ['KEEPERS', 'DRAFT', 'SCORES', 'TRADES', 'LEAGUE', 'VAULT', 'RULES']);
+  assert.deepEqual(commish.map((section) => section.label), ['KEEPERS', 'DRAFT', 'SCORES', 'TRADES', 'LEAGUE', 'VAULT', 'RULES', 'COMMISH']);
 });
 
 test('everyone sees the mock draft, projections and tiers', () => {
   const draft = (sections: typeof member) => sections.find((section) => section.id === 'draft')!.tabs.map((tab) => tab.to);
-  assert.deepEqual(draft(member), ['/draft', '/mock', '/projections', '/tiers']);
-  assert.deepEqual(draft(commish), ['/draft', '/mock', '/projections', '/tiers']);
+  assert.deepEqual(draft(member), ['/draft', '/my-rankings', '/mock', '/projections', '/tiers']);
+  assert.deepEqual(draft(commish), ['/draft', '/my-rankings', '/mock', '/projections', '/tiers']);
 });
 
-test('the phone bar holds four sections before the season', () => {
-  assert.deepEqual(member.filter((section) => section.primary).map((section) => section.id), ['keepers', 'draft', 'trades', 'league']);
+test('the phone bar holds five sections until keepers go public, then four', () => {
+  assert.deepEqual(member.filter((section) => section.primary).map((section) => section.id), ['keepers', 'draft', 'trades', 'league', 'vault']);
+  const draftDay = visibleSections(false, true, PRESEASON);
+  assert.deepEqual(draftDay.filter((section) => section.primary).map((section) => section.id), ['keepers', 'draft', 'trades', 'league']);
+  assert.ok(draftDay.some((section) => section.id === 'vault'), 'VAULT moves behind MORE, it does not vanish');
 });
 
 test('SCORES sits after DRAFT before the season, and first once it starts', () => {
@@ -31,15 +34,16 @@ test('SCORES sits after DRAFT before the season, and first once it starts', () =
   assert.ok(seasonUnderway(OPENING_DAY));
   assert.ok(seasonUnderway('2027-03-01'));
 
-  assert.deepEqual(member.map((section) => section.id), ['keepers', 'draft', 'scores', 'trades', 'league', 'rules']);
+  assert.deepEqual(member.map((section) => section.id), ['keepers', 'draft', 'scores', 'trades', 'league', 'vault', 'rules']);
   assert.ok(!member.find((section) => section.id === 'scores')!.primary, 'behind MORE until there is something to score');
 
-  const inSeason = visibleSections(false, OPENING_DAY);
-  assert.deepEqual(inSeason.map((section) => section.id), ['scores', 'keepers', 'draft', 'trades', 'league', 'rules']);
+  // In season the keepers are public, so VAULT is already behind MORE.
+  const inSeason = visibleSections(false, true, OPENING_DAY);
+  assert.deepEqual(inSeason.map((section) => section.id), ['scores', 'keepers', 'draft', 'trades', 'league', 'vault', 'rules']);
   // Still four on the phone bar: SCORES takes the slot KEEPERS no longer needs.
   assert.deepEqual(inSeason.filter((section) => section.primary).map((section) => section.id), ['scores', 'draft', 'trades', 'league']);
   assert.equal(sectionFor('/keepers/Brey', inSeason)?.id, 'keepers', 'the keepers page still has its section');
-  const commishInSeason = visibleSections(true, '2027-01-05');
+  const commishInSeason = visibleSections(true, true, '2027-01-05');
   assert.equal(commishInSeason[0].id, 'scores');
   assert.equal(commishInSeason[commishInSeason.length - 1].id, 'commish');
 });
@@ -54,6 +58,7 @@ test('every old page address finds its section', () => {
     ['/keepers/Brey', 'keepers'],
     ['/draft', 'draft'],
     ['/mock', 'draft'],
+    ['/my-rankings', 'draft'],
     ['/projections', 'draft'],
     ['/tiers', 'draft'],
     ['/scores', 'scores'],
@@ -62,15 +67,24 @@ test('every old page address finds its section', () => {
     ['/teams', 'league'],
     ['/history', 'league'],
     ['/league', 'league'],
+    ['/dues', 'league'],
+    ['/achievements', 'vault'],
+    ['/revealed', 'vault'],
+    ['/achievements/reveal', 'vault'],
+    ['/props', 'vault'],
     ['/votes', 'rules'],
     ['/rules', 'rules'],
     ['/schedule', 'commish'],
+    ['/awards', 'commish'],
+    ['/depth', 'commish'],
     ['/admin', 'commish'],
     ['/', null],
   ];
   for (const [path, id] of cases) assert.equal(sectionFor(path, commish)?.id ?? null, id, path);
   // A member who follows a commish link lands nowhere, not on a tab they cannot see.
   assert.equal(sectionFor('/admin', member), null);
+  assert.equal(sectionFor('/awards', member), null);
+  assert.equal(sectionFor('/depth', member), null);
   assert.equal(sectionFor('/mock', member)?.id, 'draft');
 });
 

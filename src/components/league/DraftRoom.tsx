@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useIdentity } from '../../hooks/useLeague.js';
 import { POSITIONS, type Position, type ValueBoard } from '../../lib/league/draftValue.js';
 import { autoPick, oddsGoneByNextPick, oddsKeeperThere, type LiveChoices } from '../../lib/league/liveMock.js';
 import type { MockCandidate, MockMode, MockPick, PreparedMock } from '../../lib/league/mockDraft.js';
@@ -17,9 +18,12 @@ import {
 } from '../../lib/league/draftRoom.js';
 import NavIcon from './NavIcon.js';
 import MockGradeCard from './MockGradeCard.js';
+import MockBoardGrid, { KeeperChip } from './MockBoardGrid.js';
+import { boardFromGrid, type SavedBoard } from '../../lib/league/mockBoard.js';
 import ShareButton from './ShareButton.js';
 import { gradeMock, mockResultId, type GradePlayer, type MockGrade } from '../../lib/league/mockGrade.js';
-import { positionColor, positionTheme } from '../draft/boardUtils.js';
+import { SHARED_GRACE_SECONDS, headToHead } from '../../lib/league/sharedMock.js';
+import { positionColor } from '../draft/boardUtils.js';
 
 /** A position code in the board's own colour for it. */
 function Pos({ positions }: { positions: readonly string[] }) {
@@ -40,12 +44,16 @@ export interface RoomProgress {
   choices: Record<number, string>;
   queue: string[];
   clockLeft: number | null;
+  /** The last pick landed. */
+  finished?: boolean;
 }
 
 interface Props {
   prepared: PreparedMock;
   values: ValueBoard;
   projections: ReadonlyMap<string, PlayerProjection>;
+  /** Picks that move only if a switched-on pending trade goes through, to who holds them now. */
+  projectedTrades?: ReadonlyMap<number, string>;
   person: string;
   seed: number;
   mode: MockMode;
@@ -54,13 +62,37 @@ interface Props {
   onProgress: (progress: RoomProgress) => void;
   onNewDraft: () => void;
   /** Called once when the last pick lands, with the draft's grade. */
-  onFinished: (finished: { choices: Record<number, string>; grade: MockGrade }) => void;
+  onFinished: (finished: { choices: Record<number, string>; grade: MockGrade; board: SavedBoard }) => void;
+  /** Set for a mock with a friend. */
+  shared?: SharedRoomControls;
+}
+
+/**
+ * A mock with a friend: the server holds the picks and the clock, and this
+ * room only shows them and sends the person's own. `saved.choices` is the
+ * server's, refreshed as it polls.
+ */
+export interface SharedRoomControls {
+  /** Everyone at the table, the viewer included. */
+  people: readonly string[];
+  /** The pick on the server's clock, and when it runs out on this phone's clock. */
+  clockOverall: number | null;
+  deadlineMs: number | null;
+  onPick: (overall: number, playerKey: string) => Promise<void>;
+  /** Time ran out on `overall`: the pick the room makes. */
+  onRunOut: (overall: number, playerKey: string) => Promise<void>;
+  /** End the mock for everyone. */
+  onQuit: () => void;
 }
 
 type CenterTab = 'players' | 'teams' | 'results';
-type SortKey = 'rank' | 'adp' | 'fppg' | 'total' | 'games' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone';
+type SortKey = 'rank' | 'adp' | 'fppg' | 'total' | 'games' | 'pi' | 'po' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'threes' | 'to' | 'gone';
 
 const pct = (share: number) => `${Math.round(share * 100)}%`;
+/** His NBA team's games in our play-in or playoff weeks. */
+function PostseasonCell({ games }: { games: number | null | undefined }) {
+  return <td className="room-num">{games ?? '–'}</td>;
+}
 const one = (value: number | null | undefined) => (value === null || value === undefined ? '–' : value.toFixed(1));
 type Clock = { overall: number; deadline: number; pausedAt: number | null } | null;
 
@@ -84,21 +116,36 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? `${n}st` : n % 
  * before. What is new is that it is saved as it goes, so leaving the page and
  * coming back finds it where it was, with the clock paused.
  */
-export default function DraftRoom({ prepared, values, projections, person, seed, mode, saved, onProgress, onNewDraft, onFinished }: Props) {
+export default function DraftRoom({ prepared, values, projections, projectedTrades, person, seed, mode, saved, onProgress, onNewDraft, onFinished, shared }: Props) {
   const navigate = useNavigate();
+  // Play-in and playoff games (PI, PO) are the commissioner's columns only.
+  const { identity } = useIdentity();
+  const showPostseason = identity?.isCommissioner === true;
+  // Everyone whose picks stop the replay: the person alone, or the whole table.
+  const people = shared?.people ?? person;
   // Only the first render restores; after that the room owns its state.
-  const [restored] = useState(() => replaySaved(prepared, seed, person, saved?.choices ?? {}));
-  const [started, setStarted] = useState(saved?.started === true);
-  const [choices, setChoices] = useState<LiveChoices>(restored.choices);
+  const [restored] = useState(() => replaySaved(prepared, seed, people, saved?.choices ?? {}));
+  const [started, setStarted] = useState(shared !== undefined || saved?.started === true);
+  // In a mock with a friend the server's choices come in through `saved`.
+  const [ownChoices, setOwnChoices] = useState<LiveChoices>(restored.choices);
+  const sharedChoices = saved?.choices;
+  const choices = useMemo((): LiveChoices => (shared ? sharedChoices ?? {} : ownChoices), [shared, sharedChoices, ownChoices]);
   const [queue, setQueue] = useState<string[]>(saved?.queue ?? []);
   // A restored draft shows everything at once; there is nothing to watch roll in.
-  const [revealed, setRevealed] = useState(saved?.started ? restored.live.picks.length : 0);
-  const [clock, setClock] = useState<Clock>(() => {
+  const [revealed, setRevealed] = useState(saved?.started || shared ? restored.live.picks.length : 0);
+  const [ownClock, setClock] = useState<Clock>(() => {
     const waiting = restored.live.waitingOn?.pick.overall;
     if (!saved?.started || waiting === undefined || saved.clockLeft === null) return null;
     const at = Date.now();
     return { overall: waiting, deadline: at + saved.clockLeft * 1000, pausedAt: at };
   });
+  // With a friend the clock is the server's, never paused.
+  const sharedOverall = shared?.clockOverall ?? null;
+  const sharedDeadline = shared?.deadlineMs ?? null;
+  const clock = useMemo((): Clock => {
+    if (!shared) return ownClock;
+    return sharedOverall !== null && sharedDeadline !== null ? { overall: sharedOverall, deadline: sharedDeadline, pausedAt: null } : null;
+  }, [shared, ownClock, sharedOverall, sharedDeadline]);
   const [now, setNow] = useState(() => Date.now());
   const [center, setCenter] = useState<CenterTab>('players');
   const [selected, setSelected] = useState<string | null>(null);
@@ -114,7 +161,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // The player list scrolled sideways: names shorten so the stats fit.
   const [scrolled, setScrolled] = useState(false);
   // Scrolled down into the list: the pinned clock and card slim down.
-  const [compact, setCompact] = useState(false);
+  // The page and the list each say whether they are scrolled down; either one
+  // slims the stack. Kept apart so one never undoes the other mid-swipe.
+  const [pageDown, setPageDown] = useState(false);
+  const [listDown, setListDown] = useState(false);
+  const compact = pageDown || listDown;
   // Tap a player anywhere (updates, a roster, the board) to see him in the card.
   const look = (key: string | null | undefined) => {
     if (!key) return;
@@ -123,17 +174,21 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // The list first: the latest pick on top. The board is a tap away.
   const [resultsView, setResultsView] = useState<'list' | 'board'>('list');
 
-  const live = useMemo(() => replaySaved(prepared, seed, person, choices).live, [prepared, seed, person, choices]);
+  const live = useMemo(() => replaySaved(prepared, seed, people, choices).live, [prepared, seed, people, choices]);
   const byKey = useMemo(() => new Map(values.entries.map((entry) => [entry.player.key, entry])), [values]);
   const caughtUp = revealed >= live.picks.length;
   // The draft halts at each of the person's own keeper slots, so they can see
   // who would still be there, then CONTINUE. The keeper itself never changes.
+  // Not with a friend: their clock is running while you look.
   const [skipped, setSkipped] = useState<ReadonlySet<number>>(() => new Set());
   const nextUp = live.picks[revealed];
-  const atMyKeeper = started && !caughtUp && nextUp?.how === 'keeper' && nextUp.owner === person && !skipped.has(nextUp.overall)
+  const atMyKeeper = started && !shared && !caughtUp && nextUp?.how === 'keeper' && nextUp.owner === person && !skipped.has(nextUp.overall)
     ? nextUp
     : null;
-  const myTurn = started && caughtUp && live.waitingOn !== null;
+  const onClockOwner = live.waitingOn?.pick.currentOwner ?? null;
+  const myTurn = started && caughtUp && live.waitingOn !== null && (!shared || onClockOwner === person);
+  // A friend's pick, on their clock.
+  const theirTurn = shared !== undefined && started && caughtUp && live.waitingOn !== null && !myTurn;
   const over = started && caughtUp && live.over;
   const slots = prepared.input.board.slots;
 
@@ -168,7 +223,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     return () => observer.disconnect();
   }, [selected, atMyKeeper, over, center, compact]);
   useEffect(() => {
-    const onScroll = () => setCompact((current) => (window.scrollY > 80 ? true : current && window.scrollY > 20));
+    const onScroll = () => setPageDown((current) => (window.scrollY > 80 ? true : current && window.scrollY > 20));
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -194,14 +249,27 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     const current = clockRef.current;
     return current && current.overall === turnRef.current ? secondsOn(current, Date.now()) : null;
   };
-  const progressRef = useRef<RoomProgress>({ started, choices: { ...choices }, queue, clockLeft: null });
+  const progressRef = useRef<RoomProgress>({ started, choices: { ...choices }, queue, clockLeft: null, finished: saved?.finished === true });
+  // A restore that could not replay every saved pick must not save over the
+  // draft until the person does something: the board may only be part
+  // loaded, and the full draft comes back once it is.
+  const pristine = useRef(restored.dropped > 0);
+  const firstReport = useRef(true);
   useEffect(() => {
-    progressRef.current = { started, choices: { ...choices }, queue, clockLeft: clockLeftNow() };
+    progressRef.current = { started, choices: { ...choices }, queue, clockLeft: clockLeftNow(), finished: over };
+    if (firstReport.current) {
+      firstReport.current = false;
+      if (pristine.current) return;
+    }
+    pristine.current = false;
     onProgress(progressRef.current);
-  }, [started, choices, queue, onProgress]);
+  }, [started, choices, queue, over, onProgress]);
   useEffect(() => {
     // Leaving the page or the app keeps the clock where it stood.
-    const keep = () => onProgress({ ...progressRef.current, clockLeft: clockLeftNow() });
+    const keep = () => {
+      if (pristine.current) return;
+      onProgress({ ...progressRef.current, clockLeft: clockLeftNow() });
+    };
     window.addEventListener('pagehide', keep);
     return () => {
       window.removeEventListener('pagehide', keep);
@@ -220,6 +288,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // ── The clock ────────────────────────────────────────────────────────────
   const waitingOverall = live.waitingOn?.pick.overall ?? null;
   useEffect(() => {
+    if (shared) return;
     if (!myTurn || waitingOverall === null) {
       if (clock === null) return;
       const stop = setTimeout(() => setClock(null), 0);
@@ -228,21 +297,40 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     if (clock?.overall === waitingOverall) return;
     const start = setTimeout(() => setClock({ overall: waitingOverall, deadline: Date.now() + PICK_CLOCK * 1000, pausedAt: null }), 0);
     return () => clearTimeout(start);
-  }, [myTurn, waitingOverall, clock]);
+  }, [shared, myTurn, waitingOverall, clock]);
 
+  // With a friend, the pick the room has already been told ran out, so one
+  // phone says it once. A refusal (the server says not yet) clears it so the
+  // next tick tries again.
+  const ranOut = useRef<number | null>(null);
   useEffect(() => {
     if (!clock || clock.pausedAt !== null) return;
     const tick = setInterval(() => {
       const at = Date.now();
       setNow(at);
+      if (shared) {
+        // Only once the replay here agrees with the server about whose pick it is.
+        if (!live.waitingOn || live.waitingOn.pick.overall !== clock.overall) return;
+        const mine = live.waitingOn.pick.currentOwner === person;
+        if (at < clock.deadline + (mine ? 0 : SHARED_GRACE_SECONDS * 1000)) return;
+        if (ranOut.current === clock.overall) return;
+        ranOut.current = clock.overall;
+        // Your own clock: the top of your queue. A friend's: the best fit for them.
+        const pick = mine ? queuedPick(queue, live.run.available(), autoPick(live)) : autoPick(live);
+        if (!pick) return;
+        shared.onRunOut(clock.overall, pick.playerKey).catch(() => {
+          window.setTimeout(() => { if (ranOut.current === clock.overall) ranOut.current = null; }, 2000);
+        });
+        return;
+      }
       if (at >= clock.deadline) {
         // Time is up: the top of the queue, else the best value left.
         const pick = queuedPick(queue, live.run.available(), autoPick(live));
-        if (pick) setChoices((current) => ({ ...current, [clock.overall]: pick.playerKey }));
+        if (pick) setOwnChoices((current) => ({ ...current, [clock.overall]: pick.playerKey }));
       }
     }, 250);
     return () => clearInterval(tick);
-  }, [clock, live, queue]);
+  }, [clock, live, queue, shared, person]);
   const secondsLeft = secondsOn(clock, now);
   const paused = clock !== null && clock.pausedAt !== null;
   const togglePause = () =>
@@ -266,19 +354,30 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   );
 
   // ── Actions ──────────────────────────────────────────────────────────────
+  // With a friend a pick goes to the server and comes back on the next
+  // answer; one at a time, so a double tap cannot send two.
+  const sending = useRef(false);
   const draft = (playerKey: string) => {
     if (!myTurn || !live.waitingOn) return;
-    setChoices((current) => ({ ...current, [live.waitingOn!.pick.overall]: playerKey }));
+    const overall = live.waitingOn.pick.overall;
+    if (shared) {
+      if (sending.current) return;
+      sending.current = true;
+      shared.onPick(overall, playerKey).catch(() => { /* the page says why */ }).finally(() => { sending.current = false; });
+    } else {
+      setOwnChoices((current) => ({ ...current, [overall]: playerKey }));
+    }
     setQueue((current) => current.filter((key) => key !== playerKey));
     setSearch('');
   };
   const undo = () => {
+    if (shared) return;
     const mine = Object.keys(choices).map(Number).sort((a, b) => a - b);
     const last = mine[mine.length - 1];
     if (last === undefined) return;
     const next = { ...choices };
     delete next[last];
-    setChoices(next);
+    setOwnChoices(next);
     setRevealed(Math.min(revealed, last - 1));
     // The replay runs forward again from here, so any keeper pause it had
     // passed on the way is due again.
@@ -287,8 +386,9 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // RESTART plays the same draft over from the first pick, same room, same
   // seed, same queue. NEW DRAFT clears the room for a fresh seed.
   const restart = (fresh = false) => {
+    if (shared) return;
     setStarted(!fresh);
-    setChoices({});
+    setOwnChoices({});
     setRevealed(0);
     setClock(null);
     setSkipped(new Set());
@@ -297,10 +397,11 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     if (fresh) setQueue([]);
     // Written now, not after the next render: NEW DRAFT unmounts this room
     // straight away, and the last thing it saves must be the empty draft.
-    progressRef.current = { started: !fresh, choices: {}, queue: fresh ? [] : queue, clockLeft: null };
+    progressRef.current = { started: !fresh, choices: {}, queue: fresh ? [] : queue, clockLeft: null, finished: false };
   };
-  // Leave the room. The draft stays saved; DRAFT brings it back.
-  const exit = () => navigate('/draft/start');
+  // Leave the room. The draft stays saved; DRAFT brings it back. With a
+  // friend it keeps running on the server, and the mock page has the way in.
+  const exit = () => navigate(shared ? '/mock' : '/draft/start');
 
   // ── What the screen shows ────────────────────────────────────────────────
   const shownPicks = useMemo(() => (started ? live.picks.slice(0, revealed) : []), [started, live.picks, revealed]);
@@ -324,6 +425,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const currentSlot = currentOverall !== null ? slots.find((slot) => slot.pick.overall === currentOverall) ?? null : null;
   const untilTurn = currentOverall !== null ? picksUntilTurn(slots, currentOverall, person) : null;
   const myNext = slots.find((slot) => slot.pick.currentOwner === person && slot.pick.overall >= (currentOverall ?? 1) && !slot.keeper && !slot.made) ?? null;
+  // On your pick: the one after it, so you can tell whether a player will wait.
+  const myAfter = slots.find((slot) => slot.pick.currentOwner === person && slot.pick.overall > (currentOverall ?? 1) && !slot.keeper && !slot.made) ?? null;
   const upcoming = upcomingPicks(slots, currentOverall ?? 1, person, 30);
 
   // The pool as the screen sees it: who is still there, plus the taken when asked.
@@ -342,6 +445,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       case 'fppg': return projection?.fppg ?? null;
       case 'total': return projection?.total ?? null;
       case 'games': return projection?.games ?? null;
+      case 'pi': return projection?.playInGames ?? null;
+      case 'po': return projection?.playoffGames ?? null;
       case 'gone': return odds.get(candidate.playerKey) ?? (odds.size > 0 ? 0 : null);
       default: return projection?.line?.[key] ?? null;
     }
@@ -354,8 +459,10 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       return `${candidate.playerName} ${projection?.name ?? ''} ${projection?.proTeam ?? ''}`.toLowerCase().includes(needle);
     })
     .sort((a, b) => {
-      const x = rowValue(a, sort.key);
-      const y = rowValue(b, sort.key);
+      // A member never sees PI or PO, so a sort on them falls back to the board.
+      const key = !showPostseason && (sort.key === 'pi' || sort.key === 'po') ? 'rank' : sort.key;
+      const x = rowValue(a, key);
+      const y = rowValue(b, key);
       if (x === null || y === null) return x === y ? a.valueRank - b.valueRank : x === null ? 1 : -1;
       return (x - y) * sort.dir || a.valueRank - b.valueRank;
     })
@@ -384,15 +491,15 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   const grade = useMemo((): MockGrade | null => {
     if (!over) return null;
     const players = new Map<string, GradePlayer>();
-    for (const [key, row] of projections) players.set(key, { name: row.name, positions: row.positions, total: row.total, adp: row.adp });
+    for (const [key, row] of projections) players.set(key, { name: row.name, positions: row.positions, total: row.total, fppg: row.fppg, adp: row.adp });
     return gradeMock(live.picks, person, players, prepared.roster);
   }, [over, projections, live.picks, person, prepared.roster]);
   const reported = useRef(false);
   useEffect(() => {
     if (!grade || reported.current) return;
     reported.current = true;
-    onFinished({ choices: { ...choices }, grade });
-  }, [grade, choices, onFinished]);
+    onFinished({ choices: { ...choices }, grade, board: boardFromGrid(draftGrid(slots, live.picks, null)) });
+  }, [grade, choices, onFinished, slots, live.picks]);
   // The link to this finished draft, the same one Past mocks keeps.
   const shareUrl = grade ? `${window.location.origin}/mock/result/${mockResultId(person, seed, mode, choices)}` : null;
 
@@ -410,8 +517,46 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     prepared.roster,
   );
   const teamRoster = rosterOf(teamView);
+  // Who a pick's row names, and its tag. A real trade: the holder, and whose
+  // pick it was. A trade only switched on: who holds it now, and who would
+  // if that trade goes through.
+  const ownerShown = (overall: number, owner: string) => projectedTrades?.get(overall) ?? owner;
+  const tradeTag = (overall: number, owner: string) => {
+    const holderNow = projectedTrades?.get(overall);
+    if (holderNow !== undefined) {
+      return (
+        <span className="board-traded-tag is-projected" title={`${holderNow}'s now. ${owner}'s if the trade you switched on goes through`}>
+          {`${owner.toUpperCase()}'S, IF TRADED`}
+        </span>
+      );
+    }
+    const slot = slots.find((entry) => entry.pick.overall === overall);
+    const original = slot ? slot.pick.originalOwner ?? slot.pick.currentOwner : owner;
+    if (original === owner) return null;
+    return (
+      <span className="board-traded-tag" title={`${owner} holds ${original}'s pick`}>
+        {`${original.toUpperCase()}'S`}
+      </span>
+    );
+  };
+  // Open a tab and bring it into view: on a phone it sits under the grade.
+  const viewRef = useRef<HTMLDivElement>(null);
+  const showView = (tab: CenterTab) => {
+    setCenter(tab);
+    setSelected(null);
+    window.setTimeout(() => viewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+  const seeBoard = () => {
+    setResultsView('board');
+    showView('results');
+  };
+  const seeTeam = (owner: string) => {
+    setTeamView(owner);
+    showView('teams');
+  };
   const grid = draftGrid(slots, shownPicks, myTurn || !over ? currentOverall : null);
   const owners = grid.owners;
+  const boardView = boardFromGrid(grid);
 
   const sortHead = (key: SortKey, label: string, title?: string, className = '') => (
     <th className={`room-num${sort.key === key ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`} title={title ?? label} data-sort={key}>
@@ -421,13 +566,18 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     </th>
   );
   const wrapRef = useRef<HTMLDivElement>(null);
+  const listTop = useRef(0);
   const onListScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const left = event.currentTarget.scrollLeft;
     // A gap between the two marks, so a finger resting near one does not flicker.
     const next = scrolled ? left > FULL_NAME_AT : left > SHORT_NAME_AT;
     if (next !== scrolled) setScrolled(next);
-    const down = event.currentTarget.scrollTop > 80;
-    if (down !== compact) setCompact(down);
+    // A sideways swipe leaves scrollTop alone, so it never touches the stack.
+    const top = event.currentTarget.scrollTop;
+    if (top === listTop.current) return;
+    listTop.current = top;
+    const down = listDown ? top > 20 : top > 80;
+    if (down !== listDown) setListDown(down);
   };
   // A sort chosen from the chips slides the list so that column lands flush
   // against the pinned name column. That column is narrower once the list is
@@ -437,7 +587,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     const wrap = wrapRef.current;
     if (!wrap) return;
     const offset = () => {
-      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]:not(.room-gone-trail)`);
+      const column = wrap.querySelector<HTMLElement>(`th[data-sort="${key}"]`);
       const pinned = wrap.querySelector<HTMLElement>('th.room-player-col');
       return column && pinned ? column.offsetLeft - (pinned.offsetLeft + pinned.offsetWidth) : 0;
     };
@@ -452,11 +602,17 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   // On a phone a tapped card stands where the clock frame was, with the clock
   // small in its corner: the time on your pick, else the pick on the clock.
   const hasPicked = started && !over && selected !== null;
+  // "Up in 3 picks at 7.9": how long until the person picks, and which pick.
+  const upIn = untilTurn === null
+    ? null
+    : `Up in ${untilTurn} pick${untilTurn === 1 ? '' : 's'}${myNext ? ` at ${myNext.pick.round}.${myNext.pick.slot}` : ''}`;
   const miniClock = (
-    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
-      {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…'}
+    <span className={`room-mini-clock${myTurn ? ' is-mine' : ''}${theirTurn ? ' is-them' : ''}${!myTurn && !theirTurn && upIn ? ' is-wait' : ''}${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
+      {myTurn || theirTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : upIn ?? (currentSlot ? `${currentSlot.pick.round}.${currentSlot.pick.slot}` : '…')}
     </span>
   );
+  // With a friend: how you did against them, once the draft is over.
+  const versus = shared && grade ? headToHead(grade.standings, person, shared.people.filter((owner) => owner !== person)) : '';
   const cardFor = (key: string, extra: { role: 'keeper' | 'compare' | 'card' }) => (
     <PlayerCard
       key={`${extra.role}-${key}`}
@@ -476,7 +632,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
   );
 
   const queueList = queue.length === 0 ? (
-    <div className="mock-note mock-note-dim">Tap ☆ next to a player to queue him. If your clock runs out, you take the top one still there.</div>
+    <div className="mock-note mock-note-dim">Tap a player, then ☆ QUEUE on his card. If your clock runs out, you take the top one still there.</div>
   ) : (
     <ol className="room-queue-list">
       {queue.map((key, index) => {
@@ -511,9 +667,30 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
       </button>
       {menuOpen && (
         <div className="room-menu-sheet" role="menu">
-          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART THIS DRAFT</button>
-          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
-          <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={exit}>LEAVE THE ROOM</button>
+          {shared ? (
+            <>
+              {!over && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="tap-btn mock-mini-btn"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    if (window.confirm('Quit this mock? It ends for everyone at the table.')) shared.onQuit();
+                  }}
+                >
+                  QUIT THIS MOCK
+                </button>
+              )}
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={exit}>LEAVE THE ROOM</button>
+            </>
+          ) : (
+            <>
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => restart()}>RESTART THIS DRAFT</button>
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
+              <button type="button" role="menuitem" className="tap-btn mock-mini-btn" onClick={exit}>LEAVE THE ROOM</button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -523,7 +700,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
     <div ref={roomRef} className={`room room-center-${center}${atMyKeeper ? ' is-at-keeper' : ''}${compact ? ' is-compact' : ''}${hasPicked ? ' has-picked' : ''}`}>
       {/* ── Left: the clock and who picks next ── */}
       <aside className="room-left">
-        <div ref={clockRef2} className={`panel room-clock${myTurn ? ' is-mine' : ''}${started ? '' : ' is-before'}`}>
+        <div ref={clockRef2} className={`panel room-clock${myTurn ? ' is-mine' : ''}${theirTurn ? ' is-them' : ''}${started ? '' : ' is-before'}`}>
           {!started ? (
             <>
               <button type="button" className="tap-btn live-start-btn" onClick={() => setStarted(true)}>START DRAFT</button>
@@ -533,33 +710,42 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             <>
               <div className="room-clock-row">
                 <div className={`room-clock-big mock-grade-letter grade-${(grade?.grade ?? 'c')[0].toLowerCase()}`}>{grade?.grade ?? 'DONE'}</div>
-                <div className="room-clock-meta"><span>Draft complete.</span><span>Saved to Past mocks.</span></div>
+                <div className="room-clock-meta"><span>Draft complete.</span><span>{versus || 'Saved to Past mocks.'}</span></div>
                 {shareUrl && grade && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} className="room-share" />}
                 {menu}
               </div>
-              <button type="button" className="room-link" onClick={() => setCenter('results')}>See the board</button>
+              <div className="room-done-actions">
+                {shared ? (
+                  <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={exit}>BACK TO MOCK DRAFT</button>
+                ) : (
+                  <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
+                )}
+                <button type="button" className="room-link" onClick={seeBoard}>See the board</button>
+              </div>
             </>
           ) : (
             <>
               <div className="room-clock-row">
                 <div className={`room-clock-big${secondsLeft !== null && secondsLeft <= 10 ? ' is-low' : ''}${paused ? ' is-paused' : ''}`} aria-live="polite">
-                  {myTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : '…'}
+                  {myTurn || theirTurn ? clockLabel(secondsLeft ?? PICK_CLOCK) : '…'}
                 </div>
                 {currentSlot && (
                   <div className="room-clock-meta">
                     <span>Round {currentSlot.pick.round}</span><span>Pick {currentSlot.pick.slot}</span><span>{ordinal(currentSlot.pick.overall)} overall</span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="tap-btn room-undo-btn"
-                  onClick={undo}
-                  disabled={Object.keys(choices).length === 0}
-                  title="Take back your last pick"
-                >
-                  <NavIcon name="undo" size="1.5em" />
-                  <span>UNDO</span>
-                </button>
+                {!shared && (
+                  <button
+                    type="button"
+                    className="tap-btn room-undo-btn"
+                    onClick={undo}
+                    disabled={Object.keys(choices).length === 0}
+                    title="Take back your last pick"
+                  >
+                    <NavIcon name="undo" size="1.5em" />
+                    <span>UNDO</span>
+                  </button>
+                )}
               </div>
               {atMyKeeper ? (
                 <div className="room-turn is-keeper">
@@ -582,14 +768,24 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                 </div>
               ) : myTurn ? (
                 <div className="room-turn is-mine">
-                  YOUR PICK
-                  <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>
+                  <span>
+                    YOUR PICK
+                    {myAfter && <small className="room-turn-next"> · next at {myAfter.pick.round}.{myAfter.pick.slot}</small>}
+                  </span>
+                  {!shared && <button type="button" className="tap-btn mock-mini-btn" onClick={togglePause} aria-pressed={paused}>{paused ? 'RESUME' : 'PAUSE'}</button>}
+                  {menu}
+                </div>
+              ) : theirTurn && onClockOwner ? (
+                <div className="room-turn is-them">
+                  <span>
+                    {onClockOwner.toUpperCase()}&apos;S PICK
+                    {upIn && <small className="room-turn-next"> · {upIn.toLowerCase()}</small>}
+                  </span>
                   {menu}
                 </div>
               ) : (
                 <div className="room-turn">
-                  {untilTurn === null ? 'No picks left for you' : `${untilTurn} pick${untilTurn === 1 ? '' : 's'} until your turn`}
-                  {myNext && <small> ({myNext.pick.round}.{myNext.pick.slot})</small>}
+                  {upIn ?? 'No picks left for you'}
                   {menu}
                 </div>
               )}
@@ -604,7 +800,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
           </div>
           <ol className="room-upcoming">
             {upcoming.map((pick, index) => (
-              <li key={pick.overall} className={`${pick.mine ? 'is-mine' : ''}${index === 0 && started && !over ? ' is-now' : ''}`}>
+              <li key={pick.overall} className={`${pick.mine ? 'is-mine' : ''}${!pick.mine && shared?.people.includes(pick.owner) ? 'is-them' : ''}${index === 0 && started && !over ? ' is-now' : ''}`}>
                 {(index === 0 || upcoming[index - 1].round !== pick.round) && <div className="room-round">Round {pick.round}</div>}
                 <span className="room-upcoming-row">
                   <span className="room-upcoming-num">{pick.overall}</span>
@@ -625,7 +821,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               HOW YOU DID
               {shareUrl && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} />}
             </div>
-            <MockGradeCard grade={grade} person={person} onPlayer={(key) => setSelected(key)} />
+            <MockGradeCard grade={grade} person={person} onPlayer={(key) => setSelected(key)} onTeam={seeTeam} />
           </section>
         )}
 
@@ -654,6 +850,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
             </button>
           ))}
         </div>
+        <div ref={viewRef} className="room-view-anchor" />
 
         {center === 'players' && (
           <div className="room-players">
@@ -664,7 +861,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               </select>
               {/* Phone: sort chips, pinned with this row under the clock. Wide screens sort by the column heads. */}
               <span className="room-sort-quick" role="group" aria-label="Sort by">
-                {([['rank', 'RK'], ['adp', 'ADP'], ['total', 'TOT'], ['fppg', 'FPPG']] as const).map(([key, label]) => (
+                {([['rank', 'RK'], ['adp', 'ADP'], ['total', 'TOT'], ['fppg', 'FPPG'], ...(myTurn ? [['gone', 'GONE']] as const : [])] as const).map(([key, label]) => (
                   <button key={key} type="button" className={sort.key === key ? 'is-on' : ''} aria-pressed={sort.key === key} onClick={() => quickSort(key)}>
                     {label}{sort.key === key ? (sort.dir === 1 ? '▲' : '▼') : ''}
                   </button>
@@ -688,7 +885,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               <table className={`room-table${myTurn ? ' is-my-turn' : ''}`}>
                 <thead>
                   <tr>
-                    {/* On a phone DRAFT and GONE BY NEXT lead the row, under a thumb. On a wide screen they trail. */}
+                    {/* DRAFT and GONE lead the row, on a phone and a wide screen alike. */}
                     {myTurn && <th className="room-draft-col room-draft-lead" />}
                     {myTurn && sortHead('gone', 'GONE', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-lead')}
                     <th className="room-star" aria-label="Queue" />
@@ -698,6 +895,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('fppg', 'FPPG')}
                     {sortHead('total', 'TOTAL', 'Projected season points')}
                     {sortHead('games', 'GP')}
+                    {showPostseason && sortHead('pi', 'PI', 'Team games in our play-in weeks')}
+                    {showPostseason && sortHead('po', 'PO', 'Team games in our playoff weeks')}
                     {sortHead('pts', 'PTS')}
                     {sortHead('reb', 'REB')}
                     {sortHead('ast', 'AST')}
@@ -705,8 +904,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {sortHead('blk', 'BLK')}
                     {sortHead('threes', '3PM')}
                     {sortHead('to', 'TO')}
-                    {myTurn && sortHead('gone', 'GONE BY NEXT', 'How often he goes before your next pick, across 60 drafts from here', 'room-gone-trail')}
-                    {myTurn && <th className="room-draft-col room-draft-trail" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -726,7 +923,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     return (
                       <Fragment key={candidate.playerKey}>
                       {pickLineAt === index && myNext && (
-                        <tr className="room-pickline"><td colSpan={18}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
+                        <tr className="room-pickline"><td colSpan={20}>Your pick {myNext.pick.round}.{myNext.pick.slot}</td></tr>
                       )}
                       <tr
                         className={`${taken ? 'is-taken' : ''}${focus === candidate.playerKey ? ' is-focus' : ''}`}
@@ -766,6 +963,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num room-strong">{one(projection?.fppg)}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num" title={projection ? editTitle(projection) ?? undefined : undefined}>{projection?.games ?? '–'}{projection?.edit ? '*' : ''}</td>
+                        {showPostseason && <PostseasonCell games={projection?.playInGames} />}
+                        {showPostseason && <PostseasonCell games={projection?.playoffGames} />}
                         <td className="room-num">{one(projection?.line?.pts)}</td>
                         <td className="room-num">{one(projection?.line?.reb)}</td>
                         <td className="room-num">{one(projection?.line?.ast)}</td>
@@ -773,17 +972,15 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num">{one(projection?.line?.blk)}</td>
                         <td className="room-num">{one(projection?.line?.threes)}</td>
                         <td className="room-num">{one(projection?.line?.to)}</td>
-                        {myTurn && goneCell('room-gone-trail')}
-                        {myTurn && <td className="room-draft-col room-draft-trail">{draftButton}</td>}
                       </tr>
                       </Fragment>
                     );
                   })}
-                  {rows.length === 0 && <tr><td colSpan={18} className="proj-empty">No players match.</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={20} className="proj-empty">No players match.</td></tr>}
                 </tbody>
               </table>
             </div>
-            {myTurn && <div className="mock-note mock-note-dim">GONE BY NEXT: how often he is taken before your next pick, across 60 drafts played from here.</div>}
+            {myTurn && <div className="mock-note mock-note-dim">GONE: how often he is taken before your next pick, across 60 drafts played from here.</div>}
           </div>
         )}
 
@@ -798,7 +995,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                   <tr>
                     <th className="room-slot-col">Slot</th>
                     <th className="room-player-col">Player</th>
-                    {['FPPG', 'TOTAL', 'GP', 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
+                    {['FPPG', 'TOTAL', 'GP', ...(showPostseason ? ['PI', 'PO'] : []), 'MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', '3PM', 'TO'].map((label) => (
                       <th key={label} className="room-num"><span className="room-th">{label}</span></th>
                     ))}
                   </tr>
@@ -823,6 +1020,8 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                         <td className="room-num room-strong">{candidate ? one(projection?.fppg) : '–'}</td>
                         <td className="room-num">{projection?.total?.toLocaleString() ?? '–'}</td>
                         <td className="room-num">{projection?.games ?? '–'}</td>
+                        {showPostseason && <PostseasonCell games={projection?.playInGames} />}
+                        {showPostseason && <PostseasonCell games={projection?.playoffGames} />}
                         <td className="room-num">{one(line?.min)}</td>
                         <td className="room-num">{one(line?.pts)}</td>
                         <td className="room-num">{one(line?.reb)}</td>
@@ -857,52 +1056,13 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
               ))}
             </div>
             {resultsView === 'board' ? (
-              <div className="room-grid-wrap">
-                <table className="room-grid">
-                  <thead>
-                    <tr>
-                      <th />
-                      {owners.map((owner) => <th key={owner} className={owner === person ? 'is-mine' : ''}>{owner}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grid.rounds.map((row, index) => (
-                      <tr key={index}>
-                        <th>R{index + 1}<span className="room-grid-arrow" aria-label={index % 2 === 0 ? 'left to right' : 'right to left'}>{index % 2 === 0 ? '→' : '←'}</span></th>
-                        {row.map((cell) => {
-                          const theme = cell.pick?.playerName ? positionTheme([...cell.pick.positions]) : null;
-                          const kept = cell.pick?.how === 'keeper';
-                          const projected = kept && cell.pick?.keeperStatus === 'assumed';
-                          return (
-                            <td
-                              key={cell.overall}
-                              className={`${cell.owner === person ? 'is-mine' : ''}${cell.current ? ' is-now' : ''}${kept ? ' is-keeper' : ''}${projected ? ' is-projected' : ''}${cell.via ? ' is-traded' : ''}${cell.pick?.playerKey ? ' is-tappable' : ''}`}
-                              onClick={() => look(cell.pick?.playerKey)}
-                              style={theme ? {
-                                background: `linear-gradient(155deg, ${theme.background} 0%, ${theme.deepBackground} 100%)`,
-                                borderColor: cell.via ? undefined : theme.border,
-                                boxShadow: `inset 3px 0 0 ${theme.color}`,
-                              } : undefined}
-                            >
-                              <span className="room-grid-label">
-                                {cell.round}.{cell.slot}
-                                {cell.via && <span className="board-traded-tag" title={`${cell.owner} holds ${cell.via}'s pick`}>→ {cell.owner.toUpperCase()}</span>}
-                                {kept && <KeeperChip projected={projected} early={cell.pick?.keeperEarly ?? null} />}
-                              </span>
-                              {cell.pick?.playerName
-                                ? <>
-                                  <span className="room-grid-name">{cell.pick.playerName}</span>
-                                  <small style={{ color: theme?.color }}>{cell.pick.positions.join('/')}</small>
-                                </>
-                                : cell.current ? <span className="room-grid-name mock-live">on the clock</span> : null}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <MockBoardGrid
+                owners={owners}
+                rounds={boardView.rounds}
+                person={person}
+                projectedTrades={projectedTrades}
+                onPlayer={look}
+              />
             ) : (
               <ol className="room-team-list room-results-list">
                 {/* Newest pick first, so the one that just landed is on top. */}
@@ -914,7 +1074,7 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
                     {pick.how === 'keeper'
                       ? <span><KeeperChip projected={pick.keeperStatus === 'assumed'} early={pick.keeperEarly ?? null} /></span>
                       : <span />}
-                    <span className="room-update-owner">{pick.owner}</span>
+                    <span className="room-update-owner">{ownerShown(pick.overall, pick.owner)}{tradeTag(pick.overall, pick.owner)}</span>
                   </li>
                 ))}
                 {shownPicks.length === 0 && <li className="mock-live">No picks yet.</li>}
@@ -988,19 +1148,6 @@ export default function DraftRoom({ prepared, values, projections, person, seed,
 /** Who has a player, for the list, the card and the roster. */
 type Taken = Pick<MockPick, 'label' | 'owner'> & Partial<Pick<MockPick, 'how' | 'keeperStatus' | 'keeperEarly'>>;
 
-/** A keeper on the board, in the list and in the updates: K, solid when entered, dashed when projected. */
-function KeeperChip({ projected, early }: { projected: boolean; early: string | null }) {
-  return (
-    <>
-      <span
-        className={`room-keeper-chip${projected ? ' is-projected' : ''}`}
-        title={projected ? 'Projected keeper' : 'Keeper'}
-        aria-label={projected ? 'Projected keeper' : 'Keeper'}
-      >K</span>
-      {early && <span className="keeper-early" title={early} aria-label={early}>↑</span>}
-    </>
-  );
-}
 
 interface CardProps {
   playerKey: string;

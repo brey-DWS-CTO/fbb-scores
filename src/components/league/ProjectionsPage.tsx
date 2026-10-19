@@ -7,7 +7,7 @@ import {
   FIXED_COLUMNS,
   PLAY_IN_COUNTS,
   PLAYOFF_COUNTS,
-  PROJECTION_COLUMNS,
+  projectionColumnsFor,
   buildProjections,
   changeTone,
   editTitle,
@@ -26,12 +26,15 @@ import {
   type ProjectionSort,
   type Tone,
 } from '../../lib/league/projections.js';
+import { shortName } from '../../lib/league/draftRoom.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import { PROJECTION_EDITS_KEY, useProjectionData } from '../../hooks/useProjectionData.js';
+import { sourceLabel } from '../../lib/league/expertProjections.js';
+import ProjectionSourceSwitch from './ProjectionSourceSwitch.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
-import { EDITABLE_COLUMNS, cellEdited, withCellEdit } from '../../lib/league/projectionEdits.js';
+import { EDITABLE_COLUMNS, cellEdited, cellFollowsMinutes, editedProjection, projectionGames, withCellEdit } from '../../lib/league/projectionEdits.js';
 import IdentityChip from './IdentityChip.js';
 import SignInPanel from './SignInPanel.js';
 import { relativeScheduleHeat } from './scheduleUi.js';
@@ -39,6 +42,10 @@ import NavIcon from './NavIcon.js';
 
 const PAGE_SIZES = [20, 50, 100, 200, 500] as const;
 const HIDDEN_KEY = 'nerds.projections.hidden';
+
+/** Pixels scrolled sideways before names shorten, and back before they grow. The mock draft's marks. */
+const SHORT_NAME_AT = 40;
+const FULL_NAME_AT = 8;
 
 function readHidden(): Set<ProjectionColumnId> {
   try {
@@ -126,6 +133,7 @@ function cell(row: PlayerProjection, id: ProjectionColumnId): { text: React.Reac
     case 'ftPct': return { text: one(row.line?.ftPct ?? null) };
     case 'lastSeason': return { text: one(row.lastSeason) };
     case 'change': return { text: signed(row.change), className: toneClass(changeTone(row.change)).trim() };
+    case 'vsOther': return { text: signed(row.vsOther), className: toneClass(changeTone(row.vsOther)).trim() };
     case 'espnRank': return { text: whole(row.espnRank) };
     case 'adp': return { text: one(row.adp) };
   }
@@ -151,7 +159,23 @@ export default function ProjectionsPage() {
   const viewer = identity?.owner ?? null;
   const isCommish = identity?.isCommissioner === true;
 
-  const { snapshot, original, edits } = useProjectionData();
+  const { snapshot, original, edits, source, compare, compareLabel } = useProjectionData();
+  const label = sourceLabel(source);
+  const columnLabel = (column: { id: ProjectionColumnId; label: string }) => {
+    if (column.id === 'base') return label.toUpperCase();
+    if (column.id === 'vsOther') return `VS ${compareLabel.toUpperCase()}`;
+    return column.label;
+  };
+  // Postseason counts and the other projection are the commissioner's alone.
+  const available = useMemo(() => projectionColumnsFor(isCommish), [isCommish]);
+  // The list scrolled sideways: names shorten so the stats fit, as in the mock draft.
+  const [scrolled, setScrolled] = useState(false);
+  const onTableScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const left = event.currentTarget.scrollLeft;
+    // A gap between the two marks, so a finger resting near one does not flicker.
+    const next = scrolled ? left > FULL_NAME_AT : left > SHORT_NAME_AT;
+    if (next !== scrolled) setScrolled(next);
+  };
   const [editedOnly, setEditedOnly] = useState(false);
   // The player whose stats are open for typing, and what has been typed.
   const [rowEdit, setRowEdit] = useState<{ key: string; values: Record<string, string> } | null>(null);
@@ -168,7 +192,7 @@ export default function ProjectionsPage() {
   const [exporting, setExporting] = useState(false);
   const [hidden, setHidden] = useState<Set<ProjectionColumnId>>(readHidden);
   const [picking, setPicking] = useState(false);
-  const columns = useMemo(() => visibleColumns(hidden), [hidden]);
+  const columns = useMemo(() => visibleColumns(hidden, available), [hidden, available]);
   const toggleColumn = (id: ProjectionColumnId) => {
     const next = new Set(hidden);
     if (next.has(id)) next.delete(id);
@@ -190,8 +214,8 @@ export default function ProjectionsPage() {
     [dataset, viewer, state, scenario],
   );
   const rows = useMemo(
-    () => buildProjections(values, snapshot, keeperSets, edits, original),
-    [values, snapshot, keeperSets, edits, original],
+    () => buildProjections(values, snapshot, keeperSets, edits, original, compare),
+    [values, snapshot, keeperSets, edits, original, compare],
   );
   const shown = useMemo(
     () => sortProjections(filterProjections(rows, { query, position, hideKept, editedOnly }), sort),
@@ -221,15 +245,11 @@ export default function ProjectionsPage() {
     const value = projectionColumn(column).value(row);
     return typeof value === 'number' ? value : null;
   };
-  // Save whatever is typed in the open row: one write for all its stats.
-  const commitRow = async (open = rowEdit) => {
-    setRowEdit(null);
-    if (!open || !identity) return;
-    const row = rows.find((entry) => entry.key === open.key);
-    if (!row || row.espnId === null) return;
+  // The edit the open row would save: the stored edit with every typed cell laid over it.
+  const draftOf = (row: PlayerProjection, values: Record<string, string>) => {
     let next: ReturnType<typeof withCellEdit> = row.edit ? { games: row.edit.games, perGame: { ...row.edit.perGame }, note: row.edit.note } : null;
     let changed = false;
-    for (const [column, text] of Object.entries(open.values)) {
+    for (const [column, text] of Object.entries(values)) {
       const number = Number(text);
       if (text.trim() === '' || !Number.isFinite(number) || number < 0) continue;
       const before = shownValue(row, column as ProjectionColumnId);
@@ -237,6 +257,26 @@ export default function ProjectionsPage() {
       next = withCellEdit(next, espnRowOf(row), EDITABLE_COLUMNS[column], number);
       changed = true;
     }
+    return { next, changed };
+  };
+  // What a cell nobody typed in shows while the row is open: the line after
+  // the typed cells, so new minutes move the stats before anything is saved.
+  const previewText = (row: PlayerProjection, column: string): string => {
+    const espn = espnRowOf(row);
+    const { next } = draftOf(row, rowEdit?.values ?? {});
+    const projection = next ? editedProjection(espn, { ...next, espnId: 0, name: '', editedAt: '', editedBy: '' }) : espn;
+    const statId = EDITABLE_COLUMNS[column];
+    const value = statId === '42' ? projectionGames(projection) : projectedPerGame(projection)?.[statId] ?? null;
+    if (value === null) return '';
+    return String(column === 'games' ? Math.round(value) : Math.round(value * 10) / 10);
+  };
+  // Save whatever is typed in the open row: one write for all its stats.
+  const commitRow = async (open = rowEdit) => {
+    setRowEdit(null);
+    if (!open || !identity) return;
+    const row = rows.find((entry) => entry.key === open.key);
+    if (!row || row.espnId === null) return;
+    const { next, changed } = draftOf(row, open.values);
     if (!changed) return;
     try {
       if (next) await saveProjectionEdit(identity, row.espnId, { name: row.name, ...next });
@@ -247,16 +287,12 @@ export default function ProjectionsPage() {
     }
   };
   const openRow = (row: PlayerProjection) => {
-    if (!isCommish || !identity || row.espnId === null || row.line === null) return;
+    if (!identity || row.espnId === null || row.line === null) return;
     // Opening another player saves the one that was open.
     if (rowEdit && rowEdit.key !== row.key) void commitRow();
     setSaveError(null);
-    const values: Record<string, string> = {};
-    for (const column of Object.keys(EDITABLE_COLUMNS)) {
-      const value = shownValue(row, column as ProjectionColumnId);
-      values[column] = value === null ? '' : String(column === 'games' ? Math.round(value) : value);
-    }
-    setRowEdit({ key: row.key, values });
+    // Every cell shows the live line until it is typed in; only typed cells are saved.
+    setRowEdit({ key: row.key, values: {} });
   };
   const commitRowRef = useRef(commitRow);
   useEffect(() => {
@@ -313,9 +349,8 @@ export default function ProjectionsPage() {
         <IdentityChip />
       </div>
       <div className="mock-intro">
-        Points a game in our scoring: ESPN&apos;s line plus the double-double bonus. {isCommish
-          ? ' Hover a player and tap ✎ to change his stats; click anywhere else to save. Your edits show in yellow.'
-          : ' Numbers in yellow are the commish’s changes to ESPN’s projection.'}
+        Points a game in our scoring: the {label} line plus the double-double bonus.
+        {' Tap ✎ by a player to change his stats; tap anywhere else to save. Your edits show in yellow and change only your numbers.'}
         {!snapshot?.players.length && (
           <> No ESPN numbers are accepted yet.{' '}
             {isCommish ? <Link to="/admin">Fetch them in Commish Mode.</Link> : 'The commish will load them soon.'}</>
@@ -349,6 +384,7 @@ export default function ProjectionsPage() {
             </button>
           )}
         </div>
+        <ProjectionSourceSwitch onChange={resetPage} />
         <div className="mock-seg" role="radiogroup" aria-label="Position">
           {(['ALL', ...POSITIONS] as const).map((choice) => (
             <button
@@ -373,23 +409,23 @@ export default function ProjectionsPage() {
         </label>
         <div className="proj-export">
           <button type="button" className={`tap-btn mock-mini-btn${picking ? ' is-on' : ''}`} aria-expanded={picking} onClick={() => setPicking(!picking)}>
-            COLUMNS{hidden.size > 0 ? ` (${PROJECTION_COLUMNS.length - hidden.size} of ${PROJECTION_COLUMNS.length})` : ''}
+            COLUMNS{columns.length < available.length ? ` ${columns.length}/${available.length}` : ''}
           </button>
           <button type="button" className="tap-btn mock-mini-btn" onClick={exportCsv} disabled={shown.length === 0}>
-            EXPORT CSV
+            <span className="proj-export-word">EXPORT </span>CSV
           </button>
           <button type="button" className="tap-btn mock-mini-btn" onClick={() => void exportXlsx()} disabled={shown.length === 0 || exporting}>
-            {exporting ? 'SAVING…' : 'EXPORT XLSX'}
+            {exporting ? 'SAVING…' : <><span className="proj-export-word">EXPORT </span>XLSX</>}
           </button>
         </div>
       </section>
 
       {picking && (
         <section className="panel proj-columns" aria-label="Columns to show">
-          {PROJECTION_COLUMNS.filter((column) => !FIXED_COLUMNS.has(column.id)).map((column) => (
+          {available.filter((column) => !FIXED_COLUMNS.has(column.id)).map((column) => (
             <label key={column.id} className="proj-column-pick" title={column.header}>
               <input type="checkbox" checked={!hidden.has(column.id)} onChange={() => toggleColumn(column.id)} />
-              {column.label}
+              {columnLabel(column)}
             </label>
           ))}
           {hidden.size > 0 && (
@@ -398,7 +434,8 @@ export default function ProjectionsPage() {
               className="tap-btn mock-mini-btn"
               onClick={() => {
                 setHidden(new Set());
-                try { window.localStorage.removeItem(HIDDEN_KEY); } catch { /* nothing to clear */ }
+                // An empty list is a choice; no list at all means the default columns.
+                try { window.localStorage.setItem(HIDDEN_KEY, '[]'); } catch { /* no storage: lasts until reload */ }
               }}
             >
               SHOW ALL
@@ -409,7 +446,7 @@ export default function ProjectionsPage() {
 
       {saveError && <div className="identity-error" role="alert">{saveError}</div>}
 
-      <div className="panel proj-table-wrap">
+      <div className={`panel proj-table-wrap${scrolled ? ' is-scrolled' : ''}`} onScroll={onTableScroll}>
         <table className="proj-table">
           <thead>
             <tr>
@@ -424,7 +461,7 @@ export default function ProjectionsPage() {
                     title={column.header}
                   >
                     <button type="button" onClick={() => { setSort(nextSort(sort, column.id)); resetPage(); }}>
-                      {column.label}
+                      {columnLabel(column)}
                       <span className={sorted ? 'proj-caret is-on' : 'proj-caret'} aria-hidden="true">
                         {sorted === 'asc' ? '▲' : sorted === 'desc' ? '▼' : '↕'}
                       </span>
@@ -448,12 +485,16 @@ export default function ProjectionsPage() {
                     const { text, className } = cell(row, column.id);
                     const statId = EDITABLE_COLUMNS[column.id];
                     const edited = statId !== undefined && cellEdited(row.edit, statId);
-                    const classes = `proj-col-${column.id}${className ? ` ${className}` : ''}${edited ? ' proj-cell-edited' : ''}`;
+                    const scaled = statId !== undefined && !edited && cellFollowsMinutes(row.edit, statId);
+                    const classes = `proj-col-${column.id}${className ? ` ${className}` : ''}${edited ? ' proj-cell-edited' : ''}${scaled ? ' proj-cell-scaled' : ''}`;
                     if (column.id === 'name') {
                       return (
                         <td key={column.id} className={classes}>
-                          <span className="proj-name">{text}</span>
-                          {isCommish && row.espnId !== null && row.line !== null && !open && (
+                          <span className="proj-name">
+                            <span className="proj-name-full">{text}</span>
+                            <span className="proj-name-short">{shortName(row.name)}</span>
+                          </span>
+                          {row.espnId !== null && row.line !== null && !open && (
                             <button
                               type="button"
                               className={`proj-pencil${row.edit ? ' is-edited' : ''}`}
@@ -476,7 +517,7 @@ export default function ProjectionsPage() {
                       <td
                         key={column.id}
                         className={classes}
-                        title={edited && !open ? `ESPN: ${espnValue(row, statId)?.toFixed(column.id === 'games' ? 0 : 1) ?? 'none'}` : undefined}
+                        title={(edited || scaled) && !open ? `${label}: ${espnValue(row, statId)?.toFixed(column.id === 'games' ? 0 : 1) ?? 'none'}${scaled ? '. Follows his minutes.' : ''}` : undefined}
                       >
                         {open && statId !== undefined ? (
                           <input
@@ -486,7 +527,7 @@ export default function ProjectionsPage() {
                             autoComplete="off"
                             autoFocus={column.id === 'games'}
                             aria-label={`${row.name} ${column.header}`}
-                            value={rowEdit.values[column.id] ?? ''}
+                            value={rowEdit.values[column.id] ?? previewText(row, column.id)}
                             onFocus={(event) => event.currentTarget.select()}
                             // Typed numbers only: no spinner, wheel or arrow keys can change a value.
                             onChange={(event) => setRowEdit({ ...rowEdit, values: { ...rowEdit.values, [column.id]: event.target.value.replace(/[^0-9.]/g, '') } })}

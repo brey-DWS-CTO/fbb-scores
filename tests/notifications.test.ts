@@ -30,7 +30,6 @@ function run(options: {
     season: SEASON,
     owners: OWNERS,
     ownersWithKeepers: options.withKeepers ?? [],
-    keeperNames: { Brey: ['N. Jokic', 'S. Curry'] },
     alreadySent: options.alreadySent ?? [],
   });
 }
@@ -101,22 +100,22 @@ test('the day-before warning opens a day before the draft', () => {
 
 // ─── Who gets what ───────────────────────────────────────────────────────────
 
-test('keeper warnings go to everyone, and know who has saved', () => {
+test('keeper warnings skip owners who have saved', () => {
   const list = run({ hoursBeforeDraft: 30, withKeepers: ['Brey'] });
-  assert.deepEqual(owners(list, 'keepers-last-call'), ['Amy', 'Brey', 'Joel']);
-  const saved = list.filter((r) => r.kind === 'keepers-last-call' && r.keeperNames.length > 0).map((r) => r.owner);
-  assert.deepEqual(saved, ['Brey']);
+  assert.deepEqual(owners(list, 'keepers-last-call'), ['Amy', 'Joel']);
 });
 
-test('the words change with whether you have saved', () => {
+test('draft warnings still go to owners who have saved', () => {
+  const list = run({ hoursBeforeDraft: 24, withKeepers: ['Brey', 'Joel', 'Amy'] });
+  assert.deepEqual(owners(list, 'draft-day'), ['Amy', 'Brey', 'Joel']);
+  assert.ok(!list.some((r) => r.kind.startsWith('keepers-')));
+});
+
+test('the warning tells an unsaved owner when keepers are due', () => {
   const list = run({ hoursBeforeDraft: 30, withKeepers: ['Brey'] });
-  const brey = list.find((r) => r.kind === 'keepers-last-call' && r.owner === 'Brey');
   const amy = list.find((r) => r.kind === 'keepers-last-call' && r.owner === 'Amy');
-  assert.ok(brey && amy);
-  const breyCopy = reminderCopy(brey);
+  assert.ok(amy);
   const amyCopy = reminderCopy(amy);
-  assert.equal(breyCopy.subject, 'Last call: Your keepers are saved. You are done.');
-  assert.match(breyCopy.lines[0], /You saved N\. Jokic and S\. Curry\. You are done\./);
   assert.equal(amyCopy.subject, 'Last call: You have no keepers saved. Due in 6 hours.');
   assert.match(amyCopy.lines[0], /Saturday, October 17 at 2:00 PM Pacific/);
 });

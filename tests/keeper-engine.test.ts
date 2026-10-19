@@ -144,3 +144,29 @@ test('an over-cap candidate blocks by default but taps through with allowOverCap
   assert.equal(result.valid, false);
   assert.match(result.statusLine, /ILLEGAL KEEPERS/);
 });
+
+test('zero games is 25 or fewer: the season before sets the tier, and only no average at all means round 3', async () => {
+  const { computeTiers } = await import('../src/lib/keeper/engine.ts');
+  // A hundred ranked players from 60.0 down, half a point apart: round 2 is 55.0 to 49.6 and so on.
+  const ranked = Array.from({ length: 100 }, (_, i) => ({
+    key: `r${i}`, avg2026: 60 - i * 0.5, gp2026: 70, priorAvg: null, ranked: true,
+  }));
+  const tiers = computeTiers([
+    ...ranked,
+    { key: 'hurt-all-year', avg2026: null, gp2026: 0, priorAvg: 52, ranked: false },
+    { key: 'hurt-most-of-year', avg2026: 30, gp2026: 20, priorAvg: 52, ranked: false },
+    { key: 'never-played', avg2026: null, gp2026: 0, priorAvg: null, ranked: false },
+  ], {});
+  const hurtAllYear = tiers.assignments.get('hurt-all-year')!;
+  assert.equal(hurtAllYear.round, 2);
+  assert.equal(hurtAllYear.effectiveAvg, 52);
+  assert.ok(hurtAllYear.usesPriorYear && hurtAllYear.zeroGp);
+  assert.equal(tiers.assignments.get('hurt-most-of-year')!.round, 2);
+  const neverPlayed = tiers.assignments.get('never-played')!;
+  assert.equal(neverPlayed.round, 3);
+  assert.equal(neverPlayed.effectiveAvg, null);
+  // The committed dataset agrees: Haliburton sat out 2025-26 and keeps on his 2024-25 line.
+  const haliburton = dataset.players.find((p) => p.fullName === 'Tyrese Haliburton')!;
+  assert.equal(haliburton.keeper.round, 2);
+  assert.ok(haliburton.keeper.zeroGp2026 && haliburton.keeper.usesPriorYear);
+});

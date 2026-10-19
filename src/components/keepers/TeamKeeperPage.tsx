@@ -17,6 +17,7 @@ import { buildWorld } from '../../lib/league/whatIf.js';
 import { defaultMockSettings, prepareMock, type MockSlot } from '../../lib/league/mockDraft.js';
 import { keeperCostSlot, oddsTone, openOwnerBoard, shareGoneBefore, simulateTakenAt, type TakenAt } from '../../lib/league/keeperOdds.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
+import ProjectionSourceSwitch from '../league/ProjectionSourceSwitch.js';
 import { keeperDeadline, nameList, pacificLabel } from '../../lib/league/notifications.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import {
@@ -483,7 +484,8 @@ export default function TeamKeeperPage() {
   const postseasonGames = usePostseasonGames();
 
   const serverSelections = useMemo(() => state.keepers[owner] ?? [], [state.keepers, owner]);
-  const isCommish = identity?.isCommissioner ?? false;
+  // Blind, the commish is a member here: he sees and edits only his own keepers.
+  const isCommish = (identity?.isCommissioner ?? false) && meta?.commishBlind !== true;
   const [commissionerRealEdit, setCommissionerRealEdit] = useState(false);
   const projectionMode = !!identity
     && identity.owner !== owner
@@ -554,12 +556,14 @@ export default function TeamKeeperPage() {
   const result = useMemo(() => resolveTeamKeepers(dataset, owner, selections), [owner, selections, dataset]);
 
   // Commissioner only: the keeper question as a number. This team's keeper
-  // slots are opened, and the room drafts 60 times from the commish's full
-  // view of the league (entered keepers, projections for the rest). The
+  // slots are opened, and the room drafts 60 times from the commish's view
+  // of the league (entered keepers he can see, projections for the rest). The
   // answer per candidate: how often he is gone by the pick his keep costs.
+  // Blind mode keeps the odds: they read only what the commish can see.
+  const oddsForCommish = identity?.isCommissioner === true;
   const { snapshot } = useProjectionData();
   const oddsWorld = useMemo((): { taken: TakenAt; slots: MockSlot[] } | null => {
-    if (!isCommish || !identity || !snapshot) return null;
+    if (!oddsForCommish || !identity || !snapshot) return null;
     const values = valueBoard(dataset.players, snapshot, { schedule: leagueSchedule2027, projectionsOnly: true });
     if (values.entries.length === 0) return null;
     const world = buildWorld(dataset, {
@@ -568,7 +572,7 @@ export default function TeamKeeperPage() {
     const board = openOwnerBoard(world.board, owner);
     const prepared = prepareMock({ board, values, settings: defaultMockSettings('sharp', OWNERS, 7) });
     return { taken: simulateTakenAt(prepared, 7, 60), slots: board.slots };
-  }, [isCommish, identity, snapshot, dataset, state, scenarioQuery.scenario, owner]);
+  }, [oddsForCommish, identity, snapshot, dataset, state, scenarioQuery.scenario, owner]);
   const keeperOdds = (playerKey: string, round: number | null): KeeperOdds | null => {
     if (!oddsWorld || round === null) return null;
     // A chosen keeper is judged at the pick the engine charged him. Anyone
@@ -881,6 +885,7 @@ export default function TeamKeeperPage() {
               </div>
               <div style={{ color: 'var(--text-body)', fontSize: '0.76rem', marginTop: 5, lineHeight: 1.45 }}>
                 These picks are private to {identity?.owner}. They do not change {owner}'s real submission.
+                {' '}Only your first save counts for SCOUT.
               </div>
             </div>
             <button
@@ -945,6 +950,7 @@ export default function TeamKeeperPage() {
           Could not load your private scenario. Sign out and back in, then try again.
         </div>
       )}
+      {oddsForCommish && <ProjectionSourceSwitch caption="Keeper odds from" />}
       {locked && !isCommish && !projectionMode && <LockBanner />}
       {identity?.owner === owner && meta?.viewer === owner && !projectionMode && !locked && meta.draftAt && (
         <KeeperStatusBanner

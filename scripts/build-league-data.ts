@@ -247,7 +247,8 @@ for (const pl of players.values()) {
   const contract = (pl as { _contract?: ContractSeed })._contract ?? null;
   delete (pl as { _contract?: ContractSeed })._contract;
   const flags: string[] = [];
-  if (a?.zeroGp) flags.push('no-2026-games-3rd-round-rule');
+  if (a?.zeroGp && !a.usesPriorYear) flags.push('no-2026-games-3rd-round-rule');
+  else if (a?.zeroGp) flags.push('no-2026-games');
   if (a?.usesPriorYear) flags.push(`uses-prior-year-avg (${pl.prior?.source})`);
   if (!pl.stats2026 && pl.api2026) flags.push('api-window-stats');
   if (contract?.expired || (contract && contract.lastKeepableSeason < config.season)) flags.push('contract-expired');
@@ -327,7 +328,7 @@ for (const pl of dataset.players) {
   if (pl.keeper.usesPriorYear || pl.keeper.zeroGp2026) {
     if (!pl.fantasyTeam && !pl.stats2026) continue;
     console.log(
-      `  ${pl.name.padEnd(24)} gp26=${pl.stats2026?.gp ?? pl.api2026?.gp ?? 0}  2026avg=${pl.stats2026?.avg ?? '-'}  → uses ${pl.keeper.effectiveAvg} (${pl.keeper.avgSource}${pl.keeper.zeroGp2026 ? ', ZERO GP → R3 rule' : ''})  → ROUND ${pl.keeper.round}`,
+      `  ${pl.name.padEnd(24)} gp26=${pl.stats2026?.gp ?? pl.api2026?.gp ?? 0}  2026avg=${pl.stats2026?.avg ?? '-'}  → uses ${pl.keeper.effectiveAvg} (${pl.keeper.avgSource}${pl.keeper.zeroGp2026 && !pl.keeper.usesPriorYear ? ', ZERO GP, no prior → R3 rule' : ''})  → ROUND ${pl.keeper.round}`,
     );
   }
 }

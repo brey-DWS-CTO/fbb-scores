@@ -57,10 +57,10 @@ export const MAX_TRADE_NOTE = 400;
 /** The lowest round a team may trade during the season (rule keepers.picktrade.rounds.protected). */
 export const FIRST_TRADEABLE_ROUND = 3;
 
-/** Most of its own picks a team may have traded away for one draft. */
+/** Most of its own picks a team may have traded away for one draft, in season. */
 export const MAX_PICKS_AWAY_PER_SEASON = 2;
 
-/** Most picks one team may hold in a single round of one draft. */
+/** Most picks one team may hold in a single round of one draft, in season. */
 export const MAX_PICKS_PER_ROUND = 2;
 
 /**
@@ -848,6 +848,9 @@ export function picksTradedAway(
  * Rule 4.4.3 caps a team at two picks in any one round of one draft. Both count
  * within a season, so what a team does with next year's picks never limits what
  * it can do with this year's.
+ *
+ * Both are in-season rules: before and during the draft there is no limit.
+ * The caller checks the window; this only counts.
  */
 export function checkSeasonLimits(
   dataset: LeagueDataset,
@@ -959,8 +962,11 @@ export function checkProposalAgainstState(
     }
   }
 
-  const limits = checkSeasonLimits(dataset, state, season, input);
-  if (!limits.ok) return limits;
+  // The pick limits hold in season only. Before and during the draft, no limit.
+  if (window === 'in-season') {
+    const limits = checkSeasonLimits(dataset, state, season, input);
+    if (!limits.ok) return limits;
+  }
 
   // After keepers lock, a trade that leaves either side unable to pay for a
   // keeper is refused outright. The keeper engine decides that, not this file.
@@ -1081,6 +1087,43 @@ export function canAnswer(
   return proposal.proposer === owner || isCommissioner
     ? OK
     : refuse('not-yours-to-answer', 'Only the member who sent the offer, or a commissioner, can pull it.');
+}
+
+/**
+ * Whether `owner` may change an offer and send it again. Only the member who
+ * sent it, only while it is waiting, and only the version they last saw, so
+ * an edit never lands on an offer that moved underneath it.
+ */
+export function canRevise(proposal: PickTradeProposal, owner: string, version: number): TradeCheck {
+  if (!isPending(proposal)) return refuse('not-pending', 'That offer has already been settled.');
+  if (proposal.proposer !== owner) {
+    return refuse('not-yours-to-answer', 'Only the member who sent the offer can change it.');
+  }
+  if (proposal.version !== version) {
+    return refuse('stale-version', 'That offer changed since you opened it. Reload and try again.');
+  }
+  return OK;
+}
+
+/**
+ * The offer with new picks and a new note. Same id and partner; the version
+ * moves, so the other side cannot accept what they saw before, and the clock
+ * starts again from the resend.
+ */
+export function reviseProposal(
+  proposal: PickTradeProposal,
+  input: Pick<ProposalInput, 'offer' | 'request' | 'note'>,
+  now: string,
+): PickTradeProposal {
+  return {
+    ...proposal,
+    offer: input.offer,
+    request: input.request,
+    note: input.note,
+    version: proposal.version + 1,
+    revisedAt: now,
+    expiresAt: expiresAtFrom(now),
+  };
 }
 
 export function proposalInput(proposal: PickTradeProposal): ProposalInput {

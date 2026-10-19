@@ -54,6 +54,12 @@ export default function DraftStartPage() {
         )}
       </Link>
 
+      <Link to="/my-rankings" className="tap-btn start-btn start-btn-list">
+        <span className="start-btn-icon" aria-hidden="true"><NavIcon name="ballot" size="1.4em" /></span>
+        <span className="start-btn-title hub-heading">MY RANKINGS</span>
+        <span className="start-btn-sub">Your player rankings, for picks made while you are away. Only you see them.</span>
+      </Link>
+
       <div className="start-row">
         <Link to="/projections" className="tap-btn start-btn start-btn-small">
           <span aria-hidden="true"><NavIcon name="chart" size="1.3em" /></span>

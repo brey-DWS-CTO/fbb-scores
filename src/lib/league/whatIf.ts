@@ -53,6 +53,8 @@ export interface WorldInput {
   useEntered?: boolean;
   /** Teams whose entered keepers to set aside for the guess. See `MockBoardInput`. */
   guessInstead?: readonly string[];
+  /** Keepers saved per team, so partly revealed teams are topped up. See `MockBoardInput`. */
+  keeperCounts?: Readonly<Record<string, number>>;
   /**
    * The viewer's own what-if keepers, picked as if after the trades. Absent
    * or null means their real submission, which a trade may reset. An empty
@@ -131,7 +133,7 @@ export function buildWorld(dataset: LeagueDataset, input: WorldInput): World {
 
   // The keeper sets the mock will use: real for the viewer and, after the
   // reveal, for everyone; the viewer's guess for the rest. Resets act on these.
-  const sets = keepersForMock(dataset, { viewer: input.viewer, state: input.state, scenario, useEntered: input.useEntered, guessInstead: input.guessInstead });
+  const sets = keepersForMock(dataset, { viewer: input.viewer, state: input.state, scenario, useEntered: input.useEntered, guessInstead: input.guessInstead, keeperCounts: input.keeperCounts });
 
   const byId = new Map(input.proposals.map((proposal) => [proposal.id, proposal]));
   const applied: PickTradeProposal[] = [];
@@ -205,6 +207,6 @@ export function buildWorld(dataset: LeagueDataset, input: WorldInput): World {
     }
   }
 
-  const board = buildMockBoard(current, { viewer: input.viewer, state, scenario: worldScenario, useEntered: input.useEntered, guessInstead: input.guessInstead });
+  const board = buildMockBoard(current, { viewer: input.viewer, state, scenario: worldScenario, useEntered: input.useEntered, guessInstead: input.guessInstead, keeperCounts: input.keeperCounts });
   return { dataset: current, state, scenario: worldScenario, applied, skipped, resets, board };
 }

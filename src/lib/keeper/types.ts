@@ -67,7 +67,7 @@ export interface PlayerKeeperInfo {
   effectiveAvg: number | null; // the FPPG that counts for tiers + salary cap
   avgSource: AvgSource;
   usesPriorYear: boolean; // <=25 GP in 2026 → prior season average
-  zeroGp2026: boolean; // didn't play at all in 2026 → flat 3rd-round rule
+  zeroGp2026: boolean; // didn't play at all in 2026; with no earlier average → flat 3rd-round rule
   contract: ContractSeed | null;
   flags: string[];
 }
@@ -131,6 +131,8 @@ export interface DraftPickState {
   clockCalledBy?: string | null;
   /** The called clock ran out and this pick was entered late, rule 2.3.2.2. */
   skipped?: boolean;
+  /** The server made this pick for a team on auto. See src/lib/league/autoDraft.ts. */
+  auto?: boolean;
 }
 
 export interface SkippedPick {
@@ -186,6 +188,11 @@ export interface LeagueDynamicState {
      * stay open for their owner to fill any time; the clock moves on.
      */
     skipped?: Record<string, SkippedPick>;
+    /**
+     * Teams the commissioner has put on auto. The server picks for them from
+     * each one's private list, or the board's order when the list runs dry.
+     */
+    autoOwners?: string[];
   };
   /** Commissioner-accepted pool used before the draft is frozen. */
   playerPool?: {
@@ -271,6 +278,8 @@ export interface PickTradeProposal {
   version: number;
   createdAt: string;
   expiresAt: string;
+  /** The last time the proposer changed the offer and sent it again. */
+  revisedAt?: string;
   resolvedAt?: string;
   resolvedBy?: string;
   /** Why it left the pending state, when that needs saying. */
