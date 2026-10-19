@@ -52,6 +52,16 @@ interface EspnKonaPlayer {
 interface EspnKonaPlayerEntry extends EspnKonaPlayer {
   id: number;
   player?: EspnKonaPlayer;
+  /** The fantasy team holding him right now; 0 for a free agent. */
+  onTeamId?: number;
+}
+
+/** What the app needs to know about one player before an LM add. */
+export interface EspnPlayerFacts {
+  name: string;
+  proTeam: string;
+  /** 0 for a free agent, null when ESPN did not say. */
+  onTeamId: number | null;
 }
 
 interface EspnKonaResponse {
@@ -387,6 +397,13 @@ export class EspnClient {
    */
   async fetchPlayerNames(ids: readonly number[]): Promise<Map<number, { name: string; proTeam: string }>> {
     const found = new Map<number, { name: string; proTeam: string }>();
+    for (const [id, facts] of await this.fetchPlayerFacts(ids)) found.set(id, { name: facts.name, proTeam: facts.proTeam });
+    return found;
+  }
+
+  /** Name, NBA team and current holder for a few player ids. One request. */
+  async fetchPlayerFacts(ids: readonly number[]): Promise<Map<number, EspnPlayerFacts>> {
+    const found = new Map<number, EspnPlayerFacts>();
     const wanted = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 200);
     if (wanted.length === 0) return found;
     const { data } = await this.http.get<EspnKonaResponse>('', {
@@ -400,9 +417,22 @@ export class EspnClient {
       const id = raw.id ?? entry.id;
       const name = raw.fullName?.trim();
       if (!Number.isInteger(id) || !name) continue;
-      found.set(id as number, { name, proTeam: NBA_TEAM_ABBREV[raw.proTeamId ?? 0] ?? '' });
+      found.set(id as number, {
+        name,
+        proTeam: NBA_TEAM_ABBREV[raw.proTeamId ?? 0] ?? '',
+        onTeamId: Number.isInteger(entry.onTeamId) ? (entry.onTeamId as number) : null,
+      });
     }
     return found;
+  }
+
+  /** The hour ESPN runs waivers at, Eastern time, or null when it did not say. */
+  async fetchWaiverHour(): Promise<number | null> {
+    const { data } = await this.http.get<{ settings?: { acquisitionSettings?: { waiverProcessHour?: number } } }>('', {
+      params: { view: 'mSettings', _: Date.now() },
+    });
+    const hour = data.settings?.acquisitionSettings?.waiverProcessHour;
+    return Number.isInteger(hour) ? (hour as number) : null;
   }
 
   /**

@@ -16,6 +16,7 @@
 import type { PresenceRow } from '../../src/lib/league/presence.js';
 import type { DraftList } from '../../src/lib/league/autoDraft.js';
 import { transactionKey, type LeagueTransaction } from '../../src/lib/league/transactions.js';
+import type { LmAddRequest } from '../../src/lib/league/lmWeekend.js';
 import crypto from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
@@ -548,6 +549,10 @@ interface StoreBackend {
   addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number>;
   /** This season's moves, newest first. */
   listTransactions(season: number, limit: number): Promise<LeagueTransactionRow[]>;
+  /** This season's LM add requests, newest first. */
+  listLmAddRequests(season: number): Promise<LmAddRequest[]>;
+  /** Insert or replace one request by id. */
+  saveLmAddRequest(row: LmAddRequest): Promise<void>;
   getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null>;
   acceptPlayerPoolSnapshot(
     snapshot: PlayerPoolSnapshot,
@@ -971,6 +976,21 @@ class NeonBackend implements StoreBackend {
       by_league_manager boolean not null default false,
       seen_at timestamptz not null default now(),
       primary key (season, espn_id, player_id, kind)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS lm_add_requests (
+      id text primary key,
+      season int not null,
+      owner text not null,
+      team_id int not null,
+      player_id int not null,
+      player_name text not null,
+      pro_team text not null,
+      requested_at timestamptz not null,
+      for_date text not null,
+      status text not null,
+      note text not null default '',
+      updated_at timestamptz not null,
+      handled_by text
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS draft_presence (
       room text not null,
@@ -1781,6 +1801,49 @@ class NeonBackend implements StoreBackend {
     }));
   }
 
+  async listLmAddRequests(season: number): Promise<LmAddRequest[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, owner, team_id, player_id, player_name, pro_team, requested_at, for_date, status, note, updated_at, handled_by
+      FROM lm_add_requests WHERE season = ${season} ORDER BY requested_at DESC, id`) as Array<{
+      id: string;
+      owner: string;
+      team_id: number;
+      player_id: number;
+      player_name: string;
+      pro_team: string;
+      requested_at: string | Date;
+      for_date: string;
+      status: LmAddRequest['status'];
+      note: string;
+      updated_at: string | Date;
+      handled_by: string | null;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      season,
+      owner: row.owner,
+      teamId: row.team_id,
+      playerId: row.player_id,
+      playerName: row.player_name,
+      proTeam: row.pro_team,
+      requestedAt: new Date(row.requested_at).toISOString(),
+      forDate: row.for_date,
+      status: row.status,
+      note: row.note,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      handledBy: row.handled_by,
+    }));
+  }
+
+  async saveLmAddRequest(row: LmAddRequest): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO lm_add_requests
+      (id, season, owner, team_id, player_id, player_name, pro_team, requested_at, for_date, status, note, updated_at, handled_by)
+      VALUES (${row.id}, ${row.season}, ${row.owner}, ${row.teamId}, ${row.playerId}, ${row.playerName}, ${row.proTeam},
+        ${row.requestedAt}, ${row.forDate}, ${row.status}, ${row.note}, ${row.updatedAt}, ${row.handledBy})
+      ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note, updated_at = EXCLUDED.updated_at, handled_by = EXCLUDED.handled_by`;
+  }
+
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -2250,6 +2313,7 @@ interface FileDoc {
   }>;
   projectionEdits: ProjectionEditRow[];
   transactions?: LeagueTransactionRow[];
+  lmAddRequests?: LmAddRequest[];
   mockResults: MockResultRow[];
   mockFinishes: Array<MockFinish & { season: number }>;
   mockTrades: MockTrade[];
@@ -2290,6 +2354,7 @@ function emptyDoc(): FileDoc {
     keeperScenarios: [],
     projectionEdits: [],
     transactions: [],
+    lmAddRequests: [],
     mockResults: [],
     mockFinishes: [],
     mockTrades: [],
@@ -2356,6 +2421,7 @@ class FileBackend implements StoreBackend {
           ? doc.projectionEdits.map((row) => ({ ...row, owner: row.owner ?? row.updatedBy }))
           : [],
         transactions: Array.isArray(doc.transactions) ? doc.transactions : [],
+        lmAddRequests: Array.isArray(doc.lmAddRequests) ? doc.lmAddRequests : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
         mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
         mockTrades: Array.isArray(doc.mockTrades) ? doc.mockTrades : [],
@@ -2979,6 +3045,22 @@ class FileBackend implements StoreBackend {
       .filter((row) => row.season === season)
       .sort((a, b) => b.at.localeCompare(a.at) || a.espnId.localeCompare(b.espnId) || a.playerId - b.playerId)
       .slice(0, limit);
+  }
+
+  async listLmAddRequests(season: number): Promise<LmAddRequest[]> {
+    await this.ensureInit();
+    return (this.readDoc().lmAddRequests ?? [])
+      .filter((row) => row.season === season)
+      .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt) || a.id.localeCompare(b.id));
+  }
+
+  async saveLmAddRequest(row: LmAddRequest): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.lmAddRequests = (doc.lmAddRequests ?? []).filter((entry) => entry.id !== row.id);
+      doc.lmAddRequests.push(row);
+      this.writeDoc(doc);
+    });
   }
 
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
@@ -3840,6 +3922,14 @@ export async function addTransactions(rows: readonly LeagueTransactionRow[]): Pr
 
 export async function listTransactions(season: number, limit = 500): Promise<LeagueTransactionRow[]> {
   return getBackend().listTransactions(season, limit);
+}
+
+export async function listLmAddRequests(season: number): Promise<LmAddRequest[]> {
+  return getBackend().listLmAddRequests(season);
+}
+
+export async function saveLmAddRequest(row: LmAddRequest): Promise<void> {
+  return getBackend().saveLmAddRequest(row);
 }
 
 export async function deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
