@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import IdentityChip from './IdentityChip.js';
+import LmAddPanel from './LmAddPanel.js';
 import NavIcon from './NavIcon.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { apiErrorMessage, fetchTransactions, type TransactionsResponse } from '../../lib/league/api.js';
@@ -89,6 +90,8 @@ export default function ActivityPage() {
       {!error && data?.pullError && (
         <p className="rules-draft-error">ESPN did not answer the last check: {data.pullError}. This is the last good list.</p>
       )}
+
+      <LmAddPanel />
 
       <div className="activity-filters" role="group" aria-label="Show moves by team">
         <button type="button" className={owner === null ? 'activity-chip is-on' : 'activity-chip'} onClick={() => setOwner(null)}>

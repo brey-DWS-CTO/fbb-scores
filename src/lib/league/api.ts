@@ -59,6 +59,7 @@ import type {
 } from './schedule.js';
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 import type { LeagueTransaction } from './transactions.js';
+import type { EarlyDay, LmAddCheck, LmAddRequest, LmAddWindow, WaiverHour } from './lmWeekend.js';
 
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
@@ -1235,6 +1236,49 @@ export interface TransactionsResponse {
 export async function fetchTransactions(): Promise<TransactionsResponse> {
   const { data } = await axios.get<TransactionsResponse>('/api/league/transactions');
   return data;
+}
+
+// ─── Weekend LM adds ─────────────────────────────────────────────────────────
+
+export interface LmWeekendResponse {
+  season: number;
+  today: { date: string; games: number; waiver: WaiverHour; window: LmAddWindow };
+  earlyDays: EarlyDay[];
+  requests: LmAddRequest[];
+  /** Why writes to ESPN are down, or null. */
+  espnWriteTrouble: string | null;
+  dryRun: boolean;
+}
+
+/** Anyone may read today's waiver hour, the early days ahead and every request. */
+export async function fetchLmWeekend(): Promise<LmWeekendResponse> {
+  const { data } = await axios.get<LmWeekendResponse>('/api/league/lm-adds');
+  return data;
+}
+
+/** A member asks for a Saturday or Sunday LM add. A 400 carries the failed checks. */
+export async function requestLmAdd(c: Credentials, playerId: number): Promise<{ request: LmAddRequest; checks: LmAddCheck[] }> {
+  const { data } = await axios.post<{ request: LmAddRequest; checks: LmAddCheck[] }>('/api/league/lm-adds', { playerId }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function retryLmAdd(c: Credentials, id: string): Promise<LmAddRequest> {
+  const { data } = await axios.post<{ request: LmAddRequest }>(`/api/league/lm-adds/${encodeURIComponent(id)}/retry`, {}, { headers: authHeaders(c) });
+  return data.request;
+}
+
+export async function denyLmAdd(c: Credentials, id: string, note: string): Promise<LmAddRequest> {
+  const { data } = await axios.post<{ request: LmAddRequest }>(`/api/league/lm-adds/${encodeURIComponent(id)}/deny`, { note }, { headers: authHeaders(c) });
+  return data.request;
+}
+
+/** The failed checks a refused LM add came back with, if any. */
+export function lmAddChecksOf(error: unknown): LmAddCheck[] {
+  if (axios.isAxiosError(error)) {
+    const checks = (error.response?.data as { checks?: unknown } | undefined)?.checks;
+    if (Array.isArray(checks)) return checks as LmAddCheck[];
+  }
+  return [];
 }
 
 /** Anyone may read who has paid. */

@@ -311,6 +311,7 @@ import {
 } from '../lib/draftRankingService.js';
 import { getNbaWatch } from '../lib/nbaWatchService.js';
 import { transactionsFeed } from '../lib/transactionService.js';
+import { LmAddRefused, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from '../lib/lmWeekendService.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
@@ -4390,6 +4391,64 @@ router.get('/dues', async (_req, res, next) => {
 router.get('/transactions', async (_req, res, next) => {
   try {
     res.json(await transactionsFeed());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Weekend LM adds ─────────────────────────────────────────────────────────
+
+/** GET /api/league/lm-adds — today's waiver hour, the early days ahead, every request. Public. */
+router.get('/lm-adds', async (_req, res, next) => {
+  try {
+    res.json(await lmWeekendView());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds { playerId } — a member asks for a Saturday or Sunday LM add. */
+router.post('/lm-adds', requireAuth, async (req, res, next) => {
+  const playerId = Number((req.body as { playerId?: unknown } | undefined)?.playerId);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    res.status(400).json({ error: 'Pick a player first.' });
+    return;
+  }
+  try {
+    res.json(await requestLmAdd(res.locals.owner as string, playerId));
+  } catch (err) {
+    if (err instanceof LmAddRefused) {
+      res.status(400).json({ error: err.message, checks: err.checks });
+      return;
+    }
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds/:id/retry — the commissioner sends it to ESPN again. */
+router.post('/lm-adds/:id/retry', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const request = await retryLmAdd(routeParam(req.params.id), actor(res));
+    if (!request) {
+      res.status(404).json({ error: 'No such request.' });
+      return;
+    }
+    res.json({ request });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds/:id/deny { note } — the commissioner turns it down. */
+router.post('/lm-adds/:id/deny', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const note = String((req.body as { note?: unknown } | undefined)?.note ?? '').slice(0, 300);
+    const request = await denyLmAdd(routeParam(req.params.id), actor(res), note);
+    if (!request) {
+      res.status(404).json({ error: 'No such request.' });
+      return;
+    }
+    res.json({ request });
   } catch (err) {
     next(err);
   }
