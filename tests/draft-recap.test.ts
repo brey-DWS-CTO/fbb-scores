@@ -13,7 +13,6 @@ import {
   clubsOf,
   positionLeadersOf,
   positionTotalsOf,
-  tradePartners,
   ordinal,
   pickPlace,
   ageOn,
@@ -226,7 +225,7 @@ test('the CSV quotes commas and quotes', () => {
   assert.match(csv, /,12,0,Fair price\n$/);
 });
 
-test('clubs, positions and trade partners', () => {
+test('clubs and positions', () => {
   const teams = [
     { owner: 'A', positions: { PG: 6, SG: 3, SF: 3, PF: 3, C: 1 }, stacks: [{ club: 'UTA', players: ['x', 'y', 'z'] }] },
     { owner: 'B', positions: { PG: 2, SG: 3, SF: 3, PF: 3, C: 5 }, stacks: [] },
@@ -236,9 +235,6 @@ test('clubs, positions and trade partners', () => {
   assert.deepEqual(positionLeadersOf(teams).find((row) => row.position === 'SG'), { position: 'SG', count: 3, owners: ['A', 'B', 'C'] });
   assert.deepEqual(positionLeadersOf(teams).find((row) => row.position === 'C'), { position: 'C', count: 5, owners: ['B'] });
   assert.deepEqual(biggestStackOf(teams), { owner: 'A', club: 'UTA', players: ['x', 'y', 'z'] });
-  const [best, ...rest] = tradePartners(teams);
-  assert.deepEqual([best.a, best.b, best.aSpare, best.bSpare], ['A', 'B', ['PG'], ['C']]);
-  assert.equal(rest.length, 0);
   assert.deepEqual(clubsOf([{ key: 'a', proTeam: 'HOU' }, { key: 'b', proTeam: 'HOU' }, { key: 'c', proTeam: 'DAL' }, { key: null, proTeam: 'DAL' }]),
     [{ club: 'HOU', count: 2 }, { club: 'DAL', count: 1 }]);
 });

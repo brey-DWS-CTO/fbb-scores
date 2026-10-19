@@ -169,8 +169,6 @@ export interface DraftRecap {
   positionLeaders: PositionLeader[];
   /** The most players one team took from one NBA team. */
   biggestStack: { owner: string; club: string; players: string[] } | null;
-  /** Pairs where each team has extra of what the other is short of. */
-  partners: TradePartner[];
 }
 
 export interface ClubCount {
@@ -185,14 +183,6 @@ export interface PositionLeader {
   count: number;
 }
 
-export interface TradePartner {
-  a: string;
-  b: string;
-  /** Positions `a` has extra of and `b` is short of. */
-  aSpare: Position[];
-  bSpare: Position[];
-  fit: number;
-}
 
 export const GRADE_WEIGHTS = { projected: 0.45, ceiling: 0.15, floor: 0.15, pickValue: 0.15, bench: 0.1 } as const;
 
@@ -448,7 +438,6 @@ export function buildDraftRecap(input: RecapInput): DraftRecap {
     positionTotals: positionTotalsOf(teams),
     positionLeaders: positionLeadersOf(teams),
     biggestStack: biggestStackOf(teams),
-    partners: tradePartners(teams),
     bestKeeper: [...scoredPicks].filter((pick) => pick.keeper).sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.overall - b.overall)[0] ?? null,
   };
 }
@@ -504,7 +493,7 @@ export function pickPlace(pick: Pick<RecapPick, 'round' | 'slot'>): string {
   return `${pick.round}.${pick.slot}`;
 }
 
-// ─── Clubs, positions and trade partners ─────────────────────────────────────
+// ─── Clubs and positions ─────────────────────────────────────────────────────
 
 export const POSITION_ORDER: readonly Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
 
@@ -532,31 +521,6 @@ export function biggestStackOf(teams: readonly Pick<RecapTeam, 'owner' | 'stacks
   return all.sort((a, b) => b.players.length - a.players.length || a.owner.localeCompare(b.owner))[0] ?? null;
 }
 
-/**
- * Teams that fit as trade partners: each has more than the league's average
- * at a position where the other has less. A team a full player over average
- * has one to spare; a full player under is short. Best fits first.
- */
-export function tradePartners(teams: readonly Pick<RecapTeam, 'owner' | 'positions'>[], limit = 3): TradePartner[] {
-  const totals = positionTotalsOf(teams);
-  const mean = (position: Position) => totals[position] / (teams.length || 1);
-  const off = (team: Pick<RecapTeam, 'positions'>, position: Position) => team.positions[position] - mean(position);
-  const pairs: TradePartner[] = [];
-  for (let i = 0; i < teams.length; i += 1) {
-    for (let j = i + 1; j < teams.length; j += 1) {
-      const a = teams[i];
-      const b = teams[j];
-      const aSpare = POSITION_ORDER.filter((p) => off(a, p) >= 1 && off(b, p) <= -1);
-      const bSpare = POSITION_ORDER.filter((p) => off(b, p) >= 1 && off(a, p) <= -1);
-      if (aSpare.length === 0 || bSpare.length === 0) continue;
-      const fit = aSpare.reduce((sum, p) => sum + Math.min(off(a, p), -off(b, p)), 0)
-        + bSpare.reduce((sum, p) => sum + Math.min(off(b, p), -off(a, p)), 0);
-      pairs.push({ a: a.owner, b: b.owner, aSpare, bSpare, fit: Math.round(fit * 10) / 10 });
-    }
-  }
-  return pairs.sort((x, y) => y.fit - x.fit || x.a.localeCompare(y.a)).slice(0, limit);
-}
-
 /** Picks after his ADP he went: positive fell to you, negative was taken early. Null without an ADP. */
 export function adpGap(pick: Pick<RecapPick, 'overall' | 'adp'>): number | null {
   return pick.adp === null ? null : Math.round(pick.overall - pick.adp);
@@ -569,18 +533,6 @@ export function adpGapText(pick: Pick<RecapPick, 'overall' | 'adp'>): string {
   if (gap === 0) return 'Right where ESPN drafts take him';
   const count = Math.abs(gap);
   return `${count} pick${count === 1 ? '' : 's'} ${gap > 0 ? 'later' : 'earlier'} than ESPN drafts take him`;
-}
-
-/** One plain line on why a pick scored as it did. */
-export function pickReason(pick: RecapPick): string {
-  const parts: string[] = [];
-  if (pick.valueRank !== null) parts.push(`${ordinal(pick.valueRank)} in projected value`);
-  if (pick.adp !== null) parts.push(`ESPN drafts take him around ${ordinal(Math.round(pick.adp))} overall`);
-  const lines = [`${pick.keeper ? 'Kept at' : 'Taken at'} ${pickPlace(pick)}, ${ordinal(pick.overall)} overall.`];
-  if (parts.length > 0) lines.push(`${parts.join('; ')}.`);
-  if (pick.games !== null && pick.games < 60) lines.push(`Projected for ${pick.games} games.`);
-  const text = lines.join(' ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 // ─── The pick table ──────────────────────────────────────────────────────────

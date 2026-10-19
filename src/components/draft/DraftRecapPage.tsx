@@ -10,7 +10,6 @@ import {
   POSITION_ORDER,
   ordinal,
   pickPlace,
-  pickReason,
   recapCsv,
   recapPage,
   recapRows,
@@ -193,9 +192,13 @@ function PickBox({ pick, kind }: { pick: RecapPick | null; kind: 'best' | 'worst
   if (!pick) return null;
   return (
     <div className={`recap-pick recap-pick-${kind}`}>
-      <div className="recap-pick-label">{kind === 'best' ? 'BEST PICK' : 'WORST PICK'} · ROUND {pick.round}{pick.keeper ? ' KEEPER' : ''}</div>
+      <div className="recap-pick-label">{kind === 'best' ? 'BEST PICK' : 'WORST PICK'} · {pickPlace(pick)}</div>
       <strong>{pick.name}</strong>
-      <span>{pickReason(pick)}</span>
+      <div className="recap-pick-nums">
+        <span><b>{ordinal(pick.overall)}</b>taken</span>
+        <span><b>{pick.valueRank === null ? '–' : ordinal(pick.valueRank)}</b>value</span>
+        <span><b>{pick.adp === null ? '–' : ordinal(Math.round(pick.adp))}</b>ESPN</span>
+      </div>
     </div>
   );
 }
@@ -396,20 +399,6 @@ function Positions({ recap }: { recap: DraftRecap }) {
           <h3 className="recap-pick-label">POSITIONS DRAFTED</h3>
           <p className="recap-chart-note">A player who can play two spots counts at both.</p>
           <Bars rows={POSITION_ORDER.map((position) => ({ label: position, count: totals[position] }))} max={maxPos} tone="teal" />
-        </div>
-        <div className="panel recap-chart">
-          <h3 className="recap-pick-label">TRADE PARTNERS</h3>
-          <p className="recap-chart-note">Each team has extra of what the other is short of.</p>
-          {recap.partners.length === 0 ? <p className="recap-chart-note">No clean fits this year.</p> : (
-            <ul className="recap-partners">
-              {recap.partners.map((pair) => (
-                <li key={`${pair.a}-${pair.b}`}>
-                  <b>{pair.a} and {pair.b}</b>
-                  <span>{pair.a} has {pair.aSpare.map((p) => POSITION_WORDS[p]).join(' and ')} to spare. {pair.b} has {pair.bSpare.map((p) => POSITION_WORDS[p]).join(' and ')} to spare.</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       </div>
       <div className="panel recap-chart">

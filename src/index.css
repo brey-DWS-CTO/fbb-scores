@@ -5528,6 +5528,9 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .recap-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .recap-pick { border-radius: 8px; padding: 8px 10px; font-size: 0.75rem; line-height: 1.35; display: grid; gap: 2px; color: var(--text-soft); }
 .recap-pick strong { color: var(--text-max); font-size: 0.85rem; }
+.recap-pick-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+.recap-pick-nums span { display: grid; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+.recap-pick-nums b { font-size: 1.05rem; color: var(--text-max); letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .recap-pick-best { background: color-mix(in srgb, var(--neon-teal) 10%, var(--panel-bg)); }
 .recap-pick-best .recap-pick-label { color: var(--neon-teal); }
 .recap-pick-worst { background: color-mix(in srgb, var(--neon-red) 10%, var(--panel-bg)); }
@@ -5577,9 +5580,6 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 @media (min-width: 900px) {
   .recap-chart > .recap-bars:only-of-type { grid-template-columns: 1fr 1fr; column-gap: 28px; }
 }
-.recap-partners { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.recap-partners li { display: grid; gap: 2px; font-size: 0.8rem; color: var(--text-body); }
-.recap-partners b { color: var(--text-max); font-size: 0.95rem; }
 .recap-mix-wrap { overflow-x: auto; }
 .recap-mix { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 320px; font-variant-numeric: tabular-nums; }
 .recap-mix th { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.06em; color: var(--text-dim); text-align: center; padding: 4px; }
