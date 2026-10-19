@@ -497,6 +497,15 @@ export interface Rsvp {
 /** A game as a party keeps it: enough to show without the scoreboard. */
 export type PartyGame = Pick<NbaGame, 'id' | 'tipoff' | 'home' | 'away' | 'tv'>;
 
+/** Somebody in the party asked somebody else. Shown as a popup until answered or put off. */
+export interface Invite {
+  owner: string;
+  by: string;
+  at: string;
+  /** They tapped LATER: the popup stays down, the party stays open to them. */
+  seenAt: string | null;
+}
+
 export interface HouseParty {
   id: string;
   season: number;
@@ -509,6 +518,8 @@ export interface HouseParty {
   createdBy: string;
   createdAt: string;
   rsvps: Rsvp[];
+  /** Missing on parties from before invites existed. */
+  invites?: Invite[];
   cancelledAt: string | null;
 }
 
@@ -523,6 +534,7 @@ export type PartyProblem =
   | 'cancelled'
   | 'already-hosted'
   | 'bad-answer'
+  | 'not-in'
   | 'over';
 
 export const PARTY_PROBLEM_WORDS: Record<PartyProblem, string> = {
@@ -536,6 +548,7 @@ export const PARTY_PROBLEM_WORDS: Record<PartyProblem, string> = {
   cancelled: 'That party was called off.',
   'already-hosted': 'Somebody already has that one.',
   'bad-answer': 'Say in or out.',
+  'not-in': 'Join the party before you ask people to it.',
   over: 'That game is over.',
 };
 
@@ -709,6 +722,54 @@ export function partyHeadline(party: Pick<HouseParty, 'games' | 'host'>): string
   const where = party.host ? `${party.host} is hosting.` : 'Nobody has the house yet.';
   const undercard = party.games.length > 1 ? ` Plus ${party.games.length - 1} more game${party.games.length > 2 ? 's' : ''}.` : '';
   return `${matchupLabel(main)}, ${dayLabel(main.tipoff)}, ${tipLabel(main.tipoff)}. ${where}${undercard}`;
+}
+
+// ─── Invites ────────────────────────────────────────────────────────────────
+
+/**
+ * Ask people to a party. Anyone who is in may ask. People already in, or
+ * already asked, are left as they are; the rest get an invite each.
+ */
+export function inviteTo(party: HouseParty, by: string, owners: readonly string[], at: string): PartyCheck<HouseParty> {
+  if (party.cancelledAt) return { ok: false, problem: 'cancelled' };
+  if (!whoIsIn(party).includes(by)) return { ok: false, problem: 'not-in' };
+  const invites = [...(party.invites ?? [])];
+  for (const owner of new Set(owners)) {
+    if (owner === by || whoIsIn(party).includes(owner)) continue;
+    if (invites.some((invite) => invite.owner === owner)) continue;
+    invites.push({ owner, by, at, seenAt: null });
+  }
+  return { ok: true, value: { ...party, invites } };
+}
+
+/** LATER on the popup: the invite stays, the popup does not. */
+export function putOffInvite(party: HouseParty, owner: string, at: string): PartyCheck<HouseParty> {
+  const invites = (party.invites ?? []).map((invite) => (invite.owner === owner && !invite.seenAt ? { ...invite, seenAt: at } : invite));
+  return { ok: true, value: { ...party, invites } };
+}
+
+export interface PendingInvite {
+  party: HouseParty;
+  by: string;
+  at: string;
+}
+
+/** The invites to show one person: live parties they were asked to and have not answered or put off. */
+export function pendingInvites(parties: readonly HouseParty[], owner: string, now: Date): PendingInvite[] {
+  return liveParties(parties, now)
+    .flatMap((party) => {
+      const invite = (party.invites ?? []).find((row) => row.owner === owner);
+      if (!invite || invite.seenAt || answerOf(party, owner) !== null) return [];
+      return [{ party, by: invite.by, at: invite.at }];
+    })
+    .sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** Who could still be asked: not in, not asked, not the asker. */
+export function invitable(party: Pick<HouseParty, 'rsvps' | 'invites'>, owners: readonly string[], by: string): string[] {
+  const inAlready = new Set(whoIsIn(party));
+  const asked = new Set((party.invites ?? []).map((invite) => invite.owner));
+  return owners.filter((owner) => owner !== by && !inAlready.has(owner) && !asked.has(owner));
 }
 
 // ─── The tally ──────────────────────────────────────────────────────────────

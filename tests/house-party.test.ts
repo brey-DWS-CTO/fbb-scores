@@ -11,6 +11,8 @@ import {
   fansOf,
   gameDay,
   guestStakes,
+  invitable,
+  inviteTo,
   lastName,
   liveParties,
   MAX_PARTY_NOTE,
@@ -22,6 +24,8 @@ import {
   partyId,
   partyOver,
   partyTally,
+  pendingInvites,
+  putOffInvite,
   rankGames,
   rivalryIn,
   rsvp,
@@ -355,4 +359,34 @@ test('logo files use ESPN\'s own short codes where the three-letter one is missi
   assert.match(teamLogoUrl('NOP'), /\/no\.png$/);
   assert.match(teamLogoUrl('UTA'), /\/utah\.png$/);
   assert.match(teamLogoUrl('GSW'), /\/gsw\.png$/);
+});
+
+// ─── Invites ────────────────────────────────────────────────────────────────
+
+test('anyone in the party can ask people; the asker, people in, and people already asked are skipped', () => {
+  const p = party();
+  const asked = inviteTo(p, 'Kyle', ['Dustin', 'Ryan', 'Kyle', 'Dustin'], AT);
+  assert.ok(asked.ok);
+  assert.deepEqual(asked.value.invites?.map((row) => [row.owner, row.by]), [['Dustin', 'Kyle'], ['Ryan', 'Kyle']]);
+  const again = inviteTo(asked.value, 'Kyle', ['Dustin', 'Amy'], '2026-10-19T19:00:00.000Z');
+  assert.ok(again.ok);
+  assert.deepEqual(again.value.invites?.map((row) => row.owner), ['Dustin', 'Ryan', 'Amy']);
+  assert.deepEqual(inviteTo(p, 'Ryan', ['Amy'], AT), { ok: false, problem: 'not-in' });
+  assert.deepEqual(inviteTo({ ...p, cancelledAt: AT }, 'Kyle', ['Amy'], AT), { ok: false, problem: 'cancelled' });
+  assert.deepEqual(invitable(again.value, ['Kyle', 'Dustin', 'Ryan', 'Amy', 'Joel'], 'Kyle'), ['Joel']);
+});
+
+test('an invite shows until it is answered or put off, and only while the party is live', () => {
+  const asked = inviteTo(party(), 'Kyle', ['Dustin'], AT);
+  assert.ok(asked.ok);
+  const now = new Date('2026-10-19T20:00:00.000Z');
+  assert.deepEqual(pendingInvites([asked.value], 'Dustin', now).map((row) => [row.party.id, row.by]), [['abc', 'Kyle']]);
+  assert.deepEqual(pendingInvites([asked.value], 'Ryan', now), []);
+  const answered = rsvp(asked.value, 'Dustin', 'out', AT);
+  assert.ok(answered.ok);
+  assert.deepEqual(pendingInvites([answered.value], 'Dustin', now), []);
+  const later = putOffInvite(asked.value, 'Dustin', AT);
+  assert.ok(later.ok);
+  assert.deepEqual(pendingInvites([later.value], 'Dustin', now), []);
+  assert.deepEqual(pendingInvites([asked.value], 'Dustin', new Date('2026-10-22T12:00:00.000Z')), [], 'the party is over');
 });
