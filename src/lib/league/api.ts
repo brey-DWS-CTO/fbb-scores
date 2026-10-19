@@ -58,6 +58,7 @@ import type {
   StoredScheduleSnapshot,
 } from './schedule.js';
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
+import type { FillLine } from './expertProjections.js';
 
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
@@ -920,6 +921,12 @@ export async function fetchExpertProjections(c: Credentials): Promise<ExpertProj
 export async function fetchProjectionEdits(c: Credentials): Promise<ProjectionEdit[]> {
   const { data } = await axios.get('/api/league/projection-edits', { headers: authHeaders(c) });
   return data.edits as ProjectionEdit[];
+}
+
+/** The commissioner's edits, which the draft recap grades with. */
+export async function fetchRecapEdits(c: Credentials): Promise<{ edits: ProjectionEdit[]; fills: FillLine[] }> {
+  const { data } = await axios.get('/api/league/draft-recap/edits', { headers: authHeaders(c) });
+  return { edits: data.edits as ProjectionEdit[], fills: (data.fills ?? []) as FillLine[] };
 }
 
 /** Save one player's edit. */

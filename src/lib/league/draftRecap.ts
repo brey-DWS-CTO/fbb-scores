@@ -59,6 +59,8 @@ export type Verdict = 'Steal' | 'Good value' | 'Fair price' | 'A bit early' | 'R
 export interface RecapPick {
   overall: number;
   round: number;
+  /** Place within the round, 1 to 10, snake order applied. */
+  slot: number;
   owner: string;
   originalOwner: string;
   /** Column on the board: the draft position of the team the pick started with. */
@@ -149,10 +151,47 @@ export interface DraftRecap {
   fastest: RecapTeam | null;
   slowest: RecapTeam | null;
   makeup: Superlative[];
+  /**
+   * Drafted picks only (a keeper was never on offer), by plain picks after
+   * or before ADP, so the list reads the way it sounds.
+   */
   steals: RecapPick[];
   reaches: RecapPick[];
+  /** After round one, the drafted pick nearest both his ADP and his value rank. */
+  spotOn: RecapPick | null;
   /** The keeper who beat his cost by the most. */
   bestKeeper: RecapPick | null;
+  /** Players drafted from each NBA team, most first. */
+  clubs: ClubCount[];
+  /** Players who can play each position, across every roster. */
+  positionTotals: Record<Position, number>;
+  /** The team with the most players at each position. */
+  positionLeaders: PositionLeader[];
+  /** The most players one team took from one NBA team. */
+  biggestStack: { owner: string; club: string; players: string[] } | null;
+  /** Pairs where each team has extra of what the other is short of. */
+  partners: TradePartner[];
+}
+
+export interface ClubCount {
+  club: string;
+  count: number;
+}
+
+export interface PositionLeader {
+  position: Position;
+  /** More than one on a tie. */
+  owners: string[];
+  count: number;
+}
+
+export interface TradePartner {
+  a: string;
+  b: string;
+  /** Positions `a` has extra of and `b` is short of. */
+  aSpare: Position[];
+  bSpare: Position[];
+  fit: number;
 }
 
 export const GRADE_WEIGHTS = { projected: 0.45, ceiling: 0.15, floor: 0.15, pickValue: 0.15, bench: 0.1 } as const;
@@ -230,6 +269,7 @@ export function buildDraftRecap(input: RecapInput): DraftRecap {
       pick: {
         overall: cell.pick.overall,
         round: cell.pick.round,
+        slot: cell.pick.slot,
         owner: cell.pick.currentOwner,
         originalOwner: cell.pick.originalOwner,
         column: columnOf.get(cell.pick.originalOwner) ?? cell.pick.slot,
@@ -328,8 +368,9 @@ export function buildDraftRecap(input: RecapInput): DraftRecap {
       rookies: mine.filter((pick) => pick.rookie).map((pick) => pick.name),
       positions,
       stacks: [...clubs.entries()].filter(([, names]) => names.length >= 3).map(([club, names]) => ({ club, players: names })),
-      best: [...scored].sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.overall - b.overall)[0] ?? null,
-      worst: [...scored].sort((a, b) => (a.score ?? 0) - (b.score ?? 0) || a.overall - b.overall)[0] ?? null,
+      // Keepers were never on offer, so a team's best and worst picks are drafted ones.
+      best: scored.filter((pick) => !pick.keeper).sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.overall - b.overall)[0] ?? null,
+      worst: scored.filter((pick) => !pick.keeper).sort((a, b) => (a.score ?? 0) - (b.score ?? 0) || a.overall - b.overall)[0] ?? null,
       averageSeconds: own.length > 0 ? Math.round(own.reduce((sum, pick) => sum + (pick.seconds ?? 0), 0) / own.length) : null,
       ownPicks: own.length,
       autoPicks: mine.filter((pick) => pick.auto).length,
@@ -375,6 +416,10 @@ export function buildDraftRecap(input: RecapInput): DraftRecap {
   const stamps = input.board.map((cell) => cell.selection?.timestamp).filter((stamp): stamp is string => !!stamp).map((stamp) => Date.parse(stamp)).filter(Number.isFinite);
   const humanTimes = picks.filter((pick) => !pick.keeper && !pick.auto && pick.seconds !== null).map((pick) => pick.seconds!);
   const scoredPicks = picks.filter((pick) => pick.score !== null && pick.key !== null);
+  const drafted = scoredPicks.filter((pick) => !pick.keeper);
+  const withAdp = drafted.filter((pick) => pick.adp !== null);
+  // How far a pick landed from the nearer-missed of his ADP and his value rank.
+  const missOf = (pick: RecapPick) => Math.max(Math.abs(adpGap(pick)!), Math.abs(pick.overall - (pick.valueRank ?? UNVALUED_RANK)));
 
   return {
     season: input.season,
@@ -393,45 +438,34 @@ export function buildDraftRecap(input: RecapInput): DraftRecap {
     fastest,
     slowest: slowest && slowest !== fastest ? slowest : null,
     makeup: makeupOf(teams, picks),
-    steals: [...scoredPicks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.overall - b.overall).slice(0, 5),
-    reaches: [...scoredPicks].sort((a, b) => (a.score ?? 0) - (b.score ?? 0) || a.overall - b.overall).slice(0, 5),
+    // A steal fell past ESPN's spot and the value math agrees; a reach is the mirror.
+    steals: withAdp.filter((pick) => adpGap(pick)! > 0 && (pick.score ?? 0) > 0).sort((a, b) => adpGap(b)! - adpGap(a)! || a.overall - b.overall).slice(0, 5),
+    reaches: withAdp.filter((pick) => adpGap(pick)! < 0 && (pick.score ?? 0) < 0).sort((a, b) => adpGap(a)! - adpGap(b)! || a.overall - b.overall).slice(0, 5),
+    // Round one is spot on by default, so it doesn't count.
+    spotOn: withAdp.filter((pick) => pick.round > 1)
+      .sort((a, b) => missOf(a) - missOf(b) || b.overall - a.overall)[0] ?? null,
+    clubs: clubsOf(picks),
+    positionTotals: positionTotalsOf(teams),
+    positionLeaders: positionLeadersOf(teams),
+    biggestStack: biggestStackOf(teams),
+    partners: tradePartners(teams),
     bestKeeper: [...scoredPicks].filter((pick) => pick.keeper).sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.overall - b.overall)[0] ?? null,
   };
 }
 
 function makeupOf(teams: readonly RecapTeam[], picks: readonly RecapPick[]): Superlative[] {
   const out: Superlative[] = [];
-  const aged = teams.filter((team) => team.averageAge !== null);
-  const oldest = [...aged].sort((a, b) => b.averageAge! - a.averageAge!)[0];
-  const youngest = [...aged].sort((a, b) => a.averageAge! - b.averageAge!)[0];
-  if (oldest) out.push({ label: 'Oldest roster', who: oldest.owner, detail: `Average age ${oldest.averageAge!.toFixed(1)}.` });
-  if (youngest && youngest !== oldest) out.push({ label: 'Youngest roster', who: youngest.owner, detail: `Average age ${youngest.averageAge!.toFixed(1)}.` });
   // Birth dates, not whole years, so two 19-year-olds still have a youngest.
   const withAge = picks.filter((pick) => pick.age !== null && pick.born !== null && pick.key);
   const oldMan = [...withAge].sort((a, b) => a.born!.localeCompare(b.born!) || a.overall - b.overall)[0];
   const kid = [...withAge].sort((a, b) => b.born!.localeCompare(a.born!) || a.overall - b.overall)[0];
-  if (oldMan) out.push({ label: 'Oldest player', who: oldMan.owner, detail: `${oldMan.name}, ${oldMan.age}, at pick ${oldMan.round}.${oldMan.overall}.` });
-  if (kid) out.push({ label: 'Youngest player', who: kid.owner, detail: `${kid.name}, ${kid.age}, at pick ${kid.round}.${kid.overall}.` });
+  if (oldMan) out.push({ label: 'Oldest player', who: oldMan.owner, detail: `${oldMan.name}, ${oldMan.age}, taken at ${pickPlace(oldMan)}.` });
+  if (kid) out.push({ label: 'Youngest player', who: kid.owner, detail: `${kid.name}, ${kid.age}, taken at ${pickPlace(kid)}.` });
   const rookieTeam = [...teams].sort((a, b) => b.rookies.length - a.rookies.length)[0];
   const rookieCount = picks.filter((pick) => pick.rookie).length;
   if (rookieTeam && rookieTeam.rookies.length > 0) {
     out.push({ label: 'Most rookies', who: rookieTeam.owner, detail: `${rookieTeam.rookies.join(', ')}. ${rookieCount} rookies went in all.` });
   }
-  for (const team of teams) {
-    for (const stack of team.stacks) {
-      out.push({ label: 'Team stack', who: team.owner, detail: `${stack.players.length} from ${stack.club}: ${stack.players.join(', ')}.` });
-    }
-  }
-  const clubs = new Map<string, number>();
-  for (const pick of picks) if (pick.key && pick.proTeam && pick.proTeam !== 'FA') clubs.set(pick.proTeam, (clubs.get(pick.proTeam) ?? 0) + 1);
-  const byCount = [...clubs.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  if (byCount.length > 1) {
-    const [topClub, topCount] = byCount[0];
-    const [lowClub, lowCount] = byCount[byCount.length - 1];
-    out.push({ label: 'Most drafted club', who: topClub, detail: `${topCount} players went in the draft. ${lowClub} had ${lowCount}.` });
-  }
-  const centers = [...teams].sort((a, b) => a.positions.C - b.positions.C)[0];
-  if (centers) out.push({ label: 'Fewest centers', who: centers.owner, detail: `${centers.positions.C} C-eligible player${centers.positions.C === 1 ? '' : 's'} on the roster.` });
   const caller = [...teams].sort((a, b) => b.clockCalls - a.clockCalls)[0];
   if (caller && caller.clockCalls > 0) out.push({ label: 'Most clocks called', who: caller.owner, detail: `${caller.clockCalls} of ${picks.filter((pick) => pick.clockCalledBy).length}.` });
   const robot = [...teams].sort((a, b) => b.autoPicks - a.autoPicks)[0];
@@ -453,25 +487,105 @@ export function numbersRoast(
   if (team.positions.C <= 1) lines.push(`Has ${team.positions.C === 1 ? 'one center' : 'no centers'}.`);
   if (team.rookies.length >= 2) lines.push(`Drafted ${team.rookies.length} rookies.`);
   if (team.clockCalls >= 3) lines.push(`Called the clock ${team.clockCalls} times.`);
-  if (team.worst && team.worst.verdict === 'Reach') lines.push(`Reached for ${team.worst.name} at ${team.worst.round}.${team.worst.overall}.`);
-  if (team.best && team.best.verdict === 'Steal') lines.push(`Stole ${team.best.name} at ${team.best.round}.${team.best.overall}.`);
+  if (team.worst && team.worst.verdict === 'Reach') lines.push(`Reached for ${team.worst.name} in round ${team.worst.round}.`);
+  if (team.best && team.best.verdict === 'Steal') lines.push(`Stole ${team.best.name} in round ${team.best.round}.`);
   return lines.slice(0, 3).join(' ') || 'Drafted a team. Nothing more to say yet.';
+}
+
+/** 1st, 2nd, 3rd, 11th, 22nd. */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+}
+
+/** Round, then the pick within it: 9.7 is round 9's seventh pick. */
+export function pickPlace(pick: Pick<RecapPick, 'round' | 'slot'>): string {
+  return `${pick.round}.${pick.slot}`;
+}
+
+// ─── Clubs, positions and trade partners ─────────────────────────────────────
+
+export const POSITION_ORDER: readonly Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+export function clubsOf(picks: readonly Pick<RecapPick, 'key' | 'proTeam'>[]): ClubCount[] {
+  const counts = new Map<string, number>();
+  for (const pick of picks) if (pick.key && pick.proTeam && pick.proTeam !== 'FA') counts.set(pick.proTeam, (counts.get(pick.proTeam) ?? 0) + 1);
+  return [...counts.entries()].map(([club, count]) => ({ club, count })).sort((a, b) => b.count - a.count || a.club.localeCompare(b.club));
+}
+
+export function positionTotalsOf(teams: readonly Pick<RecapTeam, 'positions'>[]): Record<Position, number> {
+  const totals = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 } as Record<Position, number>;
+  for (const team of teams) for (const position of POSITION_ORDER) totals[position] += team.positions[position];
+  return totals;
+}
+
+export function positionLeadersOf(teams: readonly Pick<RecapTeam, 'owner' | 'positions'>[]): PositionLeader[] {
+  return POSITION_ORDER.map((position) => {
+    const count = Math.max(0, ...teams.map((team) => team.positions[position]));
+    return { position, count, owners: teams.filter((team) => team.positions[position] === count).map((team) => team.owner) };
+  });
+}
+
+export function biggestStackOf(teams: readonly Pick<RecapTeam, 'owner' | 'stacks'>[]): DraftRecap['biggestStack'] {
+  const all = teams.flatMap((team) => team.stacks.map((stack) => ({ owner: team.owner, club: stack.club, players: stack.players })));
+  return all.sort((a, b) => b.players.length - a.players.length || a.owner.localeCompare(b.owner))[0] ?? null;
+}
+
+/**
+ * Teams that fit as trade partners: each has more than the league's average
+ * at a position where the other has less. A team a full player over average
+ * has one to spare; a full player under is short. Best fits first.
+ */
+export function tradePartners(teams: readonly Pick<RecapTeam, 'owner' | 'positions'>[], limit = 3): TradePartner[] {
+  const totals = positionTotalsOf(teams);
+  const mean = (position: Position) => totals[position] / (teams.length || 1);
+  const off = (team: Pick<RecapTeam, 'positions'>, position: Position) => team.positions[position] - mean(position);
+  const pairs: TradePartner[] = [];
+  for (let i = 0; i < teams.length; i += 1) {
+    for (let j = i + 1; j < teams.length; j += 1) {
+      const a = teams[i];
+      const b = teams[j];
+      const aSpare = POSITION_ORDER.filter((p) => off(a, p) >= 1 && off(b, p) <= -1);
+      const bSpare = POSITION_ORDER.filter((p) => off(b, p) >= 1 && off(a, p) <= -1);
+      if (aSpare.length === 0 || bSpare.length === 0) continue;
+      const fit = aSpare.reduce((sum, p) => sum + Math.min(off(a, p), -off(b, p)), 0)
+        + bSpare.reduce((sum, p) => sum + Math.min(off(b, p), -off(a, p)), 0);
+      pairs.push({ a: a.owner, b: b.owner, aSpare, bSpare, fit: Math.round(fit * 10) / 10 });
+    }
+  }
+  return pairs.sort((x, y) => y.fit - x.fit || x.a.localeCompare(y.a)).slice(0, limit);
+}
+
+/** Picks after his ADP he went: positive fell to you, negative was taken early. Null without an ADP. */
+export function adpGap(pick: Pick<RecapPick, 'overall' | 'adp'>): number | null {
+  return pick.adp === null ? null : Math.round(pick.overall - pick.adp);
+}
+
+/** The ADP gap in words: "34 picks later than ESPN drafts take him". */
+export function adpGapText(pick: Pick<RecapPick, 'overall' | 'adp'>): string {
+  const gap = adpGap(pick);
+  if (gap === null) return 'ESPN drafts rarely take him';
+  if (gap === 0) return 'Right where ESPN drafts take him';
+  const count = Math.abs(gap);
+  return `${count} pick${count === 1 ? '' : 's'} ${gap > 0 ? 'later' : 'earlier'} than ESPN drafts take him`;
 }
 
 /** One plain line on why a pick scored as it did. */
 export function pickReason(pick: RecapPick): string {
   const parts: string[] = [];
-  if (pick.valueRank !== null) parts.push(`value rank ${pick.valueRank}`);
-  if (pick.adp !== null) parts.push(`ADP ${Math.round(pick.adp)}`);
-  if (pick.games !== null && pick.games < 60) parts.push(`${pick.games} projected games`);
-  const where = pick.keeper ? `kept at pick ${pick.overall}` : `taken at pick ${pick.overall}`;
-  const text = parts.length > 0 ? `${parts.join(', ')}, ${where}.` : `${where}.`;
+  if (pick.valueRank !== null) parts.push(`${ordinal(pick.valueRank)} in projected value`);
+  if (pick.adp !== null) parts.push(`ESPN drafts take him around ${ordinal(Math.round(pick.adp))} overall`);
+  const lines = [`${pick.keeper ? 'Kept at' : 'Taken at'} ${pickPlace(pick)}, ${ordinal(pick.overall)} overall.`];
+  if (parts.length > 0) lines.push(`${parts.join('; ')}.`);
+  if (pick.games !== null && pick.games < 60) lines.push(`Projected for ${pick.games} games.`);
+  const text = lines.join(' ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 // ─── The pick table ──────────────────────────────────────────────────────────
 
-export type RecapColumnId = 'overall' | 'owner' | 'name' | 'positions' | 'proTeam' | 'age' | 'fppg' | 'games' | 'valueRank' | 'adp' | 'seconds' | 'score' | 'verdict';
+export type RecapColumnId = 'place' | 'overall' | 'owner' | 'name' | 'positions' | 'proTeam' | 'age' | 'fppg' | 'games' | 'valueRank' | 'adp' | 'adpGap' | 'seconds' | 'score' | 'verdict';
 
 export interface RecapColumn {
   id: RecapColumnId;
@@ -480,7 +594,8 @@ export interface RecapColumn {
 }
 
 export const RECAP_COLUMNS: readonly RecapColumn[] = [
-  { id: 'overall', header: 'Pick', value: (pick) => pick.overall },
+  { id: 'place', header: 'Pick', value: (pick) => pickPlace(pick) },
+  { id: 'overall', header: 'Overall', value: (pick) => pick.overall },
   { id: 'owner', header: 'Team', value: (pick) => pick.owner },
   { id: 'name', header: 'Player', value: (pick) => pick.name },
   { id: 'positions', header: 'Pos', value: (pick) => pick.positions.join('/') },
@@ -489,9 +604,10 @@ export const RECAP_COLUMNS: readonly RecapColumn[] = [
   { id: 'fppg', header: 'FPPG', value: (pick) => pick.fppg },
   { id: 'games', header: 'Games', value: (pick) => pick.games },
   { id: 'valueRank', header: 'Value rank', value: (pick) => pick.valueRank },
-  { id: 'adp', header: 'ADP', value: (pick) => (pick.adp === null ? null : Math.round(pick.adp * 10) / 10) },
+  { id: 'adp', header: 'ESPN draft spot', value: (pick) => (pick.adp === null ? null : Math.round(pick.adp * 10) / 10) },
+  { id: 'adpGap', header: 'Picks later than ESPN', value: (pick) => (pick.keeper ? null : adpGap(pick)) },
   { id: 'seconds', header: 'Seconds', value: (pick) => pick.seconds },
-  { id: 'score', header: 'Score', value: (pick) => pick.score },
+  { id: 'score', header: 'Value score', value: (pick) => pick.score },
   { id: 'verdict', header: 'Verdict', value: (pick) => (pick.keeper ? `${pick.verdict} (keeper)` : pick.auto ? `${pick.verdict} (auto)` : pick.verdict) },
 ];
 
@@ -511,9 +627,10 @@ export function recapRows(picks: readonly RecapPick[], query: string, sort: Reca
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shown = picks.filter((pick) => pick.key !== null && words.every((word) =>
     RECAP_COLUMNS.some((column) => String(column.value(pick) ?? '').toLowerCase().includes(word))
-    || `${pick.round}.${pick.overall}`.includes(word)));
+    ));
   if (!sort) return shown;
-  const column = RECAP_COLUMNS.find((entry) => entry.id === sort.column)!;
+  // 10.1 sorts after 9.7, so the pick column sorts by overall.
+  const column = RECAP_COLUMNS.find((entry) => entry.id === (sort.column === 'place' ? 'overall' : sort.column))!;
   const sign = sort.dir === 'asc' ? 1 : -1;
   return [...shown].sort((a, b) => {
     const left = column.value(a);

@@ -7,6 +7,15 @@ import { buildDraftBoard } from '../src/lib/keeper/engine.ts';
 import { valueBoard } from '../src/lib/league/draftValue.ts';
 import { buildProjections } from '../src/lib/league/projections.ts';
 import {
+  adpGap,
+  adpGapText,
+  biggestStackOf,
+  clubsOf,
+  positionLeadersOf,
+  positionTotalsOf,
+  tradePartners,
+  ordinal,
+  pickPlace,
   ageOn,
   buildDraftRecap,
   gradeForComposite,
@@ -124,6 +133,19 @@ test('the clock numbers skip auto picks and count calls both ways', () => {
   const human = recap.picks.filter((pick) => !pick.auto).map((pick) => pick.seconds!);
   assert.equal(recap.headline.averageSeconds, Math.round(human.reduce((sum, value) => sum + value, 0) / human.length));
   assert.equal(recap.headline.lengthMinutes, 139);
+  assert.ok(recap.spotOn && recap.spotOn.round > 1 && !recap.spotOn.keeper);
+  const miss = (pick: RecapPick) => Math.max(Math.abs(adpGap(pick)!), Math.abs(pick.overall - pick.valueRank!));
+  assert.ok(recap.picks.filter((pick) => pick.round > 1 && !pick.keeper && pick.score !== null && pick.adp !== null)
+    .every((pick) => miss(pick) >= miss(recap.spotOn!)));
+  // Steals all went after their ADP, reaches all before, biggest first.
+  const gaps = recap.steals.map((pick) => adpGap(pick)!);
+  assert.ok(gaps.every((gap, i) => gap > 0 && (i === 0 || gaps[i - 1] >= gap)));
+  assert.ok(recap.reaches.every((pick) => adpGap(pick)! < 0));
+  // The value math has to agree with the ADP for a steal or a reach.
+  assert.ok(recap.steals.every((pick) => pick.score! > 0));
+  assert.ok(recap.reaches.every((pick) => pick.score! < 0));
+  // Cards name drafted picks, never keepers.
+  assert.ok(recap.teams.every((team) => !team.best?.keeper && !team.worst?.keeper));
   assert.ok(recap.makeup.some((row) => row.label === 'Most auto picks' && row.who === 'Kyle'));
 });
 
@@ -144,6 +166,9 @@ test('a keeper is measured against the pick he cost', () => {
   assert.equal(pick.verdict, 'Steal');
   assert.equal(recap.headline.keepers, 1);
   assert.equal(recap.bestKeeper?.overall, cell.pick.overall);
+  // A keeper was never on offer, so it never counts as a steal.
+  assert.ok(recap.steals.every((entry) => !entry.keeper));
+  assert.ok(recap.reaches.every((entry) => !entry.keeper));
 });
 
 test('ages and rookies come from the age file', () => {
@@ -194,11 +219,38 @@ test('the pick table searches every column, sorts with blanks last, and pages', 
 });
 
 test('the CSV quotes commas and quotes', () => {
-  const pick = { overall: 1, round: 1, owner: 'Joel', name: 'Smith, "Big" Jr.', positions: ['C'], proTeam: 'DEN', age: 30, born: null, fppg: 50, games: 70, valueRank: 1, adp: 1.04, seconds: 12, score: 0, verdict: 'Fair price', keeper: false, auto: false } as unknown as RecapPick;
+  const pick = { overall: 1, round: 1, slot: 1, owner: 'Joel', name: 'Smith, "Big" Jr.', positions: ['C'], proTeam: 'DEN', age: 30, born: null, fppg: 50, games: 70, valueRank: 1, adp: 1.04, seconds: 12, score: 0, verdict: 'Fair price', keeper: false, auto: false } as unknown as RecapPick;
   const csv = recapCsv([pick]);
-  assert.match(csv, /^Pick,Team,Player,/);
+  assert.match(csv, /^Pick,Overall,Team,Player,/);
   assert.match(csv, /"Smith, ""Big"" Jr\."/);
   assert.match(csv, /,12,0,Fair price\n$/);
+});
+
+test('clubs, positions and trade partners', () => {
+  const teams = [
+    { owner: 'A', positions: { PG: 6, SG: 3, SF: 3, PF: 3, C: 1 }, stacks: [{ club: 'UTA', players: ['x', 'y', 'z'] }] },
+    { owner: 'B', positions: { PG: 2, SG: 3, SF: 3, PF: 3, C: 5 }, stacks: [] },
+    { owner: 'C', positions: { PG: 4, SG: 3, SF: 3, PF: 3, C: 3 }, stacks: [] },
+  ];
+  assert.deepEqual(positionTotalsOf(teams), { PG: 12, SG: 9, SF: 9, PF: 9, C: 9 });
+  assert.deepEqual(positionLeadersOf(teams).find((row) => row.position === 'SG'), { position: 'SG', count: 3, owners: ['A', 'B', 'C'] });
+  assert.deepEqual(positionLeadersOf(teams).find((row) => row.position === 'C'), { position: 'C', count: 5, owners: ['B'] });
+  assert.deepEqual(biggestStackOf(teams), { owner: 'A', club: 'UTA', players: ['x', 'y', 'z'] });
+  const [best, ...rest] = tradePartners(teams);
+  assert.deepEqual([best.a, best.b, best.aSpare, best.bSpare], ['A', 'B', ['PG'], ['C']]);
+  assert.equal(rest.length, 0);
+  assert.deepEqual(clubsOf([{ key: 'a', proTeam: 'HOU' }, { key: 'b', proTeam: 'HOU' }, { key: 'c', proTeam: 'DAL' }, { key: null, proTeam: 'DAL' }]),
+    [{ club: 'HOU', count: 2 }, { club: 'DAL', count: 1 }]);
+});
+
+test('the ADP gap reads as plain words', () => {
+  assert.equal(adpGapText({ overall: 87, adp: 53.05 }), '34 picks later than ESPN drafts take him');
+  assert.equal(adpGapText({ overall: 37, adp: 68.8 }), '32 picks earlier than ESPN drafts take him');
+  assert.equal(adpGapText({ overall: 12, adp: 11.2 }), '1 pick later than ESPN drafts take him');
+  assert.equal(adpGapText({ overall: 12, adp: 12.3 }), 'Right where ESPN drafts take him');
+  assert.equal(adpGapText({ overall: 12, adp: null }), 'ESPN drafts rarely take him');
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101].map(ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '101st']);
+  assert.equal(pickPlace({ round: 9, slot: 7 }), '9.7');
 });
 
 test('a roast must name a league team and stay short', () => {

@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { buildDraftBoard } from '../../lib/keeper/engine.js';
 import {
   RECAP_COLUMNS,
   buildDraftRecap,
   nextRecapSort,
+  adpGapText,
+  POSITION_ORDER,
+  ordinal,
+  pickPlace,
   pickReason,
   recapCsv,
   recapPage,
@@ -21,12 +26,14 @@ import { valueBoard } from '../../lib/league/draftValue.js';
 import { buildProjections } from '../../lib/league/projections.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { teamNameOf } from '../../lib/league/teamNames.js';
-import { apiErrorMessage, saveRecapRoast } from '../../lib/league/api.js';
+import { apiErrorMessage, fetchRecapEdits, saveRecapRoast } from '../../lib/league/api.js';
+import { applyProjectionEdits, editsById } from '../../lib/league/projectionEdits.js';
+import { withFills } from '../../lib/league/expertProjections.js';
 import { useApplyStateResponse, useDraftData, useIdentity } from '../../hooks/useLeague.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
 import rawAges from '../../data/source/player-ages-2027.json' with { type: 'json' };
 import SignInPanel from '../league/SignInPanel.js';
-import NavIcon from '../league/NavIcon.js';
+import NavIcon, { type NavIconName } from '../league/NavIcon.js';
 
 const AGES = rawAges as Readonly<Record<string, PlayerAge>>;
 const PAGE_SIZES = [20, 50, 100] as const;
@@ -45,6 +52,11 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** The verdict short enough for a board cell. */
+const SHORT_VERDICT: Record<RecapPick['verdict'], string> = {
+  Steal: 'Steal', 'Good value': 'Value', 'Fair price': 'Fair', 'A bit early': 'Early', Reach: 'Reach', 'No numbers': '',
+};
+
 /** Green for a steal, amber for early, red for a reach. */
 function scoreClass(score: number | null): string {
   if (score === null) return '';
@@ -62,9 +74,22 @@ function scoreClass(score: number | null): string {
 export default function DraftRecapPage() {
   const { identity } = useIdentity();
   const { state, dataset } = useDraftData();
-  // ESPN's numbers with nobody's edits, so every member sees the same grades.
-  const { espn: snapshot, loading } = useProjectionData();
+  // ESPN's numbers with the commish's injury edits, the same for every member.
+  const { espn, loading: espnLoading } = useProjectionData();
   const isCommish = identity?.isCommissioner === true;
+  const editsQuery = useQuery({
+    queryKey: ['recap-edits', identity?.owner ?? 'anon'],
+    queryFn: () => fetchRecapEdits(identity as NonNullable<typeof identity>),
+    enabled: identity !== null,
+    staleTime: 60_000,
+  });
+  const snapshot = useMemo(
+    () => (espn && editsQuery.data
+      ? applyProjectionEdits(withFills(espn, editsQuery.data.fills), editsById(editsQuery.data.edits))
+      : null),
+    [espn, editsQuery.data],
+  );
+  const loading = espnLoading || editsQuery.isLoading;
 
   const recap = useMemo((): DraftRecap | null => {
     if (!snapshot) return null;
@@ -106,8 +131,17 @@ export default function DraftRecapPage() {
       )}
       {recap && (
         <>
+          <nav className="recap-jumps" aria-label="Jump to">
+            <a href="#recap-grades">GRADES</a>
+            <a href="#recap-positions">POSITIONS</a>
+            <a href="#recap-steals">STEALS</a>
+            <a href="#recap-board">BOARD</a>
+            <a href="#recap-table">EVERY PICK</a>
+          </nav>
           <Kpis recap={recap} />
           <Grades recap={recap} isCommish={isCommish} />
+          <Positions recap={recap} />
+          <Totals recap={recap} />
           <Makeup recap={recap} />
           <StealsAndReaches recap={recap} />
           <HeatBoard recap={recap} teams={dataset.teams.map((team) => ({ owner: team.owner, draftPosition: team.draftPosition }))} />
@@ -115,7 +149,7 @@ export default function DraftRecapPage() {
           <p className="recap-foot">
             Grades weigh projected points from the best ten starters (45%), a good-luck ceiling (15%), a bad-luck
             floor (15%), how each pick beat its slot (15%) and the bench (10%). Numbers are ESPN's projections in
-            our scoring, the same for everyone.
+            our scoring with the commish's injury calls (Hashtag's for anyone ESPN skips), the same for everyone.
           </p>
         </>
       )}
@@ -133,7 +167,7 @@ function Grades({ recap, isCommish }: { recap: DraftRecap; isCommish: boolean })
   const at = (value: number) => (hi > lo ? ((value - lo) / (hi - lo)) * 100 : 50);
   return (
     <section className="recap-section" aria-labelledby="recap-grades">
-      <h2 id="recap-grades" className="hub-heading recap-h2">THE GRADES</h2>
+      <h2 id="recap-grades" className="hub-heading recap-h2">GRADES AND WRITE-UPS</h2>
       <div className="panel recap-strip">
         {recap.teams.map((team) => (
           <div key={team.owner} className="recap-strip-row">
@@ -159,7 +193,7 @@ function PickBox({ pick, kind }: { pick: RecapPick | null; kind: 'best' | 'worst
   if (!pick) return null;
   return (
     <div className={`recap-pick recap-pick-${kind}`}>
-      <div className="recap-pick-label">{kind === 'best' ? 'BEST PICK' : 'WORST PICK'} · {pick.round}.{pick.overall}{pick.keeper ? ' KEEPER' : ''}</div>
+      <div className="recap-pick-label">{kind === 'best' ? 'BEST PICK' : 'WORST PICK'} · ROUND {pick.round}{pick.keeper ? ' KEEPER' : ''}</div>
       <strong>{pick.name}</strong>
       <span>{pickReason(pick)}</span>
     </div>
@@ -253,30 +287,168 @@ function TeamCard({ team, isCommish }: { team: RecapTeam; isCommish: boolean }) 
 
 interface Kpi {
   label: string;
+  icon: NavIconName;
   big: string;
-  small: string;
+  who: string;
+  stat: string;
   tone: 'teal' | 'red' | 'yellow' | 'blue' | 'purple';
 }
 
 function Kpis({ recap }: { recap: DraftRecap }) {
-  const { headline, fastest, slowest, bestKeeper } = recap;
-  const winner = recap.teams[0] ?? null;
+  const { fastest, slowest, bestKeeper, spotOn } = recap;
   const steal = recap.steals[0] ?? null;
   const reach = recap.reaches[0] ?? null;
   const aged = recap.teams.filter((team) => team.averageAge !== null);
   const oldest = [...aged].sort((a, b) => b.averageAge! - a.averageAge!)[0] ?? null;
   const youngest = [...aged].sort((a, b) => a.averageAge! - b.averageAge!)[0] ?? null;
-  const pickLine = (pick: RecapPick) => `to ${pick.owner} at ${pick.round}.${pick.overall} · ${pick.score === null ? '' : signed(pick.score)}`;
-  const kpis: Kpi[] = [
-    winner && { label: 'DRAFT WINNER', big: winner.owner, small: `Grade ${winner.grade} · ${fmt(winner.projected)} projected`, tone: 'teal' as const },
-    steal && { label: 'BIGGEST STEAL', big: steal.name, small: pickLine(steal), tone: 'teal' as const },
-    reach && { label: 'BIGGEST REACH', big: reach.name, small: pickLine(reach), tone: 'red' as const },
-    bestKeeper && { label: 'BEST KEEPER', big: bestKeeper.name, small: `${bestKeeper.owner} kept him at ${bestKeeper.round}.${bestKeeper.overall}`, tone: 'teal' as const },
-    fastest && { label: 'FASTEST DRAFTER', big: fastest.owner, small: `${clock(fastest.averageSeconds)} a pick`, tone: 'yellow' as const },
-    slowest && { label: 'SLOWEST DRAFTER', big: slowest.owner, small: `${clock(slowest.averageSeconds)} a pick`, tone: 'yellow' as const },
-    oldest && { label: 'OLDEST ROSTER', big: oldest.owner, small: `Average age ${oldest.averageAge!.toFixed(1)}`, tone: 'purple' as const },
-    youngest && youngest !== oldest && { label: 'YOUNGEST ROSTER', big: youngest.owner, small: `Average age ${youngest.averageAge!.toFixed(1)}`, tone: 'blue' as const },
-  ].filter((kpi): kpi is Kpi => Boolean(kpi));
+  const at = (pick: RecapPick) => `${pick.owner} · ${pickPlace(pick)}`;
+  const candidates: (Kpi | null | false)[] = [
+    steal && { label: 'BIGGEST STEAL', icon: 'star' as const, big: steal.name, who: at(steal), stat: adpGapText(steal), tone: 'teal' as const },
+    reach && { label: 'BIGGEST REACH', icon: 'warning' as const, big: reach.name, who: at(reach), stat: adpGapText(reach), tone: 'red' as const },
+    spotOn && { label: 'MOST SPOT-ON PICK', icon: 'target' as const, big: spotOn.name, who: at(spotOn), stat: `Taken ${ordinal(spotOn.overall)} overall. ESPN drafts: ${ordinal(Math.round(spotOn.adp ?? 0))}. Projections: ${ordinal(spotOn.valueRank ?? 0)}.`, tone: 'blue' as const },
+    bestKeeper && { label: 'BEST KEEPER', icon: 'lock' as const, big: bestKeeper.name, who: at(bestKeeper), stat: `${ordinal(bestKeeper.valueRank ?? 0)} in projected value, kept ${ordinal(bestKeeper.overall)} overall`, tone: 'teal' as const },
+    fastest && { label: 'FASTEST DRAFTER', icon: 'bolt' as const, big: fastest.owner, who: '', stat: `${clock(fastest.averageSeconds)} a pick`, tone: 'yellow' as const },
+    slowest && { label: 'SLOWEST DRAFTER', icon: 'clock' as const, big: slowest.owner, who: '', stat: `${clock(slowest.averageSeconds)} a pick`, tone: 'yellow' as const },
+    oldest && { label: 'OLDEST ROSTER', icon: 'wheelchair' as const, big: oldest.owner, who: 'Average age', stat: `${oldest.averageAge!.toFixed(1)} years`, tone: 'purple' as const },
+    youngest && youngest !== oldest && { label: 'YOUNGEST ROSTER', icon: 'sneaker' as const, big: youngest.owner, who: 'Average age', stat: `${youngest.averageAge!.toFixed(1)} years`, tone: 'blue' as const },
+  ];
+  const kpis = candidates.filter((kpi): kpi is Kpi => Boolean(kpi));
+  return (
+    <section className="recap-section" aria-label="The draft at a glance">
+      <KpiTiles kpis={kpis} />
+    </section>
+  );
+}
+
+function KpiTiles({ kpis }: { kpis: Kpi[] }) {
+  return (
+    <div className="recap-kpis">
+      {kpis.map((kpi) => (
+        <div key={kpi.label} className={`panel recap-kpi recap-kpi-${kpi.tone}`}>
+          <span className="recap-kpi-icon" aria-hidden="true"><NavIcon name={kpi.icon} size={22} /></span>
+          <span className="recap-kpi-label">{kpi.label}</span>
+          <b className="recap-kpi-big">{kpi.big}</b>
+          {kpi.who && <span className="recap-kpi-who">{kpi.who}</span>}
+          <span className="recap-kpi-stat">{kpi.stat}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const POSITION_ICONS: Record<string, NavIconName> = { PG: 'ball', SG: 'target', SF: 'swap', PF: 'shield', C: 'ruler' };
+const POSITION_TONES: Record<string, Kpi['tone']> = { PG: 'yellow', SG: 'blue', SF: 'purple', PF: 'red', C: 'teal' };
+
+function leaderTiles(recap: DraftRecap): Kpi[] {
+  const club = recap.clubs[0] ?? null;
+  const fewest = recap.clubs[recap.clubs.length - 1] ?? null;
+  const stack = recap.biggestStack;
+  const tiles: (Kpi | null)[] = [
+    club && { label: 'MOST DRAFTED NBA TEAM', icon: 'jersey', big: club.club, who: fewest ? `Fewest: ${fewest.club} with ${fewest.count}` : '', stat: `${club.count} players drafted`, tone: 'blue' },
+    stack && { label: 'BIGGEST TEAM STACK', icon: 'layers', big: stack.owner, who: stack.players.join(', '), stat: `${stack.players.length} from ${stack.club}`, tone: 'purple' },
+    ...recap.positionLeaders.map((row): Kpi => ({
+      label: `MOST ${POSITION_WORDS[row.position].toUpperCase()}`,
+      icon: POSITION_ICONS[row.position],
+      big: row.owners.join(' & '),
+      who: `Players who can play ${row.position}`,
+      stat: `${row.count} ${POSITION_WORDS[row.position]}`,
+      tone: POSITION_TONES[row.position],
+    })),
+  ];
+  return tiles.filter((tile): tile is Kpi => tile !== null);
+}
+
+const POSITION_WORDS: Record<string, string> = {
+  PG: 'point guards', SG: 'shooting guards', SF: 'small forwards', PF: 'power forwards', C: 'centers',
+};
+
+function Bars({ rows, max, tone }: { rows: { label: string; count: number; note?: string }[]; max: number; tone: string }) {
+  return (
+    <div className="recap-bars">
+      {rows.map((row) => (
+        <div key={row.label} className="recap-bar-row" title={`${row.label}: ${row.count}${row.note ? `. ${row.note}` : ''}`}>
+          <span className="recap-bar-label">{row.label}</span>
+          <span className="recap-bar-track"><span className={`recap-bar recap-bar-${tone}`} style={{ width: `${(row.count / (max || 1)) * 100}%` }} /></span>
+          <span className="recap-bar-value">{row.count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Positions({ recap }: { recap: DraftRecap }) {
+  const totals = recap.positionTotals;
+  const teams = [...recap.teams].sort((a, b) => a.owner.localeCompare(b.owner));
+  const mean = (position: (typeof POSITION_ORDER)[number]) => totals[position] / (recap.teams.length || 1);
+  const shade = (count: number, average: number) => {
+    const t = Math.max(-1, Math.min(1, (count - average) / 3));
+    const hue = t >= 0 ? 'var(--neon-teal)' : 'var(--neon-red)';
+    return `color-mix(in srgb, ${hue} ${Math.round(Math.abs(t) * 40)}%, var(--cell-bg))`;
+  };
+  const maxPos = Math.max(...POSITION_ORDER.map((position) => totals[position]));
+  const maxClub = recap.clubs[0]?.count ?? 1;
+  return (
+    <section className="recap-section" aria-labelledby="recap-positions">
+      <h2 id="recap-positions" className="hub-heading recap-h2">POSITIONS AND NBA TEAMS</h2>
+      <KpiTiles kpis={leaderTiles(recap)} />
+      <div className="recap-charts">
+        <div className="panel recap-chart">
+          <h3 className="recap-pick-label">POSITIONS DRAFTED</h3>
+          <p className="recap-chart-note">A player who can play two spots counts at both.</p>
+          <Bars rows={POSITION_ORDER.map((position) => ({ label: position, count: totals[position] }))} max={maxPos} tone="teal" />
+        </div>
+        <div className="panel recap-chart">
+          <h3 className="recap-pick-label">TRADE PARTNERS</h3>
+          <p className="recap-chart-note">Each team has extra of what the other is short of.</p>
+          {recap.partners.length === 0 ? <p className="recap-chart-note">No clean fits this year.</p> : (
+            <ul className="recap-partners">
+              {recap.partners.map((pair) => (
+                <li key={`${pair.a}-${pair.b}`}>
+                  <b>{pair.a} and {pair.b}</b>
+                  <span>{pair.a} has {pair.aSpare.map((p) => POSITION_WORDS[p]).join(' and ')} to spare. {pair.b} has {pair.bSpare.map((p) => POSITION_WORDS[p]).join(' and ')} to spare.</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+      <div className="panel recap-chart">
+        <h3 className="recap-pick-label">POSITIONS BY TEAM</h3>
+        <p className="recap-chart-note">Teal is more than the league average, red is fewer.</p>
+        <div className="recap-mix-wrap">
+          <table className="recap-mix">
+            <thead>
+              <tr><th>TEAM</th>{POSITION_ORDER.map((position) => <th key={position}>{position}</th>)}</tr>
+            </thead>
+            <tbody>
+              {teams.map((team) => (
+                <tr key={team.owner}>
+                  <th>{team.owner}</th>
+                  {POSITION_ORDER.map((position) => (
+                    <td key={position} style={{ background: shade(team.positions[position], mean(position)) }} title={`${team.owner}: ${team.positions[position]} ${POSITION_WORDS[position]}, league average ${mean(position).toFixed(1)}`}>
+                      {team.positions[position]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              <tr className="recap-mix-avg">
+                <th>Average</th>
+                {POSITION_ORDER.map((position) => <td key={position}>{mean(position).toFixed(1)}</td>)}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="panel recap-chart">
+        <h3 className="recap-pick-label">NBA TEAMS DRAFTED</h3>
+        <Bars rows={recap.clubs.map((row) => ({ label: row.club, count: row.count }))} max={maxClub} tone="blue" />
+      </div>
+    </section>
+  );
+}
+
+function Totals({ recap }: { recap: DraftRecap }) {
+  const { headline } = recap;
   const totals: [string, string][] = [
     [headline.lengthMinutes === null ? '–' : `${Math.floor(headline.lengthMinutes / 60)}h ${headline.lengthMinutes % 60}m`, 'draft length'],
     [clock(headline.averageSeconds), 'average pick'],
@@ -286,16 +458,8 @@ function Kpis({ recap }: { recap: DraftRecap }) {
     [String(headline.tradedPicks), 'picks traded'],
   ];
   return (
-    <section className="recap-section" aria-label="The draft at a glance">
-      <div className="recap-kpis">
-        {kpis.map((kpi) => (
-          <div key={kpi.label} className={`panel recap-kpi recap-kpi-${kpi.tone}`}>
-            <span className="recap-kpi-label">{kpi.label}</span>
-            <b className="recap-kpi-big">{kpi.big}</b>
-            <span className="recap-kpi-small">{kpi.small}</span>
-          </div>
-        ))}
-      </div>
+    <section className="recap-section" aria-labelledby="recap-totals">
+      <h2 id="recap-totals" className="hub-heading recap-h2">THE DRAFT IN NUMBERS</h2>
       <div className="panel recap-totals">
         {totals.map(([value, label]) => (
           <div key={label}><b>{value}</b><span>{label}</span></div>
@@ -325,15 +489,15 @@ function Makeup({ recap }: { recap: DraftRecap }) {
   );
 }
 
-function PickList({ title, picks }: { title: string; picks: RecapPick[] }) {
+function PickList({ title, picks, tone }: { title: string; picks: RecapPick[]; tone: string }) {
   return (
     <div className="panel recap-list">
       <h3 className="recap-pick-label">{title}</h3>
       <ol>
         {picks.map((pick) => (
           <li key={pick.overall}>
-            <span className={`recap-list-score ${scoreClass(pick.score)}`}>{pick.score === null ? '–' : signed(pick.score)}</span>
-            <span><strong>{pick.name}</strong> to {pick.owner} at {pick.round}.{pick.overall}{pick.keeper ? ' (keeper)' : ''}</span>
+            <span><strong>{pick.name}</strong> · {pick.owner}, {pickPlace(pick)}</span>
+            <span className={`recap-list-gap ${tone}`}>{adpGapText(pick)}</span>
           </li>
         ))}
       </ol>
@@ -346,8 +510,8 @@ function StealsAndReaches({ recap }: { recap: DraftRecap }) {
     <section className="recap-section" aria-labelledby="recap-steals">
       <h2 id="recap-steals" className="hub-heading recap-h2">STEALS AND REACHES</h2>
       <div className="recap-lists">
-        <PickList title="BIGGEST STEALS" picks={recap.steals} />
-        <PickList title="BIGGEST REACHES" picks={recap.reaches} />
+        <PickList title="BIGGEST STEALS" picks={recap.steals} tone="proj-good" />
+        <PickList title="BIGGEST REACHES" picks={recap.reaches} tone="proj-bad" />
       </div>
     </section>
   );
@@ -403,7 +567,7 @@ function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string
             ...columns.map((team) => {
               const pick = at.get(`${round}:${team.draftPosition}`);
               if (!pick || !pick.key) return <div key={`${round}-${team.owner}`} className="recap-board-cell is-empty" />;
-              const right = mode === 'age' ? (pick.age === null ? '' : String(pick.age)) : pick.score === null ? '' : signed(pick.score);
+              const right = mode === 'age' ? (pick.age === null ? '' : `age ${pick.age}`) : SHORT_VERDICT[pick.verdict];
               return (
                 <button
                   key={`${round}-${team.owner}`}
@@ -411,12 +575,12 @@ function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string
                   className={`recap-board-cell${focus === pick.owner ? ' is-on' : ''}${picked?.overall === pick.overall ? ' is-picked' : ''}`}
                   style={{ background: heat(pick, mode) }}
                   onClick={() => setPicked(pick)}
-                  aria-label={`Pick ${pick.round}.${pick.overall}, ${pick.name}, ${pick.owner}`}
+                  aria-label={`${pick.name}, ${pick.owner}, ${pickPlace(pick)}`}
                 >
                   {(pick.keeper || pick.auto) && <span className="recap-board-tag">{pick.keeper ? 'K' : 'A'}</span>}
                   <span className="recap-board-name">{pick.shortName}</span>
                   {pick.owner !== pick.originalOwner && <span className="recap-board-via">to {pick.owner}</span>}
-                  <span className="recap-board-meta"><span>{pick.round}.{pick.overall}</span><span>{right}</span></span>
+                  <span className="recap-board-meta"><span>{pickPlace(pick)}</span><span>{right}</span></span>
                 </button>
               );
             }),
@@ -426,7 +590,7 @@ function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string
       <div className="panel recap-detail" aria-live="polite">
         {picked ? (
           <>
-            <strong>{picked.name}</strong> to {picked.owner} at {picked.round}.{picked.overall}
+            <strong>{picked.name}</strong> to {picked.owner}, {pickPlace(picked)}
             {picked.keeper ? ', keeper' : picked.auto ? ', auto pick' : picked.seconds !== null ? `, ${clock(picked.seconds)} on the clock` : ''}
             {picked.clockCalledBy ? `, clock called by ${picked.clockCalledBy}` : ''}.
             <div className="recap-detail-row">
@@ -434,12 +598,13 @@ function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string
               <span>Age {picked.age ?? '–'}{picked.rookie ? ', rookie' : ''}</span>
               <span>{picked.fppg ?? '–'} pts a game</span>
               <span>{picked.games ?? '–'} games</span>
-              <span>Value rank {picked.valueRank ?? '–'}</span>
-              <span>ADP {picked.adp === null ? '–' : Math.round(picked.adp)}</span>
-              <span className={scoreClass(picked.score)}>{picked.verdict}{picked.score !== null ? ` ${signed(picked.score)}` : ''}</span>
+              <span>{picked.valueRank === null ? 'No projection' : `${ordinal(picked.valueRank)} in projected value`}</span>
+              <span>{ordinal(picked.overall)} overall</span>
+              <span>{picked.adp === null ? 'ESPN drafts rarely take him' : `ESPN drafts take him around ${ordinal(Math.round(picked.adp))}`}</span>
+              <span className={scoreClass(picked.score)}>{picked.verdict}: {adpGapText(picked).toLowerCase()}</span>
             </div>
           </>
-        ) : 'Tap a pick to see its numbers. K is a keeper, A an auto pick.'}
+        ) : 'Tap a pick to see its numbers. 9.7 means round 9, seventh pick. K is a keeper, A an auto pick.'}
       </div>
     </section>
   );
@@ -546,11 +711,11 @@ function PickTable({ recap }: { recap: DraftRecap }) {
                 </td>
                 {RECAP_COLUMNS.map((column) => {
                   const value = column.value(pick);
-                  const text = column.id === 'overall' ? `${pick.round}.${pick.overall}`
-                    : column.id === 'score' ? (pick.score === null ? '–' : signed(pick.score))
+                  const text = column.id === 'score' ? (pick.score === null ? '–' : signed(pick.score))
+                    : column.id === 'adpGap' ? (value === null ? '–' : `${Number(value) > 0 ? '+' : ''}${value}`)
                     : column.id === 'seconds' ? clock(pick.seconds)
                     : value === null ? '–' : String(value);
-                  const tone = column.id === 'score' || column.id === 'verdict' ? scoreClass(pick.score) : '';
+                  const tone = column.id === 'score' || column.id === 'verdict' || column.id === 'adpGap' ? scoreClass(pick.score) : '';
                   return <td key={column.id} className={`proj-col-${column.id}${tone ? ` ${tone}` : ''}`}>{text}</td>;
                 })}
               </tr>

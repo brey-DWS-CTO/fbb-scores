@@ -5537,7 +5537,8 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .recap-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border-top: 1px solid var(--panel-border); padding-top: 8px; font-size: 0.65rem; color: var(--text-dim); }
 .recap-mini b { display: block; color: var(--text-hi); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 
-.recap-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.recap-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 1100px) { .recap-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .recap-kpi {
   --kpi: var(--neon-teal);
   border-radius: 12px; padding: 14px 16px 14px 18px; display: grid; gap: 4px; align-content: start;
@@ -5549,9 +5550,48 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .recap-kpi-yellow { --kpi: var(--neon-yellow); }
 .recap-kpi-blue { --kpi: var(--neon-blue); }
 .recap-kpi-purple { --kpi: var(--neon-purple); }
-.recap-kpi-label { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.1em; color: var(--kpi); }
-.recap-kpi-big { font-size: 1.55rem; font-weight: 900; line-height: 1.1; color: var(--text-max); overflow-wrap: anywhere; }
-.recap-kpi-small { font-size: 0.8rem; color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.recap-kpi { position: relative; padding-right: 52px; }
+.recap-kpi-icon {
+  position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--kpi); background: color-mix(in srgb, var(--kpi) 16%, transparent);
+}
+.recap-kpi-label { font-size: 0.66rem; font-weight: 900; letter-spacing: 0.1em; color: var(--kpi); }
+.recap-kpi-big { font-size: 1.5rem; font-weight: 900; line-height: 1.1; color: var(--text-max); overflow-wrap: anywhere; }
+.recap-kpi-who { font-size: 0.8rem; color: var(--text-soft); }
+.recap-kpi-stat {
+  justify-self: start; margin-top: 4px; font-size: 0.85rem; font-weight: 800; color: var(--text-max);
+  background: color-mix(in srgb, var(--kpi) 18%, transparent); border-radius: 6px; padding: 3px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.recap-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.recap-chart { border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.recap-chart-note { margin: 0; font-size: 0.75rem; color: var(--text-mid); }
+.recap-bars { display: grid; gap: 5px; }
+.recap-bar-row { display: grid; grid-template-columns: 44px 1fr 28px; align-items: center; gap: 8px; font-size: 0.78rem; }
+.recap-bar-label { color: var(--text-hi); font-weight: 800; }
+.recap-bar-track { height: 14px; background: var(--cell-bg); border-radius: 4px; overflow: hidden; }
+.recap-bar { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.recap-bar-teal { background: var(--neon-teal); }
+.recap-bar-blue { background: var(--neon-blue); }
+.recap-bar-value { text-align: right; color: var(--text-body); font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) {
+  .recap-chart > .recap-bars:only-of-type { grid-template-columns: 1fr 1fr; column-gap: 28px; }
+}
+.recap-partners { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.recap-partners li { display: grid; gap: 2px; font-size: 0.8rem; color: var(--text-body); }
+.recap-partners b { color: var(--text-max); font-size: 0.95rem; }
+.recap-mix-wrap { overflow-x: auto; }
+.recap-mix { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 320px; font-variant-numeric: tabular-nums; }
+.recap-mix th { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.06em; color: var(--text-dim); text-align: center; padding: 4px; }
+.recap-mix tbody th { text-align: left; color: var(--text-hi); font-size: 0.8rem; letter-spacing: 0; }
+.recap-mix td { text-align: center; font-weight: 800; color: var(--text-max); border-radius: 4px; padding: 6px 4px; font-size: 0.85rem; }
+.recap-mix-avg th, .recap-mix-avg td { color: var(--text-mid); font-weight: 700; background: transparent !important; }
+.recap-jumps { display: flex; flex-wrap: wrap; gap: 6px; }
+.recap-jumps a {
+  font-size: 0.65rem; font-weight: 900; letter-spacing: 0.08em; color: var(--neon-teal); text-decoration: none;
+  border: 1px solid var(--panel-border); border-radius: 999px; padding: 6px 12px; min-height: 32px; display: inline-flex; align-items: center;
+}
+.recap-h2 { scroll-margin-top: 72px; }
 .recap-totals { border-radius: 10px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 26px; }
 .recap-totals div { display: grid; }
 .recap-totals b { font-size: 1.15rem; font-weight: 900; color: var(--text-max); font-variant-numeric: tabular-nums; }
@@ -5565,9 +5605,9 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .recap-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
 .recap-list { border-radius: 10px; padding: 12px 14px; }
 .recap-list ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
-.recap-list li { display: grid; grid-template-columns: 46px 1fr; gap: 8px; font-size: 0.8rem; color: var(--text-body); align-items: baseline; }
+.recap-list li { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 0.8rem; color: var(--text-body); align-items: baseline; }
 .recap-list strong { color: var(--text-max); }
-.recap-list-score { font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.recap-list-gap { font-weight: 800; text-align: right; font-size: 0.75rem; white-space: nowrap; }
 
 .recap-board-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .recap-legend { font-size: 0.75rem; color: var(--text-mid); }
@@ -5610,10 +5650,13 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   letter-spacing: 0.06em; text-decoration: none;
 }
 @media (max-width: 560px) {
-  .recap-kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .recap-kpis { gap: 8px; }
   .recap-kpi { padding: 10px 10px 10px 13px; }
   .recap-kpi-big { font-size: 1.05rem; }
-  .recap-kpi-small { font-size: 0.7rem; }
+  .recap-kpi { padding-right: 10px; }
+  .recap-kpi-icon { position: static; width: 28px; height: 28px; }
+  .recap-kpi-who { font-size: 0.7rem; }
+  .recap-kpi-stat { font-size: 0.72rem; padding: 2px 6px; }
   .recap-cards { grid-template-columns: 1fr; }
   .recap-picks { grid-template-columns: 1fr; }
   .recap-strip-row { grid-template-columns: 26px 64px 1fr 52px; gap: 6px; }

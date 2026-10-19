@@ -86,3 +86,13 @@ test('members see the roasts only once the draft closes', async () => {
   await store.mutateState((draft) => { draft.draft.closedAt = '2026-10-18T23:00:00.000Z'; });
   assert.deepEqual((await recapSeenBy('Joel'))?.roasts, { Joel: 'Took Jokic.' });
 });
+
+test("the commish's projection edits reach members only once the draft closes", async () => {
+  const edits = (owner: string) => request('/api/league/draft-recap/edits', { headers: auth(owner) });
+  assert.equal((await edits('Joel')).status, 403);
+  assert.equal((await edits('Brey')).status, 200);
+  await store.mutateState((draft) => { draft.draft.closedAt = '2026-10-18T23:00:00.000Z'; });
+  const open = await edits('Joel');
+  assert.equal(open.status, 200);
+  assert.ok(Array.isArray(open.body.edits));
+});
