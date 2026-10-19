@@ -10,6 +10,7 @@ import {
 } from '../league/draftRankings.js';
 import type { EspnPlayerPoolPlayer } from '../league/playerPool.js';
 import type { EspnTeamName } from '../league/teamNames.js';
+import type { EspnTransactionsResponse } from '../league/transactions.js';
 import { NBA_TEAM_ABBREV } from './calculations.js';
 
 const ESPN_BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba';
@@ -366,6 +367,42 @@ export class EspnClient {
     }
     if (teams.length === 0) throw new Error('ESPN returned no teams');
     return teams;
+  }
+
+  /**
+   * Every move this season: adds, drops, waiver claims, trades. Raw, as ESPN
+   * sends it; `normalizeTransactions` in src/lib/league/transactions.ts reads it.
+   */
+  async fetchTransactions(): Promise<EspnTransactionsResponse> {
+    const { data } = await this.http.get<EspnTransactionsResponse>('', {
+      params: { view: 'mTransactions2', _: Date.now() },
+      paramsSerializer: { indexes: null },
+    });
+    return data;
+  }
+
+  /**
+   * Names and NBA teams for a few player ids, for players the pool snapshot
+   * does not know yet. One request, no paging.
+   */
+  async fetchPlayerNames(ids: readonly number[]): Promise<Map<number, { name: string; proTeam: string }>> {
+    const found = new Map<number, { name: string; proTeam: string }>();
+    const wanted = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 200);
+    if (wanted.length === 0) return found;
+    const { data } = await this.http.get<EspnKonaResponse>('', {
+      params: { view: 'kona_player_info', _: Date.now() },
+      headers: {
+        'x-fantasy-filter': JSON.stringify({ players: { filterIds: { value: wanted }, limit: wanted.length } }),
+      },
+    });
+    for (const entry of data.players ?? []) {
+      const raw = entry.player ?? entry;
+      const id = raw.id ?? entry.id;
+      const name = raw.fullName?.trim();
+      if (!Number.isInteger(id) || !name) continue;
+      found.set(id as number, { name, proTeam: NBA_TEAM_ABBREV[raw.proTeamId ?? 0] ?? '' });
+    }
+    return found;
   }
 
   /**

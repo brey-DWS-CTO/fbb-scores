@@ -58,6 +58,7 @@ import type {
   StoredScheduleSnapshot,
 } from './schedule.js';
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
+import type { LeagueTransaction } from './transactions.js';
 
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
@@ -1217,6 +1218,23 @@ export interface DuesResponse extends DuesBoard {
   venmo: string;
   /** The owner who collects. Empty until a commissioner sets it. */
   payee: string;
+}
+
+// ─── Moves ───────────────────────────────────────────────────────────────────
+
+export interface TransactionsResponse {
+  season: number;
+  rows: LeagueTransaction[];
+  /** When ESPN was last asked, ISO, or null before the first pull. */
+  pulledAt: string | null;
+  /** Why the last pull failed, or null. The rows are the last good ones. */
+  pullError: string | null;
+}
+
+/** Anyone may read the season's adds, drops, claims and trades. */
+export async function fetchTransactions(): Promise<TransactionsResponse> {
+  const { data } = await axios.get<TransactionsResponse>('/api/league/transactions');
+  return data;
 }
 
 /** Anyone may read who has paid. */

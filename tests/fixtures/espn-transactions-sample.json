@@ -1,0 +1,93 @@
+{
+  "_note": "Hand-written from the mTransactions2 shape, not a capture. Replace with a real pull once the season has moves in it.",
+  "transactions": [
+    {
+      "id": "aaa-1",
+      "type": "FREEAGENT",
+      "status": "EXECUTED",
+      "teamId": 3,
+      "scoringPeriodId": 5,
+      "processDate": 1761600000000,
+      "isLeagueManager": false,
+      "items": [
+        { "playerId": 4001, "type": "ADD", "fromTeamId": 0, "toTeamId": 3 },
+        { "playerId": 4002, "type": "DROP", "fromTeamId": 3, "toTeamId": 0 }
+      ]
+    },
+    {
+      "id": "bbb-2",
+      "type": "WAIVER",
+      "status": "EXECUTED",
+      "teamId": 5,
+      "bidAmount": 12,
+      "scoringPeriodId": 6,
+      "processDate": 1761686400000,
+      "items": [
+        { "playerId": 4003, "type": "ADD", "fromTeamId": -1, "toTeamId": 5 }
+      ]
+    },
+    {
+      "id": "ccc-3",
+      "type": "WAIVER",
+      "status": "FAILED_INVALIDPLAYERSOURCE",
+      "teamId": 7,
+      "bidAmount": 3,
+      "proposedDate": 1761686400000,
+      "items": [
+        { "playerId": 4003, "type": "ADD", "fromTeamId": -1, "toTeamId": 7 }
+      ]
+    },
+    {
+      "id": "ddd-4",
+      "type": "TRADE_ACCEPT",
+      "status": "EXECUTED",
+      "teamId": 3,
+      "scoringPeriodId": 7,
+      "processDate": 1761772800000,
+      "items": [
+        { "playerId": 4004, "type": "ADD", "fromTeamId": 3, "toTeamId": 5 },
+        { "playerId": 4005, "type": "ADD", "fromTeamId": 5, "toTeamId": 3 },
+        { "playerId": 4006, "type": "ADD", "fromTeamId": 5, "toTeamId": 3 }
+      ]
+    },
+    {
+      "id": "eee-5",
+      "type": "ROSTER",
+      "status": "EXECUTED",
+      "teamId": 3,
+      "scoringPeriodId": 7,
+      "processDate": 1761772900000,
+      "items": [
+        { "playerId": 4005, "type": "LINEUP", "fromLineupSlotId": 12, "toLineupSlotId": 0 }
+      ]
+    },
+    {
+      "id": "fff-6",
+      "type": "FREEAGENT",
+      "status": "EXECUTED",
+      "teamId": 9,
+      "scoringPeriodId": 8,
+      "processDate": 1761859200000,
+      "isLeagueManager": true,
+      "items": [
+        { "playerId": 9999999, "type": "ADD", "fromTeamId": 0, "toTeamId": 9 }
+      ]
+    },
+    {
+      "id": "ggg-7",
+      "type": "FREEAGENT",
+      "status": "EXECUTED",
+      "teamId": 3,
+      "items": [
+        { "playerId": 4007, "type": "DROP", "fromTeamId": 3, "toTeamId": 0 }
+      ]
+    },
+    {
+      "type": "FREEAGENT",
+      "status": "EXECUTED",
+      "teamId": 42,
+      "processDate": 1761859200000,
+      "items": [{ "playerId": 4008, "type": "ADD", "toTeamId": 42 }]
+    }
+  ]
+}
