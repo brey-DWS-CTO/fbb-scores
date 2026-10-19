@@ -71,6 +71,12 @@ export interface ScorePlayer {
   injuryStatus: string | null;
   /** ESPN's current-season fantasy points a game. Null until he has played. */
   seasonAvg: number | null;
+  /** Fantasy points a game over ESPN's last 7, 15 and 30 days. Null until he has played in the window. */
+  last7: number | null;
+  last15: number | null;
+  last30: number | null;
+  /** ESPN's own projection for a day, in league points, by scoring period id. Empty when ESPN sends none. */
+  projByDay: Record<string, number>;
   /** By scoring period id. */
   days: Record<string, PlayerDay>;
 }
@@ -571,11 +577,15 @@ function dayStatRow(poolEntry: Dict, player: Dict, scoringPeriodId: number): Dic
   return null;
 }
 
-/** ESPN's season-to-date fantasy points a game, from a split-0 totals row. */
-function seasonAverage(player: Dict, season: number, items: ScoringItem[]): number | null {
+/**
+ * ESPN's fantasy points a game from a totals row of one split: 0 is the
+ * season, 1 the last 7 days, 2 the last 15, 3 the last 30. Null until he
+ * has played in the window.
+ */
+function splitAverage(player: Dict, season: number, items: ScoringItem[], split: number): number | null {
   for (const raw of list(player.stats)) {
     const row = dict(raw);
-    if (num(row.statSplitTypeId) !== 0 || num(row.statSourceId) !== 0) continue;
+    if (num(row.statSplitTypeId) !== split || num(row.statSourceId) !== 0) continue;
     const rowSeason = num(row.seasonId);
     if (rowSeason !== null && season > 0 && rowSeason !== season) continue;
     const stats = numbers(row.stats);
@@ -585,6 +595,60 @@ function seasonAverage(player: Dict, season: number, items: ScoringItem[]): numb
     return round1(total / games);
   }
   return null;
+}
+
+/** ESPN's season-to-date fantasy points a game, from a split-0 totals row. */
+function seasonAverage(player: Dict, season: number, items: ScoringItem[]): number | null {
+  return splitAverage(player, season, items, 0);
+}
+
+/**
+ * ESPN's projection rows for single days (`statSourceId` 1 with a scoring
+ * period), in league points, for the days asked about. ESPN files them on
+ * the player and sometimes on the pool entry; both are read. A row with no
+ * stats and no total says nothing.
+ */
+function dayProjections(poolEntry: Dict, player: Dict, periods: ReadonlySet<number>, items: ScoringItem[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const rows of [list(poolEntry.stats), list(player.stats)]) {
+    for (const raw of rows) {
+      const row = dict(raw);
+      const period = num(row.scoringPeriodId);
+      if (num(row.statSourceId) !== 1 || period === null || !periods.has(period)) continue;
+      if (String(period) in out) continue;
+      const stats = numbers(row.stats);
+      const applied = num(row.appliedTotal);
+      if (applied === null && Object.keys(stats).length === 0) continue;
+      const points = applied ?? (items.length > 0 ? computeFpts(stats, items) : 0);
+      out[String(period)] = round1(Math.max(0, points));
+    }
+  }
+  return out;
+}
+
+/** The figures a player carries beyond his day lines. */
+interface PlayerFigures {
+  seasonAvg: number | null;
+  last7: number | null;
+  last15: number | null;
+  last30: number | null;
+  projByDay: Record<string, number>;
+}
+
+function emptyFigures(): PlayerFigures {
+  return { seasonAvg: null, last7: null, last15: null, last30: null, projByDay: {} };
+}
+
+/** Fill in what this payload knows that an earlier one did not. */
+function mergeFigures(into: PlayerFigures, poolEntry: Dict, season: number, items: ScoringItem[], periods: ReadonlySet<number>): void {
+  const player = dict(poolEntry.player);
+  into.seasonAvg ??= seasonAverage(player, season, items);
+  into.last7 ??= splitAverage(player, season, items, 1);
+  into.last15 ??= splitAverage(player, season, items, 2);
+  into.last30 ??= splitAverage(player, season, items, 3);
+  for (const [key, value] of Object.entries(dayProjections(poolEntry, player, periods, items))) {
+    if (!(key in into.projByDay)) into.projByDay[key] = value;
+  }
 }
 
 function readRecord(team: Dict): TeamRecord {
@@ -657,13 +721,18 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
     items = readScoringItems(day.payload);
   }
 
-  const averages = new Map<number, number>();
+  const periods = new Set(plan.days.map((day) => day.scoringPeriodId));
+  const figures = new Map<number, PlayerFigures>();
   for (const payload of [input.settings, ...input.days.map((day) => day.payload)]) {
     for (const entry of playerEntries(payload)) {
       const id = num(entry.id) ?? num(dict(entry.player).id);
-      if (id === null || averages.has(id)) continue;
-      const average = seasonAverage(dict(entry.player), plan.season, items);
-      if (average !== null) averages.set(id, average);
+      if (id === null) continue;
+      let known = figures.get(id);
+      if (!known) {
+        known = emptyFigures();
+        figures.set(id, known);
+      }
+      mergeFigures(known, entry, plan.season, items, periods);
     }
   }
 
@@ -716,7 +785,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
               proTeamId,
               proTeam,
               injuryStatus: str(player.injuryStatus),
-              seasonAvg: averages.get(playerId) ?? null,
+              ...(figures.get(playerId) ?? emptyFigures()),
               days: {},
             };
             side.players.set(playerId, known);
@@ -903,43 +972,69 @@ export function gamesPlayed(side: ScoreSide, week: Pick<ScoresWeek, 'days' | 'cu
   return used;
 }
 
-/** Expected points for one player's next game. */
-export type ExpectedPoints = (player: ScorePlayer) => number;
+/** Expected points for one player in his game on one day. */
+export type ExpectedPoints = (player: ScorePlayer, scoringPeriodId: number) => number;
+
+export interface RemainingPlayerGame {
+  /** Expected points for the whole game. */
+  expected: number;
+  /** The share of the game still to play, after the cap has had its say. */
+  share: number;
+  scoringPeriodId: number;
+  live: boolean;
+}
+
+/**
+ * Every player-game a side still has this week, in date order, cut off at
+ * the games cap. ESPN stops counting once a team reaches its cap, so the
+ * future games run in date order and stop there. A live game is already
+ * being counted, so it never competes for the budget. The odds model and
+ * the projections both read the week from here.
+ */
+export function remainingGames(
+  side: ScoreSide,
+  week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId' | 'gamesCap'>,
+  expected: ExpectedPoints,
+): RemainingPlayerGame[] {
+  const remaining: RemainingPlayerGame[] = [];
+  for (const player of side.players) {
+    for (const game of gamesLeft(player, week)) {
+      const points = expected(player, game.scoringPeriodId);
+      remaining.push({
+        expected: Number.isFinite(points) ? Math.max(0, points) : 0,
+        share: game.share,
+        scoringPeriodId: game.scoringPeriodId,
+        live: game.live,
+      });
+    }
+  }
+  remaining.sort((a, b) => a.scoringPeriodId - b.scoringPeriodId);
+
+  let budget = week.gamesCap === null ? Number.POSITIVE_INFINITY : Math.max(0, week.gamesCap - gamesPlayed(side, week));
+  const kept: RemainingPlayerGame[] = [];
+  for (const game of remaining) {
+    if (game.live) {
+      kept.push(game);
+      continue;
+    }
+    if (budget <= 0) break;
+    const share = Math.min(game.share, budget);
+    budget -= share;
+    kept.push({ ...game, share });
+  }
+  return kept;
+}
 
 /**
  * One side as the odds model sees it: points so far, plus each remaining
- * player-game at that player's expected points.
- *
- * ESPN stops counting once a team reaches its games cap, so the remaining
- * games run in date order and stop at the cap. A live game is already being
- * counted, so it never competes for the budget.
+ * player-game at that player's expected points for that day.
  */
 export function sideOdds(
   side: ScoreSide,
   week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId' | 'gamesCap'>,
   expected: ExpectedPoints,
 ): SideOdds {
-  const remaining: Array<RemainingGame & { scoringPeriodId: number; live: boolean }> = [];
-  for (const player of side.players) {
-    const points = Math.max(0, expected(player));
-    for (const game of gamesLeft(player, week)) {
-      remaining.push({ expected: points, share: game.share, scoringPeriodId: game.scoringPeriodId, live: game.live });
-    }
-  }
-  remaining.sort((a, b) => a.scoringPeriodId - b.scoringPeriodId);
-
-  let budget = week.gamesCap === null ? Number.POSITIVE_INFINITY : Math.max(0, week.gamesCap - gamesPlayed(side, week));
-  const kept: RemainingGame[] = [];
-  for (const game of remaining) {
-    if (game.live) {
-      kept.push({ expected: game.expected, share: game.share });
-      continue;
-    }
-    if (budget <= 0) break;
-    const share = Math.min(game.share ?? 1, budget);
-    budget -= share;
-    kept.push({ expected: game.expected, share });
-  }
+  const kept: RemainingGame[] = remainingGames(side, week, expected).map((game) => ({ expected: game.expected, share: game.share }));
   return { points: side.total, remaining: kept };
 }
 

@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { GAMES_CAPS_KEY, useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
 import { apiErrorMessage, saveGamesCap } from '../../lib/league/api.js';
+import { playerDayProjection, playerWeekProjection, projText, sideProjection } from '../../lib/league/dailyProjection.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import { MAX_GAMES_CAP, MIN_GAMES_CAP, gamesText, parseGamesCap } from '../../lib/league/gamesCap.js';
 import {
@@ -24,6 +25,7 @@ import {
   slotOn,
   statLineText,
   weekOrder,
+  type ExpectedPoints,
   type ScoreMatchup,
   type ScorePlayer,
   type ScoreSide,
@@ -49,17 +51,20 @@ interface SideHeadProps {
   side: ScoreSide;
   owner: string | undefined;
   chance: number;
+  /** Where the side should finish the week. Null once the matchup is settled. */
+  proj: number | null;
   leading: boolean;
   right?: boolean;
 }
 
-function SideHead({ side, owner, chance, leading, right }: SideHeadProps) {
+function SideHead({ side, owner, chance, proj, leading, right }: SideHeadProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}`}>
       <div className="score-side-name">{side.name}</div>
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
       <div className="score-side-total">{side.total.toFixed(1)}</div>
       <div className="score-side-chance">{chance}% to win</div>
+      {proj !== null && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
     </div>
   );
 }
@@ -169,26 +174,45 @@ function cardClass(started: boolean, player: ScorePlayer): string {
   return ['score-player', started ? '' : 'is-bench', badge?.tone === 'out' ? 'is-out' : ''].filter(Boolean).join(' ');
 }
 
-function DayCell({ player, scoringPeriodId }: { player: ScorePlayer | undefined; scoringPeriodId: number }) {
+interface DayCellProps {
+  player: ScorePlayer | undefined;
+  week: ScoresWeek;
+  scoringPeriodId: number;
+  expected: ExpectedPoints;
+}
+
+function DayCell({ player, week, scoringPeriodId, expected }: DayCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const day = player.days[String(scoringPeriodId)];
   const slot = slotOn(player, scoringPeriodId);
+  // Only a game still to play gets a projection; a finished one is just the points.
+  const proj = day?.started ? playerDayProjection(player, week, expected, scoringPeriodId) : null;
   return (
     <div className={cardClass(day?.started === true, player)}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={slot} />
         <span className="score-player-pts">{day ? day.points.toFixed(1) : '0.0'}</span>
       </div>
-      <div className="score-player-game">{gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}</div>
+      <div className="score-player-game">
+        {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
+        {proj !== null && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
+      </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
     </div>
   );
 }
 
-function WeekCell({ player, week }: { player: ScorePlayer | undefined; week: ScoresWeek }) {
+interface WeekCellProps {
+  player: ScorePlayer | undefined;
+  week: ScoresWeek;
+  expected: ExpectedPoints;
+}
+
+function WeekCell({ player, week, expected }: WeekCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const summary = playerWeek(player, week);
   const started = Object.values(player.days).some((day) => day.started);
+  const proj = summary.left > 0 ? playerWeekProjection(player, week, expected) : null;
   return (
     <div className={cardClass(started, player)}>
       <div className="score-player-top">
@@ -197,6 +221,7 @@ function WeekCell({ player, week }: { player: ScorePlayer | undefined; week: Sco
       </div>
       <div className="score-player-game">
         {summary.played} played · {summary.left} left
+        {proj !== null && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
     </div>
   );
@@ -249,6 +274,9 @@ export default function MatchupPage() {
   const nextStep = stepIndex >= 0 && stepIndex < steps.length - 1 ? steps[stepIndex + 1] : null;
 
   const chance = week && matchup ? matchupChance(matchup, week, expected) : null;
+  const settled = matchup?.winner !== 'UNDECIDED';
+  const homeProj = week && matchup && !settled ? sideProjection(matchup.home, week, expected) : null;
+  const awayProj = week && matchup && !settled ? sideProjection(matchup.away, week, expected) : null;
   const back = `/scores${scoresQuery({ week: week?.matchupPeriodId ?? requestedWeek, demo })}`;
   const isCommish = identity?.isCommissioner === true;
 
@@ -284,8 +312,8 @@ export default function MatchupPage() {
         <>
           <section className="panel score-head">
             <div className="score-head-grid">
-              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} chance={chance.home} leading={matchup.home.total > matchup.away.total} />
-              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} chance={chance.away} leading={matchup.away.total > matchup.home.total} right />
+              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} chance={chance.home} proj={homeProj?.week ?? null} leading={matchup.home.total > matchup.away.total} />
+              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} chance={chance.away} proj={awayProj?.week ?? null} leading={matchup.away.total > matchup.home.total} right />
             </div>
             <WinBar left={chance.home} right={chance.away} />
             {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
@@ -347,6 +375,17 @@ export default function MatchupPage() {
             <span className="is-right">{owners.get(matchup.away.teamId) ?? matchup.away.name}</span>
           </div>
 
+          {view.kind === 'day' && homeProj && awayProj && view.scoringPeriodId >= week.currentScoringPeriodId && (
+            <div className="score-proj-grid" aria-label="Projected points for the day">
+              <span>
+                {(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Proj <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
+              </span>
+              <span className="is-right">
+                {(matchup.away.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Proj <b>{projText(awayProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
+              </span>
+            </div>
+          )}
+
           {view.kind === 'day' && (() => {
             const home = lineupOrder(matchup.home.players, view.scoringPeriodId);
             const away = lineupOrder(matchup.away.players, view.scoringPeriodId);
@@ -355,8 +394,8 @@ export default function MatchupPage() {
               <div className="score-grid">
                 {Array.from({ length: rows }, (_, index) => (
                   <Fragment key={home[index]?.id ?? `h${index}`}>
-                    <DayCell player={home[index]} scoringPeriodId={view.scoringPeriodId} />
-                    <DayCell player={away[index]} scoringPeriodId={view.scoringPeriodId} />
+                    <DayCell player={home[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} />
+                    <DayCell player={away[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} />
                   </Fragment>
                 ))}
               </div>
@@ -371,8 +410,8 @@ export default function MatchupPage() {
               <div className="score-grid">
                 {Array.from({ length: rows }, (_, index) => (
                   <Fragment key={home[index]?.id ?? `h${index}`}>
-                    <WeekCell player={home[index]} week={week} />
-                    <WeekCell player={away[index]} week={week} />
+                    <WeekCell player={home[index]} week={week} expected={expected} />
+                    <WeekCell player={away[index]} week={week} expected={expected} />
                   </Fragment>
                 ))}
               </div>

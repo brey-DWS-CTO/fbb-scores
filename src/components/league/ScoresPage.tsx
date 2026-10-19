@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
+import { projText, sideProjection } from '../../lib/league/dailyProjection.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import { todayIso } from '../../lib/league/navSections.js';
 import {
@@ -117,6 +118,8 @@ export default function ScoresPage() {
         <div className="score-list">
           {matchups.map((matchup) => {
             const chance = matchupChance(matchup, week, expected);
+            const homeProj = sideProjection(matchup.home, week, expected).week;
+            const awayProj = sideProjection(matchup.away, week, expected).week;
             const homeLeads = matchup.home.total > matchup.away.total;
             const awayLeads = matchup.away.total > matchup.home.total;
             const mine = matchup.home.teamId === myTeamId || matchup.away.teamId === myTeamId;
@@ -125,6 +128,14 @@ export default function ScoresPage() {
                 <TeamRow side={matchup.home} owner={owners.get(matchup.home.teamId)} leading={homeLeads} mine={matchup.home.teamId === myTeamId} />
                 <WinBar left={chance.home} right={chance.away} />
                 <TeamRow side={matchup.away} owner={owners.get(matchup.away.teamId)} leading={awayLeads} mine={matchup.away.teamId === myTeamId} />
+                {matchup.winner === 'UNDECIDED' && (
+                  <div className="score-proj">
+                    <span className="score-proj-title">Proj</span>
+                    <b className={homeProj > awayProj ? 'is-up' : ''}>{projText(homeProj)}</b>
+                    <span className="score-proj-dash">–</span>
+                    <b className={awayProj > homeProj ? 'is-up' : ''}>{projText(awayProj)}</b>
+                  </div>
+                )}
                 {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
               </Link>
             );
@@ -134,7 +145,8 @@ export default function ScoresPage() {
 
       {week && (
         <p className="score-foot">
-          Win chance: points so far plus each player&apos;s expected points for every game left this week.
+          Proj is where each team should finish the week. Win chance comes from the same numbers: points so far plus each player&apos;s expected points for every game left.
+          A player&apos;s expected points are ESPN&apos;s projection for the day when it has one, else a blend of his last 15 days, his season and his preseason projection.
           {week.matchupPeriodId === week.currentMatchupPeriodId && !demo && ' Updates every minute while you watch.'}
         </p>
       )}

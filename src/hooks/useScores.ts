@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchGamesCaps, fetchScoresWeek } from '../lib/league/api.js';
+import { expectedPointsForGame } from '../lib/league/dailyProjection.js';
 import { projectedFppg } from '../lib/league/draftRankings.js';
 import { capForWeek, type GamesCapRow } from '../lib/league/gamesCap.js';
 import type { ExpectedPoints, ScorePlayer, ScoresWeek } from '../lib/league/scores.js';
@@ -45,8 +46,10 @@ export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabl
 }
 
 /**
- * Expected points a game for a player: the commissioner's edited
- * projection, else ESPN's season average so far, else nothing.
+ * Expected points for a player's game on a day: ESPN's projection for
+ * that day when it sends one, else a blend of his last 15 days, his
+ * season so far and the commissioner's preseason projection. See
+ * `dailyProjection.ts` for the weights.
  */
 export function useExpectedPoints(): ExpectedPoints {
   const { snapshot } = useProjectionData();
@@ -58,6 +61,7 @@ export function useExpectedPoints(): ExpectedPoints {
         if (value !== null) byId.set(player.espnId, value);
       }
     }
-    return (player: ScorePlayer) => byId.get(player.id) ?? player.seasonAvg ?? 0;
+    return (player: ScorePlayer, scoringPeriodId: number) =>
+      expectedPointsForGame(player, { scoringPeriodId, preseason: byId.get(player.id) ?? null });
   }, [snapshot]);
 }

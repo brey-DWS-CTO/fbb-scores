@@ -4901,6 +4901,24 @@ html.theme-light {
   .score-player-game, .score-player-line { font-size: 0.7rem; }
 }
 
+/* ─── Daily projections on the scores pages ──────────────────────────── */
+/* On a card: "Proj 1,240 – 1,195" under the two totals. The side ahead glows. */
+.score-proj { display: flex; justify-content: center; align-items: baseline; gap: 6px; margin-top: 2px; font-size: 0.7rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-proj-title { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.score-proj b { font-weight: 800; color: var(--text-mid); }
+.score-proj b.is-up { color: var(--neon-teal); }
+.score-proj-dash { color: var(--text-dim); }
+/* In the matchup head, under the chance. */
+.score-side-proj { margin-top: 2px; font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-side-proj b { font-weight: 800; color: var(--text-mid); }
+/* The day's points so far and where the day should end, one line a side, over the lineups. */
+.score-proj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 4px 6px; font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-proj-grid .is-right { text-align: right; }
+.score-proj-grid b { font-weight: 800; color: var(--text-mid); }
+/* On a player line, after his game. */
+.score-player-proj { color: var(--neon-teal); font-weight: 700; white-space: nowrap; }
+.score-player.is-bench .score-player-proj { color: var(--text-dim); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

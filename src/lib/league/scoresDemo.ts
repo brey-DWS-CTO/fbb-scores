@@ -330,9 +330,13 @@ export function demoWeek(seed = 7): ScoresWeek {
                 defaultPositionId: player.positionId,
                 proTeamId: player.proTeamId,
                 injuryStatus: player.injuryStatus,
-                stats: done?.stats
-                  ? [{ statSourceId: 0, statSplitTypeId: 1, scoringPeriodId: period, stats: done.stats, appliedTotal: done.points }]
-                  : [],
+                stats: [
+                  // ESPN's last-15-days totals: five games at his average, so the projection reads his average.
+                  { statSourceId: 0, statSplitTypeId: 2, seasonId: 2027, stats: { '0': player.avg * 5, '42': 5 } },
+                  ...(done?.stats
+                    ? [{ statSourceId: 0, statSplitTypeId: 1, scoringPeriodId: period, stats: done.stats, appliedTotal: done.points }]
+                    : []),
+                ],
               },
             },
           };

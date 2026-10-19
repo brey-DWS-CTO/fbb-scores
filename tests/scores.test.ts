@@ -25,6 +25,7 @@ import {
   readEspnWeek,
   readNbaScoreboard,
   recordText,
+  remainingGames,
   scoringPeriodDates,
   seasonStartDate,
   shortName,
@@ -41,6 +42,8 @@ import {
   type ScoreSide,
   type ScoresWeek,
 } from '../src/lib/league/scores.ts';
+import { sideProjection } from '../src/lib/league/dailyProjection.ts';
+import { sideMean } from '../src/lib/league/winOdds.ts';
 
 // ─── A small ESPN week by hand ──────────────────────────────────────────────
 
@@ -92,6 +95,15 @@ const SETTINGS = {
                 fullName: 'Nikola Jokic',
                 stats: [
                   { statSplitTypeId: 0, statSourceId: 0, seasonId: 2027, stats: { '0': 300, '6': 120, '3': 90, '42': 10 } },
+                  // Last 7, 15 and 30 days: totals over games played.
+                  { statSplitTypeId: 1, statSourceId: 0, seasonId: 2027, stats: { '0': 90, '6': 30, '42': 3 } },
+                  { statSplitTypeId: 2, statSourceId: 0, seasonId: 2027, stats: { '0': 150, '6': 50, '3': 25, '42': 5 } },
+                  { statSplitTypeId: 3, statSourceId: 0, seasonId: 2027, stats: { '0': 240, '42': 8 } },
+                  // An empty window says nothing.
+                  { statSplitTypeId: 1, statSourceId: 0, seasonId: 2026, stats: { '0': 999, '42': 1 } },
+                  // ESPN's own projection for today, and a season projection that is not a day.
+                  { statSplitTypeId: 1, statSourceId: 1, scoringPeriodId: 18, seasonId: 2027, stats: { '0': 28, '6': 12, '3': 8 }, appliedTotal: 51.2 },
+                  { statSplitTypeId: 0, statSourceId: 1, scoringPeriodId: 0, seasonId: 2027, stats: { '0': 2000 }, appliedTotal: 4000 },
                 ],
               },
             },
@@ -419,6 +431,10 @@ test('a player\'s day is his own stat row, his slot and his game', () => {
   assert.equal(jokic.position, 'C');
   assert.equal(jokic.proTeam, 'DEN');
   assert.equal(jokic.seasonAvg, 54.6, 'season totals over games played, in league scoring');
+  assert.equal(jokic.last7, 40, 'the last 7 days, a game at a time');
+  assert.equal(jokic.last15, 47, 'the last 15 days');
+  assert.equal(jokic.last30, 30, 'the last 30 days');
+  assert.deepEqual(jokic.projByDay, { '18': 51.2 }, 'ESPN\'s projection for today only; the season projection is not a day');
   const day = jokic.days['17'];
   assert.ok(day.started);
   assert.equal(day.points, JOKIC_DAY_POINTS);
@@ -436,6 +452,8 @@ test('a player\'s day is his own stat row, his slot and his game', () => {
   const curry = week.matchups[0].away.players.find((player) => player.name === 'Stephen Curry') as ScorePlayer;
   assert.equal(gameText(curry.days['18'].game, null), '3rd Q 5:32 78-70 vs MIL');
   assert.equal(curry.seasonAvg, null);
+  assert.equal(curry.last15, null, 'no split rows, no average');
+  assert.deepEqual(curry.projByDay, {});
 });
 
 test('words for the screen cover every game state', () => {
@@ -601,6 +619,31 @@ test('the odds use expected points per game and stop at the games cap', () => {
   assert.deepEqual(matchupChance({ ...matchup, winner: 'HOME' }, week, expected), { home: 100, away: 0 });
 });
 
+test('expected points are asked for by day, and the projections read the same games as the odds', () => {
+  const week = buildWeek();
+  const [matchup] = week.matchups;
+  const asked: number[] = [];
+  const expected = (player: ScorePlayer, scoringPeriodId: number) => {
+    asked.push(scoringPeriodId);
+    return player.name === 'Nikola Jokic' ? (scoringPeriodId === 18 ? 50 : 60) : 30;
+  };
+  const games = remainingGames(matchup.home, week, expected);
+  assert.deepEqual(games.map((game) => game.scoringPeriodId), [18, 19, 20, 21]);
+  assert.equal(games[0].expected, 50, 'today at today\'s number');
+  assert.equal(games[1].expected, 60, 'tomorrow at tomorrow\'s');
+  assert.ok(asked.includes(18) && asked.includes(21));
+
+  const proj = sideProjection(matchup.home, week, expected);
+  assert.equal(proj.byDay['17'], 56.8, 'yesterday is what it was');
+  assert.equal(proj.byDay['18'], 50, 'today: nothing yet, plus Jokic\'s whole game');
+  assert.equal(proj.week, Math.round(sideMean(sideOdds(matchup.home, week, expected)) * 10) / 10);
+  assert.ok(proj.week > matchup.home.total);
+
+  const away = sideProjection(matchup.away, week, expected);
+  assert.ok(away.byDay['18'] > matchup.away.pointsByDay['18'], 'two live games still have points to come');
+  assert.ok(away.week > matchup.away.total);
+});
+
 test('more expected points for one side move its chance up', () => {
   const week = buildWeek();
   const [matchup] = week.matchups;
@@ -642,6 +685,7 @@ test('your own matchup sits on top', () => {
 
 const player = (name: string, days: Record<string, { lineupSlotId: number; started: boolean; points: number }>): ScorePlayer => ({
   id: name.length, name, position: '', proTeamId: 0, proTeam: '', injuryStatus: null, seasonAvg: null,
+  last7: null, last15: null, last30: null, projByDay: {},
   days: Object.fromEntries(Object.entries(days).map(([key, day]) => [key, { ...day, stats: null, played: day.points > 0, game: null }])),
 });
 
