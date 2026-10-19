@@ -273,6 +273,21 @@ export function lmAddAllowed(checks: readonly LmAddCheck[]): boolean {
   return checks.every((check) => check.ok);
 }
 
+/** "Mon, Oct 20" for a Pacific date, for a post. */
+function dateWords(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/** "Waivers now run at 11 AM Pacific for Tue, Oct 20 (first tip 12:00 PM). Was 3 PM." */
+export function waiverChangeText(target: WaiverHour, forDate: string, wasET: number | null, ok: boolean, note: string): string {
+  const tip = target.firstTip
+    ? ` (first tip ${new Date(target.firstTip).toLocaleTimeString('en-US', { timeZone: PACIFIC, hour: 'numeric', minute: '2-digit' })})`
+    : '';
+  const was = wasET === null ? '' : ` Was ${hourLabel((wasET - EASTERN_OFFSET_HOURS + 24) % 24)}.`;
+  if (!ok) return `Waiver hour change failed: wanted ${hourLabel(target.hourPT)} Pacific for ${dateWords(forDate)}. ${note}`;
+  return `Waivers now run at ${hourLabel(target.hourPT)} Pacific for ${dateWords(forDate)}${tip}.${was}`;
+}
+
 /** The feed line for one request. */
 export function lmAddText(request: Pick<LmAddRequest, 'owner' | 'playerName' | 'proTeam' | 'status'>): string {
   const who = request.proTeam ? `${request.playerName} (${request.proTeam})` : request.playerName;

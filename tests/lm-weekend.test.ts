@@ -166,3 +166,13 @@ test('the hour to hold never jumps to a time still ahead today', async () => {
   // Two early days in a row: nothing to do.
   assert.equal(waiverHourToHold(at(13), eleven, eleven), eleven);
 });
+
+test('the Slack line for a waiver change says the hour, the day and what it was', async () => {
+  const { waiverChangeText } = await import('../src/lib/league/lmWeekend.ts');
+  const eleven = { hourPT: 11, hourET: 14, early: true, firstTip: '2026-10-20T19:00:00.000Z' };
+  assert.equal(
+    waiverChangeText(eleven, '2026-10-20', 18, true, 'ESPN accepted (200)'),
+    'Waivers now run at 11 AM Pacific for Tue, Oct 20 (first tip 12:00 PM). Was 3 PM.',
+  );
+  assert.match(waiverChangeText(eleven, '2026-10-20', 18, false, 'ESPN refused the sign-in (401)'), /^Waiver hour change failed: wanted 11 AM Pacific for Tue, Oct 20\. ESPN refused/);
+});
