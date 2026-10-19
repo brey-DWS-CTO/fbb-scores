@@ -5490,6 +5490,20 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   vertical-align: middle;
 }
 
+/* ─── ACTIVITY: the season's moves ─── */
+.activity-page .rules-page-header p { max-width: 60ch; }
+.activity-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.activity-chip { padding: 6px 10px; min-height: 32px; border: 1px solid var(--panel-border); border-radius: 999px; background: transparent; color: var(--text-dim); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; cursor: pointer; }
+.activity-chip.is-on { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.activity-day { margin-bottom: 16px; }
+.activity-day-head { font-size: 0.62rem; color: var(--text-mid); margin: 0 0 8px; }
+.activity-move .league-activity-head { flex-wrap: wrap; }
+.activity-move .league-activity-head strong { flex: 1 1 60%; min-width: 0; font-weight: 600; }
+.activity-kind { flex: 0 0 auto; padding: 1px 6px; border-radius: 4px; font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em; line-height: 1.6; background: color-mix(in srgb, var(--neon-teal) 18%, transparent); color: var(--neon-teal); }
+.activity-kind.is-waiver { background: color-mix(in srgb, var(--neon-yellow) 18%, transparent); color: var(--neon-yellow); }
+.activity-kind.is-drop { background: color-mix(in srgb, var(--neon-red) 18%, transparent); color: var(--neon-red); }
+.activity-kind.is-trade { background: color-mix(in srgb, var(--neon-purple) 22%, transparent); color: var(--neon-purple); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

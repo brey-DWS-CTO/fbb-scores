@@ -310,6 +310,7 @@ import {
   resolveCurrentDraftRankings,
 } from '../lib/draftRankingService.js';
 import { getNbaWatch } from '../lib/nbaWatchService.js';
+import { transactionsFeed } from '../lib/transactionService.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
@@ -4376,6 +4377,19 @@ async function duesResponse() {
 router.get('/dues', async (_req, res, next) => {
   try {
     res.json(await duesResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/league/transactions — this season's adds, drops, claims and
+ * trades, newest first. Anyone may read them: ESPN shows the same to the
+ * whole league. A pull from ESPN runs first when the last one is stale.
+ */
+router.get('/transactions', async (_req, res, next) => {
+  try {
+    res.json(await transactionsFeed());
   } catch (err) {
     next(err);
   }

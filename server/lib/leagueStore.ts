@@ -15,6 +15,7 @@
  */
 import type { PresenceRow } from '../../src/lib/league/presence.js';
 import type { DraftList } from '../../src/lib/league/autoDraft.js';
+import { transactionKey, type LeagueTransaction } from '../../src/lib/league/transactions.js';
 import crypto from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
@@ -193,6 +194,14 @@ export interface ProjectionEditRow {
   edit: unknown;
   updatedAt: string;
   updatedBy: string;
+}
+
+/**
+ * One player moving once, as `src/lib/league/transactions.ts` defines it,
+ * plus when the app first saw it. Rows are only ever added.
+ */
+export interface LeagueTransactionRow extends LeagueTransaction {
+  seenAt: string;
 }
 
 /** The commissioner's working copy of the rulebook, with a version for safe writes. */
@@ -535,6 +544,10 @@ interface StoreBackend {
   purgeExpiredAuth(now: string): Promise<void>;
   appendAudit(owner: string | null, action: string, detail: unknown): Promise<void>;
   readAudit(limit: number): Promise<AuditRow[]>;
+  /** Adds the rows the store has not seen. Answers with how many were new. */
+  addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number>;
+  /** This season's moves, newest first. */
+  listTransactions(season: number, limit: number): Promise<LeagueTransactionRow[]>;
   getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null>;
   acceptPlayerPoolSnapshot(
     snapshot: PlayerPoolSnapshot,
@@ -940,6 +953,24 @@ class NeonBackend implements StoreBackend {
       keys jsonb not null,
       updated_at timestamptz not null default now(),
       primary key (room, owner)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS league_transactions (
+      season int not null,
+      espn_id text not null,
+      player_id int not null,
+      kind text not null,
+      team_id int not null,
+      owner text not null,
+      player_name text not null,
+      pro_team text not null,
+      bid int,
+      to_team_id int,
+      to_owner text,
+      at timestamptz not null,
+      scoring_period_id int,
+      by_league_manager boolean not null default false,
+      seen_at timestamptz not null default now(),
+      primary key (season, espn_id, player_id, kind)
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS draft_presence (
       room text not null,
@@ -1697,6 +1728,59 @@ class NeonBackend implements StoreBackend {
     await this.sql`DELETE FROM projection_edits WHERE season = ${season} AND owner = ${owner} AND espn_id = ${espnId}`;
   }
 
+  async addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number> {
+    await this.ensureInit();
+    let added = 0;
+    for (const row of rows) {
+      const result = (await this.sql`INSERT INTO league_transactions
+        (season, espn_id, player_id, kind, team_id, owner, player_name, pro_team, bid, to_team_id, to_owner, at, scoring_period_id, by_league_manager, seen_at)
+        VALUES (${row.season}, ${row.espnId}, ${row.playerId}, ${row.kind}, ${row.teamId}, ${row.owner}, ${row.playerName}, ${row.proTeam},
+          ${row.bid}, ${row.toTeamId}, ${row.toOwner}, ${row.at}, ${row.scoringPeriodId}, ${row.byLeagueManager}, ${row.seenAt})
+        ON CONFLICT (season, espn_id, player_id, kind) DO NOTHING
+        RETURNING espn_id`) as unknown[];
+      if (result.length > 0) added += 1;
+    }
+    return added;
+  }
+
+  async listTransactions(season: number, limit: number): Promise<LeagueTransactionRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT espn_id, player_id, kind, team_id, owner, player_name, pro_team, bid, to_team_id, to_owner, at, scoring_period_id, by_league_manager, seen_at
+      FROM league_transactions WHERE season = ${season} ORDER BY at DESC, espn_id, player_id LIMIT ${limit}`) as Array<{
+      espn_id: string;
+      player_id: number;
+      kind: LeagueTransactionRow['kind'];
+      team_id: number;
+      owner: string;
+      player_name: string;
+      pro_team: string;
+      bid: number | null;
+      to_team_id: number | null;
+      to_owner: string | null;
+      at: string | Date;
+      scoring_period_id: number | null;
+      by_league_manager: boolean;
+      seen_at: string | Date;
+    }>;
+    return rows.map((row) => ({
+      season,
+      espnId: row.espn_id,
+      playerId: row.player_id,
+      kind: row.kind,
+      teamId: row.team_id,
+      owner: row.owner,
+      playerName: row.player_name,
+      proTeam: row.pro_team,
+      bid: row.bid,
+      toTeamId: row.to_team_id,
+      toOwner: row.to_owner,
+      at: new Date(row.at).toISOString(),
+      scoringPeriodId: row.scoring_period_id,
+      byLeagueManager: row.by_league_manager,
+      seenAt: new Date(row.seen_at).toISOString(),
+    }));
+  }
+
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -2165,6 +2249,7 @@ interface FileDoc {
     updatedAt: string;
   }>;
   projectionEdits: ProjectionEditRow[];
+  transactions?: LeagueTransactionRow[];
   mockResults: MockResultRow[];
   mockFinishes: Array<MockFinish & { season: number }>;
   mockTrades: MockTrade[];
@@ -2204,6 +2289,7 @@ function emptyDoc(): FileDoc {
     draftRankingSnapshots: [],
     keeperScenarios: [],
     projectionEdits: [],
+    transactions: [],
     mockResults: [],
     mockFinishes: [],
     mockTrades: [],
@@ -2269,6 +2355,7 @@ class FileBackend implements StoreBackend {
         projectionEdits: Array.isArray(doc.projectionEdits)
           ? doc.projectionEdits.map((row) => ({ ...row, owner: row.owner ?? row.updatedBy }))
           : [],
+        transactions: Array.isArray(doc.transactions) ? doc.transactions : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
         mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
         mockTrades: Array.isArray(doc.mockTrades) ? doc.mockTrades : [],
@@ -2865,6 +2952,33 @@ class FileBackend implements StoreBackend {
       doc.projectionEdits = doc.projectionEdits.filter((entry) => !(entry.season === season && entry.owner === owner && entry.espnId === espnId));
       this.writeDoc(doc);
     });
+  }
+
+  async addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number> {
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const have = doc.transactions ?? [];
+      const seen = new Set(have.map((row) => `${row.season}:${transactionKey(row)}`));
+      let added = 0;
+      for (const row of rows) {
+        const key = `${row.season}:${transactionKey(row)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        have.push(row);
+        added += 1;
+      }
+      doc.transactions = have;
+      if (added > 0) this.writeDoc(doc);
+      return added;
+    });
+  }
+
+  async listTransactions(season: number, limit: number): Promise<LeagueTransactionRow[]> {
+    await this.ensureInit();
+    return (this.readDoc().transactions ?? [])
+      .filter((row) => row.season === season)
+      .sort((a, b) => b.at.localeCompare(a.at) || a.espnId.localeCompare(b.espnId) || a.playerId - b.playerId)
+      .slice(0, limit);
   }
 
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
@@ -3718,6 +3832,14 @@ export async function listProjectionEdits(season: number, owner: string): Promis
 
 export async function saveProjectionEdit(row: ProjectionEditRow): Promise<ProjectionEditRow> {
   return getBackend().saveProjectionEdit(row);
+}
+
+export async function addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number> {
+  return getBackend().addTransactions(rows);
+}
+
+export async function listTransactions(season: number, limit = 500): Promise<LeagueTransactionRow[]> {
+  return getBackend().listTransactions(season, limit);
 }
 
 export async function deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
