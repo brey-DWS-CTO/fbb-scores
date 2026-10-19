@@ -149,3 +149,20 @@ test('the public scoreboard reads into games with normalized team codes', async 
     { home: 'GSW', away: 'NYK', tipoff: '2026-10-24T19:00:00.000Z' },
   ]);
 });
+
+test('the hour to hold never jumps to a time still ahead today', async () => {
+  const { waiverHourToHold } = await import('../src/lib/league/lmWeekend.ts');
+  const normal = { hourPT: 15, hourET: 18, early: false, firstTip: null };
+  const eleven = { hourPT: 11, hourET: 14, early: true, firstTip: `${SAT}T19:00:00.000Z` };
+  const at = (hour: number) => ({ date: SAT, hour, minute: 10, weekday: 1 });
+  // Normal day, early tomorrow: hold 3 PM until the run passes, then 11.
+  assert.equal(waiverHourToHold(at(9), normal, eleven), normal);
+  assert.equal(waiverHourToHold(at(15), normal, eleven), normal);
+  assert.equal(waiverHourToHold(at(16), normal, eleven), eleven);
+  // Early day, normal tomorrow: after the 11 AM run, 3 PM is still ahead, so hold 11 until 4 PM.
+  assert.equal(waiverHourToHold(at(12), eleven, normal), eleven);
+  assert.equal(waiverHourToHold(at(15), eleven, normal), eleven);
+  assert.equal(waiverHourToHold(at(16), eleven, normal), normal);
+  // Two early days in a row: nothing to do.
+  assert.equal(waiverHourToHold(at(13), eleven, eleven), eleven);
+});
