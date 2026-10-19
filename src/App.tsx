@@ -34,6 +34,9 @@ import RevealedPage from './components/league/RevealedPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
 import StatsGate from './components/league/StatsGate.js'
 import MyRankingsPage from './components/draft/MyRankingsPage.js'
+import WatchPage from './components/league/WatchPage.js'
+import PartyPage from './components/league/PartyPage.js'
+import FavoritesPrompt from './components/league/FavoritesPrompt.js'
 
 function App() {
   const location = useLocation()
@@ -81,6 +84,7 @@ function App() {
       )}
       {!bareMode && <AppNav />}
       {!bareMode && !sandbox && <AchievementToast />}
+      {!bareMode && !sandbox && <FavoritesPrompt />}
       <ActingAsBanner />
       {!bareMode && <SectionTabs />}
       <Routes>
@@ -111,6 +115,8 @@ function App() {
         <Route path="/projections" element={<StatsGate><ProjectionsPage /></StatsGate>} />
         <Route path="/tiers" element={<StatsGate><TiersPage /></StatsGate>} />
         <Route path="/schedule" element={<SchedulePage />} />
+        <Route path="/watch" element={<WatchPage />} />
+        <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />
         <Route path="*" element={<SplashPage />} />

@@ -310,6 +310,31 @@ export class PollWriteError extends Error {
   }
 }
 
+/** An owner's favorite NBA teams. One row an owner; no row means none set. */
+export interface FavoriteRow {
+  owner: string;
+  first: string;
+  second: string | null;
+  updatedAt: string;
+}
+
+/** A house party, stored whole. Its games and RSVPs live inside it. */
+export interface PartyRow {
+  id: string;
+  season: number;
+  data: unknown;
+  updatedAt: string;
+}
+
+export class PartyWriteError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'PartyWriteError';
+  }
+}
+
 /** A mock draft two or more people share. One row per room, written whole. */
 export interface SharedMockRow {
   id: string;
@@ -637,6 +662,13 @@ interface StoreBackend {
   insertPoll(id: string, season: number, data: unknown, at: string): Promise<void>;
   updatePoll(id: string, mutate: (current: unknown) => unknown): Promise<unknown>;
   clearPollsForSeason(season: number): Promise<void>;
+  listFavorites(): Promise<FavoriteRow[]>;
+  setFavorites(owner: string, first: string | null, second: string | null, at: string): Promise<void>;
+  listParties(season: number): Promise<unknown[]>;
+  getParty(id: string): Promise<unknown | null>;
+  insertParty(id: string, season: number, data: unknown, at: string): Promise<void>;
+  updateParty(id: string, mutate: (current: unknown) => unknown): Promise<unknown>;
+  clearPartiesForSeason(season: number): Promise<void>;
 }
 
 interface RawVersionRow {
@@ -814,6 +846,20 @@ class NeonBackend implements StoreBackend {
       created_by text not null
     )`;
     await this.sql`CREATE TABLE IF NOT EXISTS polls (
+      id text primary key,
+      season int not null,
+      data jsonb not null,
+      updated_at timestamptz not null
+    )`;
+    // Favorite NBA teams, one row an owner. See src/lib/league/houseParty.ts.
+    await this.sql`CREATE TABLE IF NOT EXISTS favorite_teams (
+      owner text primary key,
+      first_team text not null,
+      second_team text,
+      updated_at timestamptz not null
+    )`;
+    // House parties, one row each, written whole like polls.
+    await this.sql`CREATE TABLE IF NOT EXISTS house_parties (
       id text primary key,
       season int not null,
       data jsonb not null,
@@ -2144,6 +2190,82 @@ class NeonBackend implements StoreBackend {
     await this.ensureInit();
     await this.sql`DELETE FROM polls WHERE season = ${season}`;
   }
+
+  async listFavorites(): Promise<FavoriteRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, first_team, second_team, updated_at FROM favorite_teams`) as Array<{
+      owner: string;
+      first_team: string;
+      second_team: string | null;
+      updated_at: string | Date;
+    }>;
+    return rows.map((row) => ({
+      owner: row.owner,
+      first: row.first_team,
+      second: row.second_team,
+      updatedAt: new Date(row.updated_at).toISOString(),
+    }));
+  }
+
+  async setFavorites(owner: string, first: string | null, second: string | null, at: string): Promise<void> {
+    await this.ensureInit();
+    if (first === null) {
+      await this.sql`DELETE FROM favorite_teams WHERE owner = ${owner}`;
+      return;
+    }
+    await this.sql`INSERT INTO favorite_teams (owner, first_team, second_team, updated_at)
+      VALUES (${owner}, ${first}, ${second}, ${at})
+      ON CONFLICT (owner) DO UPDATE SET first_team = EXCLUDED.first_team,
+        second_team = EXCLUDED.second_team, updated_at = EXCLUDED.updated_at`;
+  }
+
+  async listParties(season: number): Promise<unknown[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data FROM house_parties WHERE season = ${season}
+      ORDER BY updated_at DESC`) as Array<{ data: unknown }>;
+    return rows.map((r) => r.data);
+  }
+
+  async getParty(id: string): Promise<unknown | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data FROM house_parties WHERE id = ${id}`) as Array<{ data: unknown }>;
+    return rows[0]?.data ?? null;
+  }
+
+  async insertParty(id: string, season: number, data: unknown, at: string): Promise<void> {
+    await this.ensureInit();
+    const rows = (await this.sql`INSERT INTO house_parties (id, season, data, updated_at)
+      VALUES (${id}, ${season}, ${JSON.stringify(data)}::jsonb, ${at})
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id`) as Array<{ id: string }>;
+    if (!rows[0]) throw new PartyWriteError('duplicate', 'That party already exists');
+  }
+
+  /** Read, change, write, retrying if someone else wrote in between, as polls do. */
+  async updateParty(id: string, mutate: (current: unknown) => unknown): Promise<unknown> {
+    await this.ensureInit();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const rows = (await this.sql`SELECT data, updated_at FROM house_parties WHERE id = ${id}`) as Array<{
+        data: unknown;
+        updated_at: string | Date;
+      }>;
+      const row = rows[0];
+      if (!row) throw new PartyWriteError('not-found', 'No such party');
+      const next = mutate(row.data);
+      const stamp = new Date(row.updated_at).toISOString();
+      const written = (await this.sql`UPDATE house_parties
+        SET data = ${JSON.stringify(next)}::jsonb, updated_at = now()
+        WHERE id = ${id} AND updated_at = ${stamp}
+        RETURNING id`) as Array<{ id: string }>;
+      if (written[0]) return next;
+    }
+    throw new PartyWriteError('contention', 'Too many people answering at once; try again');
+  }
+
+  async clearPartiesForSeason(season: number): Promise<void> {
+    await this.ensureInit();
+    await this.sql`DELETE FROM house_parties WHERE season = ${season}`;
+  }
 }
 
 // ─── Local JSON file backend ─────────────────────────────────────────────────
@@ -2181,6 +2303,8 @@ interface FileDoc {
   ownerEmails: OwnerEmailRow[];
   loginTokens: LoginTokenRow[];
   sessions: SessionRow[];
+  favoriteTeams?: FavoriteRow[];
+  houseParties?: PartyRow[];
   /** The shared test draft, or null when none is running. */
   testDraft?: { state: LeagueDynamicState; version: number; updatedAt: string } | null;
   /** Who has a draft page open, by room. */
@@ -2285,6 +2409,8 @@ class FileBackend implements StoreBackend {
         ownerEmails: Array.isArray(doc.ownerEmails) ? doc.ownerEmails : [],
         loginTokens: Array.isArray(doc.loginTokens) ? doc.loginTokens : [],
         sessions: Array.isArray(doc.sessions) ? doc.sessions : [],
+        favoriteTeams: Array.isArray(doc.favoriteTeams) ? doc.favoriteTeams : [],
+        houseParties: Array.isArray(doc.houseParties) ? doc.houseParties : [],
         testDraft: doc.testDraft ?? null,
         draftPresence: Array.isArray(doc.draftPresence) ? doc.draftPresence : [],
         draftLists: Array.isArray(doc.draftLists) ? doc.draftLists : [],
@@ -3196,6 +3322,67 @@ class FileBackend implements StoreBackend {
       this.writeDoc(doc);
     });
   }
+
+  async listFavorites(): Promise<FavoriteRow[]> {
+    await this.ensureInit();
+    return structuredClone(this.readDoc().favoriteTeams ?? []);
+  }
+
+  async setFavorites(owner: string, first: string | null, second: string | null, at: string): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const rows = (doc.favoriteTeams ?? []).filter((row) => row.owner !== owner);
+      if (first !== null) rows.push({ owner, first, second, updatedAt: at });
+      doc.favoriteTeams = rows;
+      this.writeDoc(doc);
+    });
+  }
+
+  async listParties(season: number): Promise<unknown[]> {
+    await this.ensureInit();
+    return (this.readDoc().houseParties ?? [])
+      .filter((row) => row.season === season)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map((row) => row.data);
+  }
+
+  async getParty(id: string): Promise<unknown | null> {
+    await this.ensureInit();
+    return (this.readDoc().houseParties ?? []).find((row) => row.id === id)?.data ?? null;
+  }
+
+  async insertParty(id: string, season: number, data: unknown, at: string): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const rows = doc.houseParties ?? [];
+      if (rows.some((row) => row.id === id)) {
+        throw new PartyWriteError('duplicate', 'That party already exists');
+      }
+      rows.push({ id, season, data: structuredClone(data), updatedAt: at });
+      doc.houseParties = rows;
+      this.writeDoc(doc);
+    });
+  }
+
+  async updateParty(id: string, mutate: (current: unknown) => unknown): Promise<unknown> {
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const row = (doc.houseParties ?? []).find((candidate) => candidate.id === id);
+      if (!row) throw new PartyWriteError('not-found', 'No such party');
+      row.data = mutate(row.data);
+      row.updatedAt = new Date().toISOString();
+      this.writeDoc(doc);
+      return row.data;
+    });
+  }
+
+  async clearPartiesForSeason(season: number): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.houseParties = (doc.houseParties ?? []).filter((row) => row.season !== season);
+      this.writeDoc(doc);
+    });
+  }
 }
 
 // ─── Backend selection (lazy singleton) ──────────────────────────────────────
@@ -3829,6 +4016,38 @@ export async function updatePoll(
 /** Wipe a season's votes. Mirrors clearKeeperScenariosForSeason; used to reset a season. */
 export async function clearPollsForSeason(season: number): Promise<void> {
   return getBackend().clearPollsForSeason(season);
+}
+
+// ─── Favorite teams and house parties ────────────────────────────────────────
+
+export async function listFavorites(): Promise<FavoriteRow[]> {
+  return getBackend().listFavorites();
+}
+
+/** A null first team clears the owner's favorites. */
+export async function setFavorites(owner: string, first: string | null, second: string | null): Promise<void> {
+  return getBackend().setFavorites(owner, first, second, new Date().toISOString());
+}
+
+export async function listParties(season: number): Promise<unknown[]> {
+  return getBackend().listParties(season);
+}
+
+export async function getParty(id: string): Promise<unknown | null> {
+  return getBackend().getParty(id);
+}
+
+export async function insertParty(id: string, season: number, data: unknown): Promise<void> {
+  return getBackend().insertParty(id, season, data, new Date().toISOString());
+}
+
+export async function updateParty(id: string, mutate: (current: unknown) => unknown): Promise<unknown> {
+  return getBackend().updateParty(id, mutate);
+}
+
+/** Wipe a season's parties. Tests use it between runs. */
+export async function clearPartiesForSeason(season: number): Promise<void> {
+  return getBackend().clearPartiesForSeason(season);
 }
 
 export async function publishRulebookVersion(row: RulebookVersionRow): Promise<RulebookVersionRow> {

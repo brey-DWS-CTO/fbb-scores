@@ -310,6 +310,37 @@ import {
   resolveCurrentDraftRankings,
 } from '../lib/draftRankingService.js';
 import { getNbaWatch } from '../lib/nbaWatchService.js';
+import { getScoreboard } from '../lib/scoreboardService.js';
+import {
+  cancelParty,
+  cleanFavorites,
+  cleanPartyGames,
+  cleanPartyNote,
+  editParty,
+  FAVORITES_PROBLEM_WORDS,
+  openParty,
+  PARTY_PROBLEM_WORDS,
+  partyHeadline,
+  partyId,
+  partyOver,
+  rsvp,
+  takeHosting,
+  whoIsIn,
+  type FavoritesByOwner,
+  type HouseParty,
+  type PartyProblem,
+} from '../../src/lib/league/houseParty.js';
+import { leagueRosters } from '../../src/lib/league/partyRosters.js';
+import {
+  clearPartiesForSeason,
+  getParty,
+  insertParty,
+  listFavorites,
+  listParties,
+  PartyWriteError,
+  setFavorites,
+  updateParty,
+} from '../lib/leagueStore.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
@@ -4850,6 +4881,277 @@ router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => 
   }
   console.error('[league] Unhandled error:', err);
   res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' });
+});
+
+// ─── Favorite teams and house parties ────────────────────────────────────────
+//
+// See src/lib/league/houseParty.ts. Favorites are one or two NBA teams an
+// owner names; the league can see everyone's. A party is one to three games
+// on one night with a host, or nobody yet, and who is in. The owner on every
+// write comes from the sign-in, never the body.
+
+const partyProblem = (res: Response, problem: PartyProblem): void => {
+  res.status(problem === 'not-host' ? 403 : problem === 'unknown-game' ? 404 : 409).json({ error: PARTY_PROBLEM_WORDS[problem], code: problem });
+};
+
+async function favoritesByOwner(): Promise<FavoritesByOwner> {
+  const favorites: FavoritesByOwner = {};
+  for (const row of await listFavorites()) favorites[row.owner] = { first: row.first, second: row.second };
+  return favorites;
+}
+
+async function partiesThisSeason(): Promise<HouseParty[]> {
+  return (await listParties(leagueDataset.season)) as HouseParty[];
+}
+
+async function saveFavorites(res: Response, owner: string, body: unknown): Promise<void> {
+  const input = (body ?? {}) as { first?: unknown; second?: unknown };
+  if (input.first === null) {
+    await setFavorites(owner, null, null);
+    await appendAudit(actor(res), 'favorites-clear', { owner });
+    res.json({ favorites: await favoritesByOwner() });
+    return;
+  }
+  const check = cleanFavorites(input);
+  if (!check.ok) {
+    res.status(400).json({ error: FAVORITES_PROBLEM_WORDS[check.problem], code: check.problem });
+    return;
+  }
+  await setFavorites(owner, check.favorites.first, check.favorites.second);
+  await appendAudit(actor(res), 'favorites-set', { owner, ...check.favorites });
+  res.json({ favorites: await favoritesByOwner() });
+}
+
+/** GET /api/league/favorites — everyone's favorite teams. */
+router.get('/favorites', requireAuth, async (_req, res, next) => {
+  try {
+    res.json({ favorites: await favoritesByOwner() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PUT /api/league/favorites — set your own. `{ first: null }` clears them. */
+router.put('/favorites', requireAuth, async (req, res, next) => {
+  try {
+    await saveFavorites(res, res.locals.owner as string, req.body);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PUT /api/league/favorites/:owner — the commish sets anyone's. */
+router.put('/favorites/:owner', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const owner = String(req.params.owner);
+    if (!isKnownOwner(owner)) {
+      res.status(404).json({ error: 'No such owner' });
+      return;
+    }
+    await saveFavorites(res, owner, req.body);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/league/watch — the next two weeks of NBA games, everyone's
+ * favorites, everyone's players and the parties. The screen ranks the games
+ * for whoever is looking. `?fresh=1` reads ESPN again.
+ */
+router.get('/watch', requireAuth, async (req, res, next) => {
+  try {
+    const [board, favorites, parties, state] = await Promise.all([
+      getScoreboard(new Date(), req.query.fresh === '1'),
+      favoritesByOwner(),
+      partiesThisSeason(),
+      getState(),
+    ]);
+    const rosters = leagueRosters(currentDataset(state.state), state.state);
+    res.json({
+      now: new Date().toISOString(),
+      fetchedAt: board.fetchedAt,
+      error: board.error,
+      games: board.games,
+      favorites,
+      rosters,
+      parties,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/league/parties — every party this season, called-off ones included. */
+router.get('/parties', requireAuth, async (_req, res, next) => {
+  try {
+    res.json({ parties: await partiesThisSeason(), now: new Date().toISOString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/league/parties — throw a party, or say you are up for a game.
+ * Body: `{ gameIds: string[], hosting: boolean, note?: string }`.
+ */
+router.post('/parties', requireAuth, async (req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    const body = (req.body ?? {}) as { gameIds?: unknown; hosting?: unknown; note?: unknown };
+    const board = await getScoreboard();
+    const games = cleanPartyGames(body.gameIds, board.games);
+    if (!games.ok) return partyProblem(res, games.problem);
+    if (games.value.some((game) => board.games.find((row) => row.id === game.id)?.state === 'post')) return partyProblem(res, 'over');
+    const note = cleanPartyNote(body.note);
+    if (!note.ok) return partyProblem(res, note.problem);
+    const at = new Date().toISOString();
+    const party = openParty({
+      id: partyId(at, Math.random()),
+      season: leagueDataset.season,
+      by: owner,
+      hosting: body.hosting === true,
+      games: games.value,
+      note: note.value,
+      at,
+    });
+    await insertParty(party.id, party.season, party);
+    await appendAudit(actor(res), party.host ? 'party-host' : 'party-open', { partyId: party.id, games: party.games.map((game) => game.id) });
+    res.json({ party });
+  } catch (err) {
+    if (err instanceof PartyWriteError) {
+      res.status(409).json({ error: err.message, code: err.code });
+      return;
+    }
+    next(err);
+  }
+});
+
+/** One change to one party, with the owner's name on it. */
+async function changeParty(
+  req: Request,
+  res: Response,
+  action: string,
+  change: (party: HouseParty, owner: string) => ReturnType<typeof rsvp>,
+): Promise<void> {
+  const owner = res.locals.owner as string;
+  const id = String(req.params.id);
+  let problem: PartyProblem | null = null;
+  try {
+    const party = await updateParty(id, (current) => {
+      const result = change(current as HouseParty, owner);
+      if (!result.ok) {
+        problem = result.problem;
+        return current;
+      }
+      return result.value;
+    });
+    if (problem) return partyProblem(res, problem);
+    await appendAudit(actor(res), action, { partyId: id });
+    res.json({ party });
+  } catch (err) {
+    if (err instanceof PartyWriteError) {
+      res.status(err.code === 'not-found' ? 404 : 409).json({ error: err.message, code: err.code });
+      return;
+    }
+    throw err;
+  }
+}
+
+/** POST /api/league/parties/:id/rsvp — `{ answer: 'in' | 'out' }`. */
+router.post('/parties/:id/rsvp', requireAuth, async (req, res, next) => {
+  try {
+    const answer = (req.body as { answer?: unknown } | undefined)?.answer;
+    await changeParty(req, res, 'party-rsvp', (party, owner) => {
+      if (partyOver(party, new Date())) return { ok: false, problem: 'over' };
+      return rsvp(party, owner, answer, new Date().toISOString());
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/parties/:id/host — take the house. `{ note?: string }`. */
+router.post('/parties/:id/host', requireAuth, async (req, res, next) => {
+  try {
+    const note = cleanPartyNote((req.body as { note?: unknown } | undefined)?.note);
+    if (!note.ok) return partyProblem(res, note.problem);
+    await changeParty(req, res, 'party-take-hosting', (party, owner) => {
+      if (partyOver(party, new Date())) return { ok: false, problem: 'over' };
+      return takeHosting(party, owner, note.value, new Date().toISOString());
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/parties/:id/edit — the host changes the games or the note. */
+router.post('/parties/:id/edit', requireAuth, async (req, res, next) => {
+  try {
+    const body = (req.body ?? {}) as { gameIds?: unknown; note?: unknown };
+    const changes: { games?: HouseParty['games']; note?: string } = {};
+    if (body.gameIds !== undefined) {
+      const games = cleanPartyGames(body.gameIds, (await getScoreboard()).games);
+      if (!games.ok) return partyProblem(res, games.problem);
+      changes.games = games.value;
+    }
+    if (body.note !== undefined) {
+      const note = cleanPartyNote(body.note);
+      if (!note.ok) return partyProblem(res, note.problem);
+      changes.note = note.value;
+    }
+    await changeParty(req, res, 'party-edit', (party, owner) => editParty(party, owner, changes));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/parties/:id/cancel — call it off. The host, the opener or the commish. */
+router.post('/parties/:id/cancel', requireAuth, async (req, res, next) => {
+  try {
+    const isCommissioner = res.locals.isCommissioner === true;
+    await changeParty(req, res, 'party-cancel', (party, owner) => cancelParty(party, owner, isCommissioner, new Date().toISOString()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** DELETE /api/league/parties — the commish wipes the season's parties. Tests use it. */
+router.delete('/parties', requireAuth, requireCommissioner, async (_req, res, next) => {
+  try {
+    await clearPartiesForSeason(leagueDataset.season);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/league/parties/:id/public — the share link's view. No sign-in:
+ * the games, the night, the host, the note and who is in. Nothing else.
+ */
+router.get('/parties/:id/public', async (req, res, next) => {
+  try {
+    const party = (await getParty(String(req.params.id))) as HouseParty | null;
+    if (!party || party.season !== leagueDataset.season) {
+      res.status(404).json({ error: 'No such party' });
+      return;
+    }
+    res.json({
+      party: {
+        id: party.id,
+        host: party.host,
+        games: party.games,
+        note: party.note,
+        cancelledAt: party.cancelledAt,
+        guests: whoIsIn(party),
+      },
+      headline: partyHeadline(party),
+      now: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
