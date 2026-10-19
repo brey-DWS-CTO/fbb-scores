@@ -42,6 +42,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     home: '/draft/start',
     tabs: [
       { to: '/draft', label: 'BOARD' },
+      { to: '/draft/recap', label: 'RECAP' },
       { to: '/my-rankings', label: 'MY RANKINGS' },
       { to: '/mock', label: 'MOCK DRAFT' },
       { to: '/projections', label: 'PROJECTIONS' },
@@ -101,6 +102,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
 /** True when `pathname` is `to` or a page under it, so /keepers/Brey is KEEPERS. */
 export function onPath(pathname: string, to: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+/**
+ * The one tab a page lights up: the longest tab path it sits on, so
+ * /draft/recap is RECAP and not BOARD as well.
+ */
+export function activeTab(pathname: string, tabs: readonly SectionTab[]): string | null {
+  return tabs
+    .filter((tab) => onPath(pathname, tab.to))
+    .reduce<string | null>((best, tab) => (best === null || tab.to.length > best.length ? tab.to : best), null);
 }
 
 /** The sections a viewer may see, with only the tabs they may see. */

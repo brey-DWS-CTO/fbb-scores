@@ -35,6 +35,7 @@ import RevealedPage from './components/league/RevealedPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
 import StatsGate from './components/league/StatsGate.js'
 import MyRankingsPage from './components/draft/MyRankingsPage.js'
+import DraftRecapPage from './components/draft/DraftRecapPage.js'
 
 function App() {
   const location = useLocation()
@@ -92,6 +93,7 @@ function App() {
         <Route path="/draft" element={<DraftPage />} />
         <Route path="/draft/start" element={<DraftStartPage />} />
         <Route path="/draft/tv" element={<DraftTvPage />} />
+        <Route path="/draft/recap" element={<StatsGate><DraftRecapPage /></StatsGate>} />
         <Route path="/my-rankings" element={<MyRankingsPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />

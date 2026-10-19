@@ -4,7 +4,7 @@ import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import { readSidebarCollapsed, writeSidebarCollapsed } from '../../lib/league/sidebar.js';
-import { onPath, sectionFor, sectionHome, visibleSections } from '../../lib/league/navSections.js';
+import { activeTab, sectionFor, sectionHome, visibleSections } from '../../lib/league/navSections.js';
 
 function NavBadge({ count, label }: { count: number; label: string }) {
   if (count <= 0) return null;
@@ -170,7 +170,8 @@ export default function AppNav() {
                     <NavLink
                       key={tab.to}
                       to={tab.to}
-                      className={onPath(location.pathname, tab.to) ? 'more-item active' : 'more-item'}
+                      end
+                      className={activeTab(location.pathname, section.tabs) === tab.to ? 'more-item active' : 'more-item'}
                       onClick={() => setMoreOpen(false)}
                     >
                       <span className="more-item-icon" aria-hidden="true"><NavIcon name={section.icon} /></span>

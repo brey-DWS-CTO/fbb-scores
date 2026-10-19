@@ -315,6 +315,8 @@ import { LmAddRefused, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
+import { parseRoast } from '../../src/lib/league/draftRecap.js';
+import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -583,6 +585,8 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
   // their own route, so they stay out of the poll payload.
   delete state.achievements;
   delete state.propBets;
+  // Roasts lean on the numbers, and members draft blind until it closes.
+  if (!viewer.isCommissioner && !result.state.draft.closedAt) delete state.draftRecap;
   return { ...result, state, meta };
 }
 
@@ -1361,6 +1365,52 @@ router.post('/commish-blind', requireAuth, requireCommissioner, async (req, res)
     draft.commishBlind = blind;
   });
   await appendAudit(actor(res), 'commish.blind', { blind });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * GET /api/league/draft-recap/edits — the commissioner's projection edits,
+ * which the recap grades with so every member sees the same grades. Members
+ * get them once the draft closes, like the rest of the recap.
+ */
+router.get('/draft-recap/edits', requireAuth, async (_req, res) => {
+  const { state } = await getState();
+  if (res.locals.isCommissioner !== true && !state.draft.closedAt) {
+    res.status(403).json({ error: 'The recap opens when the commish closes the draft' });
+    return;
+  }
+  const season = leagueDataset.season;
+  const commissioner = OWNERS.find((owner) => isCommissionerOwner(owner));
+  const rows = commissioner ? await listProjectionEdits(season, commissioner) : [];
+  // Drafted players ESPN never projected get Hashtag's line instead.
+  const [snapshot, pool] = await Promise.all([resolveCurrentDraftRankings(state), resolveDraftPlayerPool(state)]);
+  const poolById = new Map(pool.players.map((player) => [player.espnId, player]));
+  const keys = [
+    ...Object.values(state.draft.picks).map((pick) => pick.playerKey),
+    ...Object.values(state.keepers).flat().map((keeper) => keeper.playerKey),
+  ];
+  const drafted = keys.flatMap((key) => {
+    const player = key && /^p\d+$/.test(key) ? poolById.get(Number(key.slice(1))) : undefined;
+    return player ? [{ espnId: player.espnId, fullName: player.fullName, proTeam: player.proTeam }] : [];
+  });
+  const fills = missingFromEspn(drafted, snapshot, hashtagProjections as ExpertProjections);
+  res.json({ season, edits: rows.map((row) => row.edit), fills });
+});
+
+/** POST /api/league/draft-recap/roast — the commissioner writes one team's recap roast. */
+router.post('/draft-recap/roast', requireAuth, requireCommissioner, async (req, res) => {
+  let parsed: { owner: string; text: string };
+  try {
+    parsed = parseRoast(OWNERS, req.body);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+    return;
+  }
+  const result = await mutateState((draft) => {
+    const recap = draft.draftRecap?.season === draft.season ? draft.draftRecap : { season: draft.season, roasts: {} };
+    draft.draftRecap = { season: draft.season, roasts: { ...recap.roasts, [parsed.owner]: parsed.text } };
+  });
+  await appendAudit(actor(res), 'draft.recap.roast', { owner: parsed.owner, length: parsed.text.length });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
