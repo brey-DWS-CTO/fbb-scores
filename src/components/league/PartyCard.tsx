@@ -25,6 +25,7 @@ import {
   type PartyGame,
   type RostersByOwner,
 } from '../../lib/league/houseParty.js';
+import InviteSheet from './InviteSheet.js';
 import ShareButton from './ShareButton.js';
 import TeamLogo from './TeamLogo.js';
 
@@ -75,6 +76,7 @@ export default function PartyCard({ party, rosters, now, onChange, onEdit, linkT
   const [error, setError] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
   const viewer = identity?.owner ?? null;
   const over = partyOver(party, now);
   const off = party.cancelledAt !== null;
@@ -120,6 +122,11 @@ export default function PartyCard({ party, rosters, now, onChange, onEdit, linkT
 
       <div className="party-guests">
         {stakes.length === 0 && <div className="mock-note mock-note-dim">Nobody is in yet.</div>}
+        {(party.invites ?? []).filter((invite) => answerOf(party, invite.owner) === null).length > 0 && (
+          <div className="party-invited">
+            Asked: {(party.invites ?? []).filter((invite) => answerOf(party, invite.owner) === null).map((invite) => invite.owner).join(', ')}
+          </div>
+        )}
         {stakes.map((guest) => (
           <div key={guest.owner} className="party-guest">
             <span className="party-guest-name">
@@ -147,6 +154,9 @@ export default function PartyCard({ party, rosters, now, onChange, onEdit, linkT
               I'M IN
             </button>
           )}
+          {mine === 'in' && (
+            <button type="button" className="tap-btn mock-mini-btn is-host" disabled={busy} onClick={() => setInviting(true)}>INVITE</button>
+          )}
           {mine === 'in' && party.host !== viewer && (
             <button type="button" className="tap-btn mock-mini-btn" disabled={busy} onClick={() => void run(() => answerHouseParty(identity!, party.id, 'out'))}>
               CAN'T MAKE IT
@@ -172,6 +182,17 @@ export default function PartyCard({ party, rosters, now, onChange, onEdit, linkT
             </>
           )}
         </div>
+      )}
+
+      {inviting && (
+        <InviteSheet
+          party={party}
+          onDone={(next) => {
+            onChange(next);
+            setInviting(false);
+          }}
+          onClose={() => setInviting(false)}
+        />
       )}
 
       {viewer && noteDraft !== null && !party.host && (

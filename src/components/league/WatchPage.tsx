@@ -1,18 +1,15 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { useWatch } from '../../hooks/useWatch.js';
-import { OWNERS } from '../../lib/league/data.js';
-import { apiErrorMessage, fetchWatch, openHouseParty } from '../../lib/league/api.js';
+import { answerHouseParty, apiErrorMessage, fetchWatch } from '../../lib/league/api.js';
 import {
   byNight,
   dayLabel,
   fansOf,
   lastName,
   liveParties,
-  matchupLabel,
   partiesForGame,
-  partyTally,
-  pastParties,
   rankGames,
   teamNickname,
   tipLabel,
@@ -25,35 +22,33 @@ import FavoritesSheet from './FavoritesSheet.js';
 import HostSheet from './HostSheet.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
-import PartyCard from './PartyCard.js';
 import SignInPanel from './SignInPanel.js';
 import TeamLogo from './TeamLogo.js';
 
-type View = 'for-you' | 'nights' | 'parties';
+type View = 'games' | 'nights';
 
 const VIEWS: Array<{ id: View; label: string }> = [
-  { id: 'for-you', label: 'FOR YOU' },
+  { id: 'games', label: 'GAMES' },
   { id: 'nights', label: 'BY NIGHT' },
-  { id: 'parties', label: 'PARTIES' },
 ];
 
 /** Games already over for more than half a day are off the list. */
 const stale = (game: NbaGame, now: Date) => game.state === 'post' && now.getTime() - Date.parse(game.tipoff) > 12 * 60 * 60 * 1000;
 
 /**
- * WATCH: the next two weeks of NBA games ranked for you, and the house
- * parties around them. Tap HOST on a game to throw one, UP FOR IT to say you
- * would come to one, I'M IN on a party to join it.
+ * WATCH: the next two weeks of NBA games ranked for you, and who is hosting
+ * each one. Every card ends in one button: HOST when nobody has the house,
+ * JOIN when somebody does. The party itself lives at its own page.
  */
 export default function WatchPage() {
   const { identity } = useIdentity();
   const watch = useWatch();
-  const [view, setView] = useState<View>('for-you');
-  const [hosting, setHosting] = useState<{ main: NbaGame; editing: HouseParty | null } | null>(null);
+  const [view, setView] = useState<View>('games');
+  const [hosting, setHosting] = useState<NbaGame | null>(null);
   const [pickingTeams, setPickingTeams] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busyGame, setBusyGame] = useState<string | null>(null);
+  const [busyParty, setBusyParty] = useState<string | null>(null);
 
   const data = watch.data;
   // The server's clock when it answered; until it does, the moment the page opened.
@@ -65,9 +60,7 @@ export default function WatchPage() {
     ? rankGames({ viewer, games: data.games.filter((game) => !stale(game, now)), favorites: data.favorites, rosters: data.rosters })
     : []), [data, viewer, now]);
   const nights = useMemo(() => byNight(ranked), [ranked]);
-  const live = useMemo(() => (data ? liveParties(data.parties, now) : []), [data, now]);
-  const past = useMemo(() => (data ? pastParties(data.parties, now) : []), [data, now]);
-  const tally = useMemo(() => (data ? partyTally(OWNERS, data.parties, now).filter((row) => row.attended > 0 || row.hosted > 0) : []), [data, now]);
+  const mineLive = useMemo(() => (data ? liveParties(data.parties, now).filter((party) => whoIsIn(party).includes(viewer)) : []), [data, now, viewer]);
 
   if (!identity) return <SignInPanel reason="Sign in to see the games worth watching and who is hosting." />;
 
@@ -84,42 +77,25 @@ export default function WatchPage() {
     }
   };
 
-  const upFor = async (game: NbaGame) => {
-    if (busyGame) return;
-    setBusyGame(game.id);
+  const join = async (party: HouseParty) => {
+    if (busyParty) return;
+    setBusyParty(party.id);
     setError(null);
     try {
-      const result = await openHouseParty(identity, { gameIds: [game.id], hosting: false, note: '' });
-      watch.putParty(result.party);
+      watch.putParty((await answerHouseParty(identity, party.id, 'in')).party);
     } catch (caught) {
       setError(apiErrorMessage(caught));
     } finally {
-      setBusyGame(null);
+      setBusyParty(null);
     }
   };
 
-  const gameById = (id: string) => data?.games.find((game) => game.id === id) ?? null;
-
-  const partyList = (parties: HouseParty[]) => parties.map((party) => (
-    <PartyCard
-      key={party.id}
-      party={party}
-      rosters={data?.rosters ?? {}}
-      now={now}
-      onChange={watch.putParty}
-      onEdit={(target) => {
-        const main = gameById(target.games[0]?.id ?? '');
-        if (main) setHosting({ main, editing: target });
-      }}
-    />
-  ));
-
   const gameCard = (game: WatchGame) => {
-    const parties = data ? partiesForGame(data.parties, game.id, now) : [];
-    const upForIt = parties.filter((party) => !party.host);
-    const hosted = parties.filter((party) => party.host);
-    const iAmUpFor = upForIt.some((party) => whoIsIn(party).includes(viewer));
+    const party = data ? partiesForGame(data.parties, game.id, now).find((row) => row.host) ?? null : null;
+    const inIt = party !== null && whoIsIn(party).includes(viewer);
     const done = game.state === 'post';
+    const stakes = [...game.stakes].sort((a, b) => Number(b.owner === viewer) - Number(a.owner === viewer) || b.players.length - a.players.length || a.owner.localeCompare(b.owner));
+    const fans = data ? fansOf(data.favorites, game.home).concat(fansOf(data.favorites, game.away)).filter((owner) => owner !== viewer) : [];
     return (
       <article key={game.id} className={`panel game-card${game.favorites.length > 0 ? ' is-favorite' : ''}${done ? ' is-done' : ''}${game.state === 'in' ? ' is-live' : ''}`}>
         <div className="game-when">
@@ -127,6 +103,7 @@ export default function WatchPage() {
           <span>{game.state === 'pre' ? tipLabel(game.tipoff) : game.detail}</span>
           {game.tv && <span className="game-tv">{game.tv}</span>}
           {game.state === 'in' && <span className="game-live">LIVE</span>}
+          {game.favorites.length > 0 && <span className="game-yours">YOUR {game.favorites.map((team) => teamNickname(team).toUpperCase()).join(' & ')}</span>}
         </div>
         <div className="game-teams">
           <span className="game-team">
@@ -141,44 +118,40 @@ export default function WatchPage() {
             {game.homeScore !== null && game.state !== 'pre' && <b>{game.homeScore}</b>}
           </span>
         </div>
-        {game.stakes.length > 0 && (
-          <div className="game-stakes">
-            {game.stakes.map((stake) => (
-              <span key={stake.owner} className={`stake-owner${stake.owner === viewer ? ' is-me' : ''}`}>
-                <b>{stake.owner === viewer ? 'You' : stake.owner}</b>
+        <div className="game-stakes">
+          {stakes.length === 0 && <div className="game-stakes-none">No league players in this one.</div>}
+          {stakes.map((stake) => (
+            <div key={stake.owner} className={`stake-row${stake.owner === viewer ? ' is-me' : ''}`}>
+              <b>{stake.owner === viewer ? 'You' : stake.owner}</b>
+              <span>
                 {stake.players.map((player) => <span key={player.key} className="stake-chip" title={player.name}>{lastName(player.name)}</span>)}
               </span>
-            ))}
-          </div>
-        )}
-        {(() => {
-          const fans = data ? fansOf(data.favorites, game.home).concat(fansOf(data.favorites, game.away)).filter((owner) => owner !== viewer) : [];
-          return fans.length > 0 ? <div className="game-fans">Fans: {fans.join(', ')}</div> : null;
-        })()}
-        {hosted.map((party) => (
-          <div key={party.id} className="game-party">
-            <NavIcon name="home" size={14} className="icon-in-heading" />
-            <span><b>{party.host}</b> is hosting · {whoIsIn(party).length} in</span>
-            <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={() => setView('parties')}>SEE IT</button>
-          </div>
-        ))}
-        {upForIt.length > 0 && (
-          <div className="game-party is-open">
-            <NavIcon name="people" size={14} className="icon-in-heading" />
-            <span>Up for it: {upForIt.flatMap(whoIsIn).join(', ')}</span>
-            <button type="button" className="tap-btn mock-mini-btn" onClick={() => setView('parties')}>SEE IT</button>
-          </div>
-        )}
-        {!done && (
-          <div className="game-actions">
-            <button type="button" className="tap-btn mock-mini-btn is-host" onClick={() => setHosting({ main: game, editing: null })}>HOST</button>
-            {!iAmUpFor && hosted.length === 0 && (
-              <button type="button" className="tap-btn mock-mini-btn" disabled={busyGame === game.id} onClick={() => void upFor(game)}>
-                {busyGame === game.id ? 'SAVING…' : "I'M UP FOR IT"}
-              </button>
-            )}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
+        {fans.length > 0 && <div className="game-fans">Fans: {fans.join(', ')}</div>}
+        <div className="game-foot">
+          {party ? (
+            <>
+              <Link className="game-party-line" to={`/party/${party.id}`}>
+                <NavIcon name="home" size={14} className="icon-in-heading" />
+                <b>{party.host}</b> is hosting · {whoIsIn(party).length} in
+              </Link>
+              {inIt
+                ? <Link className="mock-mini-btn tap-btn is-in" to={`/party/${party.id}`}>YOU'RE IN</Link>
+                : (
+                  <button type="button" className="tap-btn mock-mini-btn is-primary" disabled={busyParty === party.id || done} onClick={() => void join(party)}>
+                    {busyParty === party.id ? 'JOINING…' : 'JOIN'}
+                  </button>
+                )}
+            </>
+          ) : (
+            <>
+              <span className="game-party-line is-none">Nobody is hosting yet.</span>
+              {!done && <button type="button" className="tap-btn mock-mini-btn is-host" onClick={() => setHosting(game)}>HOST</button>}
+            </>
+          )}
+        </div>
       </article>
     );
   };
@@ -229,6 +202,23 @@ export default function WatchPage() {
         )}
       </section>
 
+      {mineLive.length > 0 && (
+        <section className="panel watch-mine">
+          <div className="hub-heading watch-mine-head">YOUR PARTIES</div>
+          {mineLive.map((party) => (
+            <Link key={party.id} className="watch-mine-row" to={`/party/${party.id}`}>
+              <TeamLogo code={party.games[0]?.away ?? null} size={22} />
+              <TeamLogo code={party.games[0]?.home ?? null} size={22} />
+              <span>
+                <strong>{party.games[0] ? `${teamNickname(party.games[0].away)} at ${teamNickname(party.games[0].home)}` : 'House party'}</strong>
+                <small>{party.games[0] && `${dayLabel(party.games[0].tipoff)}, ${tipLabel(party.games[0].tipoff)} · `}{party.host === viewer ? 'you host' : `${party.host} hosts`} · {whoIsIn(party).length} in</small>
+              </span>
+              <span className="mock-mini-btn">OPEN</span>
+            </Link>
+          ))}
+        </section>
+      )}
+
       <nav className="watch-tabs" aria-label="Views">
         {VIEWS.map((entry) => (
           <button
@@ -238,7 +228,6 @@ export default function WatchPage() {
             onClick={() => setView(entry.id)}
           >
             {entry.label}
-            {entry.id === 'parties' && live.length > 0 && <span className="nav-pill">{live.length}</span>}
           </button>
         ))}
       </nav>
@@ -248,7 +237,7 @@ export default function WatchPage() {
       {watch.isError && <div className="mock-note mock-note-bad">Could not read the schedule. Try REFRESH.</div>}
       {data?.error && <div className="mock-note mock-note-warn">{data.error}</div>}
 
-      {data && view === 'for-you' && (
+      {data && view === 'games' && (
         <section className="watch-games">
           {ranked.length === 0 && <div className="mock-note mock-note-dim">No games in the next two weeks.</div>}
           {ranked.map(gameCard)}
@@ -266,48 +255,17 @@ export default function WatchPage() {
         </section>
       )}
 
-      {data && view === 'parties' && (
-        <section className="watch-parties">
-          {live.length === 0 && (
-            <div className="mock-note mock-note-dim">
-              No parties on the calendar. Tap HOST on a game, or I'M UP FOR IT and see who bites.
-            </div>
-          )}
-          {partyList(live)}
-          {tally.length > 0 && (
-            <div className="panel party-tally">
-              <div className="hub-heading party-tally-head">PARTY PEOPLE</div>
-              <table className="party-tally-table">
-                <thead><tr><th>Who</th><th>Went</th><th>Hosted</th></tr></thead>
-                <tbody>
-                  {tally.map((row) => <tr key={row.owner}><td>{row.owner}</td><td>{row.attended}</td><td>{row.hosted}</td></tr>)}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {past.length > 0 && (
-            <>
-              <h2 className="hub-heading watch-night-head">ALREADY HAPPENED</h2>
-              {partyList(past)}
-            </>
-          )}
-        </section>
-      )}
-
       {hosting && data && (
         <HostSheet
-          main={hosting.main}
+          main={hosting}
           games={ranked}
-          editing={hosting.editing}
           onDone={(party) => {
             watch.putParty(party);
             setHosting(null);
-            setView('parties');
           }}
           onClose={() => setHosting(null)}
         />
       )}
-      {hosting && !data && <div className="mock-note">{matchupLabel(hosting.main)}</div>}
     </main>
   );
 }

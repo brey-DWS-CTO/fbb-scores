@@ -318,7 +318,10 @@ import {
   cleanPartyNote,
   editParty,
   FAVORITES_PROBLEM_WORDS,
+  inviteTo,
   openParty,
+  pendingInvites,
+  putOffInvite,
   PARTY_PROBLEM_WORDS,
   partyHeadline,
   partyId,
@@ -5111,6 +5114,39 @@ router.post('/parties/:id/cancel', requireAuth, async (req, res, next) => {
   try {
     const isCommissioner = res.locals.isCommissioner === true;
     await changeParty(req, res, 'party-cancel', (party, owner) => cancelParty(party, owner, isCommissioner, new Date().toISOString()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/parties/:id/invite — ask people. `{ owners: string[] }`. Anyone in the party may. */
+router.post('/parties/:id/invite', requireAuth, async (req, res, next) => {
+  try {
+    const raw = (req.body as { owners?: unknown } | undefined)?.owners;
+    const owners = Array.isArray(raw) ? raw.filter((owner): owner is string => typeof owner === 'string' && isKnownOwner(owner)) : [];
+    await changeParty(req, res, 'party-invite', (party, owner) => {
+      if (partyOver(party, new Date())) return { ok: false, problem: 'over' };
+      return inviteTo(party, owner, owners, new Date().toISOString());
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/parties/:id/invite/later — put the popup down without answering. */
+router.post('/parties/:id/invite/later', requireAuth, async (req, res, next) => {
+  try {
+    await changeParty(req, res, 'party-invite-later', (party, owner) => putOffInvite(party, owner, new Date().toISOString()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/league/invites — the invites waiting on you, oldest first. Light: no ESPN read. */
+router.get('/invites', requireAuth, async (_req, res, next) => {
+  try {
+    const owner = res.locals.owner as string;
+    res.json({ invites: pendingInvites(await partiesThisSeason(), owner, new Date()), now: new Date().toISOString() });
   } catch (err) {
     next(err);
   }

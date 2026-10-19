@@ -37,6 +37,7 @@ import MyRankingsPage from './components/draft/MyRankingsPage.js'
 import WatchPage from './components/league/WatchPage.js'
 import PartyPage from './components/league/PartyPage.js'
 import FavoritesPrompt from './components/league/FavoritesPrompt.js'
+import InviteToast from './components/league/InviteToast.js'
 
 function App() {
   const location = useLocation()
@@ -85,6 +86,7 @@ function App() {
       {!bareMode && <AppNav />}
       {!bareMode && !sandbox && <AchievementToast />}
       {!bareMode && !sandbox && <FavoritesPrompt />}
+      {!bareMode && !sandbox && <InviteToast />}
       <ActingAsBanner />
       {!bareMode && <SectionTabs />}
       <Routes>

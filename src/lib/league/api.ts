@@ -7,7 +7,7 @@ import type { SavedBoard } from './mockBoard.js';
 import type { SharedMockRoom } from './sharedMock.js';
 import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
-import type { FavoritesByOwner, HouseParty, NbaGame, RostersByOwner, RsvpAnswer } from './houseParty.js';
+import type { FavoritesByOwner, HouseParty, NbaGame, PendingInvite, RostersByOwner, RsvpAnswer } from './houseParty.js';
 import axios from 'axios';
 import { TEST_DRAFT_HEADER, draftRoomHeaders, type DraftRoom, type TestDraftMeta } from './testDraft.js';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
@@ -1935,5 +1935,23 @@ export interface PublicParty {
 
 export async function fetchPublicParty(id: string): Promise<PublicParty> {
   const { data } = await axios.get<PublicParty>(`/api/league/parties/${encodeURIComponent(id)}/public`);
+  return data;
+}
+
+/** Ask people to a party. Anyone in it may. */
+export async function inviteToHouseParty(c: Credentials, id: string, owners: string[]): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/invite`, { owners }, { headers: authHeaders(c) });
+  return data;
+}
+
+/** LATER on an invite popup: it stays down, the party stays open to you. */
+export async function putOffHouseInvite(c: Credentials, id: string): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/invite/later`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** The invites waiting on you. */
+export async function fetchHouseInvites(c: Credentials): Promise<{ invites: PendingInvite[]; now: string }> {
+  const { data } = await axios.get<{ invites: PendingInvite[]; now: string }>('/api/league/invites', { headers: authHeaders(c) });
   return data;
 }

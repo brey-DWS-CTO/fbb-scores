@@ -252,3 +252,29 @@ test('the host edits and calls off; a guest may not; the commish may', async () 
   const gone = await post('Kyle', '/api/league/parties/nope1234/rsvp', { answer: 'in' });
   assert.equal(gone.status, 404);
 });
+
+test('people in a party can invite; the invited see a popup until they answer or put it off', async () => {
+  const party = partyOf((await post('Kyle', '/api/league/parties', { gameIds: ['g1'], hosting: true })).body);
+
+  const outsider = await post('Ryan', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin'] });
+  assert.equal(outsider.status, 409);
+  assert.equal((outsider.body as { code: string }).code, 'not-in');
+
+  const asked = await post('Kyle', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin', 'Amy', 'Nobody'] });
+  assert.equal(asked.status, 200);
+  assert.deepEqual(partyOf(asked.body).invites?.map((row) => row.owner), ['Dustin', 'Amy']);
+
+  const waiting = await request('/api/league/invites', { headers: auth('Dustin') });
+  assert.equal(waiting.status, 200);
+  const invites = (waiting.body as { invites: Array<{ party: HouseParty; by: string }> }).invites;
+  assert.deepEqual(invites.map((row) => [row.party.id, row.by]), [[party.id, 'Kyle']]);
+
+  const later = await post('Dustin', `/api/league/parties/${party.id}/invite/later`, {});
+  assert.equal(later.status, 200);
+  const quiet = await request('/api/league/invites', { headers: auth('Dustin') });
+  assert.deepEqual((quiet.body as { invites: unknown[] }).invites, []);
+
+  await post('Amy', `/api/league/parties/${party.id}/rsvp`, { answer: 'in' });
+  const answered = await request('/api/league/invites', { headers: auth('Amy') });
+  assert.deepEqual((answered.body as { invites: unknown[] }).invites, []);
+});

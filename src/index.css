@@ -5515,10 +5515,10 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .watch-tab { position: relative; flex: 1; min-height: 40px; border: 2px solid var(--panel-border); border-radius: 8px; background: transparent; color: var(--text-mid); font-size: 0.66rem; }
 .watch-tab.active { border-color: var(--neon-orange); color: var(--neon-orange); background: color-mix(in srgb, var(--neon-orange) 10%, transparent); }
 .watch-tab .nav-pill { margin-left: 6px; }
-.watch-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.watch-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
 .watch-night { margin-bottom: 18px; }
 .watch-night-head { color: var(--neon-teal); font-size: 0.72rem; margin: 14px 0 8px; }
-.game-card { padding: 12px 14px; border-radius: 10px; display: grid; gap: 8px; align-content: start; }
+.game-card { padding: 12px 14px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
 .game-card.is-favorite { border-color: var(--neon-orange); }
 .game-card.is-done { opacity: 0.6; }
 .game-card.is-live { border-color: var(--neon-red); }
@@ -5532,16 +5532,40 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .game-team b { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--neon-yellow); }
 .game-at { color: var(--text-dim); font-size: 0.7rem; }
 .game-why { color: var(--text-body); font-size: 0.78rem; line-height: 1.4; }
-.game-stakes { display: flex; flex-wrap: wrap; gap: 6px 12px; }
-.stake-owner { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 0.7rem; color: var(--text-mid); }
-.stake-owner b { color: var(--text-hi); margin-right: 2px; }
-.stake-owner.is-me b { color: var(--neon-teal); }
+.game-yours { padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--neon-orange) 18%, transparent); color: var(--neon-orange); font-size: 0.6rem; font-weight: 800; }
+/* One row an owner, name in a fixed column, so the chips line up card to card. */
+.game-stakes { display: grid; gap: 4px; flex: 1; }
+.game-stakes-none { color: var(--text-dim); font-size: 0.7rem; }
+.stake-row { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: start; gap: 6px; font-size: 0.7rem; }
+.stake-row b { color: var(--text-hi); font-weight: 800; padding-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stake-row.is-me b { color: var(--neon-teal); }
+.stake-row > span { display: flex; flex-wrap: wrap; gap: 4px; }
 .stake-chip { padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--neon-teal) 14%, transparent); color: var(--text-body); font-size: 0.64rem; font-weight: 700; white-space: nowrap; }
 .game-fans { color: var(--text-dim); font-size: 0.68rem; }
 .game-party { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--neon-orange); border-radius: 8px; color: var(--text-body); font-size: 0.74rem; }
 .game-party.is-open { border-style: dashed; border-color: var(--panel-border); }
 .game-party > span { flex: 1; }
 .game-party b { color: var(--neon-orange); }
+.game-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--cell-border); }
+.game-party-line { display: inline-flex; align-items: center; gap: 4px; color: var(--text-body); font-size: 0.74rem; text-decoration: none; min-width: 0; }
+.game-party-line b { color: var(--neon-orange); }
+.game-party-line.is-none { color: var(--text-dim); }
+.mock-mini-btn.is-in { border-color: var(--neon-teal); color: var(--neon-teal); text-decoration: none; display: inline-flex; align-items: center; }
+.watch-mine { padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; display: grid; gap: 6px; }
+.watch-mine-head { color: var(--neon-orange); font-size: 0.66rem; }
+.watch-mine-row { display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text-body); }
+.watch-mine-row > span:not(.mock-mini-btn) { display: grid; flex: 1; min-width: 0; margin-left: 4px; }
+.watch-mine-row strong { color: var(--text-max); font-size: 0.82rem; }
+.watch-mine-row small { color: var(--text-mid); font-size: 0.66rem; }
+.watch-mine-row .mock-mini-btn { display: inline-flex; align-items: center; }
+.party-invited { color: var(--text-dim); font-size: 0.7rem; }
+.invite-toast { position: fixed; right: 12px; bottom: 12px; z-index: 190; width: min(calc(100vw - 24px), 360px); padding: 12px 14px; border-radius: 12px; border-color: var(--neon-orange); box-shadow: 0 18px 60px rgba(0,0,0,0.52); display: grid; gap: 8px; animation: account-menu-in 0.16s ease-out; }
+.invite-toast-head { display: flex; align-items: center; gap: 4px; color: var(--neon-orange); font-size: 0.7rem; }
+.invite-toast-body { display: flex; align-items: center; gap: 8px; color: var(--text-max); font-size: 0.82rem; line-height: 1.35; }
+.invite-toast-note { color: var(--text-mid); font-size: 0.74rem; }
+.invite-toast-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.invite-toast-link { margin-left: auto; color: var(--neon-teal); font-size: 0.7rem; }
+@media (max-width: 839px) { .invite-toast { bottom: 78px; left: 12px; width: auto; } }
 .game-actions, .party-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
 .mock-mini-btn.is-host { border-color: var(--neon-orange); color: var(--neon-orange); background: color-mix(in srgb, var(--neon-orange) 10%, transparent); }
 .mock-mini-btn.is-danger { border-color: var(--neon-red); color: var(--neon-red); }
