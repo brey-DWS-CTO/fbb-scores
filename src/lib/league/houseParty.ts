@@ -70,9 +70,12 @@ export function teamFullName(code: string): string {
   return team ? `${team.city} ${team.name}` : code;
 }
 
+/** ESPN's CDN files two logos under its own short codes, not the three-letter ones. */
+const LOGO_CODES: Readonly<Record<string, string>> = { NOP: 'no', UTA: 'utah' };
+
 /** ESPN's logo for a team, from its public CDN. */
 export function teamLogoUrl(code: string): string {
-  return `https://a.espncdn.com/i/teamlogos/nba/500/${code.toLowerCase()}.png`;
+  return `https://a.espncdn.com/i/teamlogos/nba/500/${LOGO_CODES[code] ?? code.toLowerCase()}.png`;
 }
 
 /**

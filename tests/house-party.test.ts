@@ -27,6 +27,7 @@ import {
   rsvp,
   stakesIn,
   takeHosting,
+  teamLogoUrl,
   teamNickname,
   whoIsIn,
   whyLine,
@@ -348,4 +349,10 @@ test('the tally counts parties that happened, most attended first', () => {
     { owner: 'Amy', hosted: 0, attended: 0 },
   ]);
   assert.deepEqual(partyTally(['Kyle'], [p], new Date(AT)), [{ owner: 'Kyle', hosted: 0, attended: 0 }], 'not yet happened');
+});
+
+test('logo files use ESPN\'s own short codes where the three-letter one is missing', () => {
+  assert.match(teamLogoUrl('NOP'), /\/no\.png$/);
+  assert.match(teamLogoUrl('UTA'), /\/utah\.png$/);
+  assert.match(teamLogoUrl('GSW'), /\/gsw\.png$/);
 });
