@@ -171,8 +171,16 @@ export interface Move {
   byLeagueManager: boolean;
 }
 
+/** "Giannis Antetokounmpo" as "G. Antetokounmpo", the league's house style for a player. */
+export function shortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  // "Player 12345" is a placeholder, not a name.
+  if (parts.length < 2 || /^\d+$/.test(parts[parts.length - 1])) return fullName.trim();
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+}
+
 const withTeam = (row: Pick<LeagueTransaction, 'playerName' | 'proTeam'>) =>
-  row.proTeam ? `${row.playerName} (${row.proTeam})` : row.playerName;
+  row.proTeam ? `${shortName(row.playerName)} (${row.proTeam})` : shortName(row.playerName);
 
 const list = (names: string[]) => (names.length === 0 ? 'nobody' : names.join(', '));
 

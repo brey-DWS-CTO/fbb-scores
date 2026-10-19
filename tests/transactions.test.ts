@@ -3,6 +3,7 @@ import test from 'node:test';
 import sample from './fixtures/espn-transactions-sample.json' with { type: 'json' };
 import {
   movesFor,
+  shortName,
   movesOf,
   normalizeTransactions,
   transactionKey,
@@ -89,11 +90,11 @@ test('rows fold into moves, newest first, in words', () => {
   assert.deepEqual(moves.map((move) => move.title), [
     'Dustin added Player 9999999',
     'Kyle and Joel traded',
-    'Joel claimed Bub Carrington (WAS) ($12)',
-    'Kyle added Jalen Green (PHX), dropped Talen Horton-Tucker (CHI)',
+    'Joel claimed B. Carrington (WAS) ($12)',
+    'Kyle added J. Green (PHX), dropped T. Horton-Tucker (CHI)',
   ]);
   const trade = moves[1];
-  assert.deepEqual(trade.lines, ['Kyle gets Devin Vassell (SAS), Keldon Johnson (SAS).', 'Joel gets Trae Young (ATL).']);
+  assert.deepEqual(trade.lines, ['Kyle gets D. Vassell (SAS), K. Johnson (SAS).', 'Joel gets T. Young (ATL).']);
   assert.deepEqual(trade.owners, ['Kyle', 'Joel']);
   assert.deepEqual(moves[0].lines, ['LM add']);
 });
@@ -104,11 +105,17 @@ test('a drop on its own reads as a drop', () => {
     bid: null, toTeamId: null, toOwner: null, at: '2026-11-01T00:00:00.000Z', scoringPeriodId: 10, byLeagueManager: false,
   }]);
   assert.equal(moves[0].kind, 'drop');
-  assert.equal(moves[0].title, 'Kyle dropped Cam Thomas (BKN)');
+  assert.equal(moves[0].title, 'Kyle dropped C. Thomas (BKN)');
 });
 
 test('a team filter keeps the moves that owner was in, trades included', () => {
   const moves = movesOf(normalizeTransactions(raw, ctx));
   assert.deepEqual(movesFor(moves, 'Joel').map((move) => move.id), ['ddd-4', 'bbb-2']);
   assert.equal(movesFor(moves, null).length, moves.length);
+});
+
+test('player names read first initial, dot, last name', () => {
+  assert.equal(shortName('Giannis Antetokounmpo'), 'G. Antetokounmpo');
+  assert.equal(shortName('Talen Horton-Tucker'), 'T. Horton-Tucker');
+  assert.equal(shortName('Nene'), 'Nene');
 });
