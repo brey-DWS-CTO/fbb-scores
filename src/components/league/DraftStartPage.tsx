@@ -3,6 +3,7 @@ import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import { formatDraftAt } from '../../lib/league/format.js';
 import { mockSaveKey, parseMockSave } from '../../lib/league/draftRoom.js';
+import { draftPhase } from '../../lib/league/draftLock.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 
@@ -24,7 +25,9 @@ export default function DraftStartPage() {
   const { identity } = useIdentity();
   const { state, meta } = useLeagueData();
   const owner = identity?.owner ?? null;
-  const live = state.draft.startedAt !== null && !state.draft.closedAt;
+  const phase = draftPhase(state.draft);
+  const live = phase === 'live';
+  const done = phase === 'done';
   const underWay = mockUnderWay(owner);
 
   return (
@@ -37,6 +40,14 @@ export default function DraftStartPage() {
         <IdentityChip />
       </div>
 
+      {done && (
+        <Link to="/draft/recap" className="tap-btn start-btn start-btn-recap">
+          <span className="start-btn-icon" aria-hidden="true"><NavIcon name="trophy" size="1.6em" /></span>
+          <span className="start-btn-title hub-heading">DRAFT RECAP</span>
+          <span className="start-btn-sub">Draft complete. Grades, steals, reaches and every pick.</span>
+        </Link>
+      )}
+
       <Link to="/mock" className="tap-btn start-btn start-btn-mock">
         <span className="start-btn-icon" aria-hidden="true"><NavIcon name="flask" size="1.6em" /></span>
         <span className="start-btn-title hub-heading">{underWay ? 'CONTINUE MOCK' : 'MOCK DRAFT'}</span>
@@ -45,11 +56,11 @@ export default function DraftStartPage() {
 
       <Link to="/draft" className={`tap-btn start-btn start-btn-live${live ? ' is-live' : ''}`}>
         <span className="start-btn-icon" aria-hidden="true"><NavIcon name="tv" size="1.6em" /></span>
-        <span className="start-btn-title hub-heading">LIVE DRAFT</span>
+        <span className="start-btn-title hub-heading">{done ? 'THE BOARD' : 'LIVE DRAFT'}</span>
         <span className="start-btn-sub">
-          {live ? 'The real draft is on now.' : meta?.draftAt ? formatDraftAt(meta.draftAt) : 'The real board.'}
+          {done ? 'Draft complete. Every pick, round by round.' : live ? 'The real draft is on now.' : meta?.draftAt ? formatDraftAt(meta.draftAt) : 'The real board.'}
         </span>
-        {!live && meta?.draftAt && (
+        {phase === 'before' && meta?.draftAt && (
           <span className="start-btn-count"><DraftCountdown targetIso={meta.draftAt} size="1.1rem" /></span>
         )}
       </Link>
