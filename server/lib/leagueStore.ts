@@ -13,6 +13,8 @@
  * first sign-in (claimPin). Commissioner status always comes from that config
  * file, never from storage.
  */
+import type { PresenceRow } from '../../src/lib/league/presence.js';
+import type { DraftList } from '../../src/lib/league/autoDraft.js';
 import crypto from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
@@ -67,6 +69,8 @@ export interface DraftPickState {
   clockCalledBy?: string | null;
   /** The called clock ran out and this pick was entered late, rule 2.3.2.2. */
   skipped?: boolean;
+  /** The server made this pick for a team on auto. See src/lib/league/autoDraft.ts. */
+  auto?: boolean;
 }
 
 export interface LeagueOverrides {
@@ -90,6 +94,8 @@ export interface LeagueDynamicState {
     /** The pick timer and any CLOCK call, rule 2.3. See src/lib/league/draftClock.ts. */
     clock?: DraftClockState | null;
     skipped?: Record<string, SkippedPick>;
+    /** Teams the commissioner has put on auto. See src/lib/league/autoDraft.ts. */
+    autoOwners?: string[];
   };
   playerPool?: {
     activeSnapshotId: string | null;
@@ -424,6 +430,8 @@ export interface ConfigTeam {
   draftPosition: number;
   originalMember?: boolean;
   isCommissioner?: boolean;
+  /** May read and save other members' private rankings for them. Never the commissioner. */
+  rankingsSteward?: boolean;
 }
 
 export const CONFIG_TEAMS = leagueConfig.teams as ConfigTeam[];
@@ -446,6 +454,15 @@ export function isCommissionerOwner(owner: string): boolean {
   return COMMISSIONERS.has(owner);
 }
 
+const RANKINGS_STEWARDS = new Set(
+  CONFIG_TEAMS.filter((t) => t.rankingsSteward === true && t.isCommissioner !== true).map((t) => t.owner),
+);
+
+/** A trusted member who enters rankings for others. The commissioner never is one; he stays blind. */
+export function isRankingsSteward(owner: string): boolean {
+  return RANKINGS_STEWARDS.has(owner);
+}
+
 function defaultState(): LeagueDynamicState {
   return {
     season: SEASON,
@@ -456,6 +473,17 @@ function defaultState(): LeagueDynamicState {
     pickTransfers: [],
     pickTradeProposals: [],
   };
+}
+
+/** The league_state row that holds the shared test draft. Row 1 is the league. */
+const TEST_DRAFT_ROW = 2;
+
+/** A test-draft write landed after the commissioner ended the test. */
+export class TestDraftMissingError extends Error {
+  constructor() {
+    super('The test draft has ended');
+    this.name = 'TestDraftMissingError';
+  }
 }
 
 /** Unclaimed PINs are stored as the empty string. */
@@ -469,6 +497,18 @@ const TEMP_PREFIX = 'T:';
 interface StoreBackend {
   getState(): Promise<StateResult>;
   mutateState(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
+  getTestDraft(): Promise<StateResult | null>;
+  setTestDraft(state: LeagueDynamicState | null): Promise<void>;
+  mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
+  touchPresence(room: string, owner: string, at: string): Promise<void>;
+  listPresence(room: string, since: string): Promise<PresenceRow[]>;
+  /** One member's private auto-pick list. Only ever read for the owner it belongs to. */
+  getDraftList(season: number, owner: string): Promise<DraftList | null>;
+  setDraftList(season: number, owner: string, list: DraftList | null): Promise<void>;
+  /** Who has a list saved. Names only, never the lists. */
+  draftListOwners(season: number): Promise<string[]>;
+  setDraftQueue(room: string, owner: string, keys: string[]): Promise<void>;
+  getDraftQueues(room: string): Promise<Record<string, string[]>>;
   getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario>;
   setKeeperScenarioTarget(
     season: number,
@@ -894,6 +934,26 @@ class NeonBackend implements StoreBackend {
       updated_by text not null,
       primary key (season, owner, espn_id)
     )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_queues (
+      room text not null,
+      owner text not null,
+      keys jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (room, owner)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_presence (
+      room text not null,
+      owner text not null,
+      seen_at timestamptz not null,
+      primary key (room, owner)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_lists (
+      season int not null,
+      owner text not null,
+      list jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (season, owner)
+    )`;
     // Edits were league-wide until 16 October 2026. Each old row becomes the
     // edit of whoever saved it, and the key gains the owner.
     await this.sql`ALTER TABLE projection_edits ADD COLUMN IF NOT EXISTS owner text`;
@@ -967,6 +1027,103 @@ class NeonBackend implements StoreBackend {
       if (updated[0]) return { state: draft, version: updated[0].version };
     }
     throw new Error('League state changed too often; retry the request');
+  }
+
+  // The shared test draft is a second row of league_state. Every live query
+  // names id = 1, so row 2 never leaks into the real league.
+  async getTestDraft(): Promise<StateResult | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data, version, updated_at FROM league_state WHERE id = ${TEST_DRAFT_ROW}`) as Array<{
+      data: LeagueDynamicState;
+      version: number;
+      updated_at: string | Date;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return { state: row.data, version: row.version, updatedAt: new Date(row.updated_at).toISOString() };
+  }
+
+  async setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+    await this.ensureInit();
+    if (state === null) {
+      await this.sql`DELETE FROM league_state WHERE id = ${TEST_DRAFT_ROW}`;
+      return;
+    }
+    await this.sql`INSERT INTO league_state (id, data, version)
+      VALUES (${TEST_DRAFT_ROW}, ${JSON.stringify(state)}::jsonb, 1)
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, version = league_state.version + 1, updated_at = now()`;
+  }
+
+  async mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+    await this.ensureInit();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const rows = (await this.sql`SELECT data, version FROM league_state WHERE id = ${TEST_DRAFT_ROW}`) as Array<{
+        data: LeagueDynamicState;
+        version: number;
+      }>;
+      const row = rows[0];
+      if (!row) throw new TestDraftMissingError();
+      const draft = structuredClone(row.data);
+      fn(draft);
+      const updated = (await this.sql`UPDATE league_state
+        SET data = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
+        WHERE id = ${TEST_DRAFT_ROW} AND version = ${row.version}
+          AND data->'draft'->>'startedAt' = ${row.data.draft.startedAt}
+        RETURNING version`) as Array<{ version: number }>;
+      if (updated[0]) return { state: draft, version: updated[0].version };
+    }
+    throw new Error('The test draft changed too often; retry the request');
+  }
+
+  async touchPresence(room: string, owner: string, at: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO draft_presence (room, owner, seen_at)
+      VALUES (${room}, ${owner}, ${at})
+      ON CONFLICT (room, owner) DO UPDATE SET seen_at = EXCLUDED.seen_at`;
+  }
+
+  async listPresence(room: string, since: string): Promise<PresenceRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, seen_at FROM draft_presence
+      WHERE room = ${room} AND seen_at >= ${since}`) as Array<{ owner: string; seen_at: string | Date }>;
+    return rows.map((row) => ({ owner: row.owner, seenAt: new Date(row.seen_at).toISOString() }));
+  }
+
+  async getDraftList(season: number, owner: string): Promise<DraftList | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT list FROM draft_lists
+      WHERE season = ${season} AND owner = ${owner}`) as Array<{ list: DraftList }>;
+    return rows[0]?.list ?? null;
+  }
+
+  async setDraftList(season: number, owner: string, list: DraftList | null): Promise<void> {
+    await this.ensureInit();
+    if (list === null) {
+      await this.sql`DELETE FROM draft_lists WHERE season = ${season} AND owner = ${owner}`;
+      return;
+    }
+    await this.sql`INSERT INTO draft_lists (season, owner, list, updated_at)
+      VALUES (${season}, ${owner}, ${JSON.stringify(list)}::jsonb, now())
+      ON CONFLICT (season, owner) DO UPDATE SET list = EXCLUDED.list, updated_at = now()`;
+  }
+
+  async draftListOwners(season: number): Promise<string[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner FROM draft_lists WHERE season = ${season} ORDER BY owner`) as Array<{ owner: string }>;
+    return rows.map((row) => row.owner);
+  }
+
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO draft_queues (room, owner, keys, updated_at)
+      VALUES (${room}, ${owner}, ${JSON.stringify(keys)}::jsonb, now())
+      ON CONFLICT (room, owner) DO UPDATE SET keys = EXCLUDED.keys, updated_at = now()`;
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, keys FROM draft_queues WHERE room = ${room}`) as Array<{ owner: string; keys: string[] }>;
+    return Object.fromEntries(rows.map((row) => [row.owner, Array.isArray(row.keys) ? row.keys : []]));
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -2024,6 +2181,14 @@ interface FileDoc {
   ownerEmails: OwnerEmailRow[];
   loginTokens: LoginTokenRow[];
   sessions: SessionRow[];
+  /** The shared test draft, or null when none is running. */
+  testDraft?: { state: LeagueDynamicState; version: number; updatedAt: string } | null;
+  /** Who has a draft page open, by room. */
+  draftPresence?: Array<PresenceRow & { room: string }>;
+  /** Each member's private auto-pick list. */
+  draftLists?: Array<{ season: number; owner: string; list: DraftList }>;
+  /** Each owner's draft queue, by room. */
+  draftQueues?: Array<{ room: string; owner: string; keys: string[] }>;
 }
 
 /** Every list a fresh document starts with. */
@@ -2120,6 +2285,10 @@ class FileBackend implements StoreBackend {
         ownerEmails: Array.isArray(doc.ownerEmails) ? doc.ownerEmails : [],
         loginTokens: Array.isArray(doc.loginTokens) ? doc.loginTokens : [],
         sessions: Array.isArray(doc.sessions) ? doc.sessions : [],
+        testDraft: doc.testDraft ?? null,
+        draftPresence: Array.isArray(doc.draftPresence) ? doc.draftPresence : [],
+        draftLists: Array.isArray(doc.draftLists) ? doc.draftLists : [],
+        draftQueues: Array.isArray(doc.draftQueues) ? doc.draftQueues : [],
       };
     } catch {
       // A missing or unreadable file starts empty. Every list must be present,
@@ -2158,6 +2327,92 @@ class FileBackend implements StoreBackend {
       this.writeDoc(doc);
       return { state: doc.state, version: doc.version };
     });
+  }
+
+
+  async getTestDraft(): Promise<StateResult | null> {
+    await this.ensureInit();
+    return this.readDoc().testDraft ?? null;
+  }
+
+  async setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.testDraft = state === null
+        ? null
+        : { state, version: (doc.testDraft?.version ?? 0) + 1, updatedAt: new Date().toISOString() };
+      this.writeDoc(doc);
+    });
+  }
+
+  async mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (!doc.testDraft) throw new TestDraftMissingError();
+      const draft = structuredClone(doc.testDraft.state);
+      fn(draft);
+      doc.testDraft = { state: draft, version: doc.testDraft.version + 1, updatedAt: new Date().toISOString() };
+      this.writeDoc(doc);
+      return { state: draft, version: doc.testDraft.version };
+    });
+  }
+
+  async touchPresence(room: string, owner: string, at: string): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const rows = (doc.draftPresence ?? []).filter((row) => !(row.room === room && row.owner === owner));
+      rows.push({ room, owner, seenAt: at });
+      doc.draftPresence = rows;
+      this.writeDoc(doc);
+    });
+  }
+
+  async listPresence(room: string, since: string): Promise<PresenceRow[]> {
+    await this.ensureInit();
+    return (this.readDoc().draftPresence ?? [])
+      .filter((row) => row.room === room && row.seenAt >= since)
+      .map(({ owner, seenAt }) => ({ owner, seenAt }));
+  }
+  async getDraftList(season: number, owner: string): Promise<DraftList | null> {
+    await this.ensureInit();
+    const row = (this.readDoc().draftLists ?? []).find((entry) => entry.season === season && entry.owner === owner);
+    return row ? structuredClone(row.list) : null;
+  }
+
+  async setDraftList(season: number, owner: string, list: DraftList | null): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const rows = (doc.draftLists ?? []).filter((entry) => !(entry.season === season && entry.owner === owner));
+      if (list !== null) rows.push({ season, owner, list: structuredClone(list) });
+      doc.draftLists = rows;
+      this.writeDoc(doc);
+    });
+  }
+
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.draftQueues = [...(doc.draftQueues ?? []).filter((row) => !(row.room === room && row.owner === owner)), { room, owner, keys }];
+      this.writeDoc(doc);
+    });
+  }
+
+  async draftListOwners(season: number): Promise<string[]> {
+    await this.ensureInit();
+    return (this.readDoc().draftLists ?? [])
+      .filter((entry) => entry.season === season)
+      .map((entry) => entry.owner)
+      .sort();
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    return Object.fromEntries((this.readDoc().draftQueues ?? []).filter((row) => row.room === room).map((row) => [row.owner, row.keys]));
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -2973,6 +3228,58 @@ export async function mutateState(
   fn: (draft: LeagueDynamicState) => void,
 ): Promise<MutateResult> {
   return getBackend().mutateState(fn);
+}
+
+/** The shared test draft, or null when none is running. */
+export async function getTestDraft(): Promise<StateResult | null> {
+  return getBackend().getTestDraft();
+}
+
+/** Start (or restart) the shared test draft with this state, or end it with null. */
+export async function setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+  return getBackend().setTestDraft(state);
+}
+
+/** Change the shared test draft. Throws TestDraftMissingError when none is running. */
+export async function mutateTestDraft(
+  fn: (draft: LeagueDynamicState) => void,
+): Promise<MutateResult> {
+  return getBackend().mutateTestDraft(fn);
+}
+
+/** Mark an owner as having the draft page open in this room. */
+export async function touchPresence(room: string, owner: string, at: string): Promise<void> {
+  return getBackend().touchPresence(room, owner, at);
+}
+
+/** One member's private auto-pick list. Callers must already know the owner may see it. */
+export async function getDraftList(season: number, owner: string): Promise<DraftList | null> {
+  return getBackend().getDraftList(season, owner);
+}
+
+/** Save a member's list, or clear it with null. */
+export async function setDraftList(season: number, owner: string, list: DraftList | null): Promise<void> {
+  return getBackend().setDraftList(season, owner, list);
+}
+
+/** Who has a list saved this season. Names only. */
+export async function draftListOwners(season: number): Promise<string[]> {
+  return getBackend().draftListOwners(season);
+}
+
+/** Save an owner's draft queue for this room. */
+export async function setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+  return getBackend().setDraftQueue(room, owner, keys);
+}
+
+/** Every owner's draft queue in this room. */
+export async function getDraftQueues(room: string): Promise<Record<string, string[]>> {
+  return getBackend().getDraftQueues(room);
+}
+
+/** Owners who checked in to this room since `since`. */
+export async function listPresence(room: string, since: string): Promise<PresenceRow[]> {
+  return getBackend().listPresence(room, since);
 }
 
 export async function getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {

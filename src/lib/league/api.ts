@@ -8,6 +8,7 @@ import type { SharedMockRoom } from './sharedMock.js';
 import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
 import axios from 'axios';
+import { TEST_DRAFT_HEADER, draftRoomHeaders, type DraftRoom, type TestDraftMeta } from './testDraft.js';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
 import type {
   KeeperSelection,
@@ -29,6 +30,8 @@ import type {
   ScoringItem,
 } from './draftRankings.js';
 import type { KeeperScenario } from './keeperScenario.js';
+import type { DraftList } from './autoDraft.js';
+import { withAuto } from './autoDraft.js';
 import type { Rulebook } from './rulebook.js';
 import type {
   HistoryConflict,
@@ -79,6 +82,8 @@ export interface StateMeta {
   };
   viewer: string | null;
   isCommissioner: boolean;
+  /** Whether a shared test draft is open, and whether this reply is it. */
+  testDraft?: TestDraftMeta;
 }
 
 export interface StateResponse {
@@ -169,6 +174,66 @@ export interface SchedulePreviewResponse {
 const authHeaders = (c: Credentials): Record<string, string> =>
   c.session ? { 'x-session': c.session } : { 'x-owner': c.owner, 'x-pin': c.pin ?? '' };
 
+/* ── The shared test draft ──────────────────────────────────────────────────
+ * A copy of the league on the server that every member can join. A device
+ * that joins sends the test header only from the draft and TV screens, on
+ * their state reads and draft writes. Every other page, keepers and trades
+ * above all, reads and writes the real league.
+ * The commissioner's on-device sandbox below wins when both are on. */
+const TEST_DRAFT_KEY = 'fbb-test-draft';
+
+/** True when this device has joined the shared test draft. */
+export function testDraftJoined(): boolean {
+  if (readSandbox()) return false;
+  try {
+    return localStorage.getItem(TEST_DRAFT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function joinTestDraft(): void {
+  try {
+    localStorage.setItem(TEST_DRAFT_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function leaveTestDraft(): void {
+  try {
+    localStorage.removeItem(TEST_DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+const draftHeaders = (c: Credentials, room: DraftRoom): Record<string, string> => ({ ...authHeaders(c), ...draftRoomHeaders(room) });
+
+/** Open the shared test draft, or start it over. Joins this device. */
+export async function startTestDraft(c: Credentials): Promise<StateResponse> {
+  const { data } = await axios.post<StateResponse>('/api/league/test-draft/start', {}, { headers: authHeaders(c) });
+  joinTestDraft();
+  return data;
+}
+
+/** Close the shared test draft for everyone. */
+export async function endTestDraft(c: Credentials): Promise<void> {
+  await axios.post('/api/league/test-draft/end', {}, { headers: authHeaders(c) });
+  leaveTestDraft();
+}
+
+/** Check in to the draft room and hear who else is there. A device in the test checks in to the test's room. */
+/** Save the signed-in owner's queue, so a clock that runs out takes the top player still there. */
+export async function saveDraftQueue(c: Credentials, room: DraftRoom, keys: readonly string[]): Promise<void> {
+  await axios.post('/api/league/draft/queue', { keys }, { headers: draftHeaders(c, room) });
+}
+
+export async function checkInDraftRoom(c: Credentials, room: DraftRoom): Promise<{ room: 'league' | 'test'; owners: string[] }> {
+  const { data } = await axios.post('/api/league/draft-room', {}, { headers: draftHeaders(c, room) });
+  return data;
+}
+
 /* ── Commissioner TEST MODE (sandbox) ────────────────────────────────────────
  * While active, keeper/draft reads and writes stay entirely in localStorage —
  * nothing touches the server — so the commissioner can fill in anyone's
@@ -241,19 +306,20 @@ export function exitSandbox(): void {
   }
 }
 
-async function fetchLiveState(credentials?: Credentials | null): Promise<StateResponse> {
+async function fetchLiveState(credentials?: Credentials | null, test = false): Promise<StateResponse> {
   const { data } = await axios.get<StateResponse>('/api/league/state', {
-    headers: credentials ? authHeaders(credentials) : undefined,
+    headers: { ...(credentials ? authHeaders(credentials) : {}), ...(test ? { [TEST_DRAFT_HEADER]: '1' } : {}) },
   });
   return data;
 }
 
 /** Pass credentials so the server can un-redact your own (or, as commissioner,
- * everyone's) keepers before draft day. In test mode, returns the sandbox. */
-export async function fetchLeagueState(credentials?: Credentials | null): Promise<StateResponse> {
+ * everyone's) keepers before draft day. In test mode, returns the sandbox.
+ * `test` asks for the shared test draft; only the draft screens ask. */
+export async function fetchLeagueState(credentials?: Credentials | null, test = false): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) return sandboxResponse(sandbox);
-  return fetchLiveState(credentials);
+  return fetchLiveState(credentials, test);
 }
 
 export async function fetchPinStatus(): Promise<Array<{ owner: string; claimed: boolean }>> {
@@ -283,6 +349,78 @@ export async function verifyPin(
 /** Replace your own PIN (used for the forced change on a temporary PIN). */
 export async function changePin(c: Credentials, newPin: string): Promise<void> {
   await axios.post('/api/league/change-pin', { pin: newPin }, { headers: authHeaders(c) });
+}
+
+/* ── Private auto-pick lists ────────────────────────────────────────────────
+ * A member's list of names, best first, for picks made while they are away.
+ * Only its owner can read it. Never cached under a shared key. */
+export interface DraftListResponse {
+  season: number;
+  list: DraftList | null;
+}
+
+export async function fetchDraftList(c: Credentials): Promise<DraftListResponse> {
+  const { data } = await axios.get<DraftListResponse>('/api/league/draft-list', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Save the list as typed, one name a line. An empty text clears it. */
+export async function saveDraftList(c: Credentials, text: string): Promise<DraftListResponse> {
+  const { data } = await axios.put<DraftListResponse>('/api/league/draft-list', { text }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function clearDraftList(c: Credentials): Promise<DraftListResponse> {
+  const { data } = await axios.delete<DraftListResponse>('/api/league/draft-list', { headers: authHeaders(c) });
+  return data;
+}
+
+/** Who the signed-in member may enter rankings for: other members, for a steward; nobody otherwise. */
+export async function fetchDraftListAccess(c: Credentials): Promise<{ stewardFor: string[] }> {
+  const { data } = await axios.get('/api/league/draft-list/access', { headers: authHeaders(c) });
+  return data;
+}
+
+const forPath = (owner: string) => `/api/league/draft-list/for/${encodeURIComponent(owner)}`;
+
+/** Another member's rankings, for a steward. */
+export async function fetchDraftListFor(c: Credentials, owner: string): Promise<DraftListResponse> {
+  const { data } = await axios.get<DraftListResponse>(forPath(owner), { headers: authHeaders(c) });
+  return data;
+}
+
+export async function saveDraftListFor(c: Credentials, owner: string, text: string): Promise<DraftListResponse> {
+  const { data } = await axios.put<DraftListResponse>(forPath(owner), { text }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function clearDraftListFor(c: Credentials, owner: string): Promise<DraftListResponse> {
+  const { data } = await axios.delete<DraftListResponse>(forPath(owner), { headers: authHeaders(c) });
+  return data;
+}
+
+/** Who is on auto and who has a list saved. Names only. Commissioner only. */
+export async function fetchAutoStatus(c: Credentials, room: DraftRoom): Promise<{ autoOwners: string[]; listOwners: string[] }> {
+  const sandbox = readSandbox();
+  if (sandbox) return { autoOwners: sandbox.state.draft.autoOwners ?? [], listOwners: [] };
+  const { data } = await axios.get('/api/league/draft/auto', { headers: draftHeaders(c, room) });
+  return data;
+}
+
+/**
+ * Put a team on auto or take it off (commissioner only). The server makes the
+ * team's pick at once when it is on the clock. The on-device sandbox only
+ * records the flag; it has no server to pick for anyone.
+ */
+export async function setAutoDraft(c: Credentials, owner: string, on: boolean, room: DraftRoom): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    return mutateSandbox(sandbox, (s) => {
+      s.draft.autoOwners = withAuto(s.draft.autoOwners, owner, on);
+    });
+  }
+  const { data } = await axios.post(`/api/league/draft/auto/${encodeURIComponent(owner)}`, { on }, { headers: draftHeaders(c, room) });
+  return data;
 }
 
 export async function fetchKeeperScenario(c: Credentials): Promise<KeeperScenarioResponse> {
@@ -406,6 +544,7 @@ export async function submitDraftPick(
     /** The player is not in the pool; name, team and position were typed in. */
     writeIn?: boolean;
   },
+  room: DraftRoom,
 ): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
@@ -429,11 +568,11 @@ export async function submitDraftPick(
       }
     });
   }
-  const { data } = await axios.post('/api/league/draft/pick', pick, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/pick', pick, { headers: draftHeaders(c, room) });
   return data;
 }
 
-export async function clearDraftPick(c: Credentials, overallPick: number): Promise<StateResponse> {
+export async function clearDraftPick(c: Credentials, overallPick: number, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
@@ -447,7 +586,7 @@ export async function clearDraftPick(c: Credentials, overallPick: number): Promi
     });
   }
   const { data } = await axios.delete(`/api/league/draft/pick/${overallPick}`, {
-    headers: authHeaders(c),
+    headers: draftHeaders(c, room),
   });
   return data;
 }
@@ -469,14 +608,14 @@ export async function startDraft(c: Credentials): Promise<StateResponse> {
 }
 
 /** Call CLOCK on the team picking (rule 2.3.1). The screen checks `canCallClock` first; the server checks again. */
-export async function callDraftClock(c: Credentials): Promise<StateResponse> {
+export async function callDraftClock(c: Credentials, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       if (s.draft.clock && !s.draft.clock.call) s.draft.clock = callClock(s.draft.clock, c.owner, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/call', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
@@ -485,7 +624,7 @@ export async function callDraftClock(c: Credentials): Promise<StateResponse> {
  * yields the pick on the clock if time really is up. `onClockOverall` is
  * only for test mode, which has no server to ask.
  */
-export async function expireDraftClock(c: Credentials, onClockOverall: number): Promise<StateResponse> {
+export async function expireDraftClock(c: Credentials, onClockOverall: number, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
@@ -497,29 +636,29 @@ export async function expireDraftClock(c: Credentials, onClockOverall: number): 
       }
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/expire', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/expire', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
-export async function pauseDraftClock(c: Credentials): Promise<StateResponse> {
+export async function pauseDraftClock(c: Credentials, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       if (s.draft.clock) s.draft.clock = pauseClock(s.draft.clock, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/pause', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/pause', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 
-export async function resumeDraftClock(c: Credentials): Promise<StateResponse> {
+export async function resumeDraftClock(c: Credentials, room: DraftRoom): Promise<StateResponse> {
   const sandbox = readSandbox();
   if (sandbox) {
     return mutateSandbox(sandbox, (s) => {
       if (s.draft.clock) s.draft.clock = resumeClock(s.draft.clock, new Date().toISOString());
     });
   }
-  const { data } = await axios.post('/api/league/draft/clock/resume', {}, { headers: authHeaders(c) });
+  const { data } = await axios.post('/api/league/draft/clock/resume', {}, { headers: draftHeaders(c, room) });
   return data;
 }
 

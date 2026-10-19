@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
-import { sandboxActive } from './lib/league/api.js'
+import { sandboxActive, testDraftJoined } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
 import NavIcon from './components/league/NavIcon.js'
 import ActingAsBanner from './components/league/ActingAsBanner.js';
@@ -32,6 +32,8 @@ import AchievementToast from './components/league/AchievementToast.js'
 import RevealPage from './components/league/RevealPage.js'
 import RevealedPage from './components/league/RevealedPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
+import StatsGate from './components/league/StatsGate.js'
+import MyRankingsPage from './components/draft/MyRankingsPage.js'
 
 function App() {
   const location = useLocation()
@@ -68,6 +70,15 @@ function App() {
           TEST MODE. Sandbox only, nothing is saved. Tap to exit in Commish Mode.
         </Link>
       )}
+      {!sandbox && testDraftJoined() && (
+        <Link
+          to="/draft"
+          className="test-draft-strip"
+        >
+          <NavIcon name="flask" size={14} className="icon-in-heading" />
+          TEST DRAFT. Picks here do not count. Tap to open the draft.
+        </Link>
+      )}
       {!bareMode && <AppNav />}
       {!bareMode && !sandbox && <AchievementToast />}
       <ActingAsBanner />
@@ -80,6 +91,7 @@ function App() {
         <Route path="/draft" element={<DraftPage />} />
         <Route path="/draft/start" element={<DraftStartPage />} />
         <Route path="/draft/tv" element={<DraftTvPage />} />
+        <Route path="/my-rankings" element={<MyRankingsPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />
         <Route path="/history" element={<HistoryPage />} />
@@ -93,11 +105,11 @@ function App() {
         <Route path="/votes" element={<VotesPage />} />
         <Route path="/trades" element={<TradesPage />} />
         <Route path="/admin" element={<AdminPage />} />
-        <Route path="/mock" element={<MockDraftPage />} />
-        <Route path="/mock/result/:id" element={<MockResultPage />} />
-        <Route path="/mock/with/:id" element={<SharedMockPage />} />
-        <Route path="/projections" element={<ProjectionsPage />} />
-        <Route path="/tiers" element={<TiersPage />} />
+        <Route path="/mock" element={<StatsGate><MockDraftPage /></StatsGate>} />
+        <Route path="/mock/result/:id" element={<StatsGate><MockResultPage /></StatsGate>} />
+        <Route path="/mock/with/:id" element={<StatsGate><SharedMockPage /></StatsGate>} />
+        <Route path="/projections" element={<StatsGate><ProjectionsPage /></StatsGate>} />
+        <Route path="/tiers" element={<StatsGate><TiersPage /></StatsGate>} />
         <Route path="/schedule" element={<SchedulePage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />

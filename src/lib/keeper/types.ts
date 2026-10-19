@@ -131,6 +131,8 @@ export interface DraftPickState {
   clockCalledBy?: string | null;
   /** The called clock ran out and this pick was entered late, rule 2.3.2.2. */
   skipped?: boolean;
+  /** The server made this pick for a team on auto. See src/lib/league/autoDraft.ts. */
+  auto?: boolean;
 }
 
 export interface SkippedPick {
@@ -186,6 +188,11 @@ export interface LeagueDynamicState {
      * stay open for their owner to fill any time; the clock moves on.
      */
     skipped?: Record<string, SkippedPick>;
+    /**
+     * Teams the commissioner has put on auto. The server picks for them from
+     * each one's private list, or the board's order when the list runs dry.
+     */
+    autoOwners?: string[];
   };
   /** Commissioner-accepted pool used before the draft is frozen. */
   playerPool?: {

@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { stateSide, type DraftRoom } from '../../lib/league/testDraft.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import type { BoardCell } from '../../lib/keeper/types.js';
 import { availablePlayers, buildDraftBoard, pickLabel } from '../../lib/keeper/engine.js';
 import { earlyKeeperNote } from '../../lib/league/keeperEarly.js';
@@ -11,26 +13,37 @@ import {
 } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
+  checkInDraftRoom,
+  fetchDraftList,
   clearKeeperScenario,
-  enterSandbox,
+  endTestDraft,
   exitSandbox,
   expireDraftClock,
+  joinTestDraft,
+  leaveTestDraft,
   sandboxActive,
   startDraft,
+  startTestDraft,
+  testDraftJoined,
 } from '../../lib/league/api.js';
 import { clockExpired } from '../../lib/league/draftClock.js';
 import { formatDraftAt } from '../../lib/league/format.js';
+import { PRESENCE_POLL_MS, roomChanges } from '../../lib/league/presence.js';
+import { queueFromRankings } from '../../lib/league/draftQueue.js';
 import {
   projectedPlayerKeys,
   stateWithKeeperScenario,
 } from '../../lib/league/keeperScenario.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import { useDraftNumbers } from '../../hooks/useDraftNumbers.js';
+import { useDraftSounds } from '../../hooks/useDraftSounds.js';
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import IdentityChip from '../league/IdentityChip.js';
 import NavIcon from '../league/NavIcon.js';
 import TeamPickerModal from '../league/TeamPickerModal.js';
 import BoardGrid from './BoardGrid.js';
+import LiveRoom from './LiveRoom.js';
+import { AutoButton, AutoChips } from './AutoPanel.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import EspnPushPanel from './EspnPushPanel.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
@@ -184,7 +197,9 @@ function PickRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ color: '#fff', fontWeight: 700 }}>{d.name}</span>
             <PosChip positions={d.positions} />
-            {d.enteredBy && (
+            {d.auto ? (
+              <span className="auto-tag">AUTO</span>
+            ) : d.enteredBy && (
               <span style={{ color: 'var(--text-dim)', fontSize: '0.65rem' }}>by {d.enteredBy}</span>
             )}
           </div>
@@ -204,13 +219,19 @@ function PickRow({
 }
 
 export default function DraftPage() {
-  const { state, meta, dataset, playerPoolQuery } = useDraftData(true);
+  const [side] = useState(() => testDraftJoined() ? 'test' as const : 'league' as const);
+  const { state, meta, dataset, playerPoolQuery } = useDraftData(true, side);
+  const room: DraftRoom = useMemo(() => stateSide(meta) === 'test'
+    ? { side: 'test', startedAt: state.draft.startedAt }
+    : { side: 'league' }, [meta, state.draft.startedAt]);
   const { identity } = useIdentity();
   const teamName = useTeamName();
   const scenarioQuery = useKeeperScenario();
   const applyState = useApplyStateResponse();
   const [view, setView] = useState<'list' | 'grid'>('grid');
   const [pickTarget, setPickTarget] = useState<BoardCell | null>(null);
+  // The picker opens straight to the write-in form from the player list.
+  const [pickWriteIn, setPickWriteIn] = useState(false);
   const [clearTarget, setClearTarget] = useState<BoardCell | null>(null);
   const [showSignIn, setShowSignIn] = useState(false);
   const [startArmed, setStartArmed] = useState(false);
@@ -255,24 +276,63 @@ export default function DraftPage() {
     }
   };
 
-  // A dry run from right here: copy the league into test mode, start it,
-  // reload so every read comes from the copy. Nothing touches the server.
+  // The shared test draft: a copy of the league on the server that every
+  // member can join from this page and pick in from their own phone. Joining
+  // or leaving reloads, so every read comes from the right side.
   const [testBusy, setTestBusy] = useState(false);
+  const [endArmed, setEndArmed] = useState(false);
   const inSandbox = sandboxActive();
+  const inTestDraft = room.side === 'test';
+  const testOpen = meta?.testDraft?.running === true;
   const doTestDraft = async () => {
     if (!identity || testBusy) return;
     setTestBusy(true);
     setStartError(null);
     try {
-      await enterSandbox(identity);
-      await startDraft(identity);
+      await startTestDraft(identity);
       window.location.reload();
     } catch (e) {
-      exitSandbox();
       setStartError(apiErrorMessage(e));
       setTestBusy(false);
     }
   };
+  const doEndTestDraft = async () => {
+    if (!identity || testBusy) return;
+    setTestBusy(true);
+    setStartError(null);
+    try {
+      await endTestDraft(identity);
+      window.location.reload();
+    } catch (e) {
+      setStartError(apiErrorMessage(e));
+      setTestBusy(false);
+    }
+  };
+  const doJoinTestDraft = () => {
+    joinTestDraft();
+    window.location.reload();
+  };
+  const doLeaveTestDraft = () => {
+    leaveTestDraft();
+    window.location.reload();
+  };
+  // Who has the draft open. Each open page checks in every few seconds; a
+  // short note says who just came in or went out.
+  const roomQuery = useQuery({
+    queryKey: ['draft-room', identity?.owner ?? 'anon', inTestDraft ? 'test' : 'league'],
+    queryFn: () => checkInDraftRoom(identity!, room),
+    enabled: identity !== null && !inSandbox && meta !== null,
+    refetchInterval: PRESENCE_POLL_MS,
+  });
+  const roomOwners = roomQuery.data?.owners;
+  const [presence, setPresence] = useState<{ last: readonly string[] | undefined; notes: string[] }>({ last: undefined, notes: [] });
+  if (roomOwners !== presence.last) {
+    const { joined, left } = roomChanges(presence.last ?? null, roomOwners ?? []);
+    const at = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const fresh = [...joined.map((owner) => `${owner} joined ${at}`), ...left.map((owner) => `${owner} left ${at}`)];
+    setPresence({ last: roomOwners, notes: [...fresh, ...presence.notes].slice(0, 3) });
+  }
+
   const doExitTest = () => {
     exitSandbox();
     window.location.reload();
@@ -296,19 +356,22 @@ export default function DraftPage() {
     ? board.slice(onClockIdx + 1).filter((c) => !c.selection && !c.keeper).slice(0, 3)
     : [];
 
-  // Only the commissioner's screen carries numbers. Members and the TV get none.
-  const { numbers } = useDraftNumbers({
+  // The pick on the clock is yours to enter when it is your team's, or you are the commish.
+  const canEnterOnClock =
+    started && poolReady && onClock !== null && identity !== null
+    && (identity.isCommissioner || identity.owner === onClock.pick.currentOwner);
+
+  // Only the commissioner's screen carries numbers. Members pick from names,
+  // positions and teams; nothing is fetched or simulated for them. The gone
+  // odds run while he can enter the pick on the clock.
+  const { numbers, projections, gone } = useDraftNumbers({
     enabled: started && identity?.isCommissioner === true,
+    odds: canEnterOnClock,
     dataset,
     state: boardState,
     onClock,
     person: identity?.owner ?? null,
   });
-
-  // The pick on the clock is yours to enter when it is your team's, or you are the commish.
-  const canEnterOnClock =
-    started && poolReady && onClock !== null && identity !== null
-    && (identity.isCommissioner || identity.owner === onClock.pick.currentOwner);
 
   const rounds = useMemo(
     () => Array.from({ length: dataset.draftRounds }, (_, i) => i + 1),
@@ -351,7 +414,7 @@ export default function DraftPage() {
     const report = () => {
       if (reportedCall.current === callAt) return;
       reportedCall.current = callAt;
-      expireDraftClock(identity, onClock.pick.overall).then(applyState).catch(() => {
+      expireDraftClock(identity, onClock.pick.overall, room).then(applyState).catch(() => {
         reportedCall.current = null;
       });
     };
@@ -363,8 +426,39 @@ export default function DraftPage() {
       if (clockExpired(clock, Date.now())) report();
     }, 500);
     return () => window.clearInterval(tick);
-  }, [identity, clock, onClock, applyState, inSandbox]);
+  }, [identity, clock, onClock, applyState, inSandbox, room]);
   const skippedCells = board.filter((cell) => cell.skipped);
+
+  // The viewer's saved rankings fill an empty queue, in the test draft too:
+  // it is their own screen. Theirs alone, so never for the commish in a
+  // member's seat.
+  const rankingsQuery = useQuery({
+    queryKey: ['draft-list-keys', identity?.owner ?? 'anon'],
+    queryFn: async () => queueFromRankings((await fetchDraftList(identity!)).list?.entries ?? []),
+    enabled: started && identity !== null && !identity.impersonatedBy && !inSandbox,
+    staleTime: 60_000,
+    refetchInterval: 30_000,
+  });
+  const rankingKeys = rankingsQuery.data ?? null;
+
+  // A chime when your pick comes up, beeps at two minutes, an alarm on CLOCK.
+  const { soundOn, setSoundOn } = useDraftSounds({
+    enabled: started && identity !== null,
+    clock,
+    onClockOverall: onClock?.pick.overall ?? null,
+    mine: onClock !== null && onClock.pick.currentOwner === identity?.owner,
+  });
+
+  // While the draft runs on a phone the page works like the mock room: the
+  // app's bar steps aside and the room's own bar picks Players, Board or Picks.
+  const navigate = useNavigate();
+  const roomMode = started && identity !== null;
+  const [liveTab, setLiveTab] = useState<'players' | 'board' | 'picks'>('players');
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('in-live-room', roomMode);
+    return () => document.documentElement.classList.remove('in-live-room');
+  }, [roomMode]);
+  const tabClass = (tab: typeof liveTab) => `live-tab${liveTab === tab ? ' is-shown' : ''}`;
 
   return (
     <div
@@ -380,6 +474,17 @@ export default function DraftPage() {
           2027 DRAFT
         </div>
         <IdentityChip />
+        {roomMode && (
+          <button
+            className={`tap-btn live-sound-btn${soundOn ? ' is-on' : ''}`}
+            type="button"
+            aria-pressed={soundOn}
+            onClick={() => setSoundOn(!soundOn)}
+            title="Sound when you are up, at two minutes on your pick, and whenever CLOCK is called"
+          >
+            {soundOn ? 'SOUND ON' : 'SOUND OFF'}
+          </button>
+        )}
         {inSandbox && identity?.isCommissioner && (
           <button
             className="tap-btn"
@@ -417,6 +522,66 @@ export default function DraftPage() {
           TV
         </Link>
       </div>
+
+      {identity && !inSandbox && roomOwners && (
+        <div className="panel draft-room-panel" aria-live="polite">
+          <div className="draft-room-line">
+            <span className="hub-heading">IN THE DRAFT · {roomOwners.length}</span>
+            {roomOwners.map((owner) => (
+              <span key={owner} className={`draft-room-chip${owner === identity.owner ? ' is-me' : ''}`}>{owner}</span>
+            ))}
+          </div>
+          {presence.notes.length > 0 && (
+            <div className="draft-room-notes">
+              {presence.notes.map((note) => <span key={note}>{note}</span>)}
+            </div>
+          )}
+        </div>
+      )}
+      {inTestDraft && (
+        <div className="panel test-draft-panel">
+          <div className="hub-heading">
+            <NavIcon name="flask" size={14} className="icon-in-heading" />
+            TEST DRAFT
+          </div>
+          <p>Everyone who joins picks in the same copy of the draft. Nothing here counts, and the real league stays as it was.</p>
+          <div className="test-draft-actions">
+            {identity?.isCommissioner && (
+              <button className="tap-btn" type="button" disabled={testBusy} onClick={doTestDraft}>
+                START OVER
+              </button>
+            )}
+            {identity?.isCommissioner && (
+              <button
+                className="tap-btn is-danger"
+                type="button"
+                disabled={testBusy}
+                onClick={endArmed ? doEndTestDraft : () => setEndArmed(true)}
+              >
+                {endArmed ? 'END IT FOR EVERYONE?' : 'END TEST'}
+              </button>
+            )}
+            <button className="tap-btn" type="button" onClick={doLeaveTestDraft}>
+              LEAVE TEST
+            </button>
+          </div>
+          {startError && <div className="test-draft-error">{startError}</div>}
+        </div>
+      )}
+      {!inTestDraft && !inSandbox && testOpen && identity && !started && (
+        <div className="panel test-draft-panel">
+          <div className="hub-heading">
+            <NavIcon name="flask" size={14} className="icon-in-heading" />
+            TEST DRAFT OPEN
+          </div>
+          <p>The commish opened a practice draft. Join to make picks from your own phone. Nothing counts.</p>
+          <div className="test-draft-actions">
+            <button className="tap-btn is-go" type="button" onClick={doJoinTestDraft}>
+              JOIN THE TEST
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ON THE CLOCK hero */}
       {scenarioActive && (
@@ -512,7 +677,7 @@ export default function DraftPage() {
                     FOR REAL? TAP TO GO LIVE
                   </button>
                 )}
-                {!inSandbox && (
+                {!inSandbox && !inTestDraft && (
                   <div style={{ marginTop: 10 }}>
                     <button
                       className="tap-btn"
@@ -531,10 +696,10 @@ export default function DraftPage() {
                       }}
                     >
                       <NavIcon name="flask" size={15} className="icon-in-heading" />
-                      {testBusy ? 'SETTING UP…' : 'RUN A TEST DRAFT'}
+                      {testBusy ? 'SETTING UP…' : testOpen ? 'START THE TEST OVER' : 'RUN A TEST DRAFT'}
                     </button>
                     <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', marginTop: 6 }}>
-                      A copy on this device only. Nothing is saved to the league.
+                      A practice copy everyone can join from this page. Nothing counts.
                     </div>
                   </div>
                 )}
@@ -577,16 +742,6 @@ export default function DraftPage() {
                 marginTop: 12,
               }}
             >
-              {canEnterOnClock && (
-                <button
-                  className="tap-btn"
-                  type="button"
-                  onClick={() => setPickTarget(onClock)}
-                  style={{ ...ACTION_BUTTON, border: 'none', background: 'var(--neon-teal)', color: '#001a14' }}
-                >
-                  ENTER PICK {pickLabel(onClock.pick)}
-                </button>
-              )}
               {identity?.isCommissioner && (
                 <button
                   className="tap-btn"
@@ -604,7 +759,8 @@ export default function DraftPage() {
                   ↶ UNDO LAST PICK
                 </button>
               )}
-              <ClockControls clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
+              <ClockControls room={room} clock={boardState.draft.clock} picks={boardState.draft.picks} onClock={onClock} />
+              <AutoButton room={room} owner={onClock.pick.currentOwner} autoOwners={boardState.draft.autoOwners ?? []} />
             </div>
             {skippedCells.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
@@ -632,6 +788,7 @@ export default function DraftPage() {
                 ))}
               </div>
             )}
+            <AutoChips room={room} autoOwners={boardState.draft.autoOwners ?? []} />
             {nextUp.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', fontWeight: 700 }}>NEXT:</span>
@@ -668,8 +825,48 @@ export default function DraftPage() {
         <EspnPushPanel board={board} teams={dataset.teams} teamNames={state.teamNames} />
       )}
 
+      {/* The pick that just landed, one line, as in the mock room. */}
+      {started && allPicks[0] && (
+        <div
+          key={allPicks[0].overall}
+          className={`panel room-latest live-latest${allPicks[0].owner === identity?.owner ? ' is-mine' : ''}`}
+          aria-live="polite"
+        >
+          <span className="room-upcoming-num">{allPicks[0].label}</span>
+          <span className="live-latest-text">
+            <strong>{allPicks[0].owner}</strong> takes <strong>{allPicks[0].playerName}</strong>{' '}
+            <small style={{ color: positionColor(allPicks[0].positions), fontWeight: 800 }}>{allPicks[0].positions.join('/')}</small>
+          </span>
+        </div>
+      )}
+
+      {started && poolReady && onClock && identity && (
+        <div className={tabClass('players')}>
+          <LiveRoom
+            room={room}
+            board={board}
+            everyone={dataset.players}
+            available={pool}
+            onClock={onClock}
+            person={identity.owner}
+            canDraft={canEnterOnClock}
+            showStats={identity.isCommissioner}
+            projections={projections}
+            gone={gone}
+            queueKey={`fbb-live-queue-${identity.owner}-${inTestDraft ? 'test' : 'league'}`}
+            rankings={rankingKeys}
+            onWriteIn={() => {
+              setPickWriteIn(true);
+              setPickTarget(onClock);
+            }}
+          />
+        </div>
+      )}
+
       {started && !onClock && (
-        <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
+        <div className={tabClass('picks')}>
+          <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
+        </div>
       )}
 
       {meta && !meta.revealed && started && (
@@ -712,8 +909,11 @@ export default function DraftPage() {
       )}
 
       {/* picks made, newest first, like the mock room's pick list */}
+      {roomMode && allPicks.length === 0 && (
+        <div className={`panel live-empty ${tabClass('picks')}`}>No picks yet.</div>
+      )}
       {allPicks.length > 0 && (
-        <div className="panel" style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+        <div className={`panel ${tabClass('picks')}`} style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
               PICKS · {allPicks.length} MADE
@@ -756,6 +956,7 @@ export default function DraftPage() {
       )}
 
       {/* view toggle */}
+      <div className={tabClass('board')}>
       <div
         aria-label="Position color key"
         style={{
@@ -856,12 +1057,38 @@ export default function DraftPage() {
           />
         </div>
       )}
+      </div>
+
+      {roomMode && (
+        <nav className="live-phone-tabs" aria-label="Draft room">
+          {([['players', 'people', 'PLAYERS'], ['board', 'tiers', 'BOARD'], ['picks', 'ballot', 'PICKS']] as const).map(([tab, icon, label]) => (
+            <button key={tab} type="button" className={liveTab === tab ? 'is-on' : ''} aria-pressed={liveTab === tab} onClick={() => setLiveTab(tab)}>
+              <span aria-hidden="true"><NavIcon name={icon} /></span>
+              <span className="hub-heading">{label}</span>
+            </button>
+          ))}
+          <button type="button" className="is-exit" onClick={() => navigate(identity ? `/keepers/${identity.owner}` : '/')}>
+            <span aria-hidden="true"><NavIcon name="close" /></span>
+            <span className="hub-heading">EXIT</span>
+          </button>
+        </nav>
+      )}
 
       {showSignIn && <TeamPickerModal onClose={() => setShowSignIn(false)} />}
       {pickTarget && (
-        <PickSheet cell={pickTarget} pool={pool} numbers={numbers} onClose={() => setPickTarget(null)} />
+        <PickSheet
+          room={room}
+          cell={pickTarget}
+          pool={pool}
+          numbers={numbers}
+          startInWriteIn={pickWriteIn}
+          onClose={() => {
+            setPickTarget(null);
+            setPickWriteIn(false);
+          }}
+        />
       )}
-      {clearTarget && <ClearPickSheet cell={clearTarget} onClose={() => setClearTarget(null)} />}
+      {clearTarget && <ClearPickSheet room={room} cell={clearTarget} onClose={() => setClearTarget(null)} />}
     </div>
   );
 }
