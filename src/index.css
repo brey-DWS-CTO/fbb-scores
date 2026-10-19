@@ -5697,6 +5697,10 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .lm-status.is-denied { background: color-mix(in srgb, var(--neon-red) 18%, transparent); color: var(--neon-red); }
 .lm-rule { margin: 0; color: var(--text-faint); font-size: 0.66rem; line-height: 1.45; }
 
+/* ─── Draft landing: once the draft is closed ─── */
+.start-btn-recap { border-color: var(--neon-orange); color: var(--neon-orange); background: color-mix(in srgb, var(--neon-orange) 9%, var(--panel-bg)); }
+.start-btn-recap .start-btn-sub { color: var(--text-soft); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
