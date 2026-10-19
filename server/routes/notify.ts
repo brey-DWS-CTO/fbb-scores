@@ -95,6 +95,12 @@ router.get('/lm-clock', async (req: Request, res: Response) => {
   }
   try {
     const run = await runLmClock(new Date());
+    // One line every run, so the log shows the clock is alive even when
+    // nothing needed changing. Nobody can read a silence.
+    const waiver = run.waiver
+      ? `target ${run.waiver.target.hourPT} PT (${run.waiver.target.hourET} ET), ESPN has ${run.waiver.current ?? '?'}, ${run.waiver.changed ? 'changed' : run.waiver.note}`
+      : 'hour not checked';
+    console.log(`[lm-clock] ${run.date}: ${run.skipped ?? waiver}; adds ${run.adds.length}`);
     if (run.waiver?.changed || run.adds.length > 0) console.log('[lm-clock]', JSON.stringify(run));
     res.json(run);
   } catch (err) {

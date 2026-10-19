@@ -119,6 +119,22 @@ export function waiverHourFor(games: readonly DayGame[]): WaiverHour {
   return { hourPT: NORMAL_WAIVER_HOUR_PT, hourET: easternHour(NORMAL_WAIVER_HOUR_PT), early: false, firstTip: tip };
 }
 
+/**
+ * The hour ESPN should hold right now, given today's and tomorrow's hours.
+ *
+ * ESPN runs waivers once a day at whatever hour it holds. Change it to an
+ * hour still ahead today and it runs again today. So the switch to
+ * tomorrow's hour waits until two things are true: today's run has passed,
+ * and tomorrow's hour has passed too. A normal Monday before an 11 AM
+ * Tuesday switches at 4 PM Monday. An 11 AM Tuesday before a normal
+ * Wednesday switches at 4 PM Tuesday, not at noon.
+ */
+export function waiverHourToHold(now: PacificMoment, today: WaiverHour, tomorrow: WaiverHour): WaiverHour {
+  if (now.hour <= today.hourPT) return today;
+  if (now.hour <= tomorrow.hourPT) return today;
+  return tomorrow;
+}
+
 export interface EarlyDay {
   /** YYYY-MM-DD Pacific. */
   date: string;

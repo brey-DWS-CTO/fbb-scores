@@ -20,6 +20,7 @@ import {
   lmAddWindow,
   pacific,
   waiverHourFor,
+  waiverHourToHold,
   type DayGame,
   type EarlyDay,
   type LmAddCheck,
@@ -66,16 +67,18 @@ function tomorrowOf(date: string): string {
 }
 
 /**
- * The hour ESPN should hold right now: today's, until today's run has
- * passed, then tomorrow's. That is what puts a normal day back to 3 PM the
- * same evening an early day ran.
+ * The hour ESPN should hold right now: today's until today's run has
+ * passed, then tomorrow's, but never an hour still ahead today (ESPN would
+ * run waivers a second time). `waiverHourToHold` holds the rule.
  */
 export async function targetWaiverHour(now: Date): Promise<{ date: string; target: WaiverHour }> {
   const pt = pacific(now);
   const today = waiverHourFor(await gamesOn(pt.date));
   if (pt.hour <= today.hourPT) return { date: pt.date, target: today };
   const next = tomorrowOf(pt.date);
-  return { date: next, target: waiverHourFor(await gamesOn(next)) };
+  const tomorrow = waiverHourFor(await gamesOn(next));
+  const target = waiverHourToHold(pt, today, tomorrow);
+  return { date: target === tomorrow ? next : pt.date, target };
 }
 
 async function keepWaiverHour(config: EspnLmConfig, now: Date): Promise<LmClockRun['waiver']> {
