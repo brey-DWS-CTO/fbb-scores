@@ -720,6 +720,12 @@ export async function setCommishBlind(c: Credentials, blind: boolean): Promise<S
   return data;
 }
 
+/** The commissioner saves one team's recap roast. An empty text hands it back to the numbers. */
+export async function saveRecapRoast(c: Credentials, owner: string, text: string): Promise<StateResponse> {
+  const { data } = await axios.post('/api/league/draft-recap/roast', { owner, text }, { headers: authHeaders(c) });
+  return data;
+}
+
 export async function setOverrides(
   c: Credentials,
   overrides: { cap?: number | null; playerRounds?: Record<string, number | null> },

@@ -137,6 +137,8 @@ export interface LeagueDynamicState {
   propBets?: PropBet[];
   /** The commissioner turned off his view of other teams' keepers. */
   commishBlind?: boolean;
+  /** The commissioner's roasts for the draft recap. Hidden from members until the draft closes. */
+  draftRecap?: { season: number; roasts: Record<string, string> };
 }
 
 export interface AuditRow {

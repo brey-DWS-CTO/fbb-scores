@@ -860,6 +860,9 @@ export default function DraftPage() {
 
       {started && !onClock && (
         <div className={tabClass('picks')}>
+          {(state.draft.closedAt || identity?.isCommissioner) && (
+            <Link to="/draft/recap" className="tap-btn recap-board-link">SEE THE GRADES: DRAFT RECAP</Link>
+          )}
           <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
         </div>
       )}
