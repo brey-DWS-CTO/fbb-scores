@@ -48,11 +48,14 @@ export default function DraftStartPage() {
         </Link>
       )}
 
-      <Link to="/mock" className="tap-btn start-btn start-btn-mock">
-        <span className="start-btn-icon" aria-hidden="true"><NavIcon name="flask" size="1.6em" /></span>
-        <span className="start-btn-title hub-heading">{underWay ? 'CONTINUE MOCK' : 'MOCK DRAFT'}</span>
-        <span className="start-btn-sub">{underWay ? 'Your draft is where you left it.' : 'Practice against nine computer teams.'}</span>
-      </Link>
+      {/* Once the draft is done the mock steps back to a small button beside the stats. */}
+      {!done && (
+        <Link to="/mock" className="tap-btn start-btn start-btn-mock">
+          <span className="start-btn-icon" aria-hidden="true"><NavIcon name="flask" size="1.6em" /></span>
+          <span className="start-btn-title hub-heading">{underWay ? 'CONTINUE MOCK' : 'MOCK DRAFT'}</span>
+          <span className="start-btn-sub">{underWay ? 'Your draft is where you left it.' : 'Practice against nine computer teams.'}</span>
+        </Link>
+      )}
 
       <Link to="/draft" className={`tap-btn start-btn start-btn-live${live ? ' is-live' : ''}`}>
         <span className="start-btn-icon" aria-hidden="true"><NavIcon name="tv" size="1.6em" /></span>
@@ -71,7 +74,13 @@ export default function DraftStartPage() {
         <span className="start-btn-sub">Your player rankings, for picks made while you are away. Only you see them.</span>
       </Link>
 
-      <div className="start-row">
+      <div className={`start-row${done ? ' start-row-three' : ''}`}>
+        {done && (
+          <Link to="/mock" className="tap-btn start-btn start-btn-small">
+            <span aria-hidden="true"><NavIcon name="flask" size="1.3em" /></span>
+            <span className="hub-heading">MOCK DRAFT</span>
+          </Link>
+        )}
         <Link to="/projections" className="tap-btn start-btn start-btn-small">
           <span aria-hidden="true"><NavIcon name="chart" size="1.3em" /></span>
           <span className="hub-heading">PROJECTIONS</span>
