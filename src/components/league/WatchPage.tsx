@@ -141,7 +141,6 @@ export default function WatchPage() {
             {game.homeScore !== null && game.state !== 'pre' && <b>{game.homeScore}</b>}
           </span>
         </div>
-        {game.why && <div className="game-why">{game.why}</div>}
         {game.stakes.length > 0 && (
           <div className="game-stakes">
             {game.stakes.map((stake) => (

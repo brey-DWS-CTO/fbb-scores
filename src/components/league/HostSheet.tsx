@@ -86,7 +86,7 @@ export default function HostSheet({ main, games, editing = null, onDone, onClose
                   <TeamLogo code={game.home} size={22} />
                   <span>
                     <strong>{matchupLabel(game)}</strong>
-                    <small>{tipLabel(game.tipoff)}{game.tv ? ` · ${game.tv}` : ''}{game.why ? ` · ${game.why}` : ''}</small>
+                    <small>{tipLabel(game.tipoff)}{game.tv ? ` · ${game.tv}` : ''}</small>
                   </span>
                 </label>
               );
