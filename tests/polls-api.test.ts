@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
@@ -90,6 +90,12 @@ before(async () => {
   tempRoot = mkdtempSync(path.join(tempParent, 'polls-api-'));
   cpSync(path.join(repoRoot, 'server'), path.join(tempRoot, 'server'), { recursive: true });
   cpSync(path.join(repoRoot, 'src'), path.join(tempRoot, 'src'), { recursive: true });
+  // Votes close at the draft. Move the copy's draft a year past today so these
+  // tests keep running after the real one; the live config is untouched.
+  const configPath = path.join(tempRoot, 'src', 'data', 'source', 'league-2027-config.json');
+  const config = JSON.parse(readFileSync(configPath, 'utf8')) as { draftAt?: string };
+  config.draftAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  writeFileSync(configPath, JSON.stringify(config, null, 2));
 
   process.env.DATABASE_URL = '';
   process.env.DOTENV_CONFIG_QUIET = 'true';

@@ -57,6 +57,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     primary: true,
     tabs: [
       { to: '/league', label: 'LEAGUE HQ' },
+      { to: '/activity', label: 'ACTIVITY' },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
       { to: '/history', label: 'HISTORY' },

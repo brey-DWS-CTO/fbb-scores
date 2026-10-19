@@ -1,9 +1,10 @@
-import { useMemo, type CSSProperties, type ReactNode } from 'react';
-
-
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
-import { leagueActivity } from '../../lib/league/activity.js';
+import { leagueActivity, mergedActivity } from '../../lib/league/activity.js';
+import { fetchTransactions } from '../../lib/league/api.js';
+import { movesOf, type Move } from '../../lib/league/transactions.js';
 
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
@@ -52,7 +53,17 @@ const formatWhen = (iso: string) =>
 export default function LeaguePage() {
   const { dataset, state } = useLeagueData();
   const { identity, signOut } = useIdentity();
-  const activity = useMemo(() => leagueActivity(state.pickTradeProposals ?? [], dataset), [state.pickTradeProposals, dataset]);
+  const trades = useMemo(() => leagueActivity(state.pickTradeProposals ?? [], dataset), [state.pickTradeProposals, dataset]);
+  const [moves, setMoves] = useState<Move[]>([]);
+  useEffect(() => {
+    let alive = true;
+    // ESPN moves join the log when they load; the page is whole without them.
+    fetchTransactions()
+      .then((feed) => { if (alive) setMoves(movesOf(feed.rows)); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const activity = useMemo(() => mergedActivity(trades, moves), [trades, moves]);
 
   const contractPlayers = useMemo(
     () => dataset.players.filter((p) => p.keeper.contract != null),
@@ -97,10 +108,10 @@ export default function LeaguePage() {
         <IdentityChip />
       </div>
 
-      {/* ── Activity: every trade that went through, newest first ── */}
+      {/* ── Activity: pick trades and ESPN moves, newest first ── */}
       <Section title="ACTIVITY" color="var(--neon-yellow)">
         {activity.length === 0 ? (
-          <div style={{ color: 'var(--text-faint)' }}>No trades in the app yet. When one goes through, it shows here and everyone gets an email.</div>
+          <div style={{ color: 'var(--text-faint)' }}>No trades or moves yet. When one goes through, it shows here.</div>
         ) : (
           <ol className="league-activity">
             {activity.map((entry) => (
@@ -114,6 +125,9 @@ export default function LeaguePage() {
             ))}
           </ol>
         )}
+        <div style={{ marginTop: 10, fontSize: '0.7rem' }}>
+          <Link to="/activity" style={{ color: 'var(--neon-yellow)' }}>EVERY MOVE THIS SEASON →</Link>
+        </div>
       </Section>
 
       {/* ── a. Keeper tiers ────────────────────────────────────── */}

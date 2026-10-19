@@ -5663,6 +5663,39 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   .recap-strip-axis { padding-left: 96px; padding-right: 58px; }
   .recap-grade { font-size: 2rem; }
 }
+/* ─── ACTIVITY: the season's moves ─── */
+.activity-page .rules-page-header p { max-width: 60ch; }
+.activity-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.activity-chip { padding: 6px 10px; min-height: 32px; border: 1px solid var(--panel-border); border-radius: 999px; background: transparent; color: var(--text-dim); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; cursor: pointer; }
+.activity-chip.is-on { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.activity-day { margin-bottom: 16px; }
+.activity-day-head { font-size: 0.62rem; color: var(--text-mid); margin: 0 0 8px; }
+.activity-move .league-activity-head { flex-wrap: wrap; }
+.activity-move .league-activity-head strong { flex: 1 1 60%; min-width: 0; font-weight: 600; }
+.activity-kind { flex: 0 0 auto; padding: 1px 6px; border-radius: 4px; font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em; line-height: 1.6; background: color-mix(in srgb, var(--neon-teal) 18%, transparent); color: var(--neon-teal); }
+.activity-kind.is-waiver { background: color-mix(in srgb, var(--neon-yellow) 18%, transparent); color: var(--neon-yellow); }
+.activity-kind.is-drop { background: color-mix(in srgb, var(--neon-red) 18%, transparent); color: var(--neon-red); }
+.activity-kind.is-trade { background: color-mix(in srgb, var(--neon-purple) 22%, transparent); color: var(--neon-purple); }
+
+/* ─── ACTIVITY: waivers and LM adds ─── */
+.lm-panel { padding: 12px 14px; border-radius: 10px; margin: 0 0 14px; display: grid; gap: 10px; }
+.lm-title { font-size: 0.62rem; color: var(--neon-teal); }
+.lm-today { margin: 0; color: var(--text-body); font-size: 0.85rem; }
+.lm-today strong { color: var(--neon-yellow); }
+.lm-early { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.72rem; color: var(--text-dim); }
+.lm-early li { display: flex; flex-wrap: wrap; gap: 8px; }
+.lm-early li span:first-child { color: var(--text-hi); min-width: 7ch; }
+.lm-ask { min-height: 44px; padding: 10px 16px; border: 1px solid var(--neon-yellow); border-radius: 8px; background: color-mix(in srgb, var(--neon-yellow) 14%, transparent); color: var(--neon-yellow); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; cursor: pointer; justify-self: start; }
+.lm-ask:disabled { opacity: 0.5; cursor: default; }
+.lm-form { display: grid; gap: 8px; }
+.lm-checks { margin: 0; padding: 0 0 0 18px; color: var(--neon-red); font-size: 0.72rem; display: grid; gap: 4px; }
+.lm-requests { margin-top: 4px; }
+.lm-actions { display: flex; gap: 6px; margin-top: 6px; }
+.lm-status.is-added { background: color-mix(in srgb, var(--neon-teal) 18%, transparent); color: var(--neon-teal); }
+.lm-status.is-requested, .lm-status.is-waiting-for-drop { background: color-mix(in srgb, var(--neon-yellow) 18%, transparent); color: var(--neon-yellow); }
+.lm-status.is-failsafe { background: color-mix(in srgb, var(--neon-purple) 22%, transparent); color: var(--neon-purple); }
+.lm-status.is-denied { background: color-mix(in srgb, var(--neon-red) 18%, transparent); color: var(--neon-red); }
+.lm-rule { margin: 0; color: var(--text-faint); font-size: 0.66rem; line-height: 1.45; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
