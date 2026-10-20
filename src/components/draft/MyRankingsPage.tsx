@@ -17,6 +17,7 @@ import {
   saveDraftListFor,
 } from '../../lib/league/api.js';
 import { DRAFT_LIST_MAX, listToText, parseListText, type DraftList } from '../../lib/league/autoDraft.js';
+import { shortName } from '../../lib/league/format.js';
 
 /**
  * A member's private rankings for the draft: names, best first, one a line.
@@ -307,7 +308,7 @@ export default function MyRankingsPage() {
             {saved.entries.map((entry) => (
               <li key={entry.rank} className={entry.playerKey ? '' : 'is-missing'}>
                 <span className="my-list-rank">{entry.rank}</span>
-                <span className="my-list-name">{entry.playerName ?? entry.name}</span>
+                <span className="my-list-name">{entry.playerName ? shortName(entry.playerName) : entry.name}</span>
                 {entry.playerName && entry.playerName.toLowerCase() !== entry.name.toLowerCase() && (
                   <small>typed “{entry.name}”</small>
                 )}

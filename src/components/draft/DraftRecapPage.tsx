@@ -1,3 +1,4 @@
+import { shortName } from '../../lib/league/format.js';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -193,7 +194,7 @@ function PickBox({ pick, kind }: { pick: RecapPick | null; kind: 'best' | 'worst
   return (
     <div className={`recap-pick recap-pick-${kind}`}>
       <div className="recap-pick-label">{kind === 'best' ? 'BEST PICK' : 'WORST PICK'} · {pickPlace(pick)}</div>
-      <strong>{pick.name}</strong>
+      <strong>{shortName(pick.name)}</strong>
       <div className="recap-pick-nums">
         <span><b>{ordinal(pick.overall)}</b>taken</span>
         <span><b>{pick.valueRank === null ? '–' : ordinal(pick.valueRank)}</b>value</span>
@@ -306,10 +307,10 @@ function Kpis({ recap }: { recap: DraftRecap }) {
   const youngest = [...aged].sort((a, b) => a.averageAge! - b.averageAge!)[0] ?? null;
   const at = (pick: RecapPick) => `${pick.owner} · ${pickPlace(pick)}`;
   const candidates: (Kpi | null | false)[] = [
-    steal && { label: 'BIGGEST STEAL', icon: 'star' as const, big: steal.name, who: at(steal), stat: adpGapText(steal), tone: 'teal' as const },
-    reach && { label: 'BIGGEST REACH', icon: 'warning' as const, big: reach.name, who: at(reach), stat: adpGapText(reach), tone: 'red' as const },
-    spotOn && { label: 'MOST SPOT-ON PICK', icon: 'target' as const, big: spotOn.name, who: at(spotOn), stat: `Taken ${ordinal(spotOn.overall)} overall. ESPN drafts: ${ordinal(Math.round(spotOn.adp ?? 0))}. Projections: ${ordinal(spotOn.valueRank ?? 0)}.`, tone: 'blue' as const },
-    bestKeeper && { label: 'BEST KEEPER', icon: 'lock' as const, big: bestKeeper.name, who: at(bestKeeper), stat: `${ordinal(bestKeeper.valueRank ?? 0)} in projected value, kept ${ordinal(bestKeeper.overall)} overall`, tone: 'teal' as const },
+    steal && { label: 'BIGGEST STEAL', icon: 'star' as const, big: shortName(steal.name), who: at(steal), stat: adpGapText(steal), tone: 'teal' as const },
+    reach && { label: 'BIGGEST REACH', icon: 'warning' as const, big: shortName(reach.name), who: at(reach), stat: adpGapText(reach), tone: 'red' as const },
+    spotOn && { label: 'MOST SPOT-ON PICK', icon: 'target' as const, big: shortName(spotOn.name), who: at(spotOn), stat: `Taken ${ordinal(spotOn.overall)} overall. ESPN drafts: ${ordinal(Math.round(spotOn.adp ?? 0))}. Projections: ${ordinal(spotOn.valueRank ?? 0)}.`, tone: 'blue' as const },
+    bestKeeper && { label: 'BEST KEEPER', icon: 'lock' as const, big: shortName(bestKeeper.name), who: at(bestKeeper), stat: `${ordinal(bestKeeper.valueRank ?? 0)} in projected value, kept ${ordinal(bestKeeper.overall)} overall`, tone: 'teal' as const },
     fastest && { label: 'FASTEST DRAFTER', icon: 'bolt' as const, big: fastest.owner, who: '', stat: `${clock(fastest.averageSeconds)} a pick`, tone: 'yellow' as const },
     slowest && { label: 'SLOWEST DRAFTER', icon: 'clock' as const, big: slowest.owner, who: '', stat: `${clock(slowest.averageSeconds)} a pick`, tone: 'yellow' as const },
     oldest && { label: 'OLDEST ROSTER', icon: 'wheelchair' as const, big: oldest.owner, who: 'Average age', stat: `${oldest.averageAge!.toFixed(1)} years`, tone: 'purple' as const },
@@ -348,7 +349,7 @@ function leaderTiles(recap: DraftRecap): Kpi[] {
   const stack = recap.biggestStack;
   const tiles: (Kpi | null)[] = [
     club && { label: 'MOST DRAFTED NBA TEAM', icon: 'jersey', big: club.club, who: fewest ? `Fewest: ${fewest.club} with ${fewest.count}` : '', stat: `${club.count} players drafted`, tone: 'blue' },
-    stack && { label: 'BIGGEST TEAM STACK', icon: 'layers', big: stack.owner, who: stack.players.join(', '), stat: `${stack.players.length} from ${stack.club}`, tone: 'purple' },
+    stack && { label: 'BIGGEST TEAM STACK', icon: 'layers', big: stack.owner, who: stack.players.map(shortName).join(', '), stat: `${stack.players.length} from ${stack.club}`, tone: 'purple' },
     ...recap.positionLeaders.map((row): Kpi => ({
       label: `MOST ${POSITION_WORDS[row.position].toUpperCase()}`,
       icon: POSITION_ICONS[row.position],
@@ -485,7 +486,7 @@ function PickList({ title, picks, tone }: { title: string; picks: RecapPick[]; t
       <ol>
         {picks.map((pick) => (
           <li key={pick.overall}>
-            <span><strong>{pick.name}</strong> · {pick.owner}, {pickPlace(pick)}</span>
+            <span><strong>{shortName(pick.name)}</strong> · {pick.owner}, {pickPlace(pick)}</span>
             <span className={`recap-list-gap ${tone}`}>{adpGapText(pick)}</span>
           </li>
         ))}
@@ -564,7 +565,7 @@ function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string
                   className={`recap-board-cell${focus === pick.owner ? ' is-on' : ''}${picked?.overall === pick.overall ? ' is-picked' : ''}`}
                   style={{ background: heat(pick, mode) }}
                   onClick={() => setPicked(pick)}
-                  aria-label={`${pick.name}, ${pick.owner}, ${pickPlace(pick)}`}
+                  aria-label={`${shortName(pick.name)}, ${pick.owner}, ${pickPlace(pick)}`}
                 >
                   {(pick.keeper || pick.auto) && <span className="recap-board-tag">{pick.keeper ? 'K' : 'A'}</span>}
                   <span className="recap-board-name">{pick.shortName}</span>
@@ -579,7 +580,7 @@ function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string
       <div className="panel recap-detail" aria-live="polite">
         {picked ? (
           <>
-            <strong>{picked.name}</strong> to {picked.owner}, {pickPlace(picked)}
+            <strong>{shortName(picked.name)}</strong> to {picked.owner}, {pickPlace(picked)}
             {picked.keeper ? ', keeper' : picked.auto ? ', auto pick' : picked.seconds !== null ? `, ${clock(picked.seconds)} on the clock` : ''}
             {picked.clockCalledBy ? `, clock called by ${picked.clockCalledBy}` : ''}.
             <div className="recap-detail-row">
@@ -696,12 +697,13 @@ function PickTable({ recap }: { recap: DraftRecap }) {
             {current.rows.map((pick) => (
               <tr key={pick.overall} className="proj-row recap-row">
                 <td className="recap-col-check">
-                  <input type="checkbox" aria-label={`Pick ${pick.name}`} checked={selected.has(pick.overall)} onChange={() => toggle(pick.overall)} />
+                  <input type="checkbox" aria-label={`Pick ${shortName(pick.name)}`} checked={selected.has(pick.overall)} onChange={() => toggle(pick.overall)} />
                 </td>
                 {RECAP_COLUMNS.map((column) => {
                   const value = column.value(pick);
                   const text = column.id === 'score' ? (pick.score === null ? '–' : signed(pick.score))
                     : column.id === 'adpGap' ? (value === null ? '–' : `${Number(value) > 0 ? '+' : ''}${value}`)
+                    : column.id === 'name' ? shortName(pick.name)
                     : column.id === 'seconds' ? clock(pick.seconds)
                     : value === null ? '–' : String(value);
                   const tone = column.id === 'score' || column.id === 'verdict' || column.id === 'adpGap' ? scoreClass(pick.score) : '';

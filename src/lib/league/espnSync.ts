@@ -12,6 +12,7 @@
 import type { DraftRankingRefreshPreview } from './draftRankings.js';
 import type { PlayerPoolRefreshPreview } from './playerPool.js';
 import type { TeamNameRefreshPreview } from './teamNames.js';
+import { shortName } from './format.js';
 
 export type SyncPart = 'players' | 'rankings' | 'teams';
 
@@ -58,15 +59,15 @@ export function summarizePlayers(
   ].filter((part): part is string => part !== null);
 
   const details: string[] = [];
-  if (preview.added.length > 0) details.push(`New: ${nameList(preview.added.map((player) => player.fullName))}.`);
-  if (preview.removed.length > 0) details.push(`Gone: ${nameList(preview.removed.map((player) => player.fullName))}.`);
+  if (preview.added.length > 0) details.push(`New: ${nameList(preview.added.map((player) => shortName(player.fullName)))}.`);
+  if (preview.removed.length > 0) details.push(`Gone: ${nameList(preview.removed.map((player) => shortName(player.fullName)))}.`);
   if (preview.teamChanged.length > 0) {
-    details.push(`New team: ${nameList(preview.teamChanged.map((change) => `${change.fullName} (${String(change.after)})`))}.`);
+    details.push(`New team: ${nameList(preview.teamChanged.map((change) => `${shortName(change.fullName)} (${String(change.after)})`))}.`);
   }
 
   const warnings: string[] = [];
   if (preview.retainedMissing.length > 0) {
-    warnings.push(`ESPN left out ${nameList(preview.retainedMissing.map((player) => player.fullName))}. They stay, because a team holds them.`);
+    warnings.push(`ESPN left out ${nameList(preview.retainedMissing.map((player) => shortName(player.fullName)))}. They stay, because a team holds them.`);
   }
   if (draftStarted) warnings.push('The draft has started, so the player list is locked.');
 
@@ -98,7 +99,7 @@ export function summarizeRankings(
   const details: string[] = [];
   const bigMoves = preview.moved.slice(0, 5);
   if (bigMoves.length > 0) {
-    details.push(`Biggest moves: ${bigMoves.map((move) => `${move.fullName} ${move.before} to ${move.after}`).join(', ')}.`);
+    details.push(`Biggest moves: ${bigMoves.map((move) => `${shortName(move.fullName)} ${move.before} to ${move.after}`).join(', ')}.`);
   }
 
   const warnings: string[] = [];

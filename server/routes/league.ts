@@ -360,6 +360,7 @@ import { LmAddRefused, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
+import { shortName } from '../../src/lib/league/format.js';
 import { parseRoast } from '../../src/lib/league/draftRecap.js';
 import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
@@ -1863,10 +1864,10 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     if (writeIn) {
       const wanted = player.name.toLowerCase();
       const inPool = dataset.players.find((entry) => entry.name.toLowerCase() === wanted || entry.fullName?.toLowerCase() === wanted);
-      if (inPool) throw new HttpError(409, `${inPool.fullName ?? inPool.name} is in the player pool. Pick him from the list.`);
-      if (nameTaken(player.name, draft.draft.picks, [], new Set())) throw new HttpError(409, `${player.name} is already on the board`);
+      if (inPool) throw new HttpError(409, `${shortName(inPool.fullName ?? inPool.name)} is in the player pool. Pick him from the list.`);
+      if (nameTaken(player.name, draft.draft.picks, [], new Set())) throw new HttpError(409, `${shortName(player.name)} is already on the board`);
     } else if (!availablePlayers(dataset, draft).some((candidate) => candidate.key === player.key)) {
-      throw new HttpError(409, `${player.name} is already off the board`);
+      throw new HttpError(409, `${shortName(player.name)} is already off the board`);
     }
     const yielded = draft.draft.skipped?.[String(overallPick)];
     draft.draft.picks[String(overallPick)] = {
@@ -5046,27 +5047,7 @@ router.delete('/prop-bets/:id', requireAuth, async (req, res) => {
 });
 
 
-router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  void _next;
-  if (err instanceof PlayerPoolAcceptError) {
-    res.status(409).json({ error: err.message, reason: err.reason });
-    return;
-  }
-  if (err instanceof ScheduleAcceptError) {
-    res.status(409).json({ error: err.message, reason: err.reason });
-    return;
-  }
-  if (err instanceof DraftRankingAcceptError) {
-    res.status(409).json({ error: err.message, reason: err.reason });
-    return;
-  }
-  if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message });
-    return;
-  }
-  console.error('[league] Unhandled error:', err);
-  res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' });
-});
+
 
 // ─── Favorite teams and house parties ────────────────────────────────────────
 //
@@ -5413,6 +5394,28 @@ router.get('/parties/:id/public', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  void _next;
+  if (err instanceof PlayerPoolAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof ScheduleAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof DraftRankingAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof HttpError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+  console.error('[league] Unhandled error:', err);
+  res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' });
 });
 
 export default router;

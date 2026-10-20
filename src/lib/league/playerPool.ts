@@ -1,4 +1,5 @@
 import type { DatasetPlayer, LeagueDataset } from '../keeper/types.js';
+import { shortName } from './format.js';
 
 export type PlayerPoolSourceStatus = 'fetched' | 'retained-missing';
 
@@ -198,12 +199,6 @@ export function previewPlayerPoolRefresh(
     teamChanged,
     positionChanged,
   };
-}
-
-function shortName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2) return fullName;
-  return `${parts[0]?.charAt(0)}. ${parts.slice(1).join(' ')}`;
 }
 
 /**

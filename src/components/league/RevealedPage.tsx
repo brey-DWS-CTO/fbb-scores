@@ -5,6 +5,7 @@ import NavIcon from './NavIcon.js';
 import SignInPanel from './SignInPanel.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { apiErrorMessage, fetchAchievements, type AchievementsResponse } from '../../lib/league/api.js';
+import { shortName } from '../../lib/league/format.js';
 
 /**
  * Every other team as a card, its keeper slots either revealed or still a
@@ -102,7 +103,7 @@ export default function RevealedPage() {
                     <>
                       {shown.map((s) => (
                         <span key={s.playerKey} className={s.playerName ? 'vault-slot is-open' : 'vault-slot is-gone'}>
-                          {s.playerName ?? 'Since dropped'}
+                          {s.playerName ? shortName(s.playerName) : 'Since dropped'}
                         </span>
                       ))}
                       {Array.from({ length: hidden }, (_, i) => (

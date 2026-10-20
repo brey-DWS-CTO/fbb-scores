@@ -39,8 +39,8 @@ test('players: new, gone and team moves are counted and named', () => {
   }, differs);
   assert.equal(summary.changed, true);
   assert.equal(summary.headline, '1 new, 1 gone, 1 changed team. 2 players in all.');
-  assert.deepEqual(summary.details, ['New: Cooper Flagg.', 'Gone: Old Guy.', 'New team: Kevin Durant (Hou).']);
-  assert.match(summary.warnings[0], /Hurt Keeper/);
+  assert.deepEqual(summary.details, ['New: C. Flagg.', 'Gone: O. Guy.', 'New team: K. Durant (Hou).']);
+  assert.match(summary.warnings[0], /H\. Keeper/);
 });
 
 test('players: once the draft starts the list is locked and never saved', () => {
@@ -64,7 +64,7 @@ test('rankings: projections and moves in one line', () => {
   const summary = summarizeRankings(rankings, differs);
   assert.equal(summary.changed, true);
   assert.equal(summary.headline, '348 projected (8 more), 1 rank move.');
-  assert.deepEqual(summary.details, ['Biggest moves: Josh Giddey 25 to 16.']);
+  assert.deepEqual(summary.details, ['Biggest moves: J. Giddey 25 to 16.']);
   assert.deepEqual(summary.warnings, []);
 });
 
