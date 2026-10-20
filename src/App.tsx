@@ -27,6 +27,8 @@ import ProjectionsPage from './components/league/ProjectionsPage.js'
 import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
+import ScoresPage from './components/league/ScoresPage.js'
+import MatchupPage from './components/league/MatchupPage.js'
 import SharedMockPage from './components/league/SharedMockPage.js'
 import AchievementsPage from './components/league/AchievementsPage.js'
 import AchievementToast from './components/league/AchievementToast.js'
@@ -115,6 +117,8 @@ function App() {
         <Route path="/projections" element={<StatsGate><ProjectionsPage /></StatsGate>} />
         <Route path="/tiers" element={<StatsGate><TiersPage /></StatsGate>} />
         <Route path="/schedule" element={<SchedulePage />} />
+        <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/scores/:matchupId" element={<MatchupPage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />
         <Route path="*" element={<SplashPage />} />
