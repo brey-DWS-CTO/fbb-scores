@@ -1,4 +1,4 @@
-import { gamesLeft, gamesPlayed, type ScoreSide, type ScoresWeek } from './scores.js';
+import { lineupGamesLeft, gamesPlayed, type ScoreSide, type ScoresWeek } from './scores.js';
 
 export interface LineupGames {
   played: number;
@@ -9,23 +9,12 @@ export interface LineupGames {
   estimated: boolean;
 }
 
-/** Count lineup games before the points projection cuts them off at the cap. */
+/** Count lineup games before any overage deductions. */
 export function lineupGames(side: ScoreSide, week: ScoresWeek): LineupGames {
   const played = gamesPlayed(side, week);
   const rosterDays = new Set(side.players.flatMap((player) => Object.keys(player.days)));
-  const remaining = side.players.reduce((total, player) => {
-    // A player absent from a known daily roster was dropped or traded away.
-    // Do not carry his old starting slot forward into the new lineup.
-    const days = { ...player.days };
-    for (const day of week.days) {
-      const key = String(day.scoringPeriodId);
-      if (!days[key] && rosterDays.has(key)) {
-        days[key] = { lineupSlotId: 12, started: false, points: 0, stats: null, played: false, game: null };
-      }
-    }
-    return total + gamesLeft({ ...player, days }, week)
-      .filter((game) => !game.live).reduce((sum, game) => sum + game.share, 0);
-  }, 0);
+  const remaining = lineupGamesLeft(side, week).filter(({ game }) => !game.live)
+    .reduce((sum, { game }) => sum + game.share, 0);
   const projected = Math.round((played + remaining) * 10) / 10;
   return {
     played, remaining: Math.round(remaining * 10) / 10, projected, cap: week.gamesCap,

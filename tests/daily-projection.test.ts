@@ -172,12 +172,11 @@ test('a side projects each day and the week from the same games the odds use', (
   assert.ok(proj.week > home.total);
 });
 
-test('the games cap cuts a side\'s projection off in date order, but never a live game', () => {
+test('the games cap deducts the highest projected games from the last day, including live points', () => {
   const jokic = player({ id: 1, name: 'Nikola Jokic', proTeam: 'DEN', seasonAvg: 50, points: { '17': 56.8, '18': 30 } });
   const curry = player({ id: 8, name: 'Stephen Curry', proTeam: 'GSW', seasonAvg: 40, points: { '17': 33 } });
   const home = side([jokic, curry], { '17': 89.8, '18': 30 });
-  // Three games count already: yesterday's pair and Jokic's live one. A cap
-  // of 4 leaves room for one more whole game, Curry today, and nothing after.
+  // Six games project in all. Two over removes both games tomorrow first.
   const capped = sideProjection(home, { ...WEEK, gamesCap: 4 }, expected);
   const jokicGame = (0.3 * 50 + 0.2 * 20) / 0.5;
   const curryGame = (0.3 * 40 + 0.2 * 20) / 0.5;
@@ -185,9 +184,10 @@ test('the games cap cuts a side\'s projection off in date order, but never a liv
   assert.equal(capped.byDay['19'], 0, 'tomorrow is over the cap');
   const open = sideProjection(home, WEEK, expected);
   assert.ok(capped.week < open.week);
-  // No room at all: only the live half of Jokic's game survives.
+  // Three over also removes Jokic's higher projected live game today.
   const full = sideProjection(home, { ...WEEK, gamesCap: 3 }, expected);
-  assert.equal(full.byDay['18'], Math.round((30 + jokicGame * 0.5) * 10) / 10);
+  assert.equal(full.byDay['18'], Math.round(curryGame * 10) / 10);
+  assert.ok(full.overages.some((game) => game.playerId === jokic.id && game.scoringPeriodId === 18 && game.scoredDeduction === 30));
 });
 
 test('a projection prints with one decimal and a thousands comma', () => {

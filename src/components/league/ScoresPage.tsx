@@ -31,13 +31,14 @@ interface SideProps {
   mine: boolean;
   /** Where the team should finish the week. Null when there is nothing to say. */
   proj: number | null;
+  deduction: number;
   /** Projected to finish ahead of the other side. */
   projAhead: boolean;
   right?: boolean;
 }
 
 /** One team on a card: name, owner, total, projection. Home left, away right, as on the matchup page. */
-function CardSide({ side, week, owner, leading, mine, proj, projAhead, right }: SideProps) {
+function CardSide({ side, week, owner, leading, mine, proj, deduction, projAhead, right }: SideProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
       <div className="score-side-name">{side.name}</div>
@@ -47,6 +48,7 @@ function CardSide({ side, week, owner, leading, mine, proj, projAhead, right }: 
       {proj !== null && (
         <div className={`score-side-proj${projAhead ? ' is-up' : ''}`}>Proj <b>{projText(proj)}</b></div>
       )}
+      {proj !== null && deduction > 0 && <div className="score-overage-label">{projText(deduction)} overage pts deducted</div>}
     </div>
   );
 }
@@ -127,8 +129,10 @@ export default function ScoresPage() {
         <div className="score-list">
           {matchups.map((matchup) => {
             const chance = matchupChance(matchup, week, expected);
-            const homeProj = sideProjection(matchup.home, week, expected).week;
-            const awayProj = sideProjection(matchup.away, week, expected).week;
+            const homeForecast = sideProjection(matchup.home, week, expected);
+            const awayForecast = sideProjection(matchup.away, week, expected);
+            const homeProj = homeForecast.week;
+            const awayProj = awayForecast.week;
             // A settled matchup has nothing left to project; before any source loads there is nothing to say.
             const showProj = matchup.winner === 'UNDECIDED' && homeProj + awayProj > 0;
             const homeLeads = matchup.home.total > matchup.away.total;
@@ -144,6 +148,7 @@ export default function ScoresPage() {
                     leading={homeLeads}
                     mine={matchup.home.teamId === myTeamId}
                     proj={showProj ? homeProj : null}
+                    deduction={homeForecast.deduction}
                     projAhead={homeProj > awayProj}
                   />
                   <CardSide
@@ -153,6 +158,7 @@ export default function ScoresPage() {
                     leading={awayLeads}
                     mine={matchup.away.teamId === myTeamId}
                     proj={showProj ? awayProj : null}
+                    deduction={awayForecast.deduction}
                     projAhead={awayProj > homeProj}
                     right
                   />
@@ -169,6 +175,7 @@ export default function ScoresPage() {
         <p className="score-foot">
           Proj is where each team should finish the week. Win chance comes from the same numbers: points so far plus each player&apos;s expected points for every game left.
           A player&apos;s expected points are ESPN&apos;s projection for the day when it has one, else a blend of his last 15 days, his season and his preseason projection.
+          {' If a team projects over the games cap, its highest-scoring games on its last day with games are deducted. Open the matchup to see those games in red.'}
           {week.matchupPeriodId === week.currentMatchupPeriodId && !demo && ' Updates every minute while you watch.'}
         </p>
       )}

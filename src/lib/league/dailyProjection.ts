@@ -17,15 +17,14 @@
  */
 import {
   gamesLeft,
+  gamesCapProjection,
   isOut,
-  remainingGames,
-  sideOdds,
   type ExpectedPoints,
   type ScorePlayer,
   type ScoreSide,
   type ScoresWeek,
+  type OverageGame,
 } from './scores.js';
-import { sideMean } from './winOdds.js';
 
 /** How much each average counts in the blend. They add to one. */
 export const BLEND_WEIGHTS = { last15: 0.5, season: 0.3, preseason: 0.2 } as const;
@@ -74,28 +73,40 @@ export function expectedPointsForGame(player: ScorePlayer, ctx: ProjectionContex
 }
 
 export interface SideProjection {
-  /** Where the side should finish the week: points so far plus every game left, up to the cap. */
+  /** Where the side should finish after the league's overage deductions. */
   week: number;
   /** Where the side should finish each day, by scoring period id: that day's points plus its games left. */
   byDay: Record<string, number>;
+  overages: OverageGame[];
+  /** Total projected points removed for excess games. */
+  deduction: number;
 }
 
 type WeekView = Pick<ScoresWeek, 'days' | 'currentScoringPeriodId' | 'gamesCap'>;
 
 /**
  * A side's projected finish for the week and for each day. A day gone by
- * projects to what it scored. The games cap cuts the future off in date
- * order, as ESPN does.
+ * projects to what it scored, less any overage. Excess games come out of
+ * the last day with games, highest projected scores first.
  */
 export function sideProjection(side: ScoreSide, week: WeekView, expected: ExpectedPoints): SideProjection {
+  const plan = gamesCapProjection(side, week, expected);
   const byDay: Record<string, number> = {};
   for (const day of week.days) byDay[String(day.scoringPeriodId)] = side.pointsByDay[String(day.scoringPeriodId)] ?? 0;
-  for (const game of remainingGames(side, week, expected)) {
+  for (const game of plan.remaining) {
     const key = String(game.scoringPeriodId);
     byDay[key] = (byDay[key] ?? 0) + game.expected * game.share;
   }
+  for (const game of plan.overages) {
+    const key = String(game.scoringPeriodId);
+    byDay[key] = (byDay[key] ?? 0) - game.scoredDeduction;
+  }
   for (const key of Object.keys(byDay)) byDay[key] = Math.round(byDay[key] * 10) / 10;
-  return { week: Math.round(sideMean(sideOdds(side, week, expected)) * 10) / 10, byDay };
+  const total = side.total - plan.scoredDeduction + plan.remaining.reduce((sum, game) => sum + game.expected * game.share, 0);
+  return {
+    week: Math.round(total * 10) / 10, byDay, overages: plan.overages,
+    deduction: Math.round(plan.overages.reduce((sum, game) => sum + game.deduction, 0) * 10) / 10,
+  };
 }
 
 /**

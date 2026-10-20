@@ -596,7 +596,7 @@ test('a day with no game for the team, and a day already final, add nothing', ()
   assert.ok(left[0].live);
 });
 
-test('the odds use expected points per game and stop at the games cap', () => {
+test('the odds use expected points per game after last-day overage deductions', () => {
   const week = buildWeek();
   const [matchup] = week.matchups;
   const expected = (player: ScorePlayer) => (player.name === 'Nikola Jokic' ? 60 : 30);
@@ -605,10 +605,10 @@ test('the odds use expected points per game and stop at the games cap', () => {
   assert.equal(home.remaining.length, 4);
   assert.equal(home.remaining[0].expected, 60);
 
-  // A cap with no room left keeps only the live games.
+  // A zero cap excludes every game, including live games and their scored points.
   const capped = sideOdds(matchup.away, { ...week, gamesCap: 0 }, expected);
-  assert.ok(capped.remaining.every((game) => game.share !== undefined && game.share < 1), 'only the live game shares survive');
-  assert.equal(capped.remaining.length, 2);
+  assert.equal(capped.remaining.length, 0);
+  assert.ok(capped.points < matchup.away.total);
   // Room for one whole game: the first future game in date order fills it.
   const one = sideOdds(matchup.home, { ...week, gamesCap: 2 }, expected);
   assert.equal(one.remaining.length, 1);

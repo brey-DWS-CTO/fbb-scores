@@ -6054,6 +6054,16 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .lineup-games-panel p { color: var(--text-mid); font-size: 0.75rem; line-height: 1.5; }
 .lineup-games-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 14px; font-size: 0.8rem; }
 
+/* Last-day game overages from rule 6.5.1. */
+.score-player.is-overage { border: 1px solid var(--neon-red); background: color-mix(in srgb, var(--neon-red) 10%, var(--panel-bg)); opacity: 1; }
+.score-player.is-overage .score-player-name, .score-player.is-overage .score-player-pts { color: var(--neon-red); }
+.score-player.is-overage .score-player-pts { text-decoration: line-through; }
+.score-overage-label { color: var(--neon-red); font-size: 0.65rem; line-height: 1.5; margin-top: 5px; font-weight: 800; }
+.score-overage-note { margin-top: 12px; border-top: 1px solid var(--panel-border); padding-top: 10px; }
+.score-overage-note p { color: var(--text-mid); font-size: 0.72rem; line-height: 1.5; margin: 0 0 8px; }
+.score-overage-jump { color: var(--neon-red); border: 1px solid var(--neon-red); font-size: 0.65rem; min-height: 44px; padding: 6px 10px; margin: 3px; white-space: normal; }
+.score-day-nav { scroll-margin-top: 12px; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
