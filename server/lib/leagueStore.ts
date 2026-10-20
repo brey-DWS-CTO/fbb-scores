@@ -84,6 +84,7 @@ export interface LeagueOverrides {
 }
 
 export interface LeagueDynamicState {
+  seasonMode?: import('../../src/lib/league/seasonMode.js').SeasonMode;
   season: number; // 2027
   keepers: Record<string, KeeperSelection[]>; // owner -> up to 2
   /** Commissioner-controlled public visibility. Missing in old rows means hidden. */

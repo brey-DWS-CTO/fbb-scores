@@ -1,3 +1,4 @@
+import { shortName } from '../../lib/league/format.js';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -10,6 +11,7 @@ import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import RecordTables from './RecordTables.js';
 import ScoringTable from './ScoringTable.js';
+import LmAddPanel from './LmAddPanel.js';
 
 const th: CSSProperties = {
   padding: '4px 8px',
@@ -109,6 +111,7 @@ export default function LeaguePage() {
       </div>
 
       {/* ── Activity: pick trades and ESPN moves, newest first ── */}
+      <LmAddPanel compact />
       <Section title="ACTIVITY" color="var(--neon-yellow)">
         {activity.length === 0 ? (
           <div style={{ color: 'var(--text-faint)' }}>No trades or moves yet. When one goes through, it shows here.</div>
@@ -187,7 +190,7 @@ export default function LeaguePage() {
                 const c = p.keeper.contract!;
                 return (
                   <tr key={p.key}>
-                    <td style={{ ...td, color: 'var(--text-hi)', fontWeight: 600 }}>{p.name}</td>
+                    <td style={{ ...td, color: 'var(--text-hi)', fontWeight: 600 }}>{shortName(p.fullName ?? p.name)}</td>
                     <td style={{ ...td, color: p.fantasyTeam ? 'var(--text-body)' : 'var(--text-dim)' }}>
                       {p.fantasyTeam ?? 'unrostered'}
                     </td>
@@ -217,7 +220,7 @@ export default function LeaguePage() {
             <div style={{ display: 'grid', gap: 3 }}>
               {expiredContracts.map((p) => (
                 <div key={p.key} style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                  <span style={{ textDecoration: 'line-through' }}>{p.name}</span>{' '}
+                  <span style={{ textDecoration: 'line-through' }}>{shortName(p.fullName ?? p.name)}</span>{' '}
                   <span style={{ fontSize: '0.7rem' }}>
                     (R{p.keeper.contract!.originalRound} · {p.fantasyTeam ?? 'unrostered'})
                   </span>
@@ -270,7 +273,7 @@ export default function LeaguePage() {
                               }}
                             >
                               {isPick && <NavIcon name="target" size={13} className="icon-in-heading" />}
-                              {item}
+                              {isPick ? item : shortName(item)}
                             </span>
                           );
                         })}

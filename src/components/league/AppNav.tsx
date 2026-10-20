@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 import IdentityChip from './IdentityChip.js';
@@ -17,7 +17,7 @@ function NavBadge({ count, label }: { count: number; label: string }) {
 
 export default function AppNav() {
   const { identity } = useIdentity();
-  const { meta } = useLeagueState();
+  const { meta, seasonMode } = useLeagueState();
   const location = useLocation();
   // The sheet is open only for the path it was opened on, so navigating
   // anywhere closes it without an effect.
@@ -49,7 +49,7 @@ export default function AppNav() {
 
   // One list drives both bars. `primary` sections sit on the phone's bottom
   // bar; the rest live behind MORE. Desktop shows every section.
-  const sections = visibleSections(identity?.isCommissioner === true, meta?.revealed === true);
+  const sections = visibleSections(identity?.isCommissioner === true, meta?.revealed === true, seasonMode);
   const current = sectionFor(location.pathname, sections);
   const primary = sections.filter((section) => section.primary);
   const secondary = sections.filter((section) => !section.primary);
@@ -93,8 +93,9 @@ export default function AppNav() {
           </div>
           <nav className="top-nav-links" aria-label="Main">
             {sections.map((t) => (
+              <Fragment key={t.id}>
+              {t.offSeason && t.id === 'draft' && <div className="nav-offseason-label">OFF SEASON</div>}
               <NavLink
-                key={t.id}
                 to={sectionHome(t)}
                 className={current?.id === t.id ? 'top-nav-link hub-heading active' : 'top-nav-link hub-heading'}
                 {...(collapsed ? { title: t.label, 'aria-label': t.label } : {})}
@@ -111,6 +112,7 @@ export default function AppNav() {
                   </span>
                 )}
               </NavLink>
+              </Fragment>
             ))}
           </nav>
           <div className="top-nav-account">

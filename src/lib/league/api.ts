@@ -1,3 +1,4 @@
+import { resolveSeasonMode } from './seasonMode.js';
 import type { ExpertProjections } from './expertProjections.js';
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockGrade, MockResultRecord } from './mockGrade.js';
@@ -66,6 +67,7 @@ import type { LeagueTransaction } from './transactions.js';
 import type { EarlyDay, LmAddCheck, LmAddRequest, LmAddWindow, WaiverHour } from './lmWeekend.js';
 
 export interface StateMeta {
+  seasonMode?: import('./seasonMode.js').SeasonMode;
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
   pendingTrades?: number;
   /** Keeper reveals this viewer has earned and not spent. Drives the VAULT badge. */
@@ -268,7 +270,7 @@ function sandboxResponse(doc: SandboxDoc): StateResponse {
   return {
     state: doc.state,
     version: doc.version,
-    meta: { ...doc.meta, revealed: true, isCommissioner: true, keeperStatus },
+    meta: { ...doc.meta, seasonMode: resolveSeasonMode(doc.state), revealed: true, isCommissioner: true, keeperStatus },
   };
 }
 
@@ -723,6 +725,17 @@ export async function setLocks(c: Credentials, keepersLocked: boolean): Promise<
 /** Commissioner: stop (or start) seeing other teams' keepers, so reveals work for you. */
 export async function setCommishBlind(c: Credentials, blind: boolean): Promise<StateResponse> {
   const { data } = await axios.post('/api/league/commish-blind', { blind }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function setSeasonMode(c: Credentials, seasonMode: import('./seasonMode.js').SeasonMode): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    const result = mutateSandbox(sandbox, (state) => { state.seasonMode = seasonMode; });
+    if (result.meta) result.meta.seasonMode = seasonMode;
+    return result;
+  }
+  const { data } = await axios.post('/api/league/season-mode', { seasonMode }, { headers: authHeaders(c) });
   return data;
 }
 

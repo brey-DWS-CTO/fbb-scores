@@ -176,6 +176,26 @@ export function lmAddWindow(now: string | Date, todaysGames: readonly DayGame[])
 
 export type LmAddStatus = 'requested' | 'waiting-for-drop' | 'added' | 'failsafe' | 'denied';
 
+/** Copy for the always-visible button, using the server's window and Pacific date. */
+export function lmAddButtonReason(window: LmAddWindow | null, date: string | null, signedIn: boolean): string {
+  if (!signedIn) return 'Sign in to request an LM add.';
+  if (!window || !date) return "Checking today's LM add window.";
+  if (window.open) return 'Open until the first tip.';
+  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+  if ((day === 0 || day === 6) && window.closesAt !== null) {
+    return day === 6
+      ? 'Closed for today. Opens again tomorrow before the first tip.'
+      : 'Closed for today. Opens again next Saturday before the first tip.';
+  }
+  return window.closesAt === null && (day === 0 || day === 6)
+    ? window.reason ?? 'No NBA games today, so no LM adds.'
+    : 'LM adds open Saturday and Sunday, until the first tip.';
+}
+
+export function ownOpenLmRequests(requests: readonly LmAddRequest[], owner: string | null): LmAddRequest[] {
+  return owner === null ? [] : requests.filter((request) => request.owner === owner && request.status !== 'added' && request.status !== 'denied');
+}
+
 export interface LmAddRequest {
   id: string;
   season: number;
