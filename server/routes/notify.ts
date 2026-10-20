@@ -16,6 +16,8 @@
 import { Router, type Request, type Response } from 'express';
 import { runDueReminders } from '../lib/notifier.js';
 import { refreshTeamNamesNow } from '../lib/teamNameService.js';
+import { pullTransactionsIfStale } from '../lib/transactionService.js';
+import { runLmClock } from '../lib/lmWeekendService.js';
 import { appOrigin } from './auth.js';
 
 const router = Router();
@@ -47,6 +49,10 @@ router.get('/tick', async (req: Request, res: Response) => {
     return;
   }
   try {
+    // The moves feed fills on the hour too, so the table is whole even when
+    // nobody opens the page. A failed pull is logged, never fatal here.
+    const moves = await pullTransactionsIfStale();
+    if (moves && moves.added > 0) console.log(`[transactions] tick: ${moves.added} new`);
     const run = await runDueReminders(new Date(), appOrigin(req));
     // Counts only. Who was mailed is not something a log needs to carry.
     console.log(`[notify] tick: ${run.sent} of ${run.due} due reminders sent`);
@@ -75,6 +81,31 @@ router.get('/team-names', async (req: Request, res: Response) => {
     const reason = err instanceof Error ? err.message : String(err);
     console.error('[teams] weekly refresh failed:', reason);
     res.json({ changed: 0, error: reason });
+  }
+});
+
+/**
+ * GET /api/notify/lm-clock, every fifteen minutes: keep ESPN's waiver hour
+ * where the league wants it and run any LM adds that are due.
+ */
+router.get('/lm-clock', async (req: Request, res: Response) => {
+  if (!allowed(req)) {
+    res.status(401).json({ error: 'Not for you' });
+    return;
+  }
+  try {
+    const run = await runLmClock(new Date());
+    // One line every run, so the log shows the clock is alive even when
+    // nothing needed changing. Nobody can read a silence.
+    const waiver = run.waiver
+      ? `target ${run.waiver.target.hourPT} PT (${run.waiver.target.hourET} ET), ESPN has ${run.waiver.current ?? '?'}, ${run.waiver.changed ? 'changed' : run.waiver.note}`
+      : 'hour not checked';
+    console.log(`[lm-clock] ${run.date}: ${run.skipped ?? waiver}; adds ${run.adds.length}`);
+    if (run.waiver?.changed || run.adds.length > 0) console.log('[lm-clock]', JSON.stringify(run));
+    res.json(run);
+  } catch (err) {
+    console.error('[lm-clock] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'The LM clock failed' });
   }
 });
 

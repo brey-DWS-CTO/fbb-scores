@@ -32,6 +32,14 @@ const paths = {
   undo: 'M9 14L4 9l5-5 M4 9h10a6 6 0 0 1 0 12h-3',
   dots: 'M5 12h.01 M12 12h.01 M19 12h.01',
   share: 'M4 12v8h16v-8 M12 3v13 M8 7l4-4 4 4',
+  bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
+  clock: 'M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9 M12 7v5l3 2',
+  wheelchair: 'M11 4.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0 M9.5 7v6h6l2.5 5h2 M9.5 10h5 M7 11.5a5.5 5.5 0 1 0 7.5 6.5',
+  sneaker: 'M2 18h20v2H2z M2 18v-8l5 1 2 3 5 1 6 1a2 2 0 0 1 2 2 M9 14l1-2 M12 15l1-2',
+  ball: 'M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9 M3 12h18 M12 3v18 M5.6 5.6c3.5 3.5 3.5 9.3 0 12.8 M18.4 5.6c-3.5 3.5-3.5 9.3 0 12.8',
+  jersey: 'M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0',
+  layers: 'M12 3 2 8l10 5 10-5z M2 13l10 5 10-5 M2 18l10 5 10-5',
+  ruler: 'M9 2h6v20H9z M9 6h3 M9 10h3 M9 14h3 M9 18h3',
 };
 
 export type NavIconName = keyof typeof paths;

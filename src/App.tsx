@@ -20,12 +20,15 @@ import RulesPage from './components/league/RulesPage.js'
 import PaperPage from './components/league/PaperPage.js'
 import VotesPage from './components/league/VotesPage.js'
 import DuesPage from './components/league/DuesPage.js'
+import ActivityPage from './components/league/ActivityPage.js'
 import TradesPage from './components/league/TradesPage.js'
 import MockDraftPage from './components/league/MockDraftPage.js'
 import ProjectionsPage from './components/league/ProjectionsPage.js'
 import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
+import ScoresPage from './components/league/ScoresPage.js'
+import MatchupPage from './components/league/MatchupPage.js'
 import SharedMockPage from './components/league/SharedMockPage.js'
 import AchievementsPage from './components/league/AchievementsPage.js'
 import AchievementToast from './components/league/AchievementToast.js'
@@ -38,6 +41,7 @@ import WatchPage from './components/league/WatchPage.js'
 import PartyPage from './components/league/PartyPage.js'
 import FavoritesPrompt from './components/league/FavoritesPrompt.js'
 import InviteToast from './components/league/InviteToast.js'
+import DraftRecapPage from './components/draft/DraftRecapPage.js'
 
 function App() {
   const location = useLocation()
@@ -97,11 +101,13 @@ function App() {
         <Route path="/draft" element={<DraftPage />} />
         <Route path="/draft/start" element={<DraftStartPage />} />
         <Route path="/draft/tv" element={<DraftTvPage />} />
+        <Route path="/draft/recap" element={<StatsGate><DraftRecapPage /></StatsGate>} />
         <Route path="/my-rankings" element={<MyRankingsPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/dues" element={<DuesPage />} />
+        <Route path="/activity" element={<ActivityPage />} />
         <Route path="/achievements" element={<AchievementsPage />} />
         <Route path="/achievements/reveal" element={<RevealPage />} />
         <Route path="/revealed" element={<RevealedPage />} />
@@ -119,6 +125,8 @@ function App() {
         <Route path="/schedule" element={<SchedulePage />} />
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/party/:id" element={<PartyPage />} />
+        <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/scores/:matchupId" element={<MatchupPage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />
         <Route path="*" element={<SplashPage />} />
