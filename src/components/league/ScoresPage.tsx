@@ -26,9 +26,13 @@ interface RowProps {
   owner: string | undefined;
   leading: boolean;
   mine: boolean;
+  /** Where the team should finish the week. Null when there is nothing to say. */
+  proj: number | null;
+  /** Projected to finish ahead of the other side. */
+  projAhead: boolean;
 }
 
-function TeamRow({ side, owner, leading, mine }: RowProps) {
+function TeamRow({ side, owner, leading, mine, proj, projAhead }: RowProps) {
   return (
     <div className={`score-row${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
       <div className="score-row-who">
@@ -37,7 +41,12 @@ function TeamRow({ side, owner, leading, mine }: RowProps) {
           {owner ?? 'Unknown owner'} · {recordText(side.record)}
         </div>
       </div>
-      <div className="score-row-total">{side.total.toFixed(1)}</div>
+      <div className="score-row-score">
+        <div className="score-row-total">{side.total.toFixed(1)}</div>
+        {proj !== null && (
+          <div className={`score-row-proj${projAhead ? ' is-up' : ''}`}>Proj <b>{projText(proj)}</b></div>
+        )}
+      </div>
     </div>
   );
 }
@@ -120,22 +129,30 @@ export default function ScoresPage() {
             const chance = matchupChance(matchup, week, expected);
             const homeProj = sideProjection(matchup.home, week, expected).week;
             const awayProj = sideProjection(matchup.away, week, expected).week;
+            // A settled matchup has nothing left to project; before any source loads there is nothing to say.
+            const showProj = matchup.winner === 'UNDECIDED' && homeProj + awayProj > 0;
             const homeLeads = matchup.home.total > matchup.away.total;
             const awayLeads = matchup.away.total > matchup.home.total;
             const mine = matchup.home.teamId === myTeamId || matchup.away.teamId === myTeamId;
             return (
               <Link key={matchup.id} to={linkTo(matchup)} className={`panel score-card${mine ? ' is-mine' : ''}`}>
-                <TeamRow side={matchup.home} owner={owners.get(matchup.home.teamId)} leading={homeLeads} mine={matchup.home.teamId === myTeamId} />
+                <TeamRow
+                  side={matchup.home}
+                  owner={owners.get(matchup.home.teamId)}
+                  leading={homeLeads}
+                  mine={matchup.home.teamId === myTeamId}
+                  proj={showProj ? homeProj : null}
+                  projAhead={homeProj > awayProj}
+                />
                 <WinBar left={chance.home} right={chance.away} />
-                <TeamRow side={matchup.away} owner={owners.get(matchup.away.teamId)} leading={awayLeads} mine={matchup.away.teamId === myTeamId} />
-                {matchup.winner === 'UNDECIDED' && homeProj + awayProj > 0 && (
-                  <div className="score-proj">
-                    <span className="score-proj-title">Proj</span>
-                    <b className={homeProj > awayProj ? 'is-up' : ''}>{projText(homeProj)}</b>
-                    <span className="score-proj-dash">–</span>
-                    <b className={awayProj > homeProj ? 'is-up' : ''}>{projText(awayProj)}</b>
-                  </div>
-                )}
+                <TeamRow
+                  side={matchup.away}
+                  owner={owners.get(matchup.away.teamId)}
+                  leading={awayLeads}
+                  mine={matchup.away.teamId === myTeamId}
+                  proj={showProj ? awayProj : null}
+                  projAhead={awayProj > homeProj}
+                />
                 {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
               </Link>
             );
