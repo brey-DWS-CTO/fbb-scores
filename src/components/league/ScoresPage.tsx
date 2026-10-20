@@ -15,7 +15,9 @@ import {
   seasonStartDate,
   type ScoreMatchup,
   type ScoreSide,
+  type ScoresWeek,
 } from '../../lib/league/scores.js';
+import LineupGamesSummary from './LineupGamesSummary.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import { ScoresNotice, WeekPicker, WinBar } from './ScoresBits.js';
@@ -23,6 +25,7 @@ import { numberParam, scoresQuery } from './scoresUi.js';
 
 interface SideProps {
   side: ScoreSide;
+  week: ScoresWeek;
   owner: string | undefined;
   leading: boolean;
   mine: boolean;
@@ -34,12 +37,13 @@ interface SideProps {
 }
 
 /** One team on a card: name, owner, total, projection. Home left, away right, as on the matchup page. */
-function CardSide({ side, owner, leading, mine, proj, projAhead, right }: SideProps) {
+function CardSide({ side, week, owner, leading, mine, proj, projAhead, right }: SideProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
       <div className="score-side-name">{side.name}</div>
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
       <div className="score-side-total">{side.total.toFixed(1)}</div>
+      <LineupGamesSummary side={side} week={week} />
       {proj !== null && (
         <div className={`score-side-proj${projAhead ? ' is-up' : ''}`}>Proj <b>{projText(proj)}</b></div>
       )}
@@ -134,6 +138,7 @@ export default function ScoresPage() {
               <Link key={matchup.id} to={linkTo(matchup)} className={`panel score-card${mine ? ' is-mine' : ''}`}>
                 <div className="score-head-grid">
                   <CardSide
+                    week={week}
                     side={matchup.home}
                     owner={owners.get(matchup.home.teamId)}
                     leading={homeLeads}
@@ -142,6 +147,7 @@ export default function ScoresPage() {
                     projAhead={homeProj > awayProj}
                   />
                   <CardSide
+                    week={week}
                     side={matchup.away}
                     owner={owners.get(matchup.away.teamId)}
                     leading={awayLeads}

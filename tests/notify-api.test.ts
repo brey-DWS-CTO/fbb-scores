@@ -8,6 +8,7 @@ import { ANNOUNCEMENTS } from '../src/lib/league/announcements.ts';
 import { pathToFileURL } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import type { LeagueDynamicState, PickRef, PickTradeProposal } from '../src/lib/keeper/types.ts';
+import { warningWeek } from './helpers/lineup-games-fixture.js';
 
 /**
  * The league's email, end to end against the local file backend.
@@ -38,6 +39,7 @@ type NotifierModule = typeof import('../server/lib/notifier.ts');
 let tempRoot = '';
 let store: StoreModule;
 let notifier: NotifierModule;
+let gamesWarnings: typeof import('../server/lib/gamesWarningService.ts');
 let server: Server;
 let baseUrl = '';
 
@@ -151,6 +153,7 @@ before(async () => {
   ]);
   store = storeModule;
   notifier = notifierModule;
+  gamesWarnings = await import(load('server', 'lib', 'gamesWarningService.ts'));
   for (const [owner, pin] of Object.entries(pins)) await store.setPin(owner, pin);
 
   server = app.listen(0, '127.0.0.1');
@@ -189,6 +192,50 @@ beforeEach(async () => {
     draft.pickTradeProposals = [];
   });
   mailLog = [];
+});
+
+test('lineup warnings mail only affected owners, deduplicate Friday, and recalculate Sunday', async () => {
+  const week = warningWeek();
+  const friday = new Date('2026-11-06T15:00:00Z');
+  const run = () => gamesWarnings.runGamesWarnings(friday, 'https://example.test', async () => week);
+  assert.deepEqual(await run(), { due: 2, sent: 2 });
+  assert.deepEqual(mails(), [
+    { to: addresses.Brey, subject: 'Lineup warning: 3 over cap' },
+    { to: addresses.Amy, subject: 'Lineup warning: 2 under cap' },
+  ]);
+  assert.deepEqual(await run(), { due: 2, sent: 0 });
+  assert.equal(mails().length, 2);
+  week.currentScoringPeriodId = 20;
+  assert.deepEqual(await gamesWarnings.runGamesWarnings(new Date('2026-11-08T15:00:00Z'), 'https://example.test', async () => week), { due: 2, sent: 2 });
+  assert.equal(mails()[2].subject, 'Lineup warning: 1 under cap', 'Sunday uses the new forecast');
+});
+
+test('lineup warnings honor commissioner caps, skip at-cap teams, and never fetch outside the window', async () => {
+  const week = warningWeek();
+  week.matchupPeriodId = week.currentMatchupPeriodId = 501;
+  await store.saveGamesCap({ season: 2027, matchupPeriodId: 501, cap: 4, updatedBy: 'Brey', updatedAt: new Date().toISOString() });
+  assert.deepEqual(await gamesWarnings.runGamesWarnings(new Date('2026-11-06T15:00:00Z'), 'https://example.test', async () => week), { due: 1, sent: 1 });
+  assert.equal(mails()[0].subject, 'Lineup warning: 5 over cap');
+  assert.deepEqual(await gamesWarnings.runGamesWarnings(new Date('2026-11-07T15:00:00Z'), 'https://example.test', async () => { throw new Error('must not fetch'); }), { due: 0, sent: 0 });
+});
+
+test('lineup warnings skip missing addresses, incomplete schedules, final and stale matchups', async () => {
+  const week = warningWeek();
+  week.matchupPeriodId = week.currentMatchupPeriodId = 502;
+  const run = () => gamesWarnings.runGamesWarnings(new Date('2026-11-06T15:00:00Z'), 'https://example.test', async () => week);
+  week.matchups[0].home.teamId = week.matchups[0].away.teamId = 3;
+  assert.equal((await run()).sent, 0);
+  week.matchups[0].home.teamId = 7;
+  const games = week.days[3].games;
+  week.days[3].games = null;
+  assert.equal((await run()).sent, 0);
+  week.days[3].games = games;
+  week.matchups[0].winner = 'HOME';
+  assert.equal((await run()).sent, 0);
+  week.matchups[0].winner = 'UNDECIDED';
+  week.currentMatchupPeriodId = 503;
+  assert.equal((await run()).sent, 0);
+  assert.equal(mails().length, 0);
 });
 
 /* ─── Trades ───────────────────────────────────────────────────────────── */

@@ -6038,6 +6038,22 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .lm-panel-head a { color: var(--neon-teal); text-decoration: none; }
 .lm-panel .rules-draft-note { margin: 0; }
 
+/* Projected lineup games, before the weekly cap. */
+.score-games { flex-wrap: wrap; }
+.lineup-games { display: grid; gap: 3px; margin-top: 9px; padding: 8px; border: 1px solid var(--panel-border); border-radius: 7px; font-size: 0.75rem; color: var(--text-soft); }
+.lineup-games strong { color: var(--text-hi); }
+.lineup-games small { font-size: 0.65rem; color: var(--text-mid); }
+.lineup-games.is-over { border-color: var(--neon-red); }
+.lineup-games.is-over strong { color: var(--neon-red); }
+.lineup-games.is-under { border-color: var(--neon-yellow); }
+.lineup-games.is-under strong { color: var(--neon-yellow); }
+.lineup-games.is-at strong { color: var(--neon-teal); }
+.score-games > .lineup-games { grid-column: 1 / -1; width: 100%; box-sizing: border-box; }
+.lineup-games-panel { padding: 14px; margin-bottom: 16px; }
+.lineup-games-panel h2 { font-size: 0.75rem; margin: 0; }
+.lineup-games-panel p { color: var(--text-mid); font-size: 0.75rem; line-height: 1.5; }
+.lineup-games-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 14px; font-size: 0.8rem; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }
