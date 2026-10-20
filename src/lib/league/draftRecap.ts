@@ -1,3 +1,4 @@
+import { shortName } from './format.js';
 /**
  * The draft recap: grades, a roast and the best and worst pick for every
  * team, the draft's numbers, and a value score on every pick for the heat map.
@@ -234,7 +235,7 @@ function zScores(values: readonly number[]): number[] {
 }
 
 function shortOf(player: DatasetPlayer | null, fallback: string): string {
-  return player?.name ?? fallback;
+  return shortName(player?.fullName ?? player?.name ?? fallback);
 }
 
 export function buildDraftRecap(input: RecapInput): DraftRecap {
@@ -448,12 +449,12 @@ function makeupOf(teams: readonly RecapTeam[], picks: readonly RecapPick[]): Sup
   const withAge = picks.filter((pick) => pick.age !== null && pick.born !== null && pick.key);
   const oldMan = [...withAge].sort((a, b) => a.born!.localeCompare(b.born!) || a.overall - b.overall)[0];
   const kid = [...withAge].sort((a, b) => b.born!.localeCompare(a.born!) || a.overall - b.overall)[0];
-  if (oldMan) out.push({ label: 'Oldest player', who: oldMan.owner, detail: `${oldMan.name}, ${oldMan.age}, taken at ${pickPlace(oldMan)}.` });
-  if (kid) out.push({ label: 'Youngest player', who: kid.owner, detail: `${kid.name}, ${kid.age}, taken at ${pickPlace(kid)}.` });
+  if (oldMan) out.push({ label: 'Oldest player', who: oldMan.owner, detail: `${shortName(oldMan.name)}, ${oldMan.age}, taken at ${pickPlace(oldMan)}.` });
+  if (kid) out.push({ label: 'Youngest player', who: kid.owner, detail: `${shortName(kid.name)}, ${kid.age}, taken at ${pickPlace(kid)}.` });
   const rookieTeam = [...teams].sort((a, b) => b.rookies.length - a.rookies.length)[0];
   const rookieCount = picks.filter((pick) => pick.rookie).length;
   if (rookieTeam && rookieTeam.rookies.length > 0) {
-    out.push({ label: 'Most rookies', who: rookieTeam.owner, detail: `${rookieTeam.rookies.join(', ')}. ${rookieCount} rookies went in all.` });
+    out.push({ label: 'Most rookies', who: rookieTeam.owner, detail: `${rookieTeam.rookies.map(shortName).join(', ')}. ${rookieCount} rookies went in all.` });
   }
   const caller = [...teams].sort((a, b) => b.clockCalls - a.clockCalls)[0];
   if (caller && caller.clockCalls > 0) out.push({ label: 'Most clocks called', who: caller.owner, detail: `${caller.clockCalls} of ${picks.filter((pick) => pick.clockCalledBy).length}.` });
@@ -476,8 +477,8 @@ export function numbersRoast(
   if (team.positions.C <= 1) lines.push(`Has ${team.positions.C === 1 ? 'one center' : 'no centers'}.`);
   if (team.rookies.length >= 2) lines.push(`Drafted ${team.rookies.length} rookies.`);
   if (team.clockCalls >= 3) lines.push(`Called the clock ${team.clockCalls} times.`);
-  if (team.worst && team.worst.verdict === 'Reach') lines.push(`Reached for ${team.worst.name} in round ${team.worst.round}.`);
-  if (team.best && team.best.verdict === 'Steal') lines.push(`Stole ${team.best.name} in round ${team.best.round}.`);
+  if (team.worst && team.worst.verdict === 'Reach') lines.push(`Reached for ${shortName(team.worst.name)} in round ${team.worst.round}.`);
+  if (team.best && team.best.verdict === 'Steal') lines.push(`Stole ${shortName(team.best.name)} in round ${team.best.round}.`);
   return lines.slice(0, 3).join(' ') || 'Drafted a team. Nothing more to say yet.';
 }
 

@@ -4,6 +4,7 @@ import { useIdentity } from '../../hooks/useLeague.js';
 import { useTeamName } from '../../hooks/useTeamNames.js';
 import TeamPickerForm from './TeamPickerForm.js';
 import SetPinPanel from './SetPinPanel.js';
+import AccountFavorites from './AccountFavorites.js';
 
 interface Props {
   anchor?: DOMRect;
@@ -47,6 +48,8 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
             ×
           </button>
         </div>
+
+        {identity && <AccountFavorites />}
 
         {identity && <SetPinPanel />}
 

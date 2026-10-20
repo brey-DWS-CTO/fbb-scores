@@ -43,6 +43,7 @@ import type {
 } from '../keeper/types.js';
 import type { LeagueSchedulePeriod } from './schedule.js';
 import { leagueSchedule2027 } from './scheduleData.js';
+import { shortName } from './format.js';
 
 export type { PickRef, PickTradeProposal, PickTradeStatus, PickTransfer, StoredPickRef };
 
@@ -1271,7 +1272,7 @@ export function keeperResetWarning(
   const charges = keeperChargedPicks(dataset, owner, state.keepers[owner] ?? [], refs);
   if (charges.length === 0) return null;
   const lines = charges.map(
-    (charge) => `Pick ${charge.label} is currently being used to keep ${charge.playerName}.`,
+    (charge) => `Pick ${charge.label} is currently being used to keep ${shortName(charge.playerName)}.`,
   );
   lines.push(
     moment === 'send'

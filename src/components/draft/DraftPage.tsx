@@ -55,6 +55,7 @@ import {
   positionTheme,
   recentPicks,
 } from './boardUtils.js';
+import { shortName } from '../../lib/league/format.js';
 
 /** Picks shown under the clock before SHOW ALL. */
 const RECENT_LIMIT = 10;
@@ -748,7 +749,7 @@ export default function DraftPage() {
                   type="button"
                   disabled={!lastLive}
                   onClick={() => lastLive && setClearTarget(lastLive)}
-                  title={allPicks[0] ? `Clear ${allPicks[0].playerName} off ${allPicks[0].label}` : 'No pick to undo yet'}
+                  title={allPicks[0] ? `Clear ${shortName(allPicks[0].playerName)} off ${allPicks[0].label}` : 'No pick to undo yet'}
                   style={{
                     ...ACTION_BUTTON,
                     border: '2px solid var(--panel-border)',
@@ -834,7 +835,7 @@ export default function DraftPage() {
         >
           <span className="room-upcoming-num">{allPicks[0].label}</span>
           <span className="live-latest-text">
-            <strong>{allPicks[0].owner}</strong> takes <strong>{allPicks[0].playerName}</strong>{' '}
+            <strong>{allPicks[0].owner}</strong> takes <strong>{shortName(allPicks[0].playerName)}</strong>{' '}
             <small style={{ color: positionColor(allPicks[0].positions), fontWeight: 800 }}>{allPicks[0].positions.join('/')}</small>
           </span>
         </div>
@@ -945,7 +946,7 @@ export default function DraftPage() {
               <li key={rp.overall} className={rp.owner === identity?.owner ? 'is-mine' : undefined}>
                 <span className="room-upcoming-num">{rp.label}</span>
                 <span className="room-player-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {rp.playerName}
+                  {shortName(rp.playerName)}
                 </span>
                 <small>
                   <span style={{ color: positionColor(rp.positions), fontWeight: 800 }}>{rp.positions.join('/')}</span>

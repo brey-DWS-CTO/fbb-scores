@@ -33,6 +33,7 @@ import NavIcon from '../league/NavIcon.js';
 import PlayerCombobox from '../league/PlayerCombobox.js';
 import PostseasonTag from '../league/PostseasonTag.js';
 import { CapBar, LockBanner, RoundChip, SourceBadge } from './keeperUi.js';
+import { shortName } from '../../lib/league/format.js';
 
 const selKey = (sels: KeeperSelection[]) => sels.map((s) => `${s.playerKey}~${s.playerName}`).join('|');
 
@@ -218,7 +219,7 @@ function KeeperCard({
       )}
       <div className="keeper-card-main" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-max)' }}>{name}</div>
+          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-max)' }}>{shortName(name)}</div>
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 2, color: 'var(--text-mid)', fontSize: '0.72rem' }}>
             {p && (
               <span>

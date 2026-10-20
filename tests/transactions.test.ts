@@ -3,7 +3,6 @@ import test from 'node:test';
 import sample from './fixtures/espn-transactions-sample.json' with { type: 'json' };
 import {
   movesFor,
-  shortName,
   movesOf,
   normalizeTransactions,
   transactionKey,
@@ -112,10 +111,4 @@ test('a team filter keeps the moves that owner was in, trades included', () => {
   const moves = movesOf(normalizeTransactions(raw, ctx));
   assert.deepEqual(movesFor(moves, 'Joel').map((move) => move.id), ['ddd-4', 'bbb-2']);
   assert.equal(movesFor(moves, null).length, moves.length);
-});
-
-test('player names read first initial, dot, last name', () => {
-  assert.equal(shortName('Giannis Antetokounmpo'), 'G. Antetokounmpo');
-  assert.equal(shortName('Talen Horton-Tucker'), 'T. Horton-Tucker');
-  assert.equal(shortName('Nene'), 'Nene');
 });

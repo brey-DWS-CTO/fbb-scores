@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { fetchNbaWatch } from '../../lib/league/api.js';
-import { shortName } from '../../lib/league/draftRoom.js';
+import { shortName } from '../../lib/league/format.js';
 import {
   DEPTH_POSITIONS,
   awardBadges,
@@ -124,7 +124,7 @@ export default function NbaWatchPage({ view }: { view: NbaWatchView }) {
                               <li key={row.name}>
                                 <span className="nba-award-rank">{index + 1}</span>
                                 <span className="nba-award-name">
-                                  {row.name}
+                                  {shortName(row.name)}
                                   {spot && <small>{spot.abbrev} · {spot.spots.slice(0, 2).join(', ')}</small>}
                                 </span>
                                 <span className="nba-award-odds">
@@ -201,8 +201,7 @@ function DepthName({ player, badges, match }: { player: DepthPlayer; badges: rea
   const out = player.injury?.status.toLowerCase() === 'out';
   return (
     <span className={`nba-depth-name${match ? ' is-match' : ''}`}>
-      <span className="nba-name-full">{player.name}</span>
-      <span className="nba-name-short">{shortName(player.name)}</span>
+      <span title={player.name}>{shortName(player.name)}</span>
       {out && <span className="nba-injury is-out" title={player.injury?.note || 'Out'}>OUT</span>}
       {badges.map((badge) => (
         <span key={badge.label} className="nba-badge" title={`${badge.label} ${pct(badge.chance)}`}>

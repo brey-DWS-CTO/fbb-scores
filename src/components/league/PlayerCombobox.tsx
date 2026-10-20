@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import type { DatasetPlayer } from '../../lib/keeper/types.js';
+import { shortName } from '../../lib/league/format.js';
 
 interface Props {
   players: DatasetPlayer[];
@@ -105,7 +106,7 @@ export default function PlayerCombobox({
                   }}
                 >
                   <span style={{ minWidth: 0 }}>
-                    <span style={{ fontWeight: 600 }}>{p.name}</span>{' '}
+                    <span style={{ fontWeight: 600 }} title={p.fullName ?? undefined}>{shortName(p.name)}</span>{' '}
                     <span style={{ color: 'var(--text-mid)', fontSize: '0.75rem' }}>
                       {p.proTeam} · {p.positions.join('/')}
                     </span>
