@@ -43,8 +43,15 @@ const post = (owner: string, pathname: string, body: unknown) =>
 const put = (owner: string, pathname: string, body: unknown) =>
   request(pathname, { method: 'PUT', headers: auth(owner), body: JSON.stringify(body) });
 
-/** Two weeks out, so nothing is ever "over" while the tests run. */
-const soon = (hours: number) => new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+/** Anchor future fixtures so g1/g2 stay on the same Pacific night at any test time. */
+const soon = (hours: number) => {
+  const anchor = new Date();
+  if (hours >= 0) {
+    anchor.setUTCDate(anchor.getUTCDate() + 14);
+    anchor.setUTCHours(20, 0, 0, 0);
+  }
+  return new Date(anchor.getTime() + hours * 60 * 60 * 1000).toISOString();
+};
 
 const game = (id: string, home: string, away: string, tipoff: string, tv: string | null = null): NbaGame => ({
   id, home, away, tipoff, tv, state: 'pre', detail: '', homeScore: null, awayScore: null,
