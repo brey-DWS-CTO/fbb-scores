@@ -179,8 +179,8 @@ test('the games cap cuts a side\'s projection off in date order, but never a liv
   assert.equal(full.byDay['18'], Math.round((30 + jokicGame * 0.5) * 10) / 10);
 });
 
-test('a projection prints as a whole number with a thousands comma', () => {
-  assert.equal(projText(1239.6), '1,240');
-  assert.equal(projText(42.4), '42');
-  assert.equal(projText(0), '0');
+test('a projection prints with one decimal and a thousands comma', () => {
+  assert.equal(projText(1239.64), '1,239.6');
+  assert.equal(projText(42), '42.0');
+  assert.equal(projText(0), '0.0');
 });

@@ -14,12 +14,15 @@ export const GAMES_CAPS_KEY = ['games-caps'] as const;
 
 /**
  * The weekly games caps, and the cap for any week: what the commissioner
- * set, else the default. Until the caps load every week reads the default.
+ * set, else ESPN's limit for the week, else the default.
  */
-export function useGamesCaps(): { rows: GamesCapRow[]; capFor: (matchupPeriodId: number) => number } {
+export function useGamesCaps(): { rows: GamesCapRow[]; capFor: (matchupPeriodId: number, espnCap?: number | null) => number } {
   const query = useQuery({ queryKey: GAMES_CAPS_KEY, queryFn: fetchGamesCaps, staleTime: 60_000 });
   const rows = useMemo(() => query.data?.caps ?? [], [query.data]);
-  const capFor = useCallback((matchupPeriodId: number) => capForWeek(rows, matchupPeriodId), [rows]);
+  const capFor = useCallback(
+    (matchupPeriodId: number, espnCap: number | null = null) => capForWeek(rows, matchupPeriodId, espnCap),
+    [rows],
+  );
   return { rows, capFor };
 }
 

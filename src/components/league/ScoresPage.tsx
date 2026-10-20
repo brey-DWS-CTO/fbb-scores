@@ -67,9 +67,9 @@ export default function ScoresPage() {
     : null;
 
   const loaded = query.data;
-  // The commissioner's cap for this week, in place of ESPN's lineup limit.
+  // The commissioner's cap for this week when he set one, else ESPN's.
   const week = useMemo(
-    () => (loaded ? { ...loaded, gamesCap: capFor(loaded.matchupPeriodId) } : undefined),
+    () => (loaded ? { ...loaded, gamesCap: capFor(loaded.matchupPeriodId, loaded.gamesCap) } : undefined),
     [loaded, capFor],
   );
   const matchups = useMemo(() => (week ? orderForViewer(week.matchups, myTeamId) : []), [week, myTeamId]);

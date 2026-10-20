@@ -127,7 +127,7 @@ export function playerWeekProjection(
   return Math.round(total * 10) / 10;
 }
 
-/** "1,240" for a projected total. Projections are rough, so no decimals. */
+/** "1,239.6" for a projected total: one decimal, like the totals beside it. */
 export function projText(value: number): string {
-  return Math.round(value).toLocaleString('en-US');
+  return value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }

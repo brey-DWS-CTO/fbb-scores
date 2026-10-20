@@ -2,7 +2,8 @@
  * The weekly games cap: how many started player-games a team may count in
  * one fantasy week. The rule book says 30 (`season.gameLimit`) and gives the
  * All-Star week its own formula, so the number can differ by week. The
- * commissioner sets it per week here; a week nobody has set is 30.
+ * commissioner sets it per week here; a week nobody has set takes ESPN's
+ * own limit for that week, and 30 when ESPN has not said.
  *
  * Pure. No server, no browser.
  */
@@ -28,9 +29,14 @@ export function parseGamesCap(input: unknown): number | null {
   return value;
 }
 
-/** The cap for one week: what the commissioner set, else the default. */
-export function capForWeek(rows: readonly GamesCapRow[], matchupPeriodId: number): number {
-  return rows.find((row) => row.matchupPeriodId === matchupPeriodId)?.cap ?? DEFAULT_GAMES_CAP;
+/**
+ * The cap for one week: what the commissioner set, else ESPN's limit for
+ * that week (`espnCap`, from the lineup settings), else the default.
+ */
+export function capForWeek(rows: readonly GamesCapRow[], matchupPeriodId: number, espnCap: number | null = null): number {
+  const set = rows.find((row) => row.matchupPeriodId === matchupPeriodId)?.cap;
+  if (set !== undefined) return set;
+  return espnCap !== null && espnCap > 0 ? espnCap : DEFAULT_GAMES_CAP;
 }
 
 /** "14 of 30". */

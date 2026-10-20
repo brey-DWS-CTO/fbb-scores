@@ -29,6 +29,11 @@ test('a week nobody has set is 30; a set week is what the commish said', () => {
   assert.equal(capForWeek(rows, 3), 31);
   assert.equal(capForWeek(rows, 18), 24);
   assert.equal(capForWeek(rows, 4), 30);
+  // ESPN's limit for the week stands in when the commissioner has not set one.
+  assert.equal(capForWeek(rows, 4, 26), 26, 'a six-day week on ESPN');
+  assert.equal(capForWeek(rows, 3, 26), 31, 'the commish number still wins');
+  assert.equal(capForWeek([], 4, null), 30);
+  assert.equal(capForWeek([], 4, 0), 30, 'nothing from ESPN means the default');
 });
 
 test('games read as played of cap', () => {
