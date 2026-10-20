@@ -105,7 +105,7 @@ function ScoredGuest({ guest, host }: { guest: GuestScore; host: string | null }
             className={`stake-chip is-scored${player.fpts === null ? ' is-waiting' : ''}${player.fpts !== null && !player.played ? ' is-dnp' : ''}`}
             title={player.line ? `${player.name}: ${player.line}` : `${player.name}, ${teamNickname(player.team)}`}
           >
-            {lastName(player.name)}
+            {shortName(player.name)}
             {player.fpts !== null && <b>{player.fpts.toFixed(1)}</b>}
           </span>
         ))}
