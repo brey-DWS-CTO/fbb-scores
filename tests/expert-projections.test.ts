@@ -127,3 +127,17 @@ test('ESPN\'s blanks take the Hashtag line; anyone ESPN projects is left alone',
   assert.equal(filled.players[0].projection, espnJokic, 'ESPN\'s own line stands');
   assert.equal(fillProjectionGaps(snapshot, null), snapshot);
 });
+
+test('the three ESPN blanks feed the Scores opening-night fallback', async () => {
+  const { projectionGaps, fillProjectionGaps } = await import('../src/lib/league/expertProjections.ts');
+  const { expectedPointsForGame } = await import('../src/lib/league/dailyProjection.ts');
+  const names = ['Sandro Mamukelashvili', 'Cam Spencer', 'Daniss Jenkins'];
+  const players = names.map((fullName, index) => ({ espnId: index + 1, fullName, projection: null }));
+  const filled = fillProjectionGaps({ players }, { players: projectionGaps(players, hashtag) });
+  for (const player of filled.players) {
+    const preseason = projectedFppg(player.projection, scoring);
+    assert.ok(preseason !== null && preseason > 0, player.fullName);
+    const scorePlayer = { injuryStatus: null, seasonAvg: null, last15: null, projByDay: {} } as import('../src/lib/league/scores.ts').ScorePlayer;
+    assert.ok(Math.abs(expectedPointsForGame(scorePlayer, { scoringPeriodId: 1, preseason }) - preseason) < 1e-9);
+  }
+});
