@@ -7,6 +7,14 @@
  */
 import type { LeagueDynamicState } from '../keeper/types.js';
 
+export type DraftPhase = 'before' | 'live' | 'done';
+
+/** Before the commissioner starts it, while it runs, and once it is closed. */
+export function draftPhase(draft: Pick<LeagueDynamicState['draft'], 'startedAt' | 'closedAt'>): DraftPhase {
+  if (draft.closedAt) return 'done';
+  return draft.startedAt !== null ? 'live' : 'before';
+}
+
 export function statsLocked(input: {
   /** The league's own state, not the test copy. */
   league: Pick<LeagueDynamicState, 'draft'>;

@@ -27,6 +27,8 @@ import ProjectionsPage from './components/league/ProjectionsPage.js'
 import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
+import ScoresPage from './components/league/ScoresPage.js'
+import MatchupPage from './components/league/MatchupPage.js'
 import SharedMockPage from './components/league/SharedMockPage.js'
 import AchievementsPage from './components/league/AchievementsPage.js'
 import AchievementToast from './components/league/AchievementToast.js'
@@ -35,6 +37,7 @@ import RevealedPage from './components/league/RevealedPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
 import StatsGate from './components/league/StatsGate.js'
 import MyRankingsPage from './components/draft/MyRankingsPage.js'
+import DraftRecapPage from './components/draft/DraftRecapPage.js'
 
 function App() {
   const location = useLocation()
@@ -92,6 +95,7 @@ function App() {
         <Route path="/draft" element={<DraftPage />} />
         <Route path="/draft/start" element={<DraftStartPage />} />
         <Route path="/draft/tv" element={<DraftTvPage />} />
+        <Route path="/draft/recap" element={<StatsGate><DraftRecapPage /></StatsGate>} />
         <Route path="/my-rankings" element={<MyRankingsPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/league" element={<LeaguePage />} />
@@ -113,6 +117,8 @@ function App() {
         <Route path="/projections" element={<StatsGate><ProjectionsPage /></StatsGate>} />
         <Route path="/tiers" element={<StatsGate><TiersPage /></StatsGate>} />
         <Route path="/schedule" element={<SchedulePage />} />
+        <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/scores/:matchupId" element={<MatchupPage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />
         <Route path="*" element={<SplashPage />} />

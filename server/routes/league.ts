@@ -114,6 +114,8 @@ import {
   saveDues,
   getDuesSettings,
   saveDuesSettings,
+  listGamesCaps,
+  saveGamesCap,
   listPolls,
   getPoll,
   insertPoll,
@@ -224,6 +226,13 @@ import {
   type DuesAction,
   type DuesSettings,
 } from '../../src/lib/league/dues.js';
+import {
+  DEFAULT_GAMES_CAP,
+  MAX_GAMES_CAP,
+  MIN_GAMES_CAP,
+  parseGamesCap,
+  type GamesCapRow,
+} from '../../src/lib/league/gamesCap.js';
 import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
@@ -311,10 +320,13 @@ import {
 } from '../lib/draftRankingService.js';
 import { getNbaWatch } from '../lib/nbaWatchService.js';
 import { transactionsFeed } from '../lib/transactionService.js';
+import { LmAddRefused, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from '../lib/lmWeekendService.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
 import { shortName } from '../../src/lib/league/format.js';
+import { parseRoast } from '../../src/lib/league/draftRecap.js';
+import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -583,6 +595,8 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
   // their own route, so they stay out of the poll payload.
   delete state.achievements;
   delete state.propBets;
+  // Roasts lean on the numbers, and members draft blind until it closes.
+  if (!viewer.isCommissioner && !result.state.draft.closedAt) delete state.draftRecap;
   return { ...result, state, meta };
 }
 
@@ -1361,6 +1375,52 @@ router.post('/commish-blind', requireAuth, requireCommissioner, async (req, res)
     draft.commishBlind = blind;
   });
   await appendAudit(actor(res), 'commish.blind', { blind });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * GET /api/league/draft-recap/edits — the commissioner's projection edits,
+ * which the recap grades with so every member sees the same grades. Members
+ * get them once the draft closes, like the rest of the recap.
+ */
+router.get('/draft-recap/edits', requireAuth, async (_req, res) => {
+  const { state } = await getState();
+  if (res.locals.isCommissioner !== true && !state.draft.closedAt) {
+    res.status(403).json({ error: 'The recap opens when the commish closes the draft' });
+    return;
+  }
+  const season = leagueDataset.season;
+  const commissioner = OWNERS.find((owner) => isCommissionerOwner(owner));
+  const rows = commissioner ? await listProjectionEdits(season, commissioner) : [];
+  // Drafted players ESPN never projected get Hashtag's line instead.
+  const [snapshot, pool] = await Promise.all([resolveCurrentDraftRankings(state), resolveDraftPlayerPool(state)]);
+  const poolById = new Map(pool.players.map((player) => [player.espnId, player]));
+  const keys = [
+    ...Object.values(state.draft.picks).map((pick) => pick.playerKey),
+    ...Object.values(state.keepers).flat().map((keeper) => keeper.playerKey),
+  ];
+  const drafted = keys.flatMap((key) => {
+    const player = key && /^p\d+$/.test(key) ? poolById.get(Number(key.slice(1))) : undefined;
+    return player ? [{ espnId: player.espnId, fullName: player.fullName, proTeam: player.proTeam }] : [];
+  });
+  const fills = missingFromEspn(drafted, snapshot, hashtagProjections as ExpertProjections);
+  res.json({ season, edits: rows.map((row) => row.edit), fills });
+});
+
+/** POST /api/league/draft-recap/roast — the commissioner writes one team's recap roast. */
+router.post('/draft-recap/roast', requireAuth, requireCommissioner, async (req, res) => {
+  let parsed: { owner: string; text: string };
+  try {
+    parsed = parseRoast(OWNERS, req.body);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+    return;
+  }
+  const result = await mutateState((draft) => {
+    const recap = draft.draftRecap?.season === draft.season ? draft.draftRecap : { season: draft.season, roasts: {} };
+    draft.draftRecap = { season: draft.season, roasts: { ...recap.roasts, [parsed.owner]: parsed.text } };
+  });
+  await appendAudit(actor(res), 'draft.recap.roast', { owner: parsed.owner, length: parsed.text.length });
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
@@ -4396,6 +4456,64 @@ router.get('/transactions', async (_req, res, next) => {
   }
 });
 
+// ─── Weekend LM adds ─────────────────────────────────────────────────────────
+
+/** GET /api/league/lm-adds — today's waiver hour, the early days ahead, every request. Public. */
+router.get('/lm-adds', async (_req, res, next) => {
+  try {
+    res.json(await lmWeekendView());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds { playerId } — a member asks for a Saturday or Sunday LM add. */
+router.post('/lm-adds', requireAuth, async (req, res, next) => {
+  const playerId = Number((req.body as { playerId?: unknown } | undefined)?.playerId);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    res.status(400).json({ error: 'Pick a player first.' });
+    return;
+  }
+  try {
+    res.json(await requestLmAdd(res.locals.owner as string, playerId));
+  } catch (err) {
+    if (err instanceof LmAddRefused) {
+      res.status(400).json({ error: err.message, checks: err.checks });
+      return;
+    }
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds/:id/retry — the commissioner sends it to ESPN again. */
+router.post('/lm-adds/:id/retry', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const request = await retryLmAdd(routeParam(req.params.id), actor(res));
+    if (!request) {
+      res.status(404).json({ error: 'No such request.' });
+      return;
+    }
+    res.json({ request });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds/:id/deny { note } — the commissioner turns it down. */
+router.post('/lm-adds/:id/deny', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const note = String((req.body as { note?: unknown } | undefined)?.note ?? '').slice(0, 300);
+    const request = await denyLmAdd(routeParam(req.params.id), actor(res), note);
+    if (!request) {
+      res.status(404).json({ error: 'No such request.' });
+      return;
+    }
+    res.json({ request });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /**
  * POST /api/league/dues/shame — mail every team that has not paid or said it
  * paid (commissioner only). Teams that tapped I PAID are left alone.
@@ -4472,6 +4590,54 @@ router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, 
     await saveDuesSettings(row);
     await appendAudit(actor(res), 'dues.settings', { venmo, payee });
     res.json(await duesResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Weekly games cap ────────────────────────────────────────────────────────
+//
+// How many started player-games a team may count in one fantasy week. The
+// scores pages show games played against it and the win chance stops at it.
+// One number per week; a week nobody has set is the default.
+
+async function gamesCapsResponse() {
+  return {
+    season: leagueDataset.season,
+    defaultCap: DEFAULT_GAMES_CAP,
+    caps: await listGamesCaps(leagueDataset.season),
+  };
+}
+
+/** GET /api/league/games-caps — anyone may read the caps, like the standings. */
+router.get('/games-caps', async (_req, res, next) => {
+  try {
+    res.json(await gamesCapsResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PUT /api/league/games-caps/:matchupPeriod — set one week's cap (commissioner only). */
+router.put('/games-caps/:matchupPeriod', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const matchupPeriodId = Number(routeParam(req.params.matchupPeriod));
+    if (!Number.isInteger(matchupPeriodId) || matchupPeriodId < 1 || matchupPeriodId > 30) {
+      throw new HttpError(400, 'That is not a fantasy week');
+    }
+    const body = req.body as { cap?: unknown };
+    const cap = parseGamesCap(body.cap);
+    if (cap === null) throw new HttpError(400, `The cap is a whole number from ${MIN_GAMES_CAP} to ${MAX_GAMES_CAP}`);
+    const row: GamesCapRow = {
+      season: leagueDataset.season,
+      matchupPeriodId,
+      cap,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor(res),
+    };
+    await saveGamesCap(row);
+    await appendAudit(actor(res), 'scores.gamesCap', { matchupPeriodId, cap });
+    res.json(await gamesCapsResponse());
   } catch (err) {
     next(err);
   }
