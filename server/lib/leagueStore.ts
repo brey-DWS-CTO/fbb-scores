@@ -464,6 +464,7 @@ export class DraftRankingAcceptError extends Error {
 
 export interface ConfigTeam {
   owner: string;
+  espnTeamId: number;
   fullName: string;
   espnTeamName?: string;
   draftPosition: number;

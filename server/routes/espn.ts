@@ -4,20 +4,8 @@ import { EspnClient } from '../../src/lib/espn/client.js';
 import { normalizeLeagueResponse, normalizeMatchupDetail, normalizeDailyView } from '../../src/lib/espn/adapter.js';
 import type { EspnMatchupRaw, EspnRosterEntry, GameStatus, NbaGameInfo } from '../../src/types/index.js';
 import { NBA_TEAM_ABBREV } from '../../src/lib/espn/calculations.js';
-import {
-  addDaysIso,
-  espnToday,
-  firstRegularSeasonDate,
-  planWeek,
-  readCurrentScoringPeriod,
-  readEspnWeek,
-  readNbaScoreboard,
-  seasonStartDate,
-  type DateAnchor,
-  type EspnDayInput,
-  type GameLine,
-  type ScoresWeek,
-} from '../../src/lib/league/scores.js';
+import type { ScoresWeek } from '../../src/lib/league/scores.js';
+import { loadWeek } from '../lib/scoresWeekService.js';
 
 const router = Router();
 
@@ -374,47 +362,6 @@ router.get('/espn/matchup/:matchupId', async (req, res) => {
 const WEEK_CACHE_MS = 45_000;
 const weekCache = new Map<string, { at: number; week: Promise<ScoresWeek> }>();
 
-/**
- * Before the season ESPN's current scoring period is 0 and says nothing
- * about dates. Opening night is scoring period 1, and the public scoreboard
- * knows which day that is: the first date from the league's week 1 with a
- * regular-season game. Falls back to the league's own season start.
- */
-async function openingNightAnchor(): Promise<DateAnchor> {
-  const start = seasonStartDate();
-  const dates = Array.from({ length: 7 }, (_, offset) => addDaysIso(start, offset));
-  const days = await Promise.all(dates.map(async (date) => ({ date, payload: await fetchNbaScoreboardRaw(date) })));
-  const opening = firstRegularSeasonDate(days);
-  return opening
-    ? { scoringPeriodId: 1, date: opening, source: 'opening-night' }
-    : { scoringPeriodId: 1, date: start, source: 'season-start' };
-}
-
-async function loadWeek(client: EspnClient, requested: number | null): Promise<ScoresWeek> {
-  const settings = await client.fetchWeekSettings();
-  const current = readCurrentScoringPeriod(settings);
-  const anchor: DateAnchor = current >= 1
-    ? { scoringPeriodId: current, date: espnToday(), source: 'scoring-period' }
-    : await openingNightAnchor();
-  const plan = planWeek(settings, requested, anchor);
-
-  const days: EspnDayInput[] = [];
-  const BATCH_SIZE = 4;
-  for (let i = 0; i < plan.days.length; i += BATCH_SIZE) {
-    const batch = plan.days.slice(i, i + BATCH_SIZE);
-    const loaded = await Promise.all(batch.map(async (day) => {
-      const [payload, games] = await Promise.all([
-        client.fetchDailyBoxScore(day.scoringPeriodId),
-        fetchNbaGamesForDate(day.date),
-      ]);
-      return { scoringPeriodId: day.scoringPeriodId, date: day.date, payload, games };
-    }));
-    days.push(...loaded);
-  }
-
-  return readEspnWeek({ plan, settings, days, fetchedAt: new Date().toISOString() });
-}
-
 router.get('/espn/week', async (req, res) => {
   const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
   if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) {
@@ -745,26 +692,6 @@ async function fetchNbaScoreboard(): Promise<Map<string, NbaGameInfo>> {
   }
 
   return gameMap;
-}
-
-/**
- * One day's NBA games from ESPN's public scoreboard, by fantasy team code.
- * Null when ESPN did not answer, so the reader can fall back to the week
- * grid for that day instead of treating it as a day with no games.
- */
-async function fetchNbaScoreboardRaw(date: string): Promise<unknown | null> {
-  try {
-    const { data } = await axios.get<unknown>(`${NBA_SCOREBOARD_URL}?dates=${date.replace(/-/g, '')}`, { timeout: 8000 });
-    return data;
-  } catch (err) {
-    console.error(`[NBA Scoreboard] Failed to fetch ${date}:`, err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
-async function fetchNbaGamesForDate(date: string): Promise<Record<string, GameLine> | null> {
-  const raw = await fetchNbaScoreboardRaw(date);
-  return raw === null ? null : readNbaScoreboard(raw);
 }
 
 /**

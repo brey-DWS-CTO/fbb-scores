@@ -31,6 +31,7 @@ import {
   type ScoreSide,
   type ScoresWeek,
 } from '../../lib/league/scores.js';
+import LineupGamesSummary from './LineupGamesSummary.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import { ScoresNotice, WinBar } from './ScoresBits.js';
@@ -70,6 +71,8 @@ function SideHead({ side, owner, chance, proj, leading, right }: SideHeadProps) 
 }
 
 interface GamesLineProps {
+  side: ScoreSide;
+  week: ScoresWeek;
   played: number;
   cap: number;
   right?: boolean;
@@ -78,7 +81,7 @@ interface GamesLineProps {
 }
 
 /** "Games 14 of 30", with a pencil for the commissioner. */
-function GamesLine({ played, cap, right, onEdit }: GamesLineProps) {
+function GamesLine({ side, week, played, cap, right, onEdit }: GamesLineProps) {
   return (
     <div className={`score-games${right ? ' is-right' : ''}${played > cap ? ' is-over' : ''}`}>
       <span className="score-games-title hub-heading">Games</span>
@@ -90,6 +93,7 @@ function GamesLine({ played, cap, right, onEdit }: GamesLineProps) {
           </button>
         )}
       </span>
+      <LineupGamesSummary side={side} week={week} />
     </div>
   );
 }
@@ -336,11 +340,15 @@ export default function MatchupPage() {
             {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
             <div className="score-games-grid">
               <GamesLine
+                side={matchup.home}
+                week={week}
                 played={gamesPlayed(matchup.home, week)}
                 cap={week.gamesCap ?? 0}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}
               />
               <GamesLine
+                side={matchup.away}
+                week={week}
                 played={gamesPlayed(matchup.away, week)}
                 cap={week.gamesCap ?? 0}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}

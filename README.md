@@ -46,6 +46,20 @@ season end and are the league's convention; the API's full-season splits differ)
 
 ## Deployment
 
+The scores, matchup, and projections pages show projected lineup games before the
+weekly cap, with explicit over/under/at-cap labels. The count includes games already
+played and remaining starts; bench and IR slots do not count, and out or suspended
+players have no remaining projected games.
+
+The existing hourly `/api/notify/tick` cron sends games-cap warnings on Friday and
+Sunday during the 7 AM Pacific hour, including daylight saving time. Each run reads
+the latest ESPN lineup and the commissioner's cap for that week. Only owners over
+or under the cap with an email on file receive a warning, once per team per date.
+Incomplete schedules and settled matchups are skipped. Like other reminders, a
+notice is claimed before sending, so failed sends are not retried automatically.
+Production uses the existing `CRON_SECRET`, ESPN credentials, `RESEND_API_KEY`, and
+`LEAGUE_MAIL_FROM` settings; without a mail key, the mailer only logs the send.
+
 ```bash
 npm run ship
 ```

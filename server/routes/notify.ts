@@ -15,6 +15,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { runDueReminders } from '../lib/notifier.js';
+import { runGamesWarnings } from '../lib/gamesWarningService.js';
 import { refreshTeamNamesNow } from '../lib/teamNameService.js';
 import { pullTransactionsIfStale } from '../lib/transactionService.js';
 import { runLmClock } from '../lib/lmWeekendService.js';
@@ -49,6 +50,11 @@ router.get('/tick', async (req: Request, res: Response) => {
     return;
   }
   try {
+    // A failed ESPN read must not prevent the other league reminders.
+    const games = await runGamesWarnings(new Date(), appOrigin(req)).catch((err: unknown) => {
+      console.error('[notify] lineup warnings failed:', err instanceof Error ? err.message : err);
+      return { due: 0, sent: 0, error: 'Lineup warnings failed' };
+    });
     // The moves feed fills on the hour too, so the table is whole even when
     // nobody opens the page. A failed pull is logged, never fatal here.
     const moves = await pullTransactionsIfStale();
@@ -56,7 +62,7 @@ router.get('/tick', async (req: Request, res: Response) => {
     const run = await runDueReminders(new Date(), appOrigin(req));
     // Counts only. Who was mailed is not something a log needs to carry.
     console.log(`[notify] tick: ${run.sent} of ${run.due} due reminders sent`);
-    res.json(run);
+    res.json({ ...run, games });
   } catch (err) {
     console.error('[notify] tick failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'The reminder run failed' });

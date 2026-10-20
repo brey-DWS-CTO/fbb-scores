@@ -35,6 +35,7 @@ import ProjectionSourceSwitch from './ProjectionSourceSwitch.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage, deleteProjectionEdit, saveProjectionEdit } from '../../lib/league/api.js';
 import { EDITABLE_COLUMNS, cellEdited, cellFollowsMinutes, editedProjection, projectionGames, withCellEdit } from '../../lib/league/projectionEdits.js';
+import CurrentLineupGames from './CurrentLineupGames.js';
 import IdentityChip from './IdentityChip.js';
 import SignInPanel from './SignInPanel.js';
 import { relativeScheduleHeat } from './scheduleUi.js';
@@ -367,6 +368,8 @@ export default function ProjectionsPage() {
             : 'The commish will update them soon.'}
         </div>
       )}
+
+      <CurrentLineupGames />
 
       <section className="panel mock-controls proj-controls">
         <div className="proj-search">
