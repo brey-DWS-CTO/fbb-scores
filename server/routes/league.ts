@@ -5045,27 +5045,7 @@ router.delete('/prop-bets/:id', requireAuth, async (req, res) => {
 });
 
 
-router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  void _next;
-  if (err instanceof PlayerPoolAcceptError) {
-    res.status(409).json({ error: err.message, reason: err.reason });
-    return;
-  }
-  if (err instanceof ScheduleAcceptError) {
-    res.status(409).json({ error: err.message, reason: err.reason });
-    return;
-  }
-  if (err instanceof DraftRankingAcceptError) {
-    res.status(409).json({ error: err.message, reason: err.reason });
-    return;
-  }
-  if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message });
-    return;
-  }
-  console.error('[league] Unhandled error:', err);
-  res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' });
-});
+
 
 // ─── Favorite teams and house parties ────────────────────────────────────────
 //
@@ -5369,6 +5349,28 @@ router.get('/parties/:id/public', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  void _next;
+  if (err instanceof PlayerPoolAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof ScheduleAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof DraftRankingAcceptError) {
+    res.status(409).json({ error: err.message, reason: err.reason });
+    return;
+  }
+  if (err instanceof HttpError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+  console.error('[league] Unhandled error:', err);
+  res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' });
 });
 
 export default router;

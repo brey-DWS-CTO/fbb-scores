@@ -1,3 +1,4 @@
+import { shortName } from '../../lib/league/format.js';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -7,7 +8,6 @@ import {
   byNight,
   dayLabel,
   fansOf,
-  lastName,
   liveParties,
   partiesForGame,
   rankGames,
@@ -124,7 +124,7 @@ export default function WatchPage() {
             <div key={stake.owner} className={`stake-row${stake.owner === viewer ? ' is-me' : ''}`}>
               <b>{stake.owner === viewer ? 'You' : stake.owner}</b>
               <span>
-                {stake.players.map((player) => <span key={player.key} className="stake-chip" title={player.name}>{lastName(player.name)}</span>)}
+                {stake.players.map((player) => <span key={player.key} className="stake-chip" title={player.name}>{shortName(player.name)}</span>)}
               </span>
             </div>
           ))}

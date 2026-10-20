@@ -1,3 +1,4 @@
+import { shortName } from './format.js';
 /**
  * House parties: who is watching which NBA game, and where.
  *
@@ -392,14 +393,14 @@ export function rivalryIn(game: Pick<NbaGame, 'home' | 'away'>, stakes: readonly
       const otherHome = other.players.find((player) => side(player) === game.home);
       if (onHome && otherAway) {
         return {
-          a: { owner: first.owner, player: lastName(onHome.name), team: game.home },
-          b: { owner: other.owner, player: lastName(otherAway.name), team: game.away },
+          a: { owner: first.owner, player: shortName(onHome.name), team: game.home },
+          b: { owner: other.owner, player: shortName(otherAway.name), team: game.away },
         };
       }
       if (onAway && otherHome) {
         return {
-          a: { owner: first.owner, player: lastName(onAway.name), team: game.away },
-          b: { owner: other.owner, player: lastName(otherHome.name), team: game.home },
+          a: { owner: first.owner, player: shortName(onAway.name), team: game.away },
+          b: { owner: other.owner, player: shortName(otherHome.name), team: game.home },
         };
       }
     }
@@ -418,9 +419,9 @@ export function whyLine(viewer: string, game: Pick<WatchGame, 'favorites' | 'min
   if (game.favorites.length > 0) parts.push(`Your ${game.favorites.map(teamNickname).join(' and ')}.`);
   const others = game.stakes.filter((stake) => stake.owner !== viewer);
   const bits: string[] = [];
-  if (game.mine.length > 0) bits.push(`You have ${listNames(game.mine.map((player) => lastName(player.name)))}`);
+  if (game.mine.length > 0) bits.push(`You have ${listNames(game.mine.map((player) => shortName(player.name)))}`);
   for (const stake of others.slice(0, 2)) {
-    bits.push(`${stake.owner} has ${listNames(stake.players.map((player) => lastName(player.name)))}`);
+    bits.push(`${stake.owner} has ${listNames(stake.players.map((player) => shortName(player.name)))}`);
   }
   if (others.length > 2) bits.push(`${others.length - 2} more ${others.length - 2 === 1 ? 'team has' : 'teams have'} players in it`);
   if (bits.length > 0) parts.push(`${bits.join(', ')}.`);

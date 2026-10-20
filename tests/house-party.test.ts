@@ -159,8 +159,8 @@ test('stakes match ESPN team spellings and put the biggest stake first', () => {
 test('a rivalry is two owners on opposite sides, and none when everyone is on one side', () => {
   const rivalry = rivalryIn(GAMES[0], stakesIn(GAMES[0], ROSTERS));
   assert.deepEqual(rivalry, {
-    a: { owner: 'Dustin', player: 'James', team: 'LAL' },
-    b: { owner: 'Kyle', player: 'Curry', team: 'GSW' },
+    a: { owner: 'Dustin', player: 'L. James', team: 'LAL' },
+    b: { owner: 'Kyle', player: 'S. Curry', team: 'GSW' },
   });
   assert.equal(rivalryIn(GAMES[2], stakesIn(GAMES[2], ROSTERS)), null);
 });
@@ -178,8 +178,8 @@ test('the WATCH list puts a favorite first, then your own players, then the rest
   const top = ranked[0];
   assert.deepEqual(top.favorites, ['GSW']);
   assert.equal(top.mine.length, 1);
-  assert.equal(top.why, "Your Warriors. You have Curry, Dustin has James and Reaves. Dustin's James vs Kyle's Curry. On TNT.");
-  assert.equal(ranked[1].why, 'You have Jokic, Ryan has Edwards. Kyle\'s Jokic vs Ryan\'s Edwards.');
+  assert.equal(top.why, "Your Warriors. You have S. Curry, Dustin has L. James and A. Reaves. Dustin's L. James vs Kyle's S. Curry. On TNT.");
+  assert.equal(ranked[1].why, 'You have N. Jokic, Ryan has A. Edwards. Kyle\'s N. Jokic vs Ryan\'s A. Edwards.');
   assert.equal(ranked[2].why, 'On ESPN.');
   assert.ok(ranked[0].score > ranked[1].score && ranked[1].score > ranked[2].score);
 });
@@ -193,7 +193,7 @@ test('a game that is over sinks below every game still to come', () => {
 test('a viewer with no favorites and no players still gets a list, TV first', () => {
   const ranked = rankGames({ viewer: 'Amy', games: GAMES, favorites: FAVORITES, rosters: ROSTERS });
   assert.equal(ranked[0].id, 'lal-gsw', 'TNT plus the most league players');
-  assert.equal(ranked[0].why, "Dustin has James and Reaves, Kyle has Curry. Dustin's James vs Kyle's Curry. On TNT.");
+  assert.equal(ranked[0].why, "Dustin has L. James and A. Reaves, Kyle has S. Curry. Dustin's L. James vs Kyle's S. Curry. On TNT.");
 });
 
 test('the why line names at most two owners and counts the rest', () => {

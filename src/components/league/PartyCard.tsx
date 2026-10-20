@@ -1,3 +1,4 @@
+import { shortName } from '../../lib/league/format.js';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -12,7 +13,6 @@ import {
   canManage,
   dayLabel,
   guestStakes,
-  lastName,
   matchupLabel,
   partyHeadline,
   partyOver,
@@ -137,7 +137,7 @@ export default function PartyCard({ party, rosters, now, onChange, onEdit, linkT
               {guest.total === 0 && <small className="party-guest-none">no players in these games</small>}
               {guest.byGame.map((players, index) => players.map((player) => (
                 <span key={`${index}-${player.key}`} className="stake-chip" title={`${player.name}, ${teamNickname(player.proTeam)}`}>
-                  {lastName(player.name)}
+                  {shortName(player.name)}
                 </span>
               )))}
             </span>
