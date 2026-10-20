@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -30,6 +30,7 @@ import {
   type ScorePlayer,
   type ScoreSide,
   type ScoresWeek,
+  type OverageGame,
 } from '../../lib/league/scores.js';
 import LineupGamesSummary from './LineupGamesSummary.js';
 import IdentityChip from './IdentityChip.js';
@@ -54,18 +55,20 @@ interface SideHeadProps {
   chance: number;
   /** Where the side should finish the week. Null once the matchup is settled. */
   proj: number | null;
+  deduction: number;
   leading: boolean;
   right?: boolean;
 }
 
-function SideHead({ side, owner, chance, proj, leading, right }: SideHeadProps) {
+function SideHead({ side, owner, chance, proj, deduction, leading, right }: SideHeadProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}`}>
       <div className="score-side-name">{side.name}</div>
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
       <div className="score-side-total">{side.total.toFixed(1)}</div>
       <div className="score-side-chance">{chance}% to win</div>
-      {proj !== null && proj > 0 && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
+      {proj !== null && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
+      {proj !== null && deduction > 0 && <div className="score-overage-label">{projText(deduction)} overage pts deducted</div>}
     </div>
   );
 }
@@ -183,6 +186,7 @@ interface DayCellProps {
   week: ScoresWeek;
   scoringPeriodId: number;
   expected: ExpectedPoints;
+  overage?: OverageGame;
 }
 
 /**
@@ -191,7 +195,7 @@ interface DayCellProps {
  * projection kept on the game line while it is live. A bench player gets
  * the same, so you can see what he would give.
  */
-function DayCell({ player, week, scoringPeriodId, expected }: DayCellProps) {
+function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const day = player.days[String(scoringPeriodId)];
   const slot = slotOn(player, scoringPeriodId);
@@ -200,7 +204,7 @@ function DayCell({ player, week, scoringPeriodId, expected }: DayCellProps) {
   const underway = day?.played === true || status === 'live' || status === 'final';
   const showProjAsNumber = !underway && proj !== null && proj > 0;
   return (
-    <div className={cardClass(day?.started === true, player)}>
+    <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}`}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={slot} />
         {showProjAsNumber
@@ -212,6 +216,7 @@ function DayCell({ player, week, scoringPeriodId, expected }: DayCellProps) {
         {status === 'live' && proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
+      {overage && <div className="score-overage-label">OVERAGE · {projText(overage.deduction)} pts excluded from team projection</div>}
     </div>
   );
 }
@@ -220,6 +225,7 @@ interface WeekCellProps {
   player: ScorePlayer | undefined;
   week: ScoresWeek;
   expected: ExpectedPoints;
+  overages: OverageGame[];
 }
 
 /**
@@ -227,23 +233,26 @@ interface WeekCellProps {
  * below, and how many games he has played and has left. A bench player's
  * games and projection count every game his team has, as if started.
  */
-function WeekCell({ player, week, expected }: WeekCellProps) {
+function WeekCell({ player, week, expected, overages }: WeekCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const summary = playerWeek(player, week, true);
   const started = Object.values(player.days).some((day) => day.started);
-  const proj = summary.left > 0 ? playerWeekProjection(player, week, expected, true) : null;
+  const excluded = overages.filter((game) => game.playerId === player.id);
+  const deduction = excluded.reduce((sum, game) => sum + game.deduction, 0);
+  const proj = summary.left > 0 || excluded.length > 0 ? playerWeekProjection(player, week, expected, true) - deduction : null;
   return (
     <div className={cardClass(started, player)}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={latestSlot(player)} />
         <span className="score-player-stack">
-          {proj !== null && proj > 0 && <span className="score-player-pts is-proj" title="Projected">{projText(proj)}</span>}
+          {proj !== null && <span className="score-player-pts is-proj" title="Projected">{projText(proj)}</span>}
           <span className="score-player-pts">{summary.total.toFixed(1)}</span>
         </span>
       </div>
       <div className="score-player-game">
         {summary.played} played · {summary.left} left
       </div>
+      {excluded.length > 0 && <div className="score-overage-label">{excluded.length} overage{excluded.length === 1 ? '' : 's'} · {projText(deduction)} pts excluded</div>}
     </div>
   );
 }
@@ -261,6 +270,7 @@ export default function MatchupPage() {
   const { capFor } = useGamesCaps();
   const owners = useMemo(() => ownerByEspnTeamId(leagueDataset.teams), []);
   const [editingCap, setEditingCap] = useState(false);
+  const dayNav = useRef<HTMLDivElement>(null);
 
   const loaded = query.data;
   // The commissioner's cap for this week when he set one, else ESPN's.
@@ -296,8 +306,11 @@ export default function MatchupPage() {
 
   const chance = week && matchup ? matchupChance(matchup, week, expected) : null;
   const settled = matchup?.winner !== 'UNDECIDED';
-  const homeProj = week && matchup && !settled ? sideProjection(matchup.home, week, expected) : null;
-  const awayProj = week && matchup && !settled ? sideProjection(matchup.away, week, expected) : null;
+  const homeForecast = week && matchup ? sideProjection(matchup.home, week, expected) : null;
+  const awayForecast = week && matchup ? sideProjection(matchup.away, week, expected) : null;
+  const homeProj = settled ? null : homeForecast;
+  const awayProj = settled ? null : awayForecast;
+  const overageDays = new Set([...(homeForecast?.overages ?? []), ...(awayForecast?.overages ?? [])].map((game) => game.scoringPeriodId));
   const back = `/scores${scoresQuery({ week: week?.matchupPeriodId ?? requestedWeek, demo })}`;
   const isCommish = identity?.isCommissioner === true;
 
@@ -333,8 +346,8 @@ export default function MatchupPage() {
         <>
           <section className="panel score-head">
             <div className="score-head-grid">
-              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} chance={chance.home} proj={homeProj?.week ?? null} leading={matchup.home.total > matchup.away.total} />
-              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} chance={chance.away} proj={awayProj?.week ?? null} leading={matchup.away.total > matchup.home.total} right />
+              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} chance={chance.home} proj={homeProj?.week ?? null} deduction={homeForecast?.deduction ?? 0} leading={matchup.home.total > matchup.away.total} />
+              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} chance={chance.away} proj={awayProj?.week ?? null} deduction={awayForecast?.deduction ?? 0} leading={matchup.away.total > matchup.home.total} right />
             </div>
             <WinBar left={chance.home} right={chance.away} />
             {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
@@ -358,9 +371,20 @@ export default function MatchupPage() {
             {editingCap && isCommish && (
               <CapEditor matchupPeriodId={week.matchupPeriodId} cap={week.gamesCap ?? 0} onClose={() => setEditingCap(false)} />
             )}
+            {overageDays.size > 0 && (
+              <div className="score-overage-note">
+                <p>Overages are deducted from each team’s last day with games, highest scores first. Red games are excluded from the team projection. Selections update as scores change.</p>
+                {week.days.filter((day) => overageDays.has(day.scoringPeriodId)).map((day) => (
+                  <button key={day.scoringPeriodId} type="button" className="tap-btn score-overage-jump" onClick={() => {
+                    setView({ kind: 'day', scoringPeriodId: day.scoringPeriodId });
+                    dayNav.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}>SHOW OVERAGES · {longDate(day.date)}</button>
+                ))}
+              </div>
+            )}
           </section>
 
-          <div className="score-week score-day-nav" role="group" aria-label="Day">
+          <div ref={dayNav} className="score-week score-day-nav" role="group" aria-label="Day">
             <button
               type="button"
               className="tap-btn score-arrow"
@@ -401,7 +425,9 @@ export default function MatchupPage() {
           </div>
 
           {view.kind === 'day' && homeProj && awayProj && view.scoringPeriodId >= week.currentScoringPeriodId
-            && (homeProj.byDay[String(view.scoringPeriodId)] ?? 0) + (awayProj.byDay[String(view.scoringPeriodId)] ?? 0) > 0 && (
+            && ((homeProj.byDay[String(view.scoringPeriodId)] ?? 0) + (awayProj.byDay[String(view.scoringPeriodId)] ?? 0) > 0
+              || homeProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)
+              || awayProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)) && (
             <div className="score-proj-grid" aria-label="Projected points for the day">
               <span>
                 {(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Proj <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
@@ -420,8 +446,8 @@ export default function MatchupPage() {
               <div className="score-grid">
                 {Array.from({ length: rows }, (_, index) => (
                   <Fragment key={home[index]?.id ?? `h${index}`}>
-                    <DayCell player={home[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} />
-                    <DayCell player={away[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} />
+                    <DayCell player={home[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={homeForecast?.overages.find((game) => game.playerId === home[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
+                    <DayCell player={away[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={awayForecast?.overages.find((game) => game.playerId === away[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
                   </Fragment>
                 ))}
               </div>
@@ -436,8 +462,8 @@ export default function MatchupPage() {
               <div className="score-grid">
                 {Array.from({ length: rows }, (_, index) => (
                   <Fragment key={home[index]?.id ?? `h${index}`}>
-                    <WeekCell player={home[index]} week={week} expected={expected} />
-                    <WeekCell player={away[index]} week={week} expected={expected} />
+                    <WeekCell player={home[index]} week={week} expected={expected} overages={homeForecast?.overages ?? []} />
+                    <WeekCell player={away[index]} week={week} expected={expected} overages={awayForecast?.overages ?? []} />
                   </Fragment>
                 ))}
               </div>

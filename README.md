@@ -51,6 +51,13 @@ weekly cap, with explicit over/under/at-cap labels. The count includes games alr
 played and remaining starts; bench and IR slots do not count, and out or suspended
 players have no remaining projected games.
 
+Weekly and daily point projections apply rule 6.5.1: remove excess games from
+the team's last day with games, highest projected final scores first. Completed
+games use actual points; live games use points scored plus their projected
+remainder. Those games are red and labeled OVERAGE on the affected day's lineup,
+and the matchup offers a SHOW OVERAGES button. Score cards show the point
+deduction, and win odds use the same adjusted forecast.
+
 The existing hourly `/api/notify/tick` cron sends games-cap warnings on Friday and
 Sunday during the 7 AM Pacific hour, including daylight saving time. Each run reads
 the latest ESPN lineup and the commissioner's cap for that week. Only owners over

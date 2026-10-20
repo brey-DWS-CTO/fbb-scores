@@ -985,54 +985,110 @@ export function gamesPlayed(side: ScoreSide, week: Pick<ScoresWeek, 'days' | 'cu
 /** Expected points for one player in his game on one day. */
 export type ExpectedPoints = (player: ScorePlayer, scoringPeriodId: number) => number;
 
+/** Future starts from known daily rosters; a dropped player cannot carry his old slot forward. */
+export function lineupGamesLeft(side: ScoreSide, week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>): Array<{ player: ScorePlayer; game: GameLeft }> {
+  const rosterDays = new Set(side.players.flatMap((player) => Object.keys(player.days)));
+  return side.players.flatMap((player) => {
+    const days = { ...player.days };
+    for (const day of week.days) {
+      const key = String(day.scoringPeriodId);
+      if (!days[key] && rosterDays.has(key)) {
+        days[key] = { lineupSlotId: 12, started: false, points: 0, stats: null, played: false, game: null };
+      }
+    }
+    return gamesLeft({ ...player, days }, week).map((game) => ({ player, game }));
+  });
+}
+
 export interface RemainingPlayerGame {
   /** Expected points for the whole game. */
   expected: number;
-  /** The share of the game still to play, after the cap has had its say. */
+  /** The share still to play after overage deductions. */
   share: number;
   scoringPeriodId: number;
   live: boolean;
 }
 
+export interface OverageGame {
+  playerId: number;
+  scoringPeriodId: number;
+  /** Projected final points removed, including any points already scored. */
+  deduction: number;
+  /** Already-scored points removed from the projection's fixed total. */
+  scoredDeduction: number;
+  /** One whole game, or a fraction when the schedule is only an estimate. */
+  games: number;
+}
+
+export interface GamesCapProjection {
+  remaining: RemainingPlayerGame[];
+  overages: OverageGame[];
+  scoredDeduction: number;
+}
+
 /**
- * Every player-game a side still has this week, in date order, cut off at
- * the games cap. ESPN stops counting once a team reaches its cap, so the
- * future games run in date order and stop there. A live game is already
- * being counted, so it never competes for the budget. The odds model and
- * the projections both read the week from here.
+ * Rule 6.5.1: deduct the highest-scoring games on the team's last day with
+ * games until its count reaches the cap. Rank completed games by actual
+ * points and unfinished games by their projected finish. If the excess
+ * exhausts that day, continue back through earlier days in the same order.
  */
+export function gamesCapProjection(
+  side: ScoreSide,
+  week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId' | 'gamesCap'>,
+  expected: ExpectedPoints,
+): GamesCapProjection {
+  const candidates: Array<RemainingPlayerGame & { playerId: number; scored: number; count: number; removed: number }> = [];
+  const left = new Map(lineupGamesLeft(side, week).map(({ player, game }) => [`${player.id}:${game.scoringPeriodId}`, game]));
+  for (const player of side.players) {
+    for (const day of week.days) {
+      const actual = player.days[String(day.scoringPeriodId)];
+      const played = actual?.started === true && (day.scoringPeriodId < week.currentScoringPeriodId
+        ? actual.played
+        : day.scoringPeriodId === week.currentScoringPeriodId
+          && (actual.played || actual.game?.status === 'live' || actual.game?.status === 'final'));
+      const game = left.get(`${player.id}:${day.scoringPeriodId}`);
+      if (!played && !game) continue;
+      const points = game ? expected(player, day.scoringPeriodId) : 0;
+      candidates.push({
+        playerId: player.id, scoringPeriodId: day.scoringPeriodId,
+        expected: Number.isFinite(points) ? Math.max(0, points) : 0,
+        share: game?.share ?? 0, live: game?.live ?? false,
+        scored: played ? actual?.points ?? 0 : 0,
+        count: played || game?.live ? 1 : game?.share ?? 0, removed: 0,
+      });
+    }
+  }
+  const finish = (game: typeof candidates[number]) => game.scored + game.expected * game.share;
+  let excess = week.gamesCap === null ? 0 : Math.max(0, candidates.reduce((sum, game) => sum + game.count, 0) - week.gamesCap);
+  const ranked = [...candidates].sort((a, b) => b.scoringPeriodId - a.scoringPeriodId
+    || finish(b) - finish(a) || a.playerId - b.playerId);
+  const overages: OverageGame[] = [];
+  for (const game of ranked) {
+    if (excess < 1e-8) break;
+    const removed = Math.min(game.count, excess);
+    game.removed = removed / game.count;
+    excess -= removed;
+    overages.push({
+      playerId: game.playerId, scoringPeriodId: game.scoringPeriodId, games: removed,
+      deduction: finish(game) * game.removed, scoredDeduction: game.scored * game.removed,
+    });
+  }
+  return {
+    remaining: candidates.filter((game) => game.share > 0 && game.removed < 1)
+      .sort((a, b) => a.scoringPeriodId - b.scoringPeriodId)
+      .map((game) => ({ expected: game.expected, share: game.share * (1 - game.removed), scoringPeriodId: game.scoringPeriodId, live: game.live })),
+    overages,
+    scoredDeduction: overages.reduce((sum, game) => sum + game.scoredDeduction, 0),
+  };
+}
+
+/** Remaining games after the league's last-day overage deductions. */
 export function remainingGames(
   side: ScoreSide,
   week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId' | 'gamesCap'>,
   expected: ExpectedPoints,
 ): RemainingPlayerGame[] {
-  const remaining: RemainingPlayerGame[] = [];
-  for (const player of side.players) {
-    for (const game of gamesLeft(player, week)) {
-      const points = expected(player, game.scoringPeriodId);
-      remaining.push({
-        expected: Number.isFinite(points) ? Math.max(0, points) : 0,
-        share: game.share,
-        scoringPeriodId: game.scoringPeriodId,
-        live: game.live,
-      });
-    }
-  }
-  remaining.sort((a, b) => a.scoringPeriodId - b.scoringPeriodId);
-
-  let budget = week.gamesCap === null ? Number.POSITIVE_INFINITY : Math.max(0, week.gamesCap - gamesPlayed(side, week));
-  const kept: RemainingPlayerGame[] = [];
-  for (const game of remaining) {
-    if (game.live) {
-      kept.push(game);
-      continue;
-    }
-    if (budget <= 0) break;
-    const share = Math.min(game.share, budget);
-    budget -= share;
-    kept.push({ ...game, share });
-  }
-  return kept;
+  return gamesCapProjection(side, week, expected).remaining;
 }
 
 /**
@@ -1044,8 +1100,9 @@ export function sideOdds(
   week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId' | 'gamesCap'>,
   expected: ExpectedPoints,
 ): SideOdds {
-  const kept: RemainingGame[] = remainingGames(side, week, expected).map((game) => ({ expected: game.expected, share: game.share }));
-  return { points: side.total, remaining: kept };
+  const plan = gamesCapProjection(side, week, expected);
+  const kept: RemainingGame[] = plan.remaining.map((game) => ({ expected: game.expected, share: game.share }));
+  return { points: side.total - plan.scoredDeduction, remaining: kept };
 }
 
 /** Each side's chance of winning the matchup, in whole percents. */
