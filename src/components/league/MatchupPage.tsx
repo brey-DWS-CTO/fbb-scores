@@ -64,7 +64,7 @@ function SideHead({ side, owner, chance, proj, leading, right }: SideHeadProps) 
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
       <div className="score-side-total">{side.total.toFixed(1)}</div>
       <div className="score-side-chance">{chance}% to win</div>
-      {proj !== null && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
+      {proj !== null && proj > 0 && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
     </div>
   );
 }
@@ -195,7 +195,7 @@ function DayCell({ player, week, scoringPeriodId, expected }: DayCellProps) {
       </div>
       <div className="score-player-game">
         {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
-        {proj !== null && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
+        {proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
     </div>
@@ -221,7 +221,7 @@ function WeekCell({ player, week, expected }: WeekCellProps) {
       </div>
       <div className="score-player-game">
         {summary.played} played · {summary.left} left
-        {proj !== null && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
+        {proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
     </div>
   );
@@ -375,7 +375,8 @@ export default function MatchupPage() {
             <span className="is-right">{owners.get(matchup.away.teamId) ?? matchup.away.name}</span>
           </div>
 
-          {view.kind === 'day' && homeProj && awayProj && view.scoringPeriodId >= week.currentScoringPeriodId && (
+          {view.kind === 'day' && homeProj && awayProj && view.scoringPeriodId >= week.currentScoringPeriodId
+            && (homeProj.byDay[String(view.scoringPeriodId)] ?? 0) + (awayProj.byDay[String(view.scoringPeriodId)] ?? 0) > 0 && (
             <div className="score-proj-grid" aria-label="Projected points for the day">
               <span>
                 {(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Proj <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>

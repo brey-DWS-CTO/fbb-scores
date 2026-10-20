@@ -128,7 +128,7 @@ export default function ScoresPage() {
                 <TeamRow side={matchup.home} owner={owners.get(matchup.home.teamId)} leading={homeLeads} mine={matchup.home.teamId === myTeamId} />
                 <WinBar left={chance.home} right={chance.away} />
                 <TeamRow side={matchup.away} owner={owners.get(matchup.away.teamId)} leading={awayLeads} mine={matchup.away.teamId === myTeamId} />
-                {matchup.winner === 'UNDECIDED' && (
+                {matchup.winner === 'UNDECIDED' && homeProj + awayProj > 0 && (
                   <div className="score-proj">
                     <span className="score-proj-title">Proj</span>
                     <b className={homeProj > awayProj ? 'is-up' : ''}>{projText(homeProj)}</b>
