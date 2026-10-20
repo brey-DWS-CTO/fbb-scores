@@ -223,3 +223,57 @@ export function fillProjectionGaps<T extends Pick<DraftRankingSnapshot, 'players
     }),
   };
 }
+
+/** An outside line for a drafted player ESPN does not project. */
+export interface FillLine {
+  espnId: number;
+  fullName: string;
+  proTeam: string;
+  games: number;
+  perGame: Record<string, number>;
+}
+
+/**
+ * Outside lines for the drafted players ESPN leaves without a projection,
+ * so the recap can value everyone the room took. Players ESPN projects are
+ * left alone.
+ */
+export function missingFromEspn(
+  drafted: readonly { espnId: number; fullName: string; proTeam: string }[],
+  snapshot: Pick<DraftRankingSnapshot, 'players'> | null,
+  expert: Pick<ExpertProjections, 'players'>,
+): FillLine[] {
+  const projected = new Set((snapshot?.players ?? []).filter((player) => player.projection).map((player) => player.espnId));
+  const missing = drafted.filter((player) => !projected.has(player.espnId));
+  const { byEspnId } = matchExpert(missing, expert);
+  return missing.flatMap((player) => {
+    const line = byEspnId.get(player.espnId);
+    return line ? [{ ...player, games: line.games, perGame: expertPerGame(line, null) }] : [];
+  });
+}
+
+/** The snapshot with each fill line as that player's projection, adding him if ESPN never listed him. */
+export function withFills<T extends Pick<DraftRankingSnapshot, 'players'>>(snapshot: T, fills: readonly FillLine[]): T {
+  if (fills.length === 0) return snapshot;
+  const byId = new Map(fills.map((fill) => [fill.espnId, fill]));
+  const players = snapshot.players.map((player): DraftRankingPlayer => {
+    const fill = byId.get(player.espnId);
+    if (!fill || player.projection) return player;
+    byId.delete(player.espnId);
+    return { ...player, projection: rowOf(fill.perGame, fill.games, 'hashtag') };
+  });
+  for (const fill of byId.values()) {
+    players.push({
+      espnId: fill.espnId,
+      fullName: fill.fullName,
+      proTeam: fill.proTeam,
+      adp: null,
+      percentOwned: null,
+      standard: null,
+      roto: null,
+      projection: rowOf(fill.perGame, fill.games, 'hashtag'),
+      lastSeason: null,
+    } as DraftRankingPlayer);
+  }
+  return { ...snapshot, players };
+}

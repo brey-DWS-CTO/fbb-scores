@@ -13,6 +13,10 @@
  * first sign-in (claimPin). Commissioner status always comes from that config
  * file, never from storage.
  */
+import type { PresenceRow } from '../../src/lib/league/presence.js';
+import type { DraftList } from '../../src/lib/league/autoDraft.js';
+import { transactionKey, type LeagueTransaction } from '../../src/lib/league/transactions.js';
+import type { LmAddRequest } from '../../src/lib/league/lmWeekend.js';
 import crypto from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
@@ -39,6 +43,7 @@ import { foldProblem, foldedBook } from '../../src/lib/league/rulebookFold.js';
 import type { MockFinish } from '../../src/lib/league/mockStats.js';
 import { parseMockTrade, type MockTrade } from '../../src/lib/league/mockTrades.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
+import type { GamesCapRow } from '../../src/lib/league/gamesCap.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
 import type { AchievementLedger } from '../../src/lib/league/achievements.js';
@@ -67,6 +72,8 @@ export interface DraftPickState {
   clockCalledBy?: string | null;
   /** The called clock ran out and this pick was entered late, rule 2.3.2.2. */
   skipped?: boolean;
+  /** The server made this pick for a team on auto. See src/lib/league/autoDraft.ts. */
+  auto?: boolean;
 }
 
 export interface LeagueOverrides {
@@ -90,6 +97,8 @@ export interface LeagueDynamicState {
     /** The pick timer and any CLOCK call, rule 2.3. See src/lib/league/draftClock.ts. */
     clock?: DraftClockState | null;
     skipped?: Record<string, SkippedPick>;
+    /** Teams the commissioner has put on auto. See src/lib/league/autoDraft.ts. */
+    autoOwners?: string[];
   };
   playerPool?: {
     activeSnapshotId: string | null;
@@ -131,6 +140,8 @@ export interface LeagueDynamicState {
   propBets?: PropBet[];
   /** The commissioner turned off his view of other teams' keepers. */
   commishBlind?: boolean;
+  /** The commissioner's roasts for the draft recap. Hidden from members until the draft closes. */
+  draftRecap?: { season: number; roasts: Record<string, string> };
 }
 
 export interface AuditRow {
@@ -187,6 +198,14 @@ export interface ProjectionEditRow {
   edit: unknown;
   updatedAt: string;
   updatedBy: string;
+}
+
+/**
+ * One player moving once, as `src/lib/league/transactions.ts` defines it,
+ * plus when the app first saw it. Rows are only ever added.
+ */
+export interface LeagueTransactionRow extends LeagueTransaction {
+  seenAt: string;
 }
 
 /** The commissioner's working copy of the rulebook, with a version for safe writes. */
@@ -424,6 +443,8 @@ export interface ConfigTeam {
   draftPosition: number;
   originalMember?: boolean;
   isCommissioner?: boolean;
+  /** May read and save other members' private rankings for them. Never the commissioner. */
+  rankingsSteward?: boolean;
 }
 
 export const CONFIG_TEAMS = leagueConfig.teams as ConfigTeam[];
@@ -446,6 +467,15 @@ export function isCommissionerOwner(owner: string): boolean {
   return COMMISSIONERS.has(owner);
 }
 
+const RANKINGS_STEWARDS = new Set(
+  CONFIG_TEAMS.filter((t) => t.rankingsSteward === true && t.isCommissioner !== true).map((t) => t.owner),
+);
+
+/** A trusted member who enters rankings for others. The commissioner never is one; he stays blind. */
+export function isRankingsSteward(owner: string): boolean {
+  return RANKINGS_STEWARDS.has(owner);
+}
+
 function defaultState(): LeagueDynamicState {
   return {
     season: SEASON,
@@ -456,6 +486,17 @@ function defaultState(): LeagueDynamicState {
     pickTransfers: [],
     pickTradeProposals: [],
   };
+}
+
+/** The league_state row that holds the shared test draft. Row 1 is the league. */
+const TEST_DRAFT_ROW = 2;
+
+/** A test-draft write landed after the commissioner ended the test. */
+export class TestDraftMissingError extends Error {
+  constructor() {
+    super('The test draft has ended');
+    this.name = 'TestDraftMissingError';
+  }
 }
 
 /** Unclaimed PINs are stored as the empty string. */
@@ -469,6 +510,18 @@ const TEMP_PREFIX = 'T:';
 interface StoreBackend {
   getState(): Promise<StateResult>;
   mutateState(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
+  getTestDraft(): Promise<StateResult | null>;
+  setTestDraft(state: LeagueDynamicState | null): Promise<void>;
+  mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult>;
+  touchPresence(room: string, owner: string, at: string): Promise<void>;
+  listPresence(room: string, since: string): Promise<PresenceRow[]>;
+  /** One member's private auto-pick list. Only ever read for the owner it belongs to. */
+  getDraftList(season: number, owner: string): Promise<DraftList | null>;
+  setDraftList(season: number, owner: string, list: DraftList | null): Promise<void>;
+  /** Who has a list saved. Names only, never the lists. */
+  draftListOwners(season: number): Promise<string[]>;
+  setDraftQueue(room: string, owner: string, keys: string[]): Promise<void>;
+  getDraftQueues(room: string): Promise<Record<string, string[]>>;
   getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario>;
   setKeeperScenarioTarget(
     season: number,
@@ -495,6 +548,14 @@ interface StoreBackend {
   purgeExpiredAuth(now: string): Promise<void>;
   appendAudit(owner: string | null, action: string, detail: unknown): Promise<void>;
   readAudit(limit: number): Promise<AuditRow[]>;
+  /** Adds the rows the store has not seen. Answers with how many were new. */
+  addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number>;
+  /** This season's moves, newest first. */
+  listTransactions(season: number, limit: number): Promise<LeagueTransactionRow[]>;
+  /** This season's LM add requests, newest first. */
+  listLmAddRequests(season: number): Promise<LmAddRequest[]>;
+  /** Insert or replace one request by id. */
+  saveLmAddRequest(row: LmAddRequest): Promise<void>;
   getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null>;
   acceptPlayerPoolSnapshot(
     snapshot: PlayerPoolSnapshot,
@@ -576,6 +637,9 @@ interface StoreBackend {
   saveDues(row: DuesRow, expected: string): Promise<boolean>;
   getDuesSettings(season: number): Promise<DuesSettings | null>;
   saveDuesSettings(row: DuesSettings): Promise<void>;
+  /** The weekly games caps the commissioner has set this season. */
+  listGamesCaps(season: number): Promise<GamesCapRow[]>;
+  saveGamesCap(row: GamesCapRow): Promise<void>;
   getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null>;
   saveHistoryDraft(
     season: number,
@@ -829,6 +893,16 @@ class NeonBackend implements StoreBackend {
       updated_at timestamptz,
       updated_by text
     )`;
+    // The weekly games cap, one row per fantasy week the commissioner has
+    // set. A week with no row is the default, so the table starts empty.
+    await this.sql`CREATE TABLE IF NOT EXISTS league_games_caps (
+      season int not null,
+      matchup_period int not null,
+      cap int not null,
+      updated_at timestamptz not null,
+      updated_by text not null,
+      primary key (season, matchup_period)
+    )`;
     await this.sql`CREATE TABLE IF NOT EXISTS league_history_draft (
       season int primary key,
       data jsonb not null,
@@ -893,6 +967,59 @@ class NeonBackend implements StoreBackend {
       updated_at timestamptz not null default now(),
       updated_by text not null,
       primary key (season, owner, espn_id)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_queues (
+      room text not null,
+      owner text not null,
+      keys jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (room, owner)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS league_transactions (
+      season int not null,
+      espn_id text not null,
+      player_id int not null,
+      kind text not null,
+      team_id int not null,
+      owner text not null,
+      player_name text not null,
+      pro_team text not null,
+      bid int,
+      to_team_id int,
+      to_owner text,
+      at timestamptz not null,
+      scoring_period_id int,
+      by_league_manager boolean not null default false,
+      seen_at timestamptz not null default now(),
+      primary key (season, espn_id, player_id, kind)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS lm_add_requests (
+      id text primary key,
+      season int not null,
+      owner text not null,
+      team_id int not null,
+      player_id int not null,
+      player_name text not null,
+      pro_team text not null,
+      requested_at timestamptz not null,
+      for_date text not null,
+      status text not null,
+      note text not null default '',
+      updated_at timestamptz not null,
+      handled_by text
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_presence (
+      room text not null,
+      owner text not null,
+      seen_at timestamptz not null,
+      primary key (room, owner)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS draft_lists (
+      season int not null,
+      owner text not null,
+      list jsonb not null,
+      updated_at timestamptz not null default now(),
+      primary key (season, owner)
     )`;
     // Edits were league-wide until 16 October 2026. Each old row becomes the
     // edit of whoever saved it, and the key gains the owner.
@@ -967,6 +1094,103 @@ class NeonBackend implements StoreBackend {
       if (updated[0]) return { state: draft, version: updated[0].version };
     }
     throw new Error('League state changed too often; retry the request');
+  }
+
+  // The shared test draft is a second row of league_state. Every live query
+  // names id = 1, so row 2 never leaks into the real league.
+  async getTestDraft(): Promise<StateResult | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT data, version, updated_at FROM league_state WHERE id = ${TEST_DRAFT_ROW}`) as Array<{
+      data: LeagueDynamicState;
+      version: number;
+      updated_at: string | Date;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return { state: row.data, version: row.version, updatedAt: new Date(row.updated_at).toISOString() };
+  }
+
+  async setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+    await this.ensureInit();
+    if (state === null) {
+      await this.sql`DELETE FROM league_state WHERE id = ${TEST_DRAFT_ROW}`;
+      return;
+    }
+    await this.sql`INSERT INTO league_state (id, data, version)
+      VALUES (${TEST_DRAFT_ROW}, ${JSON.stringify(state)}::jsonb, 1)
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, version = league_state.version + 1, updated_at = now()`;
+  }
+
+  async mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+    await this.ensureInit();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const rows = (await this.sql`SELECT data, version FROM league_state WHERE id = ${TEST_DRAFT_ROW}`) as Array<{
+        data: LeagueDynamicState;
+        version: number;
+      }>;
+      const row = rows[0];
+      if (!row) throw new TestDraftMissingError();
+      const draft = structuredClone(row.data);
+      fn(draft);
+      const updated = (await this.sql`UPDATE league_state
+        SET data = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
+        WHERE id = ${TEST_DRAFT_ROW} AND version = ${row.version}
+          AND data->'draft'->>'startedAt' = ${row.data.draft.startedAt}
+        RETURNING version`) as Array<{ version: number }>;
+      if (updated[0]) return { state: draft, version: updated[0].version };
+    }
+    throw new Error('The test draft changed too often; retry the request');
+  }
+
+  async touchPresence(room: string, owner: string, at: string): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO draft_presence (room, owner, seen_at)
+      VALUES (${room}, ${owner}, ${at})
+      ON CONFLICT (room, owner) DO UPDATE SET seen_at = EXCLUDED.seen_at`;
+  }
+
+  async listPresence(room: string, since: string): Promise<PresenceRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, seen_at FROM draft_presence
+      WHERE room = ${room} AND seen_at >= ${since}`) as Array<{ owner: string; seen_at: string | Date }>;
+    return rows.map((row) => ({ owner: row.owner, seenAt: new Date(row.seen_at).toISOString() }));
+  }
+
+  async getDraftList(season: number, owner: string): Promise<DraftList | null> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT list FROM draft_lists
+      WHERE season = ${season} AND owner = ${owner}`) as Array<{ list: DraftList }>;
+    return rows[0]?.list ?? null;
+  }
+
+  async setDraftList(season: number, owner: string, list: DraftList | null): Promise<void> {
+    await this.ensureInit();
+    if (list === null) {
+      await this.sql`DELETE FROM draft_lists WHERE season = ${season} AND owner = ${owner}`;
+      return;
+    }
+    await this.sql`INSERT INTO draft_lists (season, owner, list, updated_at)
+      VALUES (${season}, ${owner}, ${JSON.stringify(list)}::jsonb, now())
+      ON CONFLICT (season, owner) DO UPDATE SET list = EXCLUDED.list, updated_at = now()`;
+  }
+
+  async draftListOwners(season: number): Promise<string[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner FROM draft_lists WHERE season = ${season} ORDER BY owner`) as Array<{ owner: string }>;
+    return rows.map((row) => row.owner);
+  }
+
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO draft_queues (room, owner, keys, updated_at)
+      VALUES (${room}, ${owner}, ${JSON.stringify(keys)}::jsonb, now())
+      ON CONFLICT (room, owner) DO UPDATE SET keys = EXCLUDED.keys, updated_at = now()`;
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT owner, keys FROM draft_queues WHERE room = ${room}`) as Array<{ owner: string; keys: string[] }>;
+    return Object.fromEntries(rows.map((row) => [row.owner, Array.isArray(row.keys) ? row.keys : []]));
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -1540,6 +1764,102 @@ class NeonBackend implements StoreBackend {
     await this.sql`DELETE FROM projection_edits WHERE season = ${season} AND owner = ${owner} AND espn_id = ${espnId}`;
   }
 
+  async addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number> {
+    await this.ensureInit();
+    let added = 0;
+    for (const row of rows) {
+      const result = (await this.sql`INSERT INTO league_transactions
+        (season, espn_id, player_id, kind, team_id, owner, player_name, pro_team, bid, to_team_id, to_owner, at, scoring_period_id, by_league_manager, seen_at)
+        VALUES (${row.season}, ${row.espnId}, ${row.playerId}, ${row.kind}, ${row.teamId}, ${row.owner}, ${row.playerName}, ${row.proTeam},
+          ${row.bid}, ${row.toTeamId}, ${row.toOwner}, ${row.at}, ${row.scoringPeriodId}, ${row.byLeagueManager}, ${row.seenAt})
+        ON CONFLICT (season, espn_id, player_id, kind) DO NOTHING
+        RETURNING espn_id`) as unknown[];
+      if (result.length > 0) added += 1;
+    }
+    return added;
+  }
+
+  async listTransactions(season: number, limit: number): Promise<LeagueTransactionRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT espn_id, player_id, kind, team_id, owner, player_name, pro_team, bid, to_team_id, to_owner, at, scoring_period_id, by_league_manager, seen_at
+      FROM league_transactions WHERE season = ${season} ORDER BY at DESC, espn_id, player_id LIMIT ${limit}`) as Array<{
+      espn_id: string;
+      player_id: number;
+      kind: LeagueTransactionRow['kind'];
+      team_id: number;
+      owner: string;
+      player_name: string;
+      pro_team: string;
+      bid: number | null;
+      to_team_id: number | null;
+      to_owner: string | null;
+      at: string | Date;
+      scoring_period_id: number | null;
+      by_league_manager: boolean;
+      seen_at: string | Date;
+    }>;
+    return rows.map((row) => ({
+      season,
+      espnId: row.espn_id,
+      playerId: row.player_id,
+      kind: row.kind,
+      teamId: row.team_id,
+      owner: row.owner,
+      playerName: row.player_name,
+      proTeam: row.pro_team,
+      bid: row.bid,
+      toTeamId: row.to_team_id,
+      toOwner: row.to_owner,
+      at: new Date(row.at).toISOString(),
+      scoringPeriodId: row.scoring_period_id,
+      byLeagueManager: row.by_league_manager,
+      seenAt: new Date(row.seen_at).toISOString(),
+    }));
+  }
+
+  async listLmAddRequests(season: number): Promise<LmAddRequest[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT id, owner, team_id, player_id, player_name, pro_team, requested_at, for_date, status, note, updated_at, handled_by
+      FROM lm_add_requests WHERE season = ${season} ORDER BY requested_at DESC, id`) as Array<{
+      id: string;
+      owner: string;
+      team_id: number;
+      player_id: number;
+      player_name: string;
+      pro_team: string;
+      requested_at: string | Date;
+      for_date: string;
+      status: LmAddRequest['status'];
+      note: string;
+      updated_at: string | Date;
+      handled_by: string | null;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      season,
+      owner: row.owner,
+      teamId: row.team_id,
+      playerId: row.player_id,
+      playerName: row.player_name,
+      proTeam: row.pro_team,
+      requestedAt: new Date(row.requested_at).toISOString(),
+      forDate: row.for_date,
+      status: row.status,
+      note: row.note,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      handledBy: row.handled_by,
+    }));
+  }
+
+  async saveLmAddRequest(row: LmAddRequest): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO lm_add_requests
+      (id, season, owner, team_id, player_id, player_name, pro_team, requested_at, for_date, status, note, updated_at, handled_by)
+      VALUES (${row.id}, ${row.season}, ${row.owner}, ${row.teamId}, ${row.playerId}, ${row.playerName}, ${row.proTeam},
+        ${row.requestedAt}, ${row.forDate}, ${row.status}, ${row.note}, ${row.updatedAt}, ${row.handledBy})
+      ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note, updated_at = EXCLUDED.updated_at, handled_by = EXCLUDED.handled_by`;
+  }
+
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -1809,6 +2129,33 @@ class NeonBackend implements StoreBackend {
         updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
   }
 
+  async listGamesCaps(season: number): Promise<GamesCapRow[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT season, matchup_period, cap, updated_at, updated_by
+      FROM league_games_caps WHERE season = ${season} ORDER BY matchup_period`) as Array<{
+      season: number;
+      matchup_period: number;
+      cap: number;
+      updated_at: string | Date;
+      updated_by: string;
+    }>;
+    return rows.map((row) => ({
+      season: row.season,
+      matchupPeriodId: row.matchup_period,
+      cap: row.cap,
+      updatedAt: new Date(row.updated_at).toISOString(),
+      updatedBy: row.updated_by,
+    }));
+  }
+
+  async saveGamesCap(row: GamesCapRow): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO league_games_caps (season, matchup_period, cap, updated_at, updated_by)
+      VALUES (${row.season}, ${row.matchupPeriodId}, ${row.cap}, ${row.updatedAt}, ${row.updatedBy})
+      ON CONFLICT (season, matchup_period) DO UPDATE SET cap = EXCLUDED.cap,
+        updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`;
+  }
+
   async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
     await this.ensureInit();
     const rows = (await this.sql`SELECT data, version, updated_at, updated_by
@@ -2008,6 +2355,8 @@ interface FileDoc {
     updatedAt: string;
   }>;
   projectionEdits: ProjectionEditRow[];
+  transactions?: LeagueTransactionRow[];
+  lmAddRequests?: LmAddRequest[];
   mockResults: MockResultRow[];
   mockFinishes: Array<MockFinish & { season: number }>;
   mockTrades: MockTrade[];
@@ -2017,6 +2366,7 @@ interface FileDoc {
   rulebookSignatures: RulebookSignature[];
   dues: DuesRow[];
   duesSettings: DuesSettings[];
+  gamesCaps: GamesCapRow[];
   historyDrafts: LeagueHistoryDraftRow[];
   historyVersions: LeagueHistoryVersionRow[];
   polls: PollRow[];
@@ -2024,6 +2374,14 @@ interface FileDoc {
   ownerEmails: OwnerEmailRow[];
   loginTokens: LoginTokenRow[];
   sessions: SessionRow[];
+  /** The shared test draft, or null when none is running. */
+  testDraft?: { state: LeagueDynamicState; version: number; updatedAt: string } | null;
+  /** Who has a draft page open, by room. */
+  draftPresence?: Array<PresenceRow & { room: string }>;
+  /** Each member's private auto-pick list. */
+  draftLists?: Array<{ season: number; owner: string; list: DraftList }>;
+  /** Each owner's draft queue, by room. */
+  draftQueues?: Array<{ room: string; owner: string; keys: string[] }>;
 }
 
 /** Every list a fresh document starts with. */
@@ -2039,6 +2397,8 @@ function emptyDoc(): FileDoc {
     draftRankingSnapshots: [],
     keeperScenarios: [],
     projectionEdits: [],
+    transactions: [],
+    lmAddRequests: [],
     mockResults: [],
     mockFinishes: [],
     mockTrades: [],
@@ -2048,6 +2408,7 @@ function emptyDoc(): FileDoc {
     rulebookSignatures: [],
     dues: [],
     duesSettings: [],
+    gamesCaps: [],
     historyDrafts: [],
     historyVersions: [],
     polls: [],
@@ -2104,6 +2465,8 @@ class FileBackend implements StoreBackend {
         projectionEdits: Array.isArray(doc.projectionEdits)
           ? doc.projectionEdits.map((row) => ({ ...row, owner: row.owner ?? row.updatedBy }))
           : [],
+        transactions: Array.isArray(doc.transactions) ? doc.transactions : [],
+        lmAddRequests: Array.isArray(doc.lmAddRequests) ? doc.lmAddRequests : [],
         mockResults: Array.isArray(doc.mockResults) ? doc.mockResults : [],
         mockFinishes: Array.isArray(doc.mockFinishes) ? doc.mockFinishes : [],
         mockTrades: Array.isArray(doc.mockTrades) ? doc.mockTrades : [],
@@ -2113,6 +2476,7 @@ class FileBackend implements StoreBackend {
         rulebookSignatures: Array.isArray(doc.rulebookSignatures) ? doc.rulebookSignatures : [],
         dues: Array.isArray(doc.dues) ? doc.dues : [],
         duesSettings: Array.isArray(doc.duesSettings) ? doc.duesSettings : [],
+        gamesCaps: Array.isArray(doc.gamesCaps) ? doc.gamesCaps : [],
         historyDrafts: Array.isArray(doc.historyDrafts) ? doc.historyDrafts : [],
         historyVersions: Array.isArray(doc.historyVersions) ? doc.historyVersions : [],
         polls: Array.isArray(doc.polls) ? doc.polls : [],
@@ -2120,6 +2484,10 @@ class FileBackend implements StoreBackend {
         ownerEmails: Array.isArray(doc.ownerEmails) ? doc.ownerEmails : [],
         loginTokens: Array.isArray(doc.loginTokens) ? doc.loginTokens : [],
         sessions: Array.isArray(doc.sessions) ? doc.sessions : [],
+        testDraft: doc.testDraft ?? null,
+        draftPresence: Array.isArray(doc.draftPresence) ? doc.draftPresence : [],
+        draftLists: Array.isArray(doc.draftLists) ? doc.draftLists : [],
+        draftQueues: Array.isArray(doc.draftQueues) ? doc.draftQueues : [],
       };
     } catch {
       // A missing or unreadable file starts empty. Every list must be present,
@@ -2158,6 +2526,92 @@ class FileBackend implements StoreBackend {
       this.writeDoc(doc);
       return { state: doc.state, version: doc.version };
     });
+  }
+
+
+  async getTestDraft(): Promise<StateResult | null> {
+    await this.ensureInit();
+    return this.readDoc().testDraft ?? null;
+  }
+
+  async setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.testDraft = state === null
+        ? null
+        : { state, version: (doc.testDraft?.version ?? 0) + 1, updatedAt: new Date().toISOString() };
+      this.writeDoc(doc);
+    });
+  }
+
+  async mutateTestDraft(fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+    await this.ensureInit();
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      if (!doc.testDraft) throw new TestDraftMissingError();
+      const draft = structuredClone(doc.testDraft.state);
+      fn(draft);
+      doc.testDraft = { state: draft, version: doc.testDraft.version + 1, updatedAt: new Date().toISOString() };
+      this.writeDoc(doc);
+      return { state: draft, version: doc.testDraft.version };
+    });
+  }
+
+  async touchPresence(room: string, owner: string, at: string): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const rows = (doc.draftPresence ?? []).filter((row) => !(row.room === room && row.owner === owner));
+      rows.push({ room, owner, seenAt: at });
+      doc.draftPresence = rows;
+      this.writeDoc(doc);
+    });
+  }
+
+  async listPresence(room: string, since: string): Promise<PresenceRow[]> {
+    await this.ensureInit();
+    return (this.readDoc().draftPresence ?? [])
+      .filter((row) => row.room === room && row.seenAt >= since)
+      .map(({ owner, seenAt }) => ({ owner, seenAt }));
+  }
+  async getDraftList(season: number, owner: string): Promise<DraftList | null> {
+    await this.ensureInit();
+    const row = (this.readDoc().draftLists ?? []).find((entry) => entry.season === season && entry.owner === owner);
+    return row ? structuredClone(row.list) : null;
+  }
+
+  async setDraftList(season: number, owner: string, list: DraftList | null): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const rows = (doc.draftLists ?? []).filter((entry) => !(entry.season === season && entry.owner === owner));
+      if (list !== null) rows.push({ season, owner, list: structuredClone(list) });
+      doc.draftLists = rows;
+      this.writeDoc(doc);
+    });
+  }
+
+  async setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.draftQueues = [...(doc.draftQueues ?? []).filter((row) => !(row.room === room && row.owner === owner)), { room, owner, keys }];
+      this.writeDoc(doc);
+    });
+  }
+
+  async draftListOwners(season: number): Promise<string[]> {
+    await this.ensureInit();
+    return (this.readDoc().draftLists ?? [])
+      .filter((entry) => entry.season === season)
+      .map((entry) => entry.owner)
+      .sort();
+  }
+
+  async getDraftQueues(room: string): Promise<Record<string, string[]>> {
+    await this.ensureInit();
+    return Object.fromEntries((this.readDoc().draftQueues ?? []).filter((row) => row.room === room).map((row) => [row.owner, row.keys]));
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -2612,6 +3066,49 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number> {
+    return this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const have = doc.transactions ?? [];
+      const seen = new Set(have.map((row) => `${row.season}:${transactionKey(row)}`));
+      let added = 0;
+      for (const row of rows) {
+        const key = `${row.season}:${transactionKey(row)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        have.push(row);
+        added += 1;
+      }
+      doc.transactions = have;
+      if (added > 0) this.writeDoc(doc);
+      return added;
+    });
+  }
+
+  async listTransactions(season: number, limit: number): Promise<LeagueTransactionRow[]> {
+    await this.ensureInit();
+    return (this.readDoc().transactions ?? [])
+      .filter((row) => row.season === season)
+      .sort((a, b) => b.at.localeCompare(a.at) || a.espnId.localeCompare(b.espnId) || a.playerId - b.playerId)
+      .slice(0, limit);
+  }
+
+  async listLmAddRequests(season: number): Promise<LmAddRequest[]> {
+    await this.ensureInit();
+    return (this.readDoc().lmAddRequests ?? [])
+      .filter((row) => row.season === season)
+      .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt) || a.id.localeCompare(b.id));
+  }
+
+  async saveLmAddRequest(row: LmAddRequest): Promise<void> {
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.lmAddRequests = (doc.lmAddRequests ?? []).filter((entry) => entry.id !== row.id);
+      doc.lmAddRequests.push(row);
+      this.writeDoc(doc);
+    });
+  }
+
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
     await this.ensureInit();
     const doc = this.readDoc();
@@ -2795,6 +3292,23 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async listGamesCaps(season: number): Promise<GamesCapRow[]> {
+    await this.ensureInit();
+    return this.readDoc().gamesCaps
+      .filter((row) => row.season === season)
+      .sort((a, b) => a.matchupPeriodId - b.matchupPeriodId);
+  }
+
+  async saveGamesCap(row: GamesCapRow): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.gamesCaps = doc.gamesCaps.filter((r) => !(r.season === row.season && r.matchupPeriodId === row.matchupPeriodId));
+      doc.gamesCaps.push(structuredClone(row));
+      this.writeDoc(doc);
+    });
+  }
+
   async getHistoryDraft(season: number): Promise<LeagueHistoryDraftRow | null> {
     await this.ensureInit();
     return this.readDoc().historyDrafts.find((row) => row.season === season) ?? null;
@@ -2973,6 +3487,58 @@ export async function mutateState(
   fn: (draft: LeagueDynamicState) => void,
 ): Promise<MutateResult> {
   return getBackend().mutateState(fn);
+}
+
+/** The shared test draft, or null when none is running. */
+export async function getTestDraft(): Promise<StateResult | null> {
+  return getBackend().getTestDraft();
+}
+
+/** Start (or restart) the shared test draft with this state, or end it with null. */
+export async function setTestDraft(state: LeagueDynamicState | null): Promise<void> {
+  return getBackend().setTestDraft(state);
+}
+
+/** Change the shared test draft. Throws TestDraftMissingError when none is running. */
+export async function mutateTestDraft(
+  fn: (draft: LeagueDynamicState) => void,
+): Promise<MutateResult> {
+  return getBackend().mutateTestDraft(fn);
+}
+
+/** Mark an owner as having the draft page open in this room. */
+export async function touchPresence(room: string, owner: string, at: string): Promise<void> {
+  return getBackend().touchPresence(room, owner, at);
+}
+
+/** One member's private auto-pick list. Callers must already know the owner may see it. */
+export async function getDraftList(season: number, owner: string): Promise<DraftList | null> {
+  return getBackend().getDraftList(season, owner);
+}
+
+/** Save a member's list, or clear it with null. */
+export async function setDraftList(season: number, owner: string, list: DraftList | null): Promise<void> {
+  return getBackend().setDraftList(season, owner, list);
+}
+
+/** Who has a list saved this season. Names only. */
+export async function draftListOwners(season: number): Promise<string[]> {
+  return getBackend().draftListOwners(season);
+}
+
+/** Save an owner's draft queue for this room. */
+export async function setDraftQueue(room: string, owner: string, keys: string[]): Promise<void> {
+  return getBackend().setDraftQueue(room, owner, keys);
+}
+
+/** Every owner's draft queue in this room. */
+export async function getDraftQueues(room: string): Promise<Record<string, string[]>> {
+  return getBackend().getDraftQueues(room);
+}
+
+/** Owners who checked in to this room since `since`. */
+export async function listPresence(room: string, since: string): Promise<PresenceRow[]> {
+  return getBackend().listPresence(room, since);
 }
 
 export async function getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -3413,6 +3979,22 @@ export async function saveProjectionEdit(row: ProjectionEditRow): Promise<Projec
   return getBackend().saveProjectionEdit(row);
 }
 
+export async function addTransactions(rows: readonly LeagueTransactionRow[]): Promise<number> {
+  return getBackend().addTransactions(rows);
+}
+
+export async function listTransactions(season: number, limit = 500): Promise<LeagueTransactionRow[]> {
+  return getBackend().listTransactions(season, limit);
+}
+
+export async function listLmAddRequests(season: number): Promise<LmAddRequest[]> {
+  return getBackend().listLmAddRequests(season);
+}
+
+export async function saveLmAddRequest(row: LmAddRequest): Promise<void> {
+  return getBackend().saveLmAddRequest(row);
+}
+
 export async function deleteProjectionEdit(season: number, owner: string, espnId: number): Promise<void> {
   return getBackend().deleteProjectionEdit(season, owner, espnId);
 }
@@ -3574,6 +4156,14 @@ export async function getDuesSettings(season: number): Promise<DuesSettings | nu
 
 export async function saveDuesSettings(row: DuesSettings): Promise<void> {
   return getBackend().saveDuesSettings(row);
+}
+
+export async function listGamesCaps(season: number): Promise<GamesCapRow[]> {
+  return getBackend().listGamesCaps(season);
+}
+
+export async function saveGamesCap(row: GamesCapRow): Promise<void> {
+  return getBackend().saveGamesCap(row);
 }
 
 export async function getScheduleSnapshot(id: string): Promise<StoredScheduleSnapshot | null> {

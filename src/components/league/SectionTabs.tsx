@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
-import { onLanding, onPath, sectionFor, visibleSections } from '../../lib/league/navSections.js';
+import { activeTab, onLanding, sectionFor, visibleSections } from '../../lib/league/navSections.js';
 
 /** The tabs across the top of a section with more than one page. */
 export default function SectionTabs() {
@@ -8,13 +8,16 @@ export default function SectionTabs() {
   const { pathname } = useLocation();
   const section = sectionFor(pathname, visibleSections(identity?.isCommissioner === true));
   if (!section || section.tabs.length < 2 || onLanding(pathname, section)) return null;
+  const active = activeTab(pathname, section.tabs);
   return (
     <nav className="section-tabs" aria-label={`${section.label} pages`}>
       {section.tabs.map((tab) => (
         <NavLink
           key={tab.to}
           to={tab.to}
-          className={onPath(pathname, tab.to) ? 'section-tab hub-heading active' : 'section-tab hub-heading'}
+          // `end` keeps the router from lighting /draft on /draft/recap; `active` decides.
+          end
+          className={active === tab.to ? 'section-tab hub-heading active' : 'section-tab hub-heading'}
         >
           {tab.label}
         </NavLink>

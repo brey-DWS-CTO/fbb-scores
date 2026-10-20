@@ -714,7 +714,14 @@ export default function DraftRoom({ prepared, values, projections, projectedTrad
                 {shareUrl && grade && <ShareButton url={shareUrl} title={`My mock draft: ${grade.grade}`} className="room-share" />}
                 {menu}
               </div>
-              <button type="button" className="room-link" onClick={seeBoard}>See the board</button>
+              <div className="room-done-actions">
+                {shared ? (
+                  <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={exit}>BACK TO MOCK DRAFT</button>
+                ) : (
+                  <button type="button" className="tap-btn mock-mini-btn is-primary" onClick={() => { restart(true); onNewDraft(); }}>NEW DRAFT</button>
+                )}
+                <button type="button" className="room-link" onClick={seeBoard}>See the board</button>
+              </div>
             </>
           ) : (
             <>
