@@ -1,12 +1,13 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { useIdentity } from '../../hooks/useLeague.js';
+import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 import { activeTab, onLanding, sectionFor, visibleSections } from '../../lib/league/navSections.js';
 
 /** The tabs across the top of a section with more than one page. */
 export default function SectionTabs() {
   const { identity } = useIdentity();
+  const { meta, seasonMode } = useLeagueState();
   const { pathname } = useLocation();
-  const section = sectionFor(pathname, visibleSections(identity?.isCommissioner === true));
+  const section = sectionFor(pathname, visibleSections(identity?.isCommissioner === true, meta?.revealed === true, seasonMode));
   if (!section || section.tabs.length < 2 || onLanding(pathname, section)) return null;
   const active = activeTab(pathname, section.tabs);
   return (

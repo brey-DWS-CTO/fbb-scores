@@ -166,6 +166,7 @@ export interface LeagueOverrides {
 }
 
 export interface LeagueDynamicState {
+  seasonMode?: import('../league/seasonMode.js').SeasonMode;
   season: number;
   keepers: Record<string, KeeperSelection[]>;
   /** Commissioner-controlled public visibility. Missing in old state means hidden. */

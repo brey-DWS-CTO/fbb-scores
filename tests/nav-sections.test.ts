@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SEASON_START, activeTab, onLanding, onPath, seasonUnderway, sectionFor, sectionHome, todayIso, visibleSections } from '../src/lib/league/navSections.ts';
+import { SEASON_START, activeTab, onLanding, onPath, sectionFor, sectionHome, todayIso, visibleSections } from '../src/lib/league/navSections.ts';
 
 /** The week before the draft: keepers and the draft are the whole app. */
-const PRESEASON = '2026-10-12';
+const PRESEASON = 'off-season';
 /** Opening day of league week 1. */
-const OPENING_DAY = '2026-10-19';
+const OPENING_DAY = 'in-season';
 
 const member = visibleSections(false, false, PRESEASON);
 const commish = visibleSections(true, false, PRESEASON);
@@ -30,22 +30,23 @@ test('the phone bar holds five sections until keepers go public, then four', () 
 
 test('SCORES sits after DRAFT before the season, and first once it starts', () => {
   assert.equal(SEASON_START, '2026-10-19');
-  assert.ok(!seasonUnderway('2026-10-18'));
-  assert.ok(seasonUnderway(OPENING_DAY));
-  assert.ok(seasonUnderway('2027-03-01'));
 
   assert.deepEqual(member.map((section) => section.id), ['keepers', 'draft', 'scores', 'trades', 'league', 'vault', 'rules']);
   assert.ok(!member.find((section) => section.id === 'scores')!.primary, 'behind MORE until there is something to score');
 
   // In season the keepers are public, so VAULT is already behind MORE.
   const inSeason = visibleSections(false, true, OPENING_DAY);
-  assert.deepEqual(inSeason.map((section) => section.id), ['scores', 'keepers', 'draft', 'trades', 'league', 'vault', 'rules']);
-  // Still four on the phone bar: SCORES takes the slot KEEPERS no longer needs.
-  assert.deepEqual(inSeason.filter((section) => section.primary).map((section) => section.id), ['scores', 'draft', 'trades', 'league']);
+  assert.deepEqual(inSeason.map((section) => section.id), ['scores', 'league', 'trades', 'rules', 'draft', 'keepers', 'vault']);
+  // Four live sections, whether keepers are public or still hidden.
+  assert.deepEqual(visibleSections(false, false, 'in-season').filter((section) => section.primary).map((section) => section.id), ['scores', 'league', 'trades', 'rules']);
+  assert.deepEqual(inSeason.filter((section) => section.primary).map((section) => section.id), ['scores', 'league', 'trades', 'rules']);
   assert.equal(sectionFor('/keepers/Brey', inSeason)?.id, 'keepers', 'the keepers page still has its section');
-  const commishInSeason = visibleSections(true, true, '2027-01-05');
+  const commishInSeason = visibleSections(true, true, 'in-season');
   assert.equal(commishInSeason[0].id, 'scores');
-  assert.equal(commishInSeason[commishInSeason.length - 1].id, 'commish');
+  assert.equal(commishInSeason[4].id, 'commish');
+  assert.deepEqual(inSeason.filter((section) => section.offSeason).map((section) => section.id), ['draft', 'keepers', 'vault']);
+  assert.deepEqual(inSeason.find((section) => section.id === 'league')!.tabs, member.find((section) => section.id === 'league')!.tabs);
+  for (const section of inSeason) for (const tab of section.tabs) assert.equal(sectionFor(tab.to, inSeason)?.id, section.id);
 });
 
 test('today reads as a local date', () => {
