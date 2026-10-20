@@ -260,6 +260,7 @@ import {
 } from '../../src/lib/league/polls.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
 import hashtagProjections from '../data/hashtag-projections-2027.json' with { type: 'json' };
+import { projectionGaps } from '../../src/lib/league/expertProjections.js';
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
 import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
 import type { Rulebook } from '../../src/lib/league/rulebook.js';
@@ -1128,6 +1129,17 @@ router.delete('/projection-edits/:espnId', requireAuth, async (req, res) => {
  */
 router.get('/expert-projections', requireAuth, requireCommissioner, (_req, res) => {
   res.json(hashtagProjections);
+});
+
+/**
+ * GET /api/league/projection-fills — Hashtag's lines for the players ESPN
+ * lists but does not project, so every owner sees a number for them. Only
+ * those players' lines leave the server.
+ */
+router.get('/projection-fills', requireAuth, async (_req, res) => {
+  const { state } = await getState();
+  const snapshot = await resolveCurrentDraftRankings(state);
+  res.json({ players: projectionGaps(snapshot.players, hashtagProjections) });
 });
 
 /** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */

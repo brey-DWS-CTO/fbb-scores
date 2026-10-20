@@ -114,3 +114,30 @@ test('editing a Hashtag line re-estimates its double-doubles; games alone keep t
   const fewerGames = projectedPerGame(editedProjection(jokic, { ...base, games: 50, perGame: {} }))!;
   assert.equal(fewerGames['37'], 0.8, 'Hashtag\'s rate stands');
 });
+
+test('ESPN\'s blanks take the Hashtag line; anyone ESPN projects is left alone', async () => {
+  const { projectionGaps, fillProjectionGaps } = await import('../src/lib/league/expertProjections.ts');
+  const expert: ExpertProjections = { source: 'hashtag', updated: '2026-10-16', players: parseHashtagPaste(PASTE) };
+  // Sarr has no ESPN line here; Jokic has one.
+  const gaps = projectionGaps(snapshot.players, expert);
+  assert.deepEqual(gaps.map((line) => line.name), ['Alexandre Sarr']);
+  const filled = fillProjectionGaps(snapshot, { players: gaps });
+  assert.equal(projectedPerGame(filled.players[1].projection)!['0'], 15.4);
+  assert.equal(filled.players[1].projection!.stats['42'], 68);
+  assert.equal(filled.players[0].projection, espnJokic, 'ESPN\'s own line stands');
+  assert.equal(fillProjectionGaps(snapshot, null), snapshot);
+});
+
+test('the three ESPN blanks feed the Scores opening-night fallback', async () => {
+  const { projectionGaps, fillProjectionGaps } = await import('../src/lib/league/expertProjections.ts');
+  const { expectedPointsForGame } = await import('../src/lib/league/dailyProjection.ts');
+  const names = ['Sandro Mamukelashvili', 'Cam Spencer', 'Daniss Jenkins'];
+  const players = names.map((fullName, index) => ({ espnId: index + 1, fullName, projection: null }));
+  const filled = fillProjectionGaps({ players }, { players: projectionGaps(players, hashtag) });
+  for (const player of filled.players) {
+    const preseason = projectedFppg(player.projection, scoring);
+    assert.ok(preseason !== null && preseason > 0, player.fullName);
+    const scorePlayer = { injuryStatus: null, seasonAvg: null, last15: null, projByDay: {} } as import('../src/lib/league/scores.ts').ScorePlayer;
+    assert.ok(Math.abs(expectedPointsForGame(scorePlayer, { scoringPeriodId: 1, preseason }) - preseason) < 1e-9);
+  }
+});
