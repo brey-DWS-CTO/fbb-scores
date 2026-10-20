@@ -14,6 +14,7 @@ import {
 import { apiErrorMessage, callDraftClock, pauseDraftClock, resumeDraftClock } from '../../lib/league/api.js';
 import { ACTION_BUTTON } from './boardUtils.js';
 import { useApplyStateResponse, useIdentity } from '../../hooks/useLeague.js';
+import { shortName } from '../../lib/league/format.js';
 
 /** A ticking clock. Only the component that calls this re-renders. */
 function useNow(active: boolean, everyMs = 250): number {
@@ -209,7 +210,7 @@ export function DraftTimingPanel({ board, owners, tv = false }: { board: readonl
     stats.longestPick && {
       label: 'LONGEST PICK',
       who: stats.longestPick.owner,
-      detail: `${seconds(stats.longestPick.seconds)} on ${stats.longestPick.playerName}`,
+      detail: `${seconds(stats.longestPick.seconds)} on ${shortName(stats.longestPick.playerName)}`,
     },
     stats.mostClocked && { label: 'MOST CLOCKED', who: stats.mostClocked.owner, detail: `${stats.mostClocked.clocked}× CLOCK called on them` },
     stats.mostYielded && { label: 'RAN OUT OF TIME', who: stats.mostYielded.owner, detail: `skipped ${stats.mostYielded.yielded}×` },

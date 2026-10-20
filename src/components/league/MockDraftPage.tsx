@@ -42,6 +42,7 @@ import SignInPanel from './SignInPanel.js';
 import DraftRoom, { type RoomProgress } from './DraftRoom.js';
 import type { MockGrade } from '../../lib/league/mockGrade.js';
 import NavIcon from './NavIcon.js';
+import { shortName } from '../../lib/league/format.js';
 
 /** This person's saved mock draft, or null. Storage can be off; that is no save. */
 function readSave(owner: string | null): MockSave | null {
@@ -498,7 +499,7 @@ function MockDraftScreen() {
                       use my projection instead
                       {guessInstead.includes(row.owner)
                         ? ' (entered picks set aside)'
-                        : row.guess.length > 0 ? ` (${row.guess.map((k) => k.playerName).join(', ')})` : ''}
+                        : row.guess.length > 0 ? ` (${row.guess.map((k) => shortName(k.playerName)).join(', ')})` : ''}
                     </span>
                   </label>
                 )}
@@ -548,7 +549,7 @@ function MockDraftScreen() {
           <div className="mock-own">
             <label>
               <input type="radio" name="mock-own" checked={!tryKeepers} onChange={() => setTryKeepers(false)} />
-              <span>My real picks{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => k.playerName).join(', ')})` : ' (none yet)'}</span>
+              <span>My real picks{state.keepers[viewer]?.length ? ` (${state.keepers[viewer].map((k) => shortName(k.playerName)).join(', ')})` : ' (none yet)'}</span>
             </label>
             <label>
               <input type="radio" name="mock-own" checked={tryKeepers} onChange={() => setTryKeepers(true)} />
@@ -571,7 +572,7 @@ function MockDraftScreen() {
                     <option value="">Nobody</option>
                     {ownCandidates.map((player) => (
                       <option key={player.key} value={player.key}>
-                        {player.name} · R{player.keeper.round ?? '?'} · {player.keeper.effectiveAvg?.toFixed(1) ?? '–'}
+                        {shortName(player.name)} · R{player.keeper.round ?? '?'} · {player.keeper.effectiveAvg?.toFixed(1) ?? '–'}
                       </option>
                     ))}
                   </select>

@@ -1092,11 +1092,7 @@ export function gameText(game: GameLine | null, tipoffText: string | null): stri
 }
 
 /** "Giannis Antetokounmpo" as "G. Antetokounmpo", which fits a phone column. */
-export function shortName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2) return fullName.trim();
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
-}
+export { shortName } from './format.js';
 
 /** "12-3" or "12-3-1". */
 export function recordText(record: TeamRecord): string {

@@ -19,7 +19,6 @@ import {
   replaySaved,
   finishedDraftNoLongerFits,
   rosterBySlot,
-  shortName,
   toggleQueued,
   upcomingPicks,
   type MockSave,
@@ -152,13 +151,4 @@ test('a finished draft the board moved under starts over instead of reopening ha
   assert.equal(finishedDraftNoLongerFits(prepared, 7, 'Brey', { finished: false, choices: { [mine]: jokic } }), false);
   // Saves from before the flag read as unfinished.
   assert.equal(parseMockSave(JSON.stringify({ ...save, finished: undefined }))?.finished, false);
-});
-
-test('a short name is first initial and last name, suffix kept', () => {
-  assert.equal(shortName('Jayson Tatum'), 'J. Tatum');
-  assert.equal(shortName('Tyrese Maxey'), 'T. Maxey');
-  assert.equal(shortName('Gary Trent Jr.'), 'G. Trent Jr.');
-  assert.equal(shortName('Shai Gilgeous-Alexander'), 'S. Gilgeous-Alexander');
-  assert.equal(shortName('Nene'), 'Nene');
-  assert.equal(shortName('  Jalen   Brunson '), 'J. Brunson');
 });

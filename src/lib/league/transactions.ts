@@ -13,6 +13,7 @@
  * Pure. No server, no browser.
  */
 import type { TeamInfo } from '../keeper/types.js';
+import { shortName } from './format.js';
 
 export type MoveKind = 'add' | 'drop' | 'waiver' | 'trade';
 
@@ -169,14 +170,6 @@ export interface Move {
   title: string;
   lines: string[];
   byLeagueManager: boolean;
-}
-
-/** "Giannis Antetokounmpo" as "G. Antetokounmpo", the league's house style for a player. */
-export function shortName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  // "Player 12345" is a placeholder, not a name.
-  if (parts.length < 2 || /^\d+$/.test(parts[parts.length - 1])) return fullName.trim();
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
 }
 
 const withTeam = (row: Pick<LeagueTransaction, 'playerName' | 'proTeam'>) =>
