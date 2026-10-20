@@ -9,6 +9,7 @@ import CommissionerPanel from './CommissionerPanel.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import EspnSyncPanel from './EspnSyncPanel.js';
+import FavoritesAdmin from './FavoritesAdmin.js';
 import HistoryAdmin from './HistoryAdmin.js';
 import SignInAdmin from './SignInAdmin.js';
 import { RoundChip } from '../keepers/keeperUi.js';
@@ -126,6 +127,8 @@ export default function AdminPage() {
         </div>
         <SignInAdmin />
       </section>
+
+      <FavoritesAdmin />
 
       <EspnSyncPanel />
 

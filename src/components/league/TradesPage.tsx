@@ -47,6 +47,7 @@ import {
   type TradePreview,
 } from '../../lib/league/pickTrades.js';
 import { mockTradeProposal, type MockTrade } from '../../lib/league/mockTrades.js';
+import { shortName } from '../../lib/league/format.js';
 
 /** Open offers either way, your mock trades, and everything that is over. */
 type Tab = 'active' | 'mock' | 'done';
@@ -324,7 +325,7 @@ function ReviewPanel({
             <p className="trade-keeper-summary">{side.summary}</p>
             {side.changes.map((change) => (
               <p key={change.playerKey} className="trade-keeper-change">
-                {change.playerName}: pick {change.beforePick ?? 'none'} → {change.afterPick ?? 'none'}
+                {shortName(change.playerName)}: pick {change.beforePick ?? 'none'} → {change.afterPick ?? 'none'}
                 {change.afterBump === 'traded' && ' (you traded that round away)'}
                 {change.afterBump === 'duplicate' && ' (same tier as your other keeper)'}
               </p>

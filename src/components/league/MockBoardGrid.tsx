@@ -1,5 +1,6 @@
 import type { BoardCellView } from '../../lib/league/mockBoard.js';
 import { positionTheme } from '../draft/boardUtils.js';
+import { shortName } from '../../lib/league/format.js';
 
 /** A keeper on the board, in the list and in the updates: K, solid when entered, dashed when projected. */
 export function KeeperChip({ projected, early }: { projected: boolean; early: string | null }) {
@@ -78,7 +79,7 @@ export default function MockBoardGrid({
                     </span>
                     {cell.playerName
                       ? <>
-                        <span className="room-grid-name">{cell.playerName}</span>
+                        <span className="room-grid-name" title={cell.playerName}>{shortName(cell.playerName)}</span>
                         <small style={{ color: theme?.color }}>{cell.positions.join('/')}</small>
                       </>
                       : cell.current ? <span className="room-grid-name mock-live">on the clock</span> : null}

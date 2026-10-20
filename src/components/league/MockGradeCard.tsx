@@ -1,4 +1,5 @@
 import { gradeSummary, type MockGrade } from '../../lib/league/mockGrade.js';
+import { shortName } from '../../lib/league/format.js';
 
 interface Props {
   grade: MockGrade;
@@ -23,8 +24,8 @@ export default function MockGradeCard({ grade, person, full = true, headline = t
         </div>
       )}
       <ul className="mock-grade-notes">
-        {grade.steal && <li>Best value: <strong>{grade.steal.name}</strong> at {grade.steal.label}, {grade.steal.by} picks after his ADP.</li>}
-        {grade.reach && <li>Biggest reach: <strong>{grade.reach.name}</strong> at {grade.reach.label}, {grade.reach.by} picks before his ADP.</li>}
+        {grade.steal && <li>Best value: <strong>{shortName(grade.steal.name)}</strong> at {grade.steal.label}, {grade.steal.by} picks after his ADP.</li>}
+        {grade.reach && <li>Biggest reach: <strong>{shortName(grade.reach.name)}</strong> at {grade.reach.label}, {grade.reach.by} picks before his ADP.</li>}
         {grade.openSlots.length > 0 && <li>No one to start at {grade.openSlots.join(', ')}.</li>}
       </ul>
       {full && (
@@ -38,7 +39,7 @@ export default function MockGradeCard({ grade, person, full = true, headline = t
                 .map((pick) => (
                   <tr key={pick.playerKey} className={onPlayer ? 'is-tappable' : ''} onClick={() => onPlayer?.(pick.playerKey)}>
                     <td>{pick.slot === 'BE' ? 'Bench' : pick.slot}</td>
-                    <td>{pick.name} <small>{pick.positions.join('/')}</small></td>
+                    <td>{shortName(pick.name)} <small>{pick.positions.join('/')}</small></td>
                     <td>{pick.label}{pick.how === 'keeper' ? ' K' : ''}</td>
                     <td className="room-num">{typeof pick.fppg === 'number' ? pick.fppg.toFixed(1) : '–'}</td>
                     <td className="room-num">{pick.total?.toLocaleString() ?? '–'}</td>

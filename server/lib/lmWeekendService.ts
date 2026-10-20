@@ -30,7 +30,7 @@ import {
   type LmAddWindow,
   type WaiverHour,
 } from '../../src/lib/league/lmWeekend.js';
-import { shortName } from '../../src/lib/league/transactions.js';
+import { shortName } from '../../src/lib/league/format.js';
 import {
   describeWrite,
   espnLmConfig,
@@ -138,7 +138,7 @@ async function attemptAdd(config: EspnLmConfig, request: LmAddRequest, by: strin
   }
   if (result.dryRun) return { ...request, note: 'dry run: nothing sent to ESPN', updatedAt };
   if (result.authFailed) {
-    await postToSlack(`LM add for ${request.owner} (${request.playerName}) could not be sent: ${note}`);
+    await postToSlack(`LM add for ${request.owner} (${shortName(request.playerName)}) could not be sent: ${note}`);
     return { ...request, note, updatedAt };
   }
   // ESPN refused the move itself. Almost always no roster spot yet.

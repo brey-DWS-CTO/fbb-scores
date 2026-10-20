@@ -7,6 +7,7 @@ import SignInPanel from './SignInPanel.js';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { apiErrorMessage, fetchAchievements, revealKeeper, type AchievementsResponse } from '../../lib/league/api.js';
 import { reelSchedule } from '../../lib/league/reel.js';
+import { shortName } from '../../lib/league/format.js';
 
 type Phase = 'ready' | 'spinning' | 'flipping' | 'done';
 
@@ -82,7 +83,7 @@ export default function RevealPage() {
       if (!pick || !team || !shown) throw new Error('The reveal came back empty. Try again.');
       const land: Landed = {
         target: pick.target,
-        playerName: shown.playerName ?? 'A player they have since dropped',
+        playerName: shown.playerName ? shortName(shown.playerName) : 'A player they have since dropped',
         shownOf: team.shown.length,
         keeping: Math.max(team.keeping, team.shown.length),
       };

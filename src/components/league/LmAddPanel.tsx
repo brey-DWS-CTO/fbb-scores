@@ -1,3 +1,4 @@
+import { shortName } from '../../lib/league/format.js';
 import { useCallback, useEffect, useState } from 'react';
 import PlayerCombobox from './PlayerCombobox.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
@@ -63,7 +64,7 @@ export default function LmAddPanel() {
 
   const ask = async (player: DatasetPlayer) => {
     if (!identity || !player.espnId) return;
-    if (!window.confirm(`Ask for ${player.name} to be LM added to your team? Drop someone in ESPN first if your roster is full.`)) return;
+    if (!window.confirm(`Ask for ${shortName(player.name)} to be LM added to your team? Drop someone in ESPN first if your roster is full.`)) return;
     setBusy(true);
     setFailed([]);
     setNotice(null);
