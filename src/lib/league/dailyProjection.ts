@@ -18,6 +18,7 @@
 import {
   gamesLeft,
   gamesCapProjection,
+  remainingGamePoints,
   isOut,
   type ExpectedPoints,
   type ScorePlayer,
@@ -26,7 +27,7 @@ import {
   type OverageGame,
 } from './scores.js';
 
-/** How much each average counts in the blend. They add to one. */
+/** Base weights before adjusting for how many games support each average. */
 export const BLEND_WEIGHTS = { last15: 0.5, season: 0.3, preseason: 0.2 } as const;
 
 export interface BlendSources {
@@ -36,6 +37,8 @@ export interface BlendSources {
   season: number | null;
   /** The preseason projection, fantasy points a game. */
   preseason: number | null;
+  seasonGames?: number | null;
+  last15Games?: number | null;
 }
 
 export interface ProjectionContext {
@@ -55,8 +58,11 @@ export function blendExpected(sources: BlendSources): number | null {
   for (const key of ['last15', 'season', 'preseason'] as const) {
     const value = sources[key];
     if (value === null || !Number.isFinite(value)) continue;
-    total += BLEND_WEIGHTS[key] * Math.max(0, value);
-    weight += BLEND_WEIGHTS[key];
+    const games = key === 'season' ? sources.seasonGames : key === 'last15' ? sources.last15Games : null;
+    const reliability = games === null || games === undefined ? 1 : Math.max(0, games) / (Math.max(0, games) + (key === 'season' ? 12 : 8));
+    const adjustedWeight = BLEND_WEIGHTS[key] * reliability;
+    total += adjustedWeight * Math.max(0, value);
+    weight += adjustedWeight;
   }
   return weight > 0 ? total / weight : null;
 }
@@ -69,7 +75,7 @@ export function expectedPointsForGame(player: ScorePlayer, ctx: ProjectionContex
   if (isOut(player)) return 0;
   const espn = player.projByDay?.[String(ctx.scoringPeriodId)];
   if (typeof espn === 'number' && Number.isFinite(espn)) return Math.max(0, espn);
-  return blendExpected({ last15: player.last15 ?? null, season: player.seasonAvg, preseason: ctx.preseason }) ?? 0;
+  return blendExpected({ last15: player.last15 ?? null, season: player.seasonAvg, preseason: ctx.preseason, seasonGames: player.seasonGames, last15Games: player.last15Games }) ?? 0;
 }
 
 export interface SideProjection {
@@ -125,7 +131,7 @@ export function playerDayProjection(
   const left = gamesLeft(player, week, anySlot).find((game) => game.scoringPeriodId === scoringPeriodId);
   if (!left) return null;
   const sofar = player.days[String(scoringPeriodId)]?.points ?? 0;
-  return Math.round((sofar + expected(player, scoringPeriodId) * left.share) * 10) / 10;
+  return Math.round((sofar + remainingGamePoints(player, left, expected(player, scoringPeriodId))) * 10) / 10;
 }
 
 /**
@@ -140,7 +146,7 @@ export function playerWeekProjection(
 ): number {
   let total = 0;
   for (const day of Object.values(player.days)) if (day.started) total += day.points;
-  for (const game of gamesLeft(player, week, anySlot)) total += expected(player, game.scoringPeriodId) * game.share;
+  for (const game of gamesLeft(player, week, anySlot)) total += remainingGamePoints(player, game, expected(player, game.scoringPeriodId));
   return Math.round(total * 10) / 10;
 }
 

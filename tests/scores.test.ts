@@ -228,6 +228,29 @@ function buildWeek(): ScoresWeek {
 
 // ─── The plan ───────────────────────────────────────────────────────────────
 
+test('score payloads retain fantasy logos, sample counts and expected playing time', () => {
+  const settings = { ...SETTINGS, teams: [
+    { id: 7, name: 'Home', roster: { entries: [{ playerPoolEntry: { id: 1, player: { id: 1, stats: [
+      { statSourceId: 0, statSplitTypeId: 0, seasonId: 2027, stats: { '0': 100, '40': 60, '42': 2 } },
+      { statSourceId: 0, statSplitTypeId: 2, seasonId: 2027, stats: { '0': 50, '42': 1 } },
+      { statSourceId: 1, statSplitTypeId: 0, seasonId: 2027, stats: { '40': 2720, '42': 80 } },
+    ] } } }] } },
+    { id: 2, name: 'Away' },
+  ] };
+  const plan = planWeek(SETTINGS, 3, TODAY_ANCHOR);
+  const payload = { ...dayPayload(18, [JOKIC], [CURRY]), teams: [
+    { id: 7, logo: 'https://example.com/team-logo.png' },
+    { id: 2, logo: 'javascript:invalid' },
+  ] };
+  const week = readEspnWeek({ plan, settings, days: [{ scoringPeriodId: 18, date: '2026-11-05', games: DAY_18_GAMES, payload }], fetchedAt: '2026-11-05T20:00:00Z' });
+  assert.equal(week.matchups[0].home.logoUrl, 'https://example.com/team-logo.png');
+  assert.equal(week.matchups[0].away.logoUrl, null);
+  const player = week.matchups[0].home.players[0];
+  assert.equal(player.seasonGames, 2);
+  assert.equal(player.last15Games, 1);
+  assert.ok(Math.abs(player.expectedMinutes! - 33.2) < 1e-9);
+});
+
 test('the plan lists the week\'s days, dated from the pro schedule and counted out from today', () => {
   const plan = planWeek(SETTINGS, null, TODAY_ANCHOR);
   assert.equal(plan.matchupPeriodId, 3);

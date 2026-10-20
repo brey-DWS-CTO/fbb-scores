@@ -75,6 +75,10 @@ export interface ScorePlayer {
   last7: number | null;
   last15: number | null;
   last30: number | null;
+  seasonGames?: number | null;
+  last15Games?: number | null;
+  /** Expected playing time, blending season and preseason minutes when available. */
+  expectedMinutes?: number | null;
   /** ESPN's own projection for a day, in league points, by scoring period id. Empty when ESPN sends none. */
   projByDay: Record<string, number>;
   /** By scoring period id. */
@@ -91,6 +95,7 @@ export interface ScoreSide {
   teamId: number;
   name: string;
   abbrev: string;
+  logoUrl?: string | null;
   record: TeamRecord;
   /** Running total for the week. */
   total: number;
@@ -633,10 +638,38 @@ interface PlayerFigures {
   last15: number | null;
   last30: number | null;
   projByDay: Record<string, number>;
+  seasonGames: number | null;
+  last15Games: number | null;
+  expectedMinutes: number | null;
 }
 
 function emptyFigures(): PlayerFigures {
-  return { seasonAvg: null, last7: null, last15: null, last30: null, projByDay: {} };
+  return { seasonAvg: null, last7: null, last15: null, last30: null, projByDay: {}, seasonGames: null, last15Games: null, expectedMinutes: null };
+}
+
+function sampleFigures(player: Dict, season: number): Pick<PlayerFigures, 'seasonGames' | 'last15Games' | 'expectedMinutes'> {
+  let seasonGames: number | null = null;
+  let last15Games: number | null = null;
+  let actualMinutes: number | null = null;
+  let projectedMinutes: number | null = null;
+  for (const raw of list(player.stats)) {
+    const row = dict(raw);
+    if (num(row.seasonId) !== null && num(row.seasonId) !== season) continue;
+    const stats = numbers(row.stats);
+    const gp = stats['42'];
+    if (!(gp > 0)) continue;
+    if (num(row.statSourceId) === 0 && num(row.statSplitTypeId) === 2) last15Games ??= gp;
+    if (num(row.statSplitTypeId) !== 0) continue;
+    const minutes = (stats['40'] ?? 0) / gp;
+    if (num(row.statSourceId) === 0) {
+      seasonGames ??= gp;
+      if (minutes > 0 && minutes <= 48) actualMinutes ??= minutes;
+    } else if (num(row.statSourceId) === 1 && minutes > 0 && minutes <= 48) projectedMinutes ??= minutes;
+  }
+  const expectedMinutes = actualMinutes !== null && projectedMinutes !== null
+    ? (actualMinutes * (seasonGames ?? 0) + projectedMinutes * 8) / ((seasonGames ?? 0) + 8)
+    : actualMinutes ?? projectedMinutes;
+  return { seasonGames, last15Games, expectedMinutes };
 }
 
 /** Fill in what this payload knows that an earlier one did not. */
@@ -646,6 +679,10 @@ function mergeFigures(into: PlayerFigures, poolEntry: Dict, season: number, item
   into.last7 ??= splitAverage(player, season, items, 1);
   into.last15 ??= splitAverage(player, season, items, 2);
   into.last30 ??= splitAverage(player, season, items, 3);
+  const samples = sampleFigures(player, season);
+  into.seasonGames ??= samples.seasonGames;
+  into.last15Games ??= samples.last15Games;
+  into.expectedMinutes ??= samples.expectedMinutes;
   for (const [key, value] of Object.entries(dayProjections(poolEntry, player, periods, items))) {
     if (!(key in into.projByDay)) into.projByDay[key] = value;
   }
@@ -660,17 +697,25 @@ interface TeamMeta {
   name: string;
   abbrev: string;
   record: TeamRecord;
+  logoUrl: string | null;
 }
 
 function readTeams(payload: unknown, into: Map<number, TeamMeta>): void {
   for (const raw of list(dict(payload).teams)) {
     const team = dict(raw);
     const id = num(team.id);
-    if (id === null || into.has(id)) continue;
+    if (id === null) continue;
+    const logo = str(team.logo);
+    const logoUrl = logo && /^https:\/\//i.test(logo) ? logo : null;
+    const existing = into.get(id);
+    if (existing) {
+      existing.logoUrl ??= logoUrl;
+      continue;
+    }
     const joined = `${str(team.location) ?? ''} ${str(team.nickname) ?? ''}`.trim();
     // ESPN hands back "Tu  Mamacita"; one space is enough.
     const name = (str(team.name) ?? (joined || `Team ${id}`)).replace(/\s+/g, ' ');
-    into.set(id, { name, abbrev: str(team.abbrev) ?? '', record: readRecord(team) });
+    into.set(id, { name, abbrev: str(team.abbrev) ?? '', record: readRecord(team), logoUrl });
   }
 }
 
@@ -820,6 +865,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
       total: draft.total ?? summed,
       pointsByDay: draft.pointsByDay,
       players: [...draft.players.values()],
+      logoUrl: meta?.logoUrl ?? null,
     };
   };
 
@@ -852,6 +898,29 @@ export interface GameLeft {
   /** 1 for a game not started, the part left for a live one, a fraction for a day nobody can read. */
   share: number;
   live: boolean;
+}
+
+/** Remaining points with a bounded update for minutes played and live efficiency. */
+export function remainingGamePoints(player: ScorePlayer, game: GameLeft, baseline: number): number {
+  const prior = Number.isFinite(baseline) ? Math.max(0, baseline) : 0;
+  if (!game.live || prior === 0 || game.share <= 0) return prior * game.share;
+  const day = player.days[String(game.scoringPeriodId)];
+  const playedMinutes = day?.stats?.min ?? 0;
+  const history = Object.entries(player.days).filter(([key, value]) => Number(key) < game.scoringPeriodId && value.played && (value.stats?.min ?? 0) > 0);
+  const minutes = player.expectedMinutes ?? (history.length > 0 ? history.reduce((sum, [, value]) => sum + (value.stats?.min ?? 0), 0) / history.length : null);
+  if (minutes === null || minutes <= 0 || minutes > 48 || playedMinutes <= 0) return prior * game.share;
+  const elapsed = 48 * (1 - game.share);
+  if (elapsed < 6) return prior * game.share;
+  // Rotation changes count gradually; a short hot/cold stretch cannot rewrite the whole game.
+  const paceMinutes = Math.min(48, Math.max(minutes * 0.65, Math.min(minutes * 1.25, playedMinutes / elapsed * 48)));
+  const confidence = Math.min(0.5, elapsed / 96);
+  const targetMinutes = minutes * (1 - confidence) + paceMinutes * confidence;
+  const rotationMinutes = targetMinutes * game.share;
+  const remainingMinutes = Math.min(48 * game.share, Math.max(minutes * game.share * 0.25, Math.min(rotationMinutes, targetMinutes - playedMinutes)));
+  const priorRate = prior / minutes;
+  const observedRate = (prior + (day?.points ?? 0)) / (minutes + playedMinutes);
+  const rate = playedMinutes < 8 ? priorRate : Math.min(priorRate * 1.35, Math.max(priorRate * 0.65, observedRate));
+  return remainingMinutes * rate;
 }
 
 /** Minutes left as a share of a 48-minute game. A live game with no clock is half done. */
@@ -1048,7 +1117,8 @@ export function gamesCapProjection(
           && (actual.played || actual.game?.status === 'live' || actual.game?.status === 'final'));
       const game = left.get(`${player.id}:${day.scoringPeriodId}`);
       if (!played && !game) continue;
-      const points = game ? expected(player, day.scoringPeriodId) : 0;
+      const baseline = game ? expected(player, day.scoringPeriodId) : 0;
+      const points = game && game.share > 0 ? remainingGamePoints(player, game, baseline) / game.share : 0;
       candidates.push({
         playerId: player.id, scoringPeriodId: day.scoringPeriodId,
         expected: Number.isFinite(points) ? Math.max(0, points) : 0,

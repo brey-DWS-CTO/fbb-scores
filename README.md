@@ -55,8 +55,20 @@ Weekly and daily point projections apply rule 6.5.1: remove excess games from
 the team's last day with games, highest projected final scores first. Completed
 games use actual points; live games use points scored plus their projected
 remainder. Those games are red and labeled OVERAGE on the affected day's lineup,
-and the matchup offers a SHOW OVERAGES button. Score cards show the point
+and the matchup offers an OVERAGES button. Matchup headers show the point
 deduction, and win odds use the same adjusted forecast.
+
+The compact score cards keep games/cap and over/under on one line, with played
+and to-go underneath. Matchup pages have a horizontally scrollable matchup strip,
+ESPN fantasy-team logos (initials when unavailable), and NBA logos beside players.
+Overage labels use only the deducted points; the longer explanation lives here.
+
+Forecasts temper recent/season averages by their supporting game counts so one
+opening-night outlier does not replace the preseason prior. Live estimates use
+expected minutes, minutes already played, the game clock, and bounded efficiency
+updates; missing minutes fall back to the clock. The odds model includes shared
+uncertainty across remaining games and retains variance proportional to time left.
+These are conservative model assumptions, not parameters fitted to historical results.
 
 The existing hourly `/api/notify/tick` cron sends games-cap warnings on Friday and
 Sunday during the 7 AM Pacific hour, including daylight saving time. Each run reads

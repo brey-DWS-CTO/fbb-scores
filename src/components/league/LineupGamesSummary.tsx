@@ -5,10 +5,9 @@ export default function LineupGamesSummary({ side, week }: { side: ScoreSide; we
   const games = lineupGames(side, week);
   const tone = games.difference === null ? '' : games.difference > 0 ? ' is-over' : games.difference < 0 ? ' is-under' : ' is-at';
   return (
-    <div className={`lineup-games${tone}`}>
-      <span>{games.estimated ? 'Est.' : 'Projected'} games <b>{games.projected}</b>{games.cap !== null && ` / ${games.cap}`}</span>
-      <strong>{gamesCapStatus(games)}</strong>
-      <small>{games.played} played + {games.remaining} remaining</small>
+    <div className={`lineup-games${tone}`} aria-label={`${games.estimated ? 'Estimated' : 'Projected'} games: ${games.projected} of ${games.cap ?? 'unknown'}. ${gamesCapStatus(games)}. ${games.played} played, ${games.remaining} to go.`}>
+      <span className="lineup-games-top"><b>{games.estimated ? '~' : ''}{games.projected}{games.cap !== null && `/${games.cap}`}</b><strong>{games.difference === 0 ? 'at cap' : gamesCapStatus(games).replace(' cap', '')}</strong></span>
+      <small>{games.played} played · {games.remaining} to go</small>
     </div>
   );
 }

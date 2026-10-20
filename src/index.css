@@ -6064,6 +6064,49 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .score-overage-jump { color: var(--neon-red); border: 1px solid var(--neon-red); font-size: 0.65rem; min-height: 44px; padding: 6px 10px; margin: 3px; white-space: normal; }
 .score-day-nav { scroll-margin-top: 12px; }
 
+/* Compact score cards, team marks and horizontal matchup navigation. */
+.fantasy-team-logo { flex: 0 0 auto; position: relative; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--cell-bg); border: 1px solid var(--panel-border); font-size: 0.6rem; font-weight: 900; color: var(--neon-teal); box-sizing: border-box; }
+.fantasy-team-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--panel-bg); }
+.score-team-heading { display: flex; align-items: center; gap: 6px; min-height: 30px; }
+.score-team-heading .score-side-name { font-size: 0.77rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.is-right .score-team-heading { flex-direction: row-reverse; }
+.score-side-scoreline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; margin-top: 4px; }
+.is-right .score-side-scoreline { justify-content: flex-end; }
+.score-side-scoreline .score-side-total { margin: 0; font-size: 1.5rem; }
+.score-side-scoreline .score-side-proj { margin: 0; font-size: 0.65rem; }
+.score-side-scoreline .score-overage-label { flex-basis: 100%; margin: 0; font-size: 0.6rem; }
+.lineup-games { border: 0; padding: 0; border-radius: 0; gap: 2px; margin-top: 5px; font-size: 0.7rem; }
+.lineup-games-top { display: flex; flex-wrap: wrap; gap: 3px 7px; align-items: baseline; }
+.lineup-games-top b, .lineup-games-top strong { white-space: nowrap; }
+.is-right .lineup-games-top { justify-content: flex-end; }
+.lineup-games small { font-size: 0.62rem; white-space: nowrap; }
+.score-card { padding: 9px 11px; }
+.score-card .score-bar-row { padding: 5px 0 0; }
+.score-games-grid { margin-top: 6px; padding-top: 6px; }
+.score-games { flex-wrap: nowrap; align-items: center; }
+.score-games > .lineup-games { flex: 1; width: auto; margin: 0; }
+.score-cap-btn { margin: 0; flex-shrink: 0; }
+.score-overage-note { padding: 0; margin-top: 7px; border: 0; }
+.score-overage-jump { min-height: 36px; padding: 4px 8px; margin: 2px; font-size: 0.61rem; }
+.score-player-team { display: inline-flex; gap: 3px; align-items: center; }
+.score-player-team .team-logo { flex-shrink: 0; object-fit: contain; }
+.score-overage-label { font-size: 0.6rem; margin-top: 3px; }
+.matchup-strip { display: flex; align-items: stretch; gap: 4px; margin-bottom: 10px; min-width: 0; }
+.matchup-strip-track { display: flex; flex: 1; min-width: 0; overflow-x: auto; gap: 6px; scroll-snap-type: x proximity; scrollbar-width: thin; padding: 2px 0 5px; }
+.matchup-strip-card { flex: 0 0 134px; border: 1px solid var(--panel-border); border-radius: 7px; padding: 6px; color: var(--text-mid); text-decoration: none; scroll-snap-align: center; background: var(--panel-bg); }
+.matchup-strip-card.is-selected { border-color: var(--neon-teal); color: var(--text-hi); }
+.matchup-strip-side { display: flex; align-items: center; gap: 4px; font-size: 0.65rem; line-height: 1.5; }
+.matchup-strip-side > span:not(.fantasy-team-logo) { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matchup-strip-side b { font-variant-numeric: tabular-nums; font-size: 0.66rem; }
+.matchup-strip-arrow { flex: 0 0 27px; font-size: 1.25rem; color: var(--text-mid); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0; }
+.matchup-strip-track { scrollbar-width: none; overscroll-behavior-x: contain; }
+.matchup-strip-track::-webkit-scrollbar { display: none; }
+.score-player-name { display: inline-flex; align-items: center; gap: 3px; flex: 0 1 auto; min-width: 0; }
+.score-player-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.score-player-name .team-logo { flex-shrink: 0; object-fit: contain; }
+@media (max-width: 639px) { .score-player-team { display: none; } }
+@media (min-width: 840px) { .score-team-heading .score-side-name { font-size: 0.9rem; } .score-card .score-side-scoreline .score-side-total { font-size: 1.6rem; } }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

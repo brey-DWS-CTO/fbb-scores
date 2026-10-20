@@ -12,6 +12,8 @@
 
 /** Standard deviation of one player-game, as a share of its expected points. */
 export const SPREAD = 0.4;
+/** Shared forecast uncertainty across a team's remaining games. */
+export const FORECAST_UNCERTAINTY = 0.1;
 
 export interface RemainingGame {
   /** Expected fantasy points for a whole game. */
@@ -69,14 +71,20 @@ export function sideMean(side: SideOdds): number {
   return total;
 }
 
-/** The variance of a side's final total: one (SPREAD × mean)² per game left. */
+/** Game variance shrinks with time left, plus uncertainty shared across future forecasts. */
 export function sideVariance(side: SideOdds): number {
   let total = 0;
+  let remainingMean = 0;
+  let independentMeansSquared = 0;
   for (const game of side.remaining) {
-    const sd = SPREAD * gameMean(game);
-    total += sd * sd;
+    const expected = Number.isFinite(game.expected) ? Math.max(0, game.expected) : 0;
+    const share = game.share === undefined ? 1 : Math.min(1, Math.max(0, game.share));
+    const mean = expected * share;
+    total += (SPREAD * expected) ** 2 * share;
+    remainingMean += mean;
+    independentMeansSquared += mean * mean;
   }
-  return total;
+  return total + FORECAST_UNCERTAINTY ** 2 * Math.max(0, remainingMean ** 2 - independentMeansSquared);
 }
 
 /**
