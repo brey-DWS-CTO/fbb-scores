@@ -573,6 +573,9 @@ test('games left: today if unfinished, known future days, and the grid for days 
 
   const bench = home.players.find((player) => player.name === 'Bench Guy') as ScorePlayer;
   assert.deepEqual(gamesLeft(bench, week), [], 'the bench does not score');
+  assert.equal(gamesLeft(bench, week, true).length, 4, 'but his line can still say what he would give');
+  assert.equal(playerWeek(bench, week, true).left, 2, 'one whole game today, one spread over the unread days');
+  assert.equal(playerWeek(bench, week).left, 0);
   assert.deepEqual(playerWeek(bench, week), { total: 0, played: 0, left: 0 });
 
   const curry = week.matchups[0].away.players.find((player) => player.name === 'Stephen Curry') as ScorePlayer;

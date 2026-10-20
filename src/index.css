@@ -5882,6 +5882,21 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 /* ─── Draft landing: the mock is a small button once the draft is done ─── */
 .start-row-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
+/* ─── Scores: teams side by side on a card, and the projection as the number until he plays ─── */
+/* A card lays its two teams out like the matchup head, a size down. */
+.score-card .score-side-total { font-size: 1.35rem; margin-top: 2px; }
+.score-card .score-side-head.is-mine .score-side-name { color: var(--neon-teal); }
+.score-side-proj.is-up b { color: var(--neon-teal); }
+/* A projected number reads in teal, so it is never mistaken for points scored. */
+.score-player-pts.is-proj { color: var(--neon-teal); }
+/* Week view: the projection above, the real points below. */
+.score-player-stack { flex: 0 0 auto; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.score-player-stack .score-player-pts { margin-left: 0; }
+.score-player-stack .score-player-pts:not(.is-proj):not(:only-child) { font-size: 0.7rem; color: var(--text-mid); }
+@media (min-width: 640px) {
+  .score-card .score-side-total { font-size: 1.6rem; }
+}
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

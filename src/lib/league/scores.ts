@@ -884,9 +884,15 @@ function startedOn(player: ScorePlayer, scoringPeriodId: number): boolean {
  * The games one player can still score in this week: today's game if it
  * has not finished, then every later day he is in the lineup and his team
  * plays. A day whose games could not be read gets the grid's leftover
- * count spread evenly as a share. An out player has none.
+ * count spread evenly as a share. An out player has none. `anySlot` counts
+ * his games whether or not he is in the lineup, which is what a bench
+ * player's line shows: what he would give if started.
  */
-export function gamesLeft(player: ScorePlayer, week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>): GameLeft[] {
+export function gamesLeft(
+  player: ScorePlayer,
+  week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>,
+  anySlot = false,
+): GameLeft[] {
   if (isOut(player) || !player.proTeam) return [];
   const today = week.currentScoringPeriodId;
   const left: GameLeft[] = [];
@@ -908,7 +914,7 @@ export function gamesLeft(player: ScorePlayer, week: Pick<ScoresWeek, 'days' | '
 
   for (const day of week.days) {
     if (day.scoringPeriodId < today) continue;
-    if (!startedOn(player, day.scoringPeriodId)) continue;
+    if (!anySlot && !startedOn(player, day.scoringPeriodId)) continue;
     if (day.games === null) {
       if (day.scoringPeriodId > today && unknownShare > 0) {
         left.push({ scoringPeriodId: day.scoringPeriodId, share: unknownShare, live: false });
@@ -932,8 +938,12 @@ export interface PlayerWeek {
   left: number;
 }
 
-/** A player's week in three numbers: points, games played, games still to come. */
-export function playerWeek(player: ScorePlayer, week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>): PlayerWeek {
+/**
+ * A player's week in three numbers: points, games played, games still to
+ * come. Points and games played count only started days. `anySlot` counts
+ * the games to come whatever his slot, for a bench player's line.
+ */
+export function playerWeek(player: ScorePlayer, week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>, anySlot = false): PlayerWeek {
   let total = 0;
   let played = 0;
   for (const day of Object.values(player.days)) {
@@ -941,7 +951,7 @@ export function playerWeek(player: ScorePlayer, week: Pick<ScoresWeek, 'days' | 
     total += day.points;
     if (day.played) played += 1;
   }
-  const left = gamesLeft(player, week).reduce((sum, game) => sum + (game.live ? 1 : game.share), 0);
+  const left = gamesLeft(player, week, anySlot).reduce((sum, game) => sum + (game.live ? 1 : game.share), 0);
   return { total: round1(total), played, left: Math.round(left) };
 }
 

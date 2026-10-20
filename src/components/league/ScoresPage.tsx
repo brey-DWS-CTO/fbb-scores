@@ -21,7 +21,7 @@ import NavIcon from './NavIcon.js';
 import { ScoresNotice, WeekPicker, WinBar } from './ScoresBits.js';
 import { numberParam, scoresQuery } from './scoresUi.js';
 
-interface RowProps {
+interface SideProps {
   side: ScoreSide;
   owner: string | undefined;
   leading: boolean;
@@ -30,23 +30,19 @@ interface RowProps {
   proj: number | null;
   /** Projected to finish ahead of the other side. */
   projAhead: boolean;
+  right?: boolean;
 }
 
-function TeamRow({ side, owner, leading, mine, proj, projAhead }: RowProps) {
+/** One team on a card: name, owner, total, projection. Home left, away right, as on the matchup page. */
+function CardSide({ side, owner, leading, mine, proj, projAhead, right }: SideProps) {
   return (
-    <div className={`score-row${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
-      <div className="score-row-who">
-        <div className="score-row-name">{side.name}</div>
-        <div className="score-row-owner">
-          {owner ?? 'Unknown owner'} · {recordText(side.record)}
-        </div>
-      </div>
-      <div className="score-row-score">
-        <div className="score-row-total">{side.total.toFixed(1)}</div>
-        {proj !== null && (
-          <div className={`score-row-proj${projAhead ? ' is-up' : ''}`}>Proj <b>{projText(proj)}</b></div>
-        )}
-      </div>
+    <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
+      <div className="score-side-name">{side.name}</div>
+      <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
+      <div className="score-side-total">{side.total.toFixed(1)}</div>
+      {proj !== null && (
+        <div className={`score-side-proj${projAhead ? ' is-up' : ''}`}>Proj <b>{projText(proj)}</b></div>
+      )}
     </div>
   );
 }
@@ -136,23 +132,26 @@ export default function ScoresPage() {
             const mine = matchup.home.teamId === myTeamId || matchup.away.teamId === myTeamId;
             return (
               <Link key={matchup.id} to={linkTo(matchup)} className={`panel score-card${mine ? ' is-mine' : ''}`}>
-                <TeamRow
-                  side={matchup.home}
-                  owner={owners.get(matchup.home.teamId)}
-                  leading={homeLeads}
-                  mine={matchup.home.teamId === myTeamId}
-                  proj={showProj ? homeProj : null}
-                  projAhead={homeProj > awayProj}
-                />
+                <div className="score-head-grid">
+                  <CardSide
+                    side={matchup.home}
+                    owner={owners.get(matchup.home.teamId)}
+                    leading={homeLeads}
+                    mine={matchup.home.teamId === myTeamId}
+                    proj={showProj ? homeProj : null}
+                    projAhead={homeProj > awayProj}
+                  />
+                  <CardSide
+                    side={matchup.away}
+                    owner={owners.get(matchup.away.teamId)}
+                    leading={awayLeads}
+                    mine={matchup.away.teamId === myTeamId}
+                    proj={showProj ? awayProj : null}
+                    projAhead={awayProj > homeProj}
+                    right
+                  />
+                </div>
                 <WinBar left={chance.home} right={chance.away} />
-                <TeamRow
-                  side={matchup.away}
-                  owner={owners.get(matchup.away.teamId)}
-                  leading={awayLeads}
-                  mine={matchup.away.teamId === myTeamId}
-                  proj={showProj ? awayProj : null}
-                  projAhead={awayProj > homeProj}
-                />
                 {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
               </Link>
             );

@@ -101,29 +101,35 @@ export function sideProjection(side: ScoreSide, week: WeekView, expected: Expect
 /**
  * One player's projected points for one day: what he has plus what his
  * game still holds. Null when he has no game left that day, so the screen
- * shows nothing rather than a zero.
+ * shows nothing rather than a zero. `anySlot` counts the game whatever his
+ * slot, so a bench player's line says what he would give.
  */
 export function playerDayProjection(
   player: ScorePlayer,
   week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>,
   expected: ExpectedPoints,
   scoringPeriodId: number,
+  anySlot = false,
 ): number | null {
-  const left = gamesLeft(player, week).find((game) => game.scoringPeriodId === scoringPeriodId);
+  const left = gamesLeft(player, week, anySlot).find((game) => game.scoringPeriodId === scoringPeriodId);
   if (!left) return null;
   const sofar = player.days[String(scoringPeriodId)]?.points ?? 0;
   return Math.round((sofar + expected(player, scoringPeriodId) * left.share) * 10) / 10;
 }
 
-/** One player's projected points for the week: started points so far plus every game left. */
+/**
+ * One player's projected points for the week: started points so far plus
+ * every game left. `anySlot` counts the games left whatever his slot.
+ */
 export function playerWeekProjection(
   player: ScorePlayer,
   week: Pick<ScoresWeek, 'days' | 'currentScoringPeriodId'>,
   expected: ExpectedPoints,
+  anySlot = false,
 ): number {
   let total = 0;
   for (const day of Object.values(player.days)) if (day.started) total += day.points;
-  for (const game of gamesLeft(player, week)) total += expected(player, game.scoringPeriodId) * game.share;
+  for (const game of gamesLeft(player, week, anySlot)) total += expected(player, game.scoringPeriodId) * game.share;
   return Math.round(total * 10) / 10;
 }
 

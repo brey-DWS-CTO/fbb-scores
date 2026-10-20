@@ -181,21 +181,31 @@ interface DayCellProps {
   expected: ExpectedPoints;
 }
 
+/**
+ * One player on one day. Until his game tips off the big number is his
+ * projection; once it starts the real points take over, with the
+ * projection kept on the game line while it is live. A bench player gets
+ * the same, so you can see what he would give.
+ */
 function DayCell({ player, week, scoringPeriodId, expected }: DayCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const day = player.days[String(scoringPeriodId)];
   const slot = slotOn(player, scoringPeriodId);
-  // Only a game still to play gets a projection; a finished one is just the points.
-  const proj = day?.started ? playerDayProjection(player, week, expected, scoringPeriodId) : null;
+  const proj = playerDayProjection(player, week, expected, scoringPeriodId, true);
+  const status = day?.game?.status;
+  const underway = day?.played === true || status === 'live' || status === 'final';
+  const showProjAsNumber = !underway && proj !== null && proj > 0;
   return (
     <div className={cardClass(day?.started === true, player)}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={slot} />
-        <span className="score-player-pts">{day ? day.points.toFixed(1) : '0.0'}</span>
+        {showProjAsNumber
+          ? <span className="score-player-pts is-proj" title="Projected">{projText(proj)}</span>
+          : <span className="score-player-pts">{day ? day.points.toFixed(1) : '0.0'}</span>}
       </div>
       <div className="score-player-game">
         {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
-        {proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
+        {status === 'live' && proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
     </div>
@@ -208,20 +218,27 @@ interface WeekCellProps {
   expected: ExpectedPoints;
 }
 
+/**
+ * One player over the week: his projected week above, his real points
+ * below, and how many games he has played and has left. A bench player's
+ * games and projection count every game his team has, as if started.
+ */
 function WeekCell({ player, week, expected }: WeekCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
-  const summary = playerWeek(player, week);
+  const summary = playerWeek(player, week, true);
   const started = Object.values(player.days).some((day) => day.started);
-  const proj = summary.left > 0 ? playerWeekProjection(player, week, expected) : null;
+  const proj = summary.left > 0 ? playerWeekProjection(player, week, expected, true) : null;
   return (
     <div className={cardClass(started, player)}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={latestSlot(player)} />
-        <span className="score-player-pts">{summary.total.toFixed(1)}</span>
+        <span className="score-player-stack">
+          {proj !== null && proj > 0 && <span className="score-player-pts is-proj" title="Projected">{projText(proj)}</span>}
+          <span className="score-player-pts">{summary.total.toFixed(1)}</span>
+        </span>
       </div>
       <div className="score-player-game">
         {summary.played} played · {summary.left} left
-        {proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
     </div>
   );

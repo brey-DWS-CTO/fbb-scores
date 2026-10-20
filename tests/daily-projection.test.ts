@@ -132,6 +132,17 @@ test('a player with no game on a day gets no projection, not a zero', () => {
   assert.equal(playerDayProjection(out, WEEK, expected, 18), null, 'out means no game to come');
 });
 
+test('a bench player projects nothing for the side, but his own line says what he would give', () => {
+  const bench = player({ id: 9, name: 'Bench Guy', proTeam: 'GSW', seasonAvg: 40, started: false });
+  const perGame = (0.3 * 40 + 0.2 * 20) / 0.5;
+  assert.equal(playerDayProjection(bench, WEEK, expected, 18), null, 'not in the lineup');
+  assert.equal(playerDayProjection(bench, WEEK, expected, 18, true), Math.round(perGame * 10) / 10, 'as if started');
+  assert.equal(playerWeekProjection(bench, WEEK, expected), 0);
+  assert.equal(playerWeekProjection(bench, WEEK, expected, true), Math.round(perGame * 2 * 10) / 10, 'today and tomorrow');
+  const home = side([bench], { '17': 0, '18': 0 });
+  assert.equal(sideProjection(home, WEEK, expected).week, 0, 'the side never counts the bench');
+});
+
 test('a live game projects points so far plus the share left; a game to come projects the whole thing', () => {
   const jokic = player({ id: 1, name: 'Nikola Jokic', proTeam: 'DEN', seasonAvg: 50, points: { '17': 56.8, '18': 30 } });
   const blended = 0.3 * 50 + 0.2 * 20;
