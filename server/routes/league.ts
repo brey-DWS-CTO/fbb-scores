@@ -114,6 +114,8 @@ import {
   saveDues,
   getDuesSettings,
   saveDuesSettings,
+  listGamesCaps,
+  saveGamesCap,
   listPolls,
   getPoll,
   insertPoll,
@@ -131,6 +133,14 @@ import {
   listMockTrades,
   saveMockTrade,
   deleteMockTrade,
+  getTestDraft,
+  listPresence,
+  touchPresence,
+  getDraftQueues,
+  setDraftQueue,
+  mutateTestDraft,
+  setTestDraft,
+  TestDraftMissingError,
   getSharedMock,
   listSharedMocks,
   listOpenSharedMocks,
@@ -139,7 +149,12 @@ import {
   SharedMockWriteError,
   type KeeperSelection,
   type LeagueDynamicState,
+  type MutateResult,
+  type StateResult,
 } from '../lib/leagueStore.js';
+import { TEST_DRAFT_HEADER, TEST_DRAFT_SESSION_HEADER, testDraftState } from '../../src/lib/league/testDraft.js';
+import { inRoom, PRESENCE_WINDOW_MS } from '../../src/lib/league/presence.js';
+import { cleanQueue, firstQueued, queueFromRankings } from '../../src/lib/league/draftQueue.js';
 import { SEED_EDITS, parseProjectionEdit, type ProjectionEdit } from '../../src/lib/league/projectionEdits.js';
 import { MEMBER_MOCK_LIMIT, parseMockResult, type MockResultRecord } from '../../src/lib/league/mockGrade.js';
 import {
@@ -211,6 +226,13 @@ import {
   type DuesAction,
   type DuesSettings,
 } from '../../src/lib/league/dues.js';
+import {
+  DEFAULT_GAMES_CAP,
+  MAX_GAMES_CAP,
+  MIN_GAMES_CAP,
+  parseGamesCap,
+  type GamesCapRow,
+} from '../../src/lib/league/gamesCap.js';
 import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
@@ -297,6 +319,13 @@ import {
   resolveCurrentDraftRankings,
 } from '../lib/draftRankingService.js';
 import { getNbaWatch } from '../lib/nbaWatchService.js';
+import { transactionsFeed } from '../lib/transactionService.js';
+import { LmAddRefused, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from '../lib/lmWeekendService.js';
+import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
+import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
+import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
+import { parseRoast } from '../../src/lib/league/draftRecap.js';
+import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -565,7 +594,82 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
   // their own route, so they stay out of the poll payload.
   delete state.achievements;
   delete state.propBets;
+  // Roasts lean on the numbers, and members draft blind until it closes.
+  if (!viewer.isCommissioner && !result.state.draft.closedAt) delete state.draftRecap;
   return { ...result, state, meta };
+}
+
+// ─── The shared test draft ───────────────────────────────────────────────────
+//
+// A device that has joined the test sends x-test-draft: 1. On the draft
+// routes below that header swaps the league for the test copy, which lives in
+// its own row and writes nothing to the audit log. Any other write carrying it
+// is refused, so a joined device can never touch the real league by mistake.
+
+const TEST_DRAFT_ROUTES = [
+  /^\/state$/,
+  /^\/draft\/pick(\/\d+)?$/,
+  /^\/draft\/clock\/(expire|call|pause|resume)$/,
+  /^\/draft\/auto(\/[^/]+)?$/,
+  /^\/test-draft\/(start|end)$/,
+  /^\/draft-room$/,
+  /^\/draft\/queue$/,
+];
+
+router.use((req, res, next) => {
+  if (req.header(TEST_DRAFT_HEADER) !== '1') {
+    next();
+    return;
+  }
+  if (TEST_DRAFT_ROUTES.some((route) => route.test(req.path))) {
+    res.locals.testDraft = true;
+    res.locals.testDraftStartedAt = req.header(TEST_DRAFT_SESSION_HEADER);
+    next();
+    return;
+  }
+  if (req.method === 'GET') {
+    next();
+    return;
+  }
+  res.status(409).json({ error: 'Leave the test draft before you change the league' });
+});
+
+const inTestDraft = (res: Response): boolean => res.locals.testDraft === true;
+
+/** The league, or the test draft for a device in the test. */
+async function draftState(res: Response): Promise<StateResult> {
+  if (!inTestDraft(res)) return getState();
+  const test = await getTestDraft();
+  if (!test) throw new HttpError(410, 'The test draft has ended');
+  return test;
+}
+
+/** Change the league, or the test draft for a device in the test. */
+async function mutateDraft(res: Response, fn: (draft: LeagueDynamicState) => void): Promise<MutateResult> {
+  if (!inTestDraft(res)) return mutateState(fn);
+  try {
+    return await mutateTestDraft((draft) => {
+      if (!res.locals.testDraftStartedAt || draft.draft.startedAt !== res.locals.testDraftStartedAt) {
+        throw new HttpError(409, 'The test draft changed. Refresh before making a pick.');
+      }
+      fn(draft);
+    });
+  } catch (error) {
+    if (error instanceof TestDraftMissingError) throw new HttpError(410, 'The test draft has ended');
+    throw error;
+  }
+}
+
+/** Test picks stay out of the league's audit log. */
+async function auditDraft(res: Response, action: string, detail: unknown): Promise<void> {
+  if (!inTestDraft(res)) await appendAudit(actor(res), action, detail);
+}
+
+/** A state reply that says whether it came from the test draft. */
+function draftReply<T extends { state: LeagueDynamicState }>(res: Response, result: T, viewer: Viewer) {
+  const body = redactState(result, viewer);
+  if (!inTestDraft(res)) return body;
+  return { ...body, meta: { ...body.meta, testDraft: { running: true, serving: true } } };
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -576,7 +680,16 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
  */
 router.get('/state', async (req, res) => {
   const viewer = await optionalViewer(req);
-  res.json(redactState(await getState(), viewer));
+  const league = await getState();
+  // Once the real draft starts there is no test draft: every joined device
+  // gets the league back and leaves. It also spares every poll a lookup.
+  const test = league.state.draft.startedAt === null ? await getTestDraft() : null;
+  if (inTestDraft(res) && test) {
+    res.json(draftReply(res, test, viewer));
+    return;
+  }
+  const body = redactState(league, viewer);
+  res.json({ ...body, meta: { ...body.meta, testDraft: { running: test !== null, serving: false } } });
 });
 
 /** GET /api/league/player-pool — active or draft-pinned pool. */
@@ -1264,6 +1377,52 @@ router.post('/commish-blind', requireAuth, requireCommissioner, async (req, res)
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
+/**
+ * GET /api/league/draft-recap/edits — the commissioner's projection edits,
+ * which the recap grades with so every member sees the same grades. Members
+ * get them once the draft closes, like the rest of the recap.
+ */
+router.get('/draft-recap/edits', requireAuth, async (_req, res) => {
+  const { state } = await getState();
+  if (res.locals.isCommissioner !== true && !state.draft.closedAt) {
+    res.status(403).json({ error: 'The recap opens when the commish closes the draft' });
+    return;
+  }
+  const season = leagueDataset.season;
+  const commissioner = OWNERS.find((owner) => isCommissionerOwner(owner));
+  const rows = commissioner ? await listProjectionEdits(season, commissioner) : [];
+  // Drafted players ESPN never projected get Hashtag's line instead.
+  const [snapshot, pool] = await Promise.all([resolveCurrentDraftRankings(state), resolveDraftPlayerPool(state)]);
+  const poolById = new Map(pool.players.map((player) => [player.espnId, player]));
+  const keys = [
+    ...Object.values(state.draft.picks).map((pick) => pick.playerKey),
+    ...Object.values(state.keepers).flat().map((keeper) => keeper.playerKey),
+  ];
+  const drafted = keys.flatMap((key) => {
+    const player = key && /^p\d+$/.test(key) ? poolById.get(Number(key.slice(1))) : undefined;
+    return player ? [{ espnId: player.espnId, fullName: player.fullName, proTeam: player.proTeam }] : [];
+  });
+  const fills = missingFromEspn(drafted, snapshot, hashtagProjections as ExpertProjections);
+  res.json({ season, edits: rows.map((row) => row.edit), fills });
+});
+
+/** POST /api/league/draft-recap/roast — the commissioner writes one team's recap roast. */
+router.post('/draft-recap/roast', requireAuth, requireCommissioner, async (req, res) => {
+  let parsed: { owner: string; text: string };
+  try {
+    parsed = parseRoast(OWNERS, req.body);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+    return;
+  }
+  const result = await mutateState((draft) => {
+    const recap = draft.draftRecap?.season === draft.season ? draft.draftRecap : { season: draft.season, roasts: {} };
+    draft.draftRecap = { season: draft.season, roasts: { ...recap.roasts, [parsed.owner]: parsed.text } };
+  });
+  await appendAudit(actor(res), 'draft.recap.roast', { owner: parsed.owner, length: parsed.text.length });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
 /** POST /api/league/keeper-visibility — reveal or hide all keeper names. */
 router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, res) => {
   const revealed = (req.body as { revealed?: unknown } | undefined)?.revealed;
@@ -1292,16 +1451,293 @@ router.post('/keeper-visibility', requireAuth, requireCommissioner, async (req, 
  * change and when a screen reports the countdown hit zero. Returns the
  * yielded pick, or null when nothing changed.
  */
-function settleClock(draft: LeagueDynamicState, dataset: LeagueDataset, now: string): number | null {
+function settleClock(
+  draft: LeagueDynamicState,
+  dataset: LeagueDataset,
+  now: string,
+  queues: Readonly<Record<string, string[]>>,
+): { overall: number; playerKey: string | null } | null {
   const clock = draft.draft.clock;
   if (!clock || draft.draft.startedAt === null || !clockExpired(clock, now)) return null;
   const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock);
   if (!onClock) return null;
+  // Time is up: the team takes the top player in its queue who is still there.
+  const owner = onClock.pick.currentOwner;
+  const available = availablePlayers(dataset, draft);
+  const key = firstQueued(queues[owner], new Set(available.map((player) => player.key)));
+  const player = key ? available.find((entry) => entry.key === key) ?? null : null;
+  if (player) {
+    draft.draft.picks[String(onClock.pick.overall)] = {
+      playerKey: player.key,
+      playerName: player.name,
+      proTeam: player.proTeam,
+      positions: player.positions,
+      isKeeper: false,
+      enteredBy: `${owner} (queue)`,
+      timestamp: now,
+      ...pickTiming(clock, now),
+    };
+    draft.draft.clock = startPickClock(now);
+    return { overall: onClock.pick.overall, playerKey: player.key };
+  }
+  // An empty queue yields the pick, rule 2.3.2.1.
   const next = yieldPick({ clock, skipped: draft.draft.skipped }, onClock.pick.overall, now);
   draft.draft.clock = next.clock;
   draft.draft.skipped = next.skipped;
-  return onClock.pick.overall;
+  return { overall: onClock.pick.overall, playerKey: null };
 }
+
+/** Every queue in the room this request is for. */
+/**
+ * Every queue in the room this request is for. An owner with nothing queued
+ * is read from their saved rankings instead, so a clock that runs out, or
+ * auto, takes their top ranked player still there. The test draft reads the
+ * same rankings: a rehearsal that ignored them would prove nothing.
+ */
+async function queuesFor(res: Response): Promise<Record<string, string[]>> {
+  const queues = await getDraftQueues(inTestDraft(res) ? 'test' : 'league');
+  // No queue, or an empty one: either way there is nothing queued.
+  const missing = OWNERS.filter((owner) => !queues[owner]?.length);
+  const lists = await Promise.all(missing.map((owner) => getDraftList(leagueDataset.season, owner)));
+  missing.forEach((owner, index) => {
+    const list = lists[index];
+    if (list) queues[owner] = queueFromRankings(list.entries);
+  });
+  return queues;
+}
+
+/** Audit what a clock running out did. */
+async function auditSettled(res: Response, settled: { overall: number; playerKey: string | null } | null, at: string): Promise<void> {
+  if (!settled) return;
+  if (settled.playerKey) await auditDraft(res, 'draft.pick_from_queue', { overallPick: settled.overall, playerKey: settled.playerKey, at });
+  else await auditDraft(res, 'draft.pick_yielded', { overallPick: settled.overall, at });
+}
+
+// ─── Auto picks from private lists ───────────────────────────────────────────
+//
+// A member saves a list of names, best first. Nobody else reads it: not another
+// member, not the commissioner, not the commissioner acting as that member.
+// When the commissioner puts a team on auto, the server makes its picks from
+// that list, and from the board's own order once the list runs dry. The test
+// draft reads the same lists, so a rehearsal shows what draft day will do.
+
+/** The signed-in member, and never the commissioner wearing their seat. */
+function listOwner(res: Response): string {
+  if (res.locals.actingBy) {
+    throw new HttpError(403, "A member's rankings are theirs alone. They stay closed while you act as them.");
+  }
+  return res.locals.owner as string;
+}
+
+/** GET /api/league/draft-list — your own private list. */
+router.get('/draft-list', requireAuth, async (_req, res) => {
+  const owner = listOwner(res);
+  const { state } = await getState();
+  res.json({ season: state.season, list: await getDraftList(state.season, owner) });
+});
+
+/** PUT /api/league/draft-list — save your list. Body: { text: string }, one name a line. */
+router.put('/draft-list', requireAuth, async (req, res) => {
+  const owner = listOwner(res);
+  const text = (req.body as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') {
+    res.status(400).json({ error: 'Send the list as text, one name a line' });
+    return;
+  }
+  if (text.length > DRAFT_LIST_MAX_CHARS) {
+    res.status(400).json({ error: 'That list is too long. Names only, one a line.' });
+    return;
+  }
+  const { state } = await getState();
+  const dataset = currentDataset(state, await resolveDraftDataset(state));
+  const list = buildDraftList(text, dataset.players, new Date().toISOString());
+  if (list.entries.length === 0) {
+    await setDraftList(state.season, owner, null);
+    res.json({ season: state.season, list: null });
+    return;
+  }
+  await setDraftList(state.season, owner, list);
+  res.json({ season: state.season, list });
+});
+
+/** DELETE /api/league/draft-list — clear your list. */
+router.delete('/draft-list', requireAuth, async (_req, res) => {
+  const owner = listOwner(res);
+  const { state } = await getState();
+  await setDraftList(state.season, owner, null);
+  res.json({ season: state.season, list: null });
+});
+
+// ─── A steward enters rankings for others ───────────────────────────────────
+//
+// One trusted member (config: rankingsSteward) may open any other member's
+// rankings and save them on their behalf, for someone who cannot be at the
+// draft and does not want to use the app. The commissioner is never a steward
+// and acting as the steward does not make one. Each save is logged with a
+// count of names, never the names.
+
+/** The signed-in steward, or a 403. */
+function stewardFor(res: Response, target: string): string {
+  const owner = listOwner(res);
+  if (!isRankingsSteward(owner)) throw new HttpError(403, 'Only a rankings steward can open another member\'s rankings');
+  if (!isKnownOwner(target)) throw new HttpError(404, `Unknown owner: ${target}`);
+  if (target === owner) throw new HttpError(400, 'Use your own rankings page for your own team');
+  return owner;
+}
+
+/** GET /api/league/draft-list/access — who the signed-in member may enter rankings for. */
+router.get('/draft-list/access', requireAuth, async (_req, res) => {
+  const owner = res.locals.owner as string;
+  const steward = !res.locals.actingBy && isRankingsSteward(owner);
+  res.json({ stewardFor: steward ? OWNERS.filter((entry) => entry !== owner) : [] });
+});
+
+/** GET /api/league/draft-list/for/:owner — another member's rankings, for a steward. */
+router.get('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  stewardFor(res, target);
+  const { state } = await getState();
+  res.json({ season: state.season, owner: target, list: await getDraftList(state.season, target) });
+});
+
+/** PUT /api/league/draft-list/for/:owner — save another member's rankings, for a steward. */
+router.put('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const steward = stewardFor(res, target);
+  const text = (req.body as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') {
+    res.status(400).json({ error: 'Send the list as text, one name a line' });
+    return;
+  }
+  if (text.length > DRAFT_LIST_MAX_CHARS) {
+    res.status(400).json({ error: 'That list is too long. Names only, one a line.' });
+    return;
+  }
+  const { state } = await getState();
+  const dataset = currentDataset(state, await resolveDraftDataset(state));
+  const list = buildDraftList(text, dataset.players, new Date().toISOString());
+  const saved = list.entries.length > 0 ? list : null;
+  await setDraftList(state.season, target, saved);
+  await appendAudit(steward, 'draft_list.saved_for', { owner: target, names: saved?.entries.length ?? 0 });
+  res.json({ season: state.season, owner: target, list: saved });
+});
+
+/** DELETE /api/league/draft-list/for/:owner — clear another member's rankings, for a steward. */
+router.delete('/draft-list/for/:owner', requireAuth, async (req, res) => {
+  const target = routeParam(req.params.owner);
+  const steward = stewardFor(res, target);
+  const { state } = await getState();
+  await setDraftList(state.season, target, null);
+  await appendAudit(steward, 'draft_list.cleared_for', { owner: target });
+  res.json({ season: state.season, owner: target, list: null });
+});
+
+/**
+ * GET /api/league/draft/auto — who is on auto, and who has a list saved
+ * (commissioner only). Names only; no list is ever read here.
+ */
+router.get('/draft/auto', requireAuth, requireCommissioner, async (_req, res) => {
+  const { state } = await draftState(res);
+  res.json({
+    autoOwners: state.draft.autoOwners ?? [],
+    listOwners: await draftListOwners(state.season),
+  });
+});
+
+/** The board moved under an auto pick; somebody else got there first. Nothing to do. */
+class AutoStale extends Error {}
+
+/**
+ * Picks for every team on auto until a team that picks for itself is on the
+ * clock, or the clock is paused. Runs after anything that can put a new team
+ * on the clock. Returns the latest state, or null when nothing was picked.
+ */
+async function runAutoPicks(res: Response, draftPoolDataset: LeagueDataset): Promise<MutateResult | null> {
+  let latest: MutateResult | null = null;
+  let rankings: DraftRankingSnapshot | null = null;
+  // Each team's live queue, which falls back to its saved rankings. A member
+  // who reorders their queue mid-draft changes what auto takes for them.
+  const queues = await queuesFor(res);
+  for (let guard = 0; guard < 200; guard += 1) {
+    const current = latest ?? await draftState(res);
+    const state = current.state;
+    if (state.draft.startedAt === null || state.draft.closedAt || isPaused(state.draft.clock)) return latest;
+    const dataset = currentDataset(state, draftPoolDataset);
+    const onClock = buildDraftBoard(dataset, state).find((cell) => cell.onClock);
+    if (!onClock || !isOnAuto(state, onClock.pick.currentOwner)) return latest;
+    const owner = onClock.pick.currentOwner;
+    const overall = onClock.pick.overall;
+    const list = { entries: (queues[owner] ?? []).map((playerKey) => ({ playerKey })) };
+    rankings ??= await resolveCurrentDraftRankings(state);
+    const available = availablePlayers(dataset, state);
+    const fallback = rankBoard(available, rankings).entries.map((entry) => entry.player);
+    const choice = nextAutoPick(list, available, fallback);
+    if (!choice) return latest;
+    const { player } = choice;
+    const timestamp = new Date().toISOString();
+    try {
+      latest = await mutateDraft(res, (draft) => {
+        const live = currentDataset(draft, draftPoolDataset);
+        const cell = buildDraftBoard(live, draft).find((entry) => entry.onClock);
+        if (!cell || cell.pick.overall !== overall || cell.pick.currentOwner !== owner) throw new AutoStale();
+        if (!isOnAuto(draft, owner) || isPaused(draft.draft.clock)) throw new AutoStale();
+        if (!availablePlayers(live, draft).some((entry) => entry.key === player.key)) throw new AutoStale();
+        draft.draft.picks[String(overall)] = {
+          playerKey: player.key,
+          playerName: player.name,
+          proTeam: player.proTeam,
+          positions: player.positions,
+          isKeeper: false,
+          enteredBy: owner,
+          auto: true,
+          timestamp,
+          ...pickTiming(draft.draft.clock, timestamp),
+        };
+        draft.draft.clock = startPickClock(timestamp, isPaused(draft.draft.clock));
+      });
+    } catch (error) {
+      if (error instanceof AutoStale) return latest;
+      throw error;
+    }
+    await auditDraft(res, 'draft.pick', {
+      overallPick: overall,
+      playerKey: player.key,
+      playerName: player.name,
+      proTeam: player.proTeam,
+      positions: player.positions,
+      isKeeper: false,
+      writeIn: false,
+      auto: true,
+    });
+  }
+  return latest;
+}
+
+/**
+ * POST /api/league/draft/auto/:owner — put a team on auto, or take it off
+ * (commissioner only). Body: { on: boolean }. Putting a team on auto while it
+ * is on the clock makes its pick at once.
+ */
+router.post('/draft/auto/:owner', requireAuth, requireCommissioner, async (req, res) => {
+  const owner = routeParam(req.params.owner);
+  if (!isKnownOwner(owner)) {
+    res.status(404).json({ error: `Unknown owner: ${owner}` });
+    return;
+  }
+  const on = (req.body as { on?: unknown } | undefined)?.on;
+  if (typeof on !== 'boolean') {
+    res.status(400).json({ error: 'on must be true or false' });
+    return;
+  }
+  const current = await draftState(res);
+  const draftPoolDataset = await resolveDraftDataset(current.state);
+  const result = await mutateDraft(res, (draft) => {
+    draft.draft.autoOwners = withAuto(draft.draft.autoOwners, owner, on);
+  });
+  await auditDraft(res, on ? 'draft.auto_on' : 'draft.auto_off', { owner });
+  const auto = on ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
 
 /**
  * POST /api/league/draft/clock/expire — a screen saw the countdown hit zero.
@@ -1309,15 +1745,18 @@ function settleClock(draft: LeagueDynamicState, dataset: LeagueDataset, now: str
  * does nothing when time is still left or the pick already moved on.
  */
 router.post('/draft/clock/expire', requireAuth, async (_req, res) => {
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
-  let yielded: number | null = null;
-  const result = await mutateState((draft) => {
-    yielded = settleClock(draft, currentDataset(draft, draftPoolDataset), now);
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
+  const result = await mutateDraft(res, (draft) => {
+    settled = settleClock(draft, currentDataset(draft, draftPoolDataset), now, queues);
   });
-  if (yielded !== null) await appendAudit(actor(res), 'draft.pick_yielded', { overallPick: yielded, at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
+  await auditSettled(res, settled, now);
+  // The clock moved on; the team now up may be on auto.
+  const auto = settled !== null ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: res.locals.isCommissioner as boolean }));
 });
 
 /**
@@ -1342,7 +1781,7 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
 
   const authedOwner = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   // A write-in is a player the locked pool does not have: name, team and position typed in.
   const writeIn = body.writeIn === true;
@@ -1363,12 +1802,14 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     player = found;
   }
   const timestamp = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) {
       throw new HttpError(409, "The draft hasn't started yet — the commissioner has to hit START DRAFT.");
     }
     const dataset = currentDataset(draft, draftPoolDataset);
-    settleClock(draft, dataset, timestamp);
+    settled = settleClock(draft, dataset, timestamp, queues);
     const board = buildDraftBoard(dataset, draft);
     const onClock = board.find((cell) => cell.onClock);
     // A yielded pick is its owner's to fill any time, rule 2.3.2.2.
@@ -1412,7 +1853,8 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
       draft.draft.clock = startPickClock(timestamp, isPaused(draft.draft.clock));
     }
   });
-  await appendAudit(actor(res), 'draft.pick', {
+  await auditSettled(res, settled, timestamp);
+  await auditDraft(res, 'draft.pick', {
     overallPick,
     playerKey: player.key,
     playerName: player.name,
@@ -1421,7 +1863,9 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     isKeeper: false,
     writeIn,
   });
-  res.json(redactState(result, { owner: authedOwner, isCommissioner }));
+  // The next team may be on auto; its pick lands before this reply goes out.
+  const auto = await runAutoPicks(res, draftPoolDataset);
+  res.json(draftReply(res, auto ?? result, { owner: authedOwner, isCommissioner }));
 });
 
 /**
@@ -1433,7 +1877,7 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
     res.status(400).json({ error: 'Invalid overallPick' });
     return;
   }
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     const was = draft.draft.picks[String(overallPick)];
     delete draft.draft.picks[String(overallPick)];
     if (was?.skipped) {
@@ -1444,8 +1888,8 @@ router.delete('/draft/pick/:overallPick', requireAuth, requireCommissioner, asyn
       draft.draft.clock = startPickClock(new Date().toISOString(), isPaused(draft.draft.clock));
     }
   });
-  await appendAudit(actor(res), 'draft.pick_cleared', { overallPick });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.pick_cleared', { overallPick });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1471,8 +1915,11 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
       draft.draft.clock = startPickClock(draft.draft.startedAt);
     }
   });
+  // The real draft closes any test draft, so no phone keeps picking in it.
+  await setTestDraft(null);
   await appendAudit(actor(res), 'draft.started', null);
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  const auto = await runAutoPicks(res, await resolveDraftDataset(result.state));
+  res.json(redactState(auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1484,14 +1931,16 @@ router.post('/draft/start', requireAuth, requireCommissioner, async (_req, res) 
 router.post('/draft/clock/call', requireAuth, async (_req, res) => {
   const caller = res.locals.owner as string;
   const isCommissioner = res.locals.isCommissioner as boolean;
-  const current = await getState();
+  const current = await draftState(res);
   const draftPoolDataset = await resolveDraftDataset(current.state);
   const now = new Date().toISOString();
   let calledOn = '';
-  const result = await mutateState((draft) => {
+  const queues = await queuesFor(res);
+  let settled: ReturnType<typeof settleClock> = null;
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null) throw new HttpError(409, 'The draft has not started');
     const dataset = currentDataset(draft, draftPoolDataset);
-    settleClock(draft, dataset, now);
+    settled = settleClock(draft, dataset, now, queues);
     const onClock = buildDraftBoard(dataset, draft).find((cell) => cell.onClock) ?? null;
     const check = canCallClock({ clock: draft.draft.clock, picks: draft.draft.picks, onClock, caller, isCommissioner, now });
     if (!check.ok) {
@@ -1509,30 +1958,33 @@ router.post('/draft/clock/call', requireAuth, async (_req, res) => {
     calledOn = onClock!.pick.currentOwner;
     draft.draft.clock = callClock(draft.draft.clock!, caller, now);
   });
-  await appendAudit(actor(res), 'draft.clock_called', { on: calledOn, at: now });
-  res.json(redactState(result, { owner: caller, isCommissioner }));
+  await auditSettled(res, settled, now);
+  await auditDraft(res, 'draft.clock_called', { on: calledOn, at: now });
+  const auto = settled !== null ? await runAutoPicks(res, draftPoolDataset) : null;
+  res.json(draftReply(res, auto ?? result, { owner: caller, isCommissioner }));
 });
 
 /** POST /api/league/draft/clock/pause — freeze the pick timer and any CLOCK (commissioner only). */
 router.post('/draft/clock/pause', requireAuth, requireCommissioner, async (_req, res) => {
   const now = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
     draft.draft.clock = pauseClock(draft.draft.clock, now);
   });
-  await appendAudit(actor(res), 'draft.clock_paused', { at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.clock_paused', { at: now });
+  res.json(draftReply(res, result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /** POST /api/league/draft/clock/resume — let the clock run again (commissioner only). */
 router.post('/draft/clock/resume', requireAuth, requireCommissioner, async (_req, res) => {
   const now = new Date().toISOString();
-  const result = await mutateState((draft) => {
+  const result = await mutateDraft(res, (draft) => {
     if (draft.draft.startedAt === null || !draft.draft.clock) throw new HttpError(409, 'The draft has not started');
     draft.draft.clock = resumeClock(draft.draft.clock, now);
   });
-  await appendAudit(actor(res), 'draft.clock_resumed', { at: now });
-  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+  await auditDraft(res, 'draft.clock_resumed', { at: now });
+  const auto = await runAutoPicks(res, await resolveDraftDataset(result.state));
+  res.json(draftReply(res, auto ?? result, { owner: res.locals.owner as string, isCommissioner: true }));
 });
 
 /**
@@ -1578,6 +2030,55 @@ router.post('/draft/reset', requireAuth, requireCommissioner, async (_req, res) 
   });
   await appendAudit(actor(res), 'draft.reset', null);
   res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/**
+ * POST /api/league/draft/queue — save the signed-in owner's queue. When a
+ * called CLOCK runs out on their pick, they take the top player still there.
+ * The test draft keeps its own queues.
+ */
+router.post('/draft/queue', requireAuth, async (req, res) => {
+  const keys = cleanQueue((req.body as { keys?: unknown } | undefined)?.keys);
+  if (!keys) {
+    res.status(400).json({ error: 'keys must be a list of player keys' });
+    return;
+  }
+  await setDraftQueue(inTestDraft(res) ? 'test' : 'league', res.locals.owner as string, keys);
+  res.json({ ok: true, keys });
+});
+
+/**
+ * POST /api/league/draft-room — the draft page checks in every few seconds
+ * and gets back who else has it open. The test draft has its own room.
+ */
+router.post('/draft-room', requireAuth, async (_req, res) => {
+  const room = inTestDraft(res) ? 'test' : 'league';
+  const now = Date.now();
+  await touchPresence(room, res.locals.owner as string, new Date(now).toISOString());
+  const rows = await listPresence(room, new Date(now - PRESENCE_WINDOW_MS).toISOString());
+  res.json({ room, owners: inRoom(rows, now, OWNERS) });
+});
+
+/**
+ * POST /api/league/test-draft/start — open the shared test draft, or start it
+ * over (commissioner only). Members join it from their draft page.
+ */
+router.post('/test-draft/start', requireAuth, requireCommissioner, async (_req, res) => {
+  const { state } = await getState();
+  if (state.draft.startedAt !== null) throw new HttpError(409, 'The real draft has started. Test drafts are closed.');
+  await setTestDraft(testDraftState(state, new Date().toISOString(), FALLBACK_PLAYER_POOL.id));
+  await appendAudit(actor(res), 'test-draft.started', null);
+  const test = await getTestDraft();
+  if (!test) throw new HttpError(500, 'The test draft did not save');
+  res.locals.testDraft = true;
+  res.json(draftReply(res, test, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
+/** POST /api/league/test-draft/end — close the test draft for everyone (commissioner only). */
+router.post('/test-draft/end', requireAuth, requireCommissioner, async (_req, res) => {
+  await setTestDraft(null);
+  await appendAudit(actor(res), 'test-draft.ended', null);
+  res.json({ ok: true });
 });
 
 /**
@@ -3942,6 +4443,77 @@ router.get('/dues', async (_req, res, next) => {
 });
 
 /**
+ * GET /api/league/transactions — this season's adds, drops, claims and
+ * trades, newest first. Anyone may read them: ESPN shows the same to the
+ * whole league. A pull from ESPN runs first when the last one is stale.
+ */
+router.get('/transactions', async (_req, res, next) => {
+  try {
+    res.json(await transactionsFeed());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Weekend LM adds ─────────────────────────────────────────────────────────
+
+/** GET /api/league/lm-adds — today's waiver hour, the early days ahead, every request. Public. */
+router.get('/lm-adds', async (_req, res, next) => {
+  try {
+    res.json(await lmWeekendView());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds { playerId } — a member asks for a Saturday or Sunday LM add. */
+router.post('/lm-adds', requireAuth, async (req, res, next) => {
+  const playerId = Number((req.body as { playerId?: unknown } | undefined)?.playerId);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    res.status(400).json({ error: 'Pick a player first.' });
+    return;
+  }
+  try {
+    res.json(await requestLmAdd(res.locals.owner as string, playerId));
+  } catch (err) {
+    if (err instanceof LmAddRefused) {
+      res.status(400).json({ error: err.message, checks: err.checks });
+      return;
+    }
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds/:id/retry — the commissioner sends it to ESPN again. */
+router.post('/lm-adds/:id/retry', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const request = await retryLmAdd(routeParam(req.params.id), actor(res));
+    if (!request) {
+      res.status(404).json({ error: 'No such request.' });
+      return;
+    }
+    res.json({ request });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/league/lm-adds/:id/deny { note } — the commissioner turns it down. */
+router.post('/lm-adds/:id/deny', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const note = String((req.body as { note?: unknown } | undefined)?.note ?? '').slice(0, 300);
+    const request = await denyLmAdd(routeParam(req.params.id), actor(res), note);
+    if (!request) {
+      res.status(404).json({ error: 'No such request.' });
+      return;
+    }
+    res.json({ request });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /api/league/dues/shame — mail every team that has not paid or said it
  * paid (commissioner only). Teams that tapped I PAID are left alone.
  */
@@ -4017,6 +4589,54 @@ router.put('/dues/settings', requireAuth, requireCommissioner, async (req, res, 
     await saveDuesSettings(row);
     await appendAudit(actor(res), 'dues.settings', { venmo, payee });
     res.json(await duesResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Weekly games cap ────────────────────────────────────────────────────────
+//
+// How many started player-games a team may count in one fantasy week. The
+// scores pages show games played against it and the win chance stops at it.
+// One number per week; a week nobody has set is the default.
+
+async function gamesCapsResponse() {
+  return {
+    season: leagueDataset.season,
+    defaultCap: DEFAULT_GAMES_CAP,
+    caps: await listGamesCaps(leagueDataset.season),
+  };
+}
+
+/** GET /api/league/games-caps — anyone may read the caps, like the standings. */
+router.get('/games-caps', async (_req, res, next) => {
+  try {
+    res.json(await gamesCapsResponse());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PUT /api/league/games-caps/:matchupPeriod — set one week's cap (commissioner only). */
+router.put('/games-caps/:matchupPeriod', requireAuth, requireCommissioner, async (req, res, next) => {
+  try {
+    const matchupPeriodId = Number(routeParam(req.params.matchupPeriod));
+    if (!Number.isInteger(matchupPeriodId) || matchupPeriodId < 1 || matchupPeriodId > 30) {
+      throw new HttpError(400, 'That is not a fantasy week');
+    }
+    const body = req.body as { cap?: unknown };
+    const cap = parseGamesCap(body.cap);
+    if (cap === null) throw new HttpError(400, `The cap is a whole number from ${MIN_GAMES_CAP} to ${MAX_GAMES_CAP}`);
+    const row: GamesCapRow = {
+      season: leagueDataset.season,
+      matchupPeriodId,
+      cap,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor(res),
+    };
+    await saveGamesCap(row);
+    await appendAudit(actor(res), 'scores.gamesCap', { matchupPeriodId, cap });
+    res.json(await gamesCapsResponse());
   } catch (err) {
     next(err);
   }

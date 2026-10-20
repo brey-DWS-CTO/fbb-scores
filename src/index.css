@@ -4741,6 +4741,179 @@ html.theme-light {
   font-size: 0.8rem;
 }
 
+/* ─── Scores: the week's matchups, and one matchup day by day ────────── */
+.scores-page { max-width: 760px; }
+.score-demo {
+  margin: 0 0 10px;
+  padding: 7px 10px;
+  border: 2px solid var(--neon-yellow);
+  border-radius: 8px;
+  background: rgba(255,230,0,0.08);
+  color: var(--neon-yellow);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.score-demo a { color: var(--neon-yellow); }
+.score-back { display: inline-flex; align-items: center; gap: 4px; color: var(--neon-teal); font-size: 0.78rem; text-decoration: none; }
+.score-week { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.score-week-select { flex: 1; min-width: 0; min-height: 40px; padding: 0 10px; font-size: 0.8rem; font-weight: 700; }
+.score-arrow {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-mid);
+}
+.score-arrow:disabled { opacity: 0.35; cursor: default; }
+.score-arrow:disabled:active { transform: none; }
+.score-arrow-next svg { transform: rotate(180deg); }
+.score-notice { border-radius: 10px; padding: 18px 14px; text-align: center; color: var(--text-mid); font-size: 0.86rem; line-height: 1.5; }
+.score-notice p { margin: 0 0 10px; }
+.score-notice p:last-child { margin: 0; }
+.score-notice a { color: var(--neon-teal); }
+.score-foot { margin: 14px 2px 0; color: var(--text-dim); font-size: 0.7rem; line-height: 1.5; }
+
+/* The scoreboard: one card per matchup, your own first. */
+.score-list { display: flex; flex-direction: column; gap: 10px; }
+.score-card { display: block; border-radius: 10px; padding: 10px 12px; text-decoration: none; color: inherit; }
+.score-card.is-mine { border-color: var(--neon-teal); }
+.score-card:active { transform: scale(0.99); }
+.score-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; color: var(--text-mid); }
+.score-row-who { flex: 1; min-width: 0; }
+.score-row-name { font-size: 0.9rem; font-weight: 800; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-row-owner { font-size: 0.7rem; color: var(--text-dim); margin-top: 1px; }
+.score-row-total { font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-body); }
+.score-row.is-leading .score-row-name, .score-row.is-leading .score-row-total { color: var(--text-max); }
+.score-row.is-mine .score-row-name { color: var(--neon-teal); }
+.score-final { margin-top: 6px; text-align: center; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--neon-orange); }
+
+/* The thin bar between the two sides, split by win chance. */
+.score-bar-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.score-pct { flex: 0 0 38px; font-size: 0.72rem; font-weight: 800; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-pct-right { text-align: right; }
+.score-pct.is-up { color: var(--neon-teal); }
+.score-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--neon-purple); overflow: hidden; }
+.score-bar-left { height: 100%; background: var(--neon-teal); transition: width 0.4s ease; }
+
+/* One matchup: the two sides over the bar, then who still has games. */
+.score-head { border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.score-head-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.score-side-head { min-width: 0; }
+.score-side-head.is-right { text-align: right; }
+.score-side-name { font-size: 0.86rem; font-weight: 800; color: var(--text-body); line-height: 1.25; overflow-wrap: anywhere; }
+.score-side-owner { font-size: 0.68rem; color: var(--text-dim); margin-top: 2px; }
+.score-side-total { font-size: 1.7rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-body); line-height: 1.2; margin-top: 4px; }
+.score-side-chance { font-size: 0.68rem; font-weight: 700; color: var(--text-mid); }
+.score-side-head.is-leading .score-side-name, .score-side-head.is-leading .score-side-total { color: var(--text-max); }
+/* Games played against the week's cap, one line a side. The commish gets a pencil. */
+.score-games-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--panel-border); }
+.score-games { min-width: 0; display: flex; align-items: baseline; gap: 6px; font-size: 0.74rem; color: var(--text-mid); }
+.score-games.is-right { justify-content: flex-end; }
+.score-games.is-over .score-games-count { color: var(--neon-orange); }
+.score-games-title { font-size: 0.6rem; color: var(--text-dim); }
+.score-games-count { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-body); }
+.score-cap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--neon-yellow);
+}
+.score-cap-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--panel-border); }
+.score-cap-label { flex: 1 0 100%; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mid); }
+.score-cap-input { width: 80px; min-height: 34px; padding: 0 10px; font-size: 0.9rem; font-weight: 800; }
+.score-cap-error { flex: 1 0 100%; font-size: 0.7rem; color: var(--neon-red); }
+
+/* The day bar: an arrow, the day (tap it to pick any day or the week), an arrow. */
+.score-day-nav { margin: 0 0 8px; }
+.score-day-nav .score-week-select { text-align: center; }
+
+/* Two columns of players, one side each, rows lined up like Sleeper. */
+.score-grid-head { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 4px 4px; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.score-grid-head .is-right { text-align: right; }
+.score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+.score-player { min-width: 0; padding: 7px 8px; border: 1px solid var(--cell-border); border-radius: 8px; background: var(--cell-bg); color: var(--text-mid); }
+.score-player.is-empty { border-style: dashed; opacity: 0.35; }
+.score-player.is-bench { opacity: 0.55; }
+.score-player.is-out { opacity: 0.65; }
+/* One line: the slot, the name, position and team, any injury badge, then points. */
+.score-player-top { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.score-slot {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 1px 3px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.score-player.is-bench .score-slot { border-style: dashed; }
+/* Name and team share one box that gives way before the points do. Inside it
+   the team code shrinks first, to nothing if it must; the name never shrinks,
+   and only a very long one gets cut at the box's edge. */
+.score-player-who { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 4px; overflow: hidden; }
+.score-player-name { flex: 0 0 auto; font-size: 0.78rem; font-weight: 800; color: var(--text-body); white-space: nowrap; }
+.score-player-team { flex: 0 1 auto; min-width: 0; font-size: 0.6rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; }
+@media (max-width: 639px) {
+  .score-player-top { gap: 3px; }
+  .score-slot { min-width: 18px; padding: 1px 2px; font-size: 0.5rem; }
+  .score-player-name { font-size: 0.74rem; }
+  .score-player-team { font-size: 0.56rem; }
+  .score-player-pts { font-size: 0.8rem; }
+}
+.score-badge {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 0.56rem;
+  font-weight: 800;
+  line-height: 1.5;
+  color: #fff;
+}
+.score-badge.is-out { background: var(--neon-red); }
+.score-badge.is-doubt { background: var(--neon-yellow); color: #1a1400; }
+.score-player-pts { flex: 0 0 auto; margin-left: auto; font-size: 0.86rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-max); }
+.score-player-game { font-size: 0.64rem; color: var(--text-soft); margin-top: 3px; }
+.score-player-line { font-size: 0.64rem; color: var(--text-mid); margin-top: 2px; line-height: 1.35; }
+@media (min-width: 640px) {
+  .score-row-name { font-size: 1rem; }
+  .score-side-name { font-size: 1rem; }
+  .score-side-total { font-size: 2rem; }
+  .score-player-name { font-size: 0.84rem; }
+  .score-player-team { font-size: 0.68rem; }
+  .score-player-game, .score-player-line { font-size: 0.7rem; }
+}
+
+/* ─── Daily projections on the scores pages ──────────────────────────── */
+/* On a card: "Proj 1,240 – 1,195" under the two totals. The side ahead glows. */
+.score-proj { display: flex; justify-content: center; align-items: baseline; gap: 6px; margin-top: 2px; font-size: 0.7rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-proj-title { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.score-proj b { font-weight: 800; color: var(--text-mid); }
+.score-proj b.is-up { color: var(--neon-teal); }
+.score-proj-dash { color: var(--text-dim); }
+/* In the matchup head, under the chance. */
+.score-side-proj { margin-top: 2px; font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-side-proj b { font-weight: 800; color: var(--text-mid); }
+/* The day's points so far and where the day should end, one line a side, over the lineups. */
+.score-proj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 4px 6px; font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-proj-grid .is-right { text-align: right; }
+.score-proj-grid b { font-weight: 800; color: var(--text-mid); }
+/* On a player line, after his game. */
+.score-player-proj { color: var(--neon-teal); font-weight: 700; white-space: nowrap; }
+.score-player.is-bench .score-player-proj { color: var(--text-dim); }
 /* ─── Finished mock: tap a team in the standings to see its roster ─── */
 .mock-grade-team { text-decoration: underline dotted; text-underline-offset: 3px; }
 .mock-grade-table tr.is-tappable:hover td { background: color-mix(in srgb, var(--neon-teal) 8%, transparent); }
@@ -5173,6 +5346,209 @@ html.theme-light {
 /* ─── Mock draft: on your pick, where your next one is ─── */
 .room-turn.is-mine .room-turn-next { color: var(--text-mid); font-weight: 700; letter-spacing: 0; white-space: nowrap; }
 
+/* ─── Live draft: the shared test draft and the player list ─── */
+.test-draft-strip {
+  display: block;
+  padding: 6px 10px;
+  border-bottom: 2px solid var(--neon-yellow);
+  background: rgba(255,230,0,0.12);
+  color: var(--neon-yellow);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-decoration: none;
+}
+.test-draft-panel { margin-bottom: 12px; padding: 12px 14px; border: 2px dashed var(--neon-yellow); border-radius: 10px; color: var(--neon-yellow); }
+.test-draft-panel .hub-heading { font-size: 0.68rem; }
+.test-draft-panel p { margin: 6px 0 0; color: var(--text-body); font-size: 0.78rem; line-height: 1.45; }
+.test-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.test-draft-actions button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.test-draft-actions button.is-go { border-color: var(--neon-yellow); background: rgba(255,230,0,0.1); color: var(--neon-yellow); }
+.test-draft-actions button.is-danger { border-color: var(--neon-red); color: var(--neon-red); }
+.test-draft-error, .live-room-error { margin-top: 8px; color: var(--neon-red); font-size: 0.76rem; font-weight: 700; }
+.live-room { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; }
+.live-room.is-my-turn { border: 2px solid var(--neon-teal); }
+.live-room-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.live-room-head .hub-heading { color: var(--text-mid); font-size: 0.62rem; }
+.live-room-status { color: var(--text-dim); font-size: 0.72rem; font-weight: 800; text-align: right; }
+.live-room-status.is-on { color: var(--neon-teal); }
+.live-room .room-table td.room-player-col small { display: block; }
+@media (max-width: 839px) {
+  .live-room { padding: 8px; }
+  .live-room .room-filters { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; }
+  .live-room .room-filters .room-search { grid-column: 1 / -1; }
+  .live-room .room-filters .proj-check { grid-column: 1 / -1; }
+  .live-room .room-sort-quick { display: inline-flex; gap: 4px; justify-content: flex-end; }
+  .live-room .room-sort-quick button { min-height: 32px; padding: 0 7px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.58rem; font-weight: 800; }
+  .live-room .room-sort-quick button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+  .live-room .room-table-wrap { max-height: 60vh; }
+  /* DRAFT, GONE and the name stay put while the stats slide under them. */
+  .live-room .room-table .live-room-draft { position: sticky; left: 0; z-index: 3; width: 58px; min-width: 58px; padding: 4px; }
+  .live-room .room-table .live-room-draft .mock-mini-btn { min-height: 34px; padding: 0 6px; font-size: 0.6rem; }
+  .live-room .room-table .live-room-gone { position: sticky; left: 58px; z-index: 3; width: 44px; min-width: 44px; padding: 4px; }
+  .live-room .room-table th.live-room-gone button { padding: 8px 4px; }
+  .live-room .room-table .room-star { position: sticky; left: 0; z-index: 2; }
+  .live-room.is-my-turn .room-table .room-star { left: 58px; }
+  .live-room.is-my-turn .room-table:has(.live-room-gone) .room-star { left: 102px; }
+  .live-room .room-table .room-player-col { position: sticky; left: 30px; z-index: 2; max-width: 150px; min-width: 120px; overflow: hidden; text-overflow: ellipsis; box-shadow: 2px 0 0 var(--panel-border); }
+  .live-room.is-my-turn .room-table .room-player-col { left: 88px; }
+  .live-room.is-my-turn .room-table:has(.live-room-gone) .room-player-col { left: 132px; }
+  .live-room .room-table th.live-room-draft, .live-room .room-table th.live-room-gone, .live-room .room-table th.room-star, .live-room .room-table th.room-player-col { z-index: 5; }
+}
+
+/* ─── Live draft: who is in the room ─── */
+.draft-room-panel { margin-bottom: 12px; padding: 8px 12px; border-radius: 10px; }
+.draft-room-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.draft-room-line .hub-heading { margin-right: 4px; color: var(--text-mid); font-size: 0.6rem; }
+.draft-room-chip {
+  padding: 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--neon-teal) 45%, var(--panel-border));
+  border-radius: 999px;
+  background: rgba(0,255,204,0.06);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.draft-room-chip.is-me { border-color: var(--neon-teal); color: var(--neon-teal); }
+.live-room-writein { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--neon-teal); font-size: 0.74rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
+/* ─── Live draft: the room on a phone, the card, the queue, sound ─── */
+/* The room's own bar: a solid strip along the bottom of the screen, the
+   same on a laptop as on a phone. On a laptop it starts where the sidebar
+   ends, and the page leaves room under the last row for it. */
+.live-phone-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 2px solid var(--panel-border);
+  background: var(--dark-bg);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.live-phone-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 0; border-top: 2px solid transparent; margin-top: -2px; background: transparent; color: var(--text-mid); cursor: pointer; }
+.live-phone-tabs button .hub-heading { font-size: 0.66rem; }
+.live-phone-tabs button.is-on { color: var(--neon-teal); border-top-color: var(--neon-teal); }
+@media (min-width: 840px) {
+  .live-phone-tabs { left: 216px; }
+  html.nav-collapsed .live-phone-tabs { left: 64px; }
+  html.in-live-room .app-shell-nav { padding-bottom: 60px; }
+}
+/* The pick that just landed, one line, as in the mock room. */
+.live-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text-body);
+  animation: room-latest-in 0.35s ease-out;
+}
+.live-latest .live-latest-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .live-latest { animation: none; } }
+.live-phone-tabs button.is-exit { color: var(--text-dim); }
+html.in-live-room .live-tab:not(.is-shown) { display: none; }
+.live-room-writein { display: block; }
+.live-room-more { display: block; margin-top: 10px; min-height: 40px; padding: 0 14px; border: 1px solid var(--panel-border); border-radius: 8px; background: transparent; color: var(--text-soft); font-size: 0.72rem; font-weight: 800; }
+.live-room-side { display: none; }
+.live-room-side .hub-heading { margin-bottom: 8px; color: var(--text-mid); font-size: 0.62rem; }
+@media (min-width: 840px) {
+  /* Members have no stat columns, so their queue takes the right side. */
+  .live-room:not(.has-stats) .live-room-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 38%); gap: 14px; align-items: start; }
+  .live-room:not(.has-stats) .live-room-side { display: block; position: sticky; top: 12px; margin: 0; }
+  .live-room:not(.has-stats) .live-room-queue-btn,
+  .live-room:not(.has-stats) .live-room-queue-fold { display: none; }
+}
+.live-sound-btn {
+  padding: 6px 10px;
+  border: 2px solid var(--panel-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.live-sound-btn.is-on { border-color: var(--neon-teal); color: var(--neon-teal); }
+.live-card { margin-bottom: 10px; padding: 10px 12px; border: 2px solid var(--neon-teal); border-radius: 10px; }
+.live-room-queue { margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--panel-border); border-radius: 10px; }
+.live-room-queue .room-queue-list li { display: flex; align-items: center; gap: 6px; }
+.live-room-queue .room-queue-name { flex: 1; min-width: 0; overflow: hidden; border: 0; background: none; color: var(--text-hi); font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.live-room-queue-btn.is-on { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.live-room .room-sort-quick.is-always { display: inline-flex; gap: 4px; }
+.live-room .room-sort-quick.is-always button { min-height: 32px; padding: 0 9px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--input-bg); color: var(--text-dim); font-size: 0.6rem; font-weight: 800; }
+.live-room .room-sort-quick.is-always button.is-on { border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.1); }
+.live-room-sub { display: block; }
+.live-empty { margin-bottom: 12px; padding: 14px; border-radius: 10px; color: var(--text-dim); text-align: center; font-size: 0.8rem; }
+@media (max-width: 839px) {
+  /* The app steps aside while the draft runs, as in the mock room. */
+  html.in-live-room .bottom-nav,
+  html.in-live-room .section-tabs { display: none; }
+  html.in-live-room .app-shell-nav { padding-bottom: 68px; }
+  .live-phone-tabs {
+    position: fixed;
+    margin: 0;
+    border-width: 2px 0 0;
+    border-radius: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 2px solid var(--panel-border);
+    background: var(--nav-bg);
+    backdrop-filter: blur(8px);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .live-phone-tabs button {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: 8px 0 10px;
+    border: 0;
+    border-top: 2px solid transparent;
+    margin-top: -2px;
+    background: transparent;
+    color: var(--text-mid);
+    font-size: 0.62rem;
+  }
+  .live-phone-tabs button .hub-heading { font-size: 0.62rem; }
+  .live-phone-tabs button.is-on { color: var(--neon-teal); border-top-color: var(--neon-teal); }
+  .live-phone-tabs button.is-exit { color: var(--text-dim); }
+  /* Names shorten once the list slides sideways, so the stats fit. */
+  .live-room .room-table-wrap.is-scrolled .room-name-full { display: none; }
+  .live-room .room-table-wrap.is-scrolled .room-name-short { display: inline; }
+  .live-room .room-table-wrap.is-scrolled .room-table .room-player-col { min-width: 0; max-width: 104px; }
+  .live-room .room-table-wrap.is-scrolled .live-room-sub,
+  .live-room .room-table-wrap.is-scrolled .room-taken { display: none; }
+  .live-room .room-table .room-star { width: 30px; min-width: 30px; padding: 0; }
+  .live-card { padding: 8px 10px; }
+  .live-card .room-card-name { font-size: 1.05rem; }
+}
+.stats-gate { padding: 18px; border: 2px solid var(--neon-yellow); border-radius: 12px; color: var(--neon-yellow); text-align: center; }
+.stats-gate .hub-heading { font-size: 0.72rem; }
+.stats-gate p { margin: 8px 0 14px; color: var(--text-body); font-size: 0.85rem; }
+.stats-gate-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: var(--neon-teal); color: #001a14; font-weight: 800; text-decoration: none; }
+.draft-room-notes { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; color: var(--text-dim); font-size: 0.7rem; font-weight: 700; }
+
 /* ─── Mock draft with a friend: the invite panel, and a friend's clock ─── */
 .mock-friend { display: grid; gap: 10px; margin-bottom: 12px; }
 .mock-friend-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 0.82rem; }
@@ -5182,6 +5558,8 @@ html.theme-light {
 .mock-friend-form .mock-select { min-width: 160px; }
 .mock-friend-wait { display: grid; gap: 10px; }
 .mock-friend-wait > .hub-heading small { margin-left: 10px; color: var(--text-dim); font-weight: 700; }
+/* The draft is over: a plain way to the next one, beside the board link. */
+.room-done-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
 .mock-friend-wait .mock-friend-actions { margin-left: 0; }
 a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .room-clock.is-them { border-color: var(--neon-yellow); }
@@ -5211,6 +5589,312 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   .proj-table th button { padding: 9px 5px; }
   .proj-table button.proj-pencil { margin-left: 4px; padding: 0 4px; font-size: 0.72rem; }
   .proj-export-word { display: none; }
+}
+
+/* ─── My list: a private list of names, and the commish's auto switches ─── */
+.start-btn-list { min-height: 96px; border-color: var(--neon-yellow); color: var(--neon-yellow); background: color-mix(in srgb, var(--neon-yellow) 6%, var(--panel-bg)); }
+.start-btn-list .start-btn-sub { color: var(--text-soft); }
+.my-list-page .panel { margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; }
+.my-list-how p { margin: 0; color: var(--text-body); font-size: 0.82rem; line-height: 1.5; }
+.my-list-how p + p { margin-top: 8px; }
+.my-list-dim { color: var(--text-dim) !important; font-size: 0.74rem !important; }
+.my-list-form .rule-edit-label { display: block; }
+/* 16px text keeps phones from zooming in on tap. */
+.my-list-text { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 240px; font-size: 16px; line-height: 1.6; }
+.my-list-count { margin-top: 8px; color: var(--text-dim); font-size: 0.72rem; font-weight: 700; }
+.my-list-actions { display: flex; gap: 8px; margin-top: 10px; }
+.my-list-save { min-height: 52px; font-size: 0.85rem; border-color: var(--neon-teal); color: var(--neon-teal); background: rgba(0,255,204,0.08); }
+.my-list-save:disabled { border-color: var(--panel-border); color: var(--text-dim); background: transparent; }
+.my-list-clear { flex: 0 0 auto; min-height: 52px; padding: 0 16px; }
+.my-list-clear.is-armed { border-color: var(--neon-red); color: var(--neon-red); background: rgba(255,34,34,0.1); }
+.my-list-missing { border-color: var(--neon-yellow); }
+.my-list-missing .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
+.my-list-missing p { margin: 6px 0 0; color: var(--text-body); font-size: 0.76rem; line-height: 1.45; }
+.my-list-missing ul { margin: 8px 0 0; padding-left: 18px; color: var(--text-hi); font-size: 0.82rem; line-height: 1.6; }
+.my-list-saved .hub-heading { font-size: 0.62rem; color: var(--text-mid); }
+.my-list-saved ol { list-style: none; margin: 8px 0 0; padding: 0; }
+.my-list-saved li { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--panel-border); font-size: 0.86rem; color: var(--text-hi); }
+.my-list-saved li:last-child { border-bottom: 0; }
+.my-list-saved li small { color: var(--text-dim); font-size: 0.66rem; }
+.my-list-saved li.is-missing .my-list-name { color: var(--text-dim); text-decoration: line-through; }
+.my-list-rank { min-width: 2em; color: var(--text-mid); font-weight: 800; font-size: 0.74rem; text-align: right; }
+.my-list-name { font-weight: 700; }
+.my-list-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.my-list-upload span { color: var(--text-dim); font-size: 0.7rem; line-height: 1.4; }
+.my-list-upload-btn { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border-color: var(--neon-purple); color: var(--neon-purple); background: color-mix(in srgb, var(--neon-purple) 8%, transparent); }
+.my-list-form .rule-edit-label { position: relative; }
+.my-list-form.is-dragging { border-color: var(--neon-teal); box-shadow: 0 0 0 2px rgba(0,255,204,0.25); }
+.my-list-form.is-dragging .my-list-text { border-style: dashed; border-color: var(--neon-teal); }
+.my-list-drop {
+  position: absolute;
+  inset: 24px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0,255,204,0.08);
+  color: var(--neon-teal);
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+}
+.my-list-closed { border-color: var(--neon-yellow); }
+.my-list-closed .hub-heading { font-size: 0.62rem; color: var(--neon-yellow); }
+.my-list-closed p { margin: 6px 0 0; color: var(--text-body); font-size: 0.82rem; line-height: 1.5; }
+.live-room-load-rankings { margin-bottom: 8px; border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.my-list-steward { border-color: var(--neon-purple); }
+.my-list-steward.is-for { background: color-mix(in srgb, var(--neon-purple) 8%, var(--panel-bg)); }
+.my-list-steward .rule-edit-label { display: block; }
+.my-list-steward .hub-input { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 48px; font-size: 16px; padding: 0 12px; }
+.my-list-steward p { margin: 8px 0 0; color: var(--text-body); font-size: 0.8rem; line-height: 1.5; }
+.my-list-steward.is-for p { color: var(--neon-purple); font-weight: 700; }
+.my-list-left { border-color: var(--neon-teal); color: var(--text-body); font-size: 0.82rem; font-weight: 700; }
+.my-list-left.is-out { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.auto-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--neon-yellow);
+  border-radius: 4px;
+  color: var(--neon-yellow);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+/* ─── Scores card: each team's projection sits under its own total ─────── */
+.score-row-score { flex: 0 0 auto; text-align: right; }
+.score-row-proj { margin-top: -2px; font-size: 0.66rem; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.score-row-proj b { font-weight: 800; color: var(--text-mid); }
+.score-row-proj.is-up b { color: var(--neon-teal); }
+/* ─── Draft recap ────────────────────────────────────────────────────── */
+.recap-page { max-width: 1180px; display: grid; gap: 22px; }
+.recap-title { font-size: 0.85rem; color: var(--neon-teal); margin: 0; line-height: 1.6; }
+.recap-section { display: grid; gap: 12px; min-width: 0; }
+.recap-h2 { font-size: 0.72rem; color: var(--neon-yellow); margin: 0; letter-spacing: 0.08em; }
+.recap-empty { padding: 18px; color: var(--text-mid); text-align: center; border-radius: 10px; }
+.recap-foot { color: var(--text-dim); font-size: 0.75rem; line-height: 1.5; margin: 0; max-width: 70ch; }
+.recap-pick-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; color: var(--text-dim); margin: 0; }
+
+.recap-strip { border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; }
+.recap-strip-row { display: grid; grid-template-columns: 34px minmax(70px, 120px) 1fr 64px; align-items: center; gap: 10px; font-size: 0.8rem; }
+.recap-strip-grade { font-weight: 900; font-size: 1.05rem; color: var(--neon-teal); }
+.recap-strip-owner { color: var(--text-hi); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recap-strip-pts { color: var(--text-body); text-align: right; font-variant-numeric: tabular-nums; }
+.recap-track { position: relative; height: 14px; }
+.recap-range { position: absolute; top: 4px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--neon-teal) 28%, transparent); }
+.recap-dot { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--neon-teal); border: 2px solid var(--panel-bg); }
+.recap-strip-axis { display: flex; justify-content: space-between; gap: 8px; font-size: 0.65rem; color: var(--text-dim); padding-left: 124px; padding-right: 74px; }
+
+.recap-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.recap-card { border-radius: 10px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.recap-card-head { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
+.recap-owner { margin: 0; font-size: 1.15rem; font-weight: 900; color: var(--text-max); letter-spacing: 0.02em; }
+.recap-teamname { color: var(--text-mid); font-size: 0.75rem; font-style: italic; }
+.recap-grade { font-size: 2.4rem; font-weight: 900; line-height: 0.9; color: var(--neon-teal); min-width: 58px; text-align: right; }
+.recap-roast { margin: 0; color: var(--text-body); font-size: 0.85rem; line-height: 1.55; }
+.recap-roast-btn {
+  margin-left: 8px; border: 1px solid var(--panel-border); background: transparent; color: var(--neon-teal);
+  border-radius: 6px; font-size: 0.6rem; font-weight: 800; padding: 2px 6px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px; vertical-align: middle;
+}
+.recap-roast-edit { display: grid; gap: 6px; }
+.recap-roast-edit textarea { width: 100%; font-size: 0.85rem; line-height: 1.5; resize: vertical; box-sizing: border-box; }
+.recap-roast-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.recap-count { color: var(--text-dim); font-size: 0.7rem; margin-left: auto; }
+.recap-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.recap-pick { border-radius: 8px; padding: 8px 10px; font-size: 0.75rem; line-height: 1.35; display: grid; gap: 2px; color: var(--text-soft); }
+.recap-pick strong { color: var(--text-max); font-size: 0.85rem; }
+.recap-pick-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+.recap-pick-nums span { display: grid; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+.recap-pick-nums b { font-size: 1.05rem; color: var(--text-max); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.recap-pick-best { background: color-mix(in srgb, var(--neon-teal) 10%, var(--panel-bg)); }
+.recap-pick-best .recap-pick-label { color: var(--neon-teal); }
+.recap-pick-worst { background: color-mix(in srgb, var(--neon-red) 10%, var(--panel-bg)); }
+.recap-pick-worst .recap-pick-label { color: var(--neon-red); }
+.recap-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.recap-chip { font-size: 0.65rem; font-weight: 700; color: var(--text-mid); border: 1px solid var(--panel-border); border-radius: 999px; padding: 2px 8px; }
+.recap-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border-top: 1px solid var(--panel-border); padding-top: 8px; font-size: 0.65rem; color: var(--text-dim); }
+.recap-mini b { display: block; color: var(--text-hi); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+
+.recap-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 1100px) { .recap-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.recap-kpi {
+  --kpi: var(--neon-teal);
+  border-radius: 12px; padding: 14px 16px 14px 18px; display: grid; gap: 4px; align-content: start;
+  border-color: color-mix(in srgb, var(--kpi) 45%, var(--panel-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--kpi) 14%, var(--panel-bg)), var(--panel-bg) 70%);
+  box-shadow: inset 4px 0 0 var(--kpi);
+}
+.recap-kpi-red { --kpi: var(--neon-red); }
+.recap-kpi-yellow { --kpi: var(--neon-yellow); }
+.recap-kpi-blue { --kpi: var(--neon-blue); }
+.recap-kpi-purple { --kpi: var(--neon-purple); }
+.recap-kpi { position: relative; padding-right: 52px; }
+.recap-kpi-icon {
+  position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--kpi); background: color-mix(in srgb, var(--kpi) 16%, transparent);
+}
+.recap-kpi-label { font-size: 0.66rem; font-weight: 900; letter-spacing: 0.1em; color: var(--kpi); }
+.recap-kpi-big { font-size: 1.5rem; font-weight: 900; line-height: 1.1; color: var(--text-max); overflow-wrap: anywhere; }
+.recap-kpi-who { font-size: 0.8rem; color: var(--text-soft); }
+.recap-kpi-stat {
+  justify-self: start; margin-top: 4px; font-size: 0.85rem; font-weight: 800; color: var(--text-max);
+  background: color-mix(in srgb, var(--kpi) 18%, transparent); border-radius: 6px; padding: 3px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.recap-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.recap-chart { border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.recap-chart-note { margin: 0; font-size: 0.75rem; color: var(--text-mid); }
+.recap-bars { display: grid; gap: 5px; }
+.recap-bar-row { display: grid; grid-template-columns: 44px 1fr 28px; align-items: center; gap: 8px; font-size: 0.78rem; }
+.recap-bar-label { color: var(--text-hi); font-weight: 800; }
+.recap-bar-track { height: 14px; background: var(--cell-bg); border-radius: 4px; overflow: hidden; }
+.recap-bar { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.recap-bar-teal { background: var(--neon-teal); }
+.recap-bar-blue { background: var(--neon-blue); }
+.recap-bar-value { text-align: right; color: var(--text-body); font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) {
+  .recap-chart > .recap-bars:only-of-type { grid-template-columns: 1fr 1fr; column-gap: 28px; }
+}
+.recap-mix-wrap { overflow-x: auto; }
+.recap-mix { border-collapse: separate; border-spacing: 3px; width: 100%; min-width: 320px; font-variant-numeric: tabular-nums; }
+.recap-mix th { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.06em; color: var(--text-dim); text-align: center; padding: 4px; }
+.recap-mix tbody th { text-align: left; color: var(--text-hi); font-size: 0.8rem; letter-spacing: 0; }
+.recap-mix td { text-align: center; font-weight: 800; color: var(--text-max); border-radius: 4px; padding: 6px 4px; font-size: 0.85rem; }
+.recap-mix-avg th, .recap-mix-avg td { color: var(--text-mid); font-weight: 700; background: transparent !important; }
+.recap-jumps { display: flex; flex-wrap: wrap; gap: 6px; }
+.recap-jumps a {
+  font-size: 0.65rem; font-weight: 900; letter-spacing: 0.08em; color: var(--neon-teal); text-decoration: none;
+  border: 1px solid var(--panel-border); border-radius: 999px; padding: 6px 12px; min-height: 32px; display: inline-flex; align-items: center;
+}
+.recap-h2 { scroll-margin-top: 72px; }
+.recap-totals { border-radius: 10px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 26px; }
+.recap-totals div { display: grid; }
+.recap-totals b { font-size: 1.15rem; font-weight: 900; color: var(--text-max); font-variant-numeric: tabular-nums; }
+.recap-totals span { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text-dim); text-transform: uppercase; }
+
+.recap-awards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0 16px; border-top: 2px solid var(--panel-border); }
+.recap-award { display: grid; gap: 3px; padding: 10px 0 12px; border-bottom: 1px solid var(--panel-border); font-size: 0.8rem; color: var(--text-body); }
+.recap-award b { font-size: 1.05rem; color: var(--text-max); }
+.recap-award .recap-pick-label { color: var(--neon-teal); }
+
+.recap-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.recap-list { border-radius: 10px; padding: 12px 14px; }
+.recap-list ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.recap-list li { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 0.8rem; color: var(--text-body); align-items: baseline; }
+.recap-list strong { color: var(--text-max); }
+.recap-list-gap { font-weight: 800; text-align: right; font-size: 0.75rem; white-space: nowrap; }
+
+.recap-board-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.recap-legend { font-size: 0.75rem; color: var(--text-mid); }
+.recap-board-wrap { border-radius: 10px; overflow-x: auto; padding: 8px; }
+.recap-board { display: grid; gap: 3px; min-width: 980px; }
+.recap-board-head {
+  border: 0; background: transparent; color: var(--text-hi); font-weight: 900; font-size: 0.75rem; letter-spacing: 0.04em;
+  padding: 4px 2px 6px; border-bottom: 2px solid var(--panel-border); cursor: pointer; text-transform: uppercase;
+}
+.recap-board-head[aria-pressed='true'] { color: var(--neon-teal); border-bottom-color: var(--neon-teal); }
+.recap-board-round { display: grid; place-items: center; color: var(--text-dim); font-weight: 900; font-size: 0.8rem; }
+.recap-board-cell {
+  position: relative; border: 1px solid var(--cell-border); border-radius: 4px; padding: 5px 6px 4px; min-height: 58px;
+  text-align: left; color: var(--text-hi); cursor: pointer; display: grid; align-content: space-between; gap: 2px;
+  transition: opacity 0.15s;
+}
+.recap-board-cell.is-empty { background: var(--cell-bg); cursor: default; }
+.recap-board.is-focus .recap-board-cell:not(.is-on) { opacity: 0.2; }
+.recap-board-cell.is-picked { outline: 2px solid var(--neon-yellow); outline-offset: 1px; }
+.recap-board-name { font-weight: 800; font-size: 0.72rem; line-height: 1.15; }
+.recap-board-via { font-size: 0.6rem; font-weight: 800; color: var(--neon-orange); }
+.recap-board-meta { display: flex; justify-content: space-between; gap: 4px; font-size: 0.6rem; color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.recap-board-tag { position: absolute; top: 3px; right: 5px; font-size: 0.55rem; font-weight: 900; color: var(--text-mid); }
+.recap-detail { border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; color: var(--text-body); min-height: 48px; }
+.recap-detail strong { color: var(--text-max); }
+.recap-detail-row { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px; font-size: 0.78rem; color: var(--text-mid); }
+
+.recap-table .recap-col-check { width: 32px; text-align: center; padding: 6px; }
+.recap-table td.proj-col-owner, .recap-table td.proj-col-name, .recap-table td.proj-col-verdict,
+.recap-table td.proj-col-positions, .recap-table td.proj-col-proTeam { text-align: left; }
+.recap-table th.proj-col-owner button, .recap-table th.proj-col-name button, .recap-table th.proj-col-verdict button { justify-content: flex-start; }
+.recap-table .proj-col-name { position: static; }
+.recap-table td.proj-col-name { color: var(--text-hi); font-weight: 700; }
+.recap-row { cursor: default; }
+.recap-row:nth-child(even) td { background: var(--cell-bg); }
+
+.recap-board-link {
+  display: block; text-align: center; margin-bottom: 10px; padding: 10px 14px; border-radius: 10px;
+  border: 2px solid var(--neon-teal); color: var(--neon-teal); font-weight: 900; font-size: 0.8rem;
+  letter-spacing: 0.06em; text-decoration: none;
+}
+@media (max-width: 560px) {
+  .recap-kpis { gap: 8px; }
+  .recap-kpi { padding: 10px 10px 10px 13px; }
+  .recap-kpi-big { font-size: 1.05rem; }
+  .recap-kpi { padding-right: 10px; }
+  .recap-kpi-icon { position: static; width: 28px; height: 28px; }
+  .recap-kpi-who { font-size: 0.7rem; }
+  .recap-kpi-stat { font-size: 0.72rem; padding: 2px 6px; }
+  .recap-cards { grid-template-columns: 1fr; }
+  .recap-picks { grid-template-columns: 1fr; }
+  .recap-strip-row { grid-template-columns: 26px 64px 1fr 52px; gap: 6px; }
+  .recap-strip-axis { padding-left: 96px; padding-right: 58px; }
+  .recap-grade { font-size: 2rem; }
+}
+/* ─── ACTIVITY: the season's moves ─── */
+.activity-page .rules-page-header p { max-width: 60ch; }
+.activity-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.activity-chip { padding: 6px 10px; min-height: 32px; border: 1px solid var(--panel-border); border-radius: 999px; background: transparent; color: var(--text-dim); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; cursor: pointer; }
+.activity-chip.is-on { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.activity-day { margin-bottom: 16px; }
+.activity-day-head { font-size: 0.62rem; color: var(--text-mid); margin: 0 0 8px; }
+.activity-move .league-activity-head { flex-wrap: wrap; }
+.activity-move .league-activity-head strong { flex: 1 1 60%; min-width: 0; font-weight: 600; }
+.activity-kind { flex: 0 0 auto; padding: 1px 6px; border-radius: 4px; font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em; line-height: 1.6; background: color-mix(in srgb, var(--neon-teal) 18%, transparent); color: var(--neon-teal); }
+.activity-kind.is-waiver { background: color-mix(in srgb, var(--neon-yellow) 18%, transparent); color: var(--neon-yellow); }
+.activity-kind.is-drop { background: color-mix(in srgb, var(--neon-red) 18%, transparent); color: var(--neon-red); }
+.activity-kind.is-trade { background: color-mix(in srgb, var(--neon-purple) 22%, transparent); color: var(--neon-purple); }
+
+/* ─── ACTIVITY: waivers and LM adds ─── */
+.lm-panel { padding: 12px 14px; border-radius: 10px; margin: 0 0 14px; display: grid; gap: 10px; }
+.lm-title { font-size: 0.62rem; color: var(--neon-teal); }
+.lm-today { margin: 0; color: var(--text-body); font-size: 0.85rem; }
+.lm-today strong { color: var(--neon-yellow); }
+.lm-early { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.72rem; color: var(--text-dim); }
+.lm-early li { display: flex; flex-wrap: wrap; gap: 8px; }
+.lm-early li span:first-child { color: var(--text-hi); min-width: 7ch; }
+.lm-ask { min-height: 44px; padding: 10px 16px; border: 1px solid var(--neon-yellow); border-radius: 8px; background: color-mix(in srgb, var(--neon-yellow) 14%, transparent); color: var(--neon-yellow); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; cursor: pointer; justify-self: start; }
+.lm-ask:disabled { opacity: 0.5; cursor: default; }
+.lm-form { display: grid; gap: 8px; }
+.lm-checks { margin: 0; padding: 0 0 0 18px; color: var(--neon-red); font-size: 0.72rem; display: grid; gap: 4px; }
+.lm-requests { margin-top: 4px; }
+.lm-actions { display: flex; gap: 6px; margin-top: 6px; }
+.lm-status.is-added { background: color-mix(in srgb, var(--neon-teal) 18%, transparent); color: var(--neon-teal); }
+.lm-status.is-requested, .lm-status.is-waiting-for-drop { background: color-mix(in srgb, var(--neon-yellow) 18%, transparent); color: var(--neon-yellow); }
+.lm-status.is-failsafe { background: color-mix(in srgb, var(--neon-purple) 22%, transparent); color: var(--neon-purple); }
+.lm-status.is-denied { background: color-mix(in srgb, var(--neon-red) 18%, transparent); color: var(--neon-red); }
+.lm-rule { margin: 0; color: var(--text-faint); font-size: 0.66rem; line-height: 1.45; }
+
+/* ─── Draft landing: once the draft is closed ─── */
+.start-btn-recap { border-color: var(--neon-orange); color: var(--neon-orange); background: color-mix(in srgb, var(--neon-orange) 9%, var(--panel-bg)); }
+.start-btn-recap .start-btn-sub { color: var(--text-soft); }
+
+/* ─── Draft landing: the mock is a small button once the draft is done ─── */
+.start-row-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* ─── Scores: teams side by side on a card, and the projection as the number until he plays ─── */
+/* A card lays its two teams out like the matchup head, a size down. */
+.score-card .score-side-total { font-size: 1.35rem; margin-top: 2px; }
+.score-card .score-side-head.is-mine .score-side-name { color: var(--neon-teal); }
+.score-side-proj.is-up b { color: var(--neon-teal); }
+/* A projected number reads in teal, so it is never mistaken for points scored. */
+.score-player-pts.is-proj { color: var(--neon-teal); }
+/* Week view: the projection above, the real points below. */
+.score-player-stack { flex: 0 0 auto; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.score-player-stack .score-player-pts { margin-left: 0; }
+.score-player-stack .score-player-pts:not(.is-proj):not(:only-child) { font-size: 0.7rem; color: var(--text-mid); }
+@media (min-width: 640px) {
+  .score-card .score-side-total { font-size: 1.6rem; }
 }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */

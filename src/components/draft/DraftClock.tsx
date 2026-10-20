@@ -1,3 +1,4 @@
+import type { DraftRoom } from '../../lib/league/testDraft.js';
 import { useEffect, useState } from 'react';
 import type { BoardCell, DraftClockState, DraftPickState } from '../../lib/keeper/types.js';
 import {
@@ -111,10 +112,12 @@ export function ClockReadout({
  * buttons: the page puts them in its action grid.
  */
 export function ClockControls({
+  room,
   clock,
   picks,
   onClock,
 }: {
+  room: DraftRoom;
   clock: DraftClockState | null | undefined;
   picks: Readonly<Record<string, DraftPickState>>;
   onClock: BoardCell | null;
@@ -157,7 +160,7 @@ export function ClockControls({
           className="tap-btn"
           type="button"
           disabled={!check.ok || busy}
-          onClick={() => run(() => callDraftClock(identity))}
+          onClick={() => run(() => callDraftClock(identity, room))}
           title={check.ok ? 'Rule 2.3.1: the team picking gets 30 seconds' : check.reason === 'too-early' ? 'Two minutes a pick in rounds 1 to 5, ninety seconds after' : 'Once every five picks'}
           style={{
             ...ACTION_BUTTON,
@@ -174,7 +177,7 @@ export function ClockControls({
           className="tap-btn"
           type="button"
           disabled={busy}
-          onClick={() => run(() => (paused ? resumeDraftClock(identity) : pauseDraftClock(identity)))}
+          onClick={() => run(() => (paused ? resumeDraftClock(identity, room) : pauseDraftClock(identity, room)))}
           style={{
             ...ACTION_BUTTON,
             border: '2px solid var(--neon-yellow)',
