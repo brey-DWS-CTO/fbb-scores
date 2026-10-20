@@ -299,14 +299,40 @@ function dateWords(date: string): string {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+/** " (first tip 12:00 PM)", or nothing with no tip. */
+function tipWords(firstTip: string | null): string {
+  return firstTip
+    ? ` (first tip ${new Date(firstTip).toLocaleTimeString('en-US', { timeZone: PACIFIC, hour: 'numeric', minute: '2-digit' })})`
+    : '';
+}
+
 /** "Waivers now run at 11 AM Pacific for Tue, Oct 20 (first tip 12:00 PM). Was 3 PM." */
 export function waiverChangeText(target: WaiverHour, forDate: string, wasET: number | null, ok: boolean, note: string): string {
-  const tip = target.firstTip
-    ? ` (first tip ${new Date(target.firstTip).toLocaleTimeString('en-US', { timeZone: PACIFIC, hour: 'numeric', minute: '2-digit' })})`
-    : '';
+  const tip = tipWords(target.firstTip);
   const was = wasET === null ? '' : ` Was ${hourLabel((wasET - EASTERN_OFFSET_HOURS + 24) % 24)}.`;
   if (!ok) return `Waiver hour change failed: wanted ${hourLabel(target.hourPT)} Pacific for ${dateWords(forDate)}. ${note}`;
   return `Waivers now run at ${hourLabel(target.hourPT)} Pacific for ${dateWords(forDate)}${tip}.${was}`;
+}
+
+/**
+ * The 5 AM line on an early day, once ESPN holds the hour:
+ * "Waivers set for 11 AM today (first tip 12:00 PM)."
+ * It is the proof the clock ran. Silence on an early morning means it did not.
+ */
+export function morningCheckText(target: WaiverHour): string {
+  return `Waivers set for ${hourLabel(target.hourPT)} today${tipWords(target.firstTip)}.`;
+}
+
+/** What the clock could not read: ESPN's waiver hour, or the NBA scoreboard. */
+export type ClockReadFailure = 'espn' | 'scoreboard';
+
+/** One line for a read the clock could not make. It posts once a day per cause. */
+export function clockReadFailText(cause: ClockReadFailure, detail: string): string {
+  const what = cause === 'espn' ? "ESPN's waiver hour" : 'the NBA scoreboard';
+  const then = cause === 'espn'
+    ? 'It will keep trying. Check the hour on ESPN.'
+    : 'It left the waiver hour alone and will keep trying.';
+  return `Waiver clock could not read ${what}: ${detail.trim().replace(/\.+$/, '')}. ${then}`;
 }
 
 /** The feed line for one request. */

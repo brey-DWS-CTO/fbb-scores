@@ -4,8 +4,9 @@
  *
  * Runs from GET /api/notify/lm-clock every fifteen minutes (vercel.json) and
  * when a member sends a request. Every run is idempotent: it reads what ESPN
- * has, works out what it should be, and writes only the difference. No
- * claims, no state of its own beyond the requests table.
+ * has, works out what it should be, and writes only the difference. Its only
+ * state beyond the requests table is a few once-a-day claims, so Slack hears
+ * a morning line on early days and one line a day when a read fails.
  *
  * The rules themselves live in src/lib/league/lmWeekend.ts.
  */
@@ -15,14 +16,17 @@ import type { LeagueDataset } from '../../src/lib/keeper/types.js';
 import { EspnClient } from '../../src/lib/espn/client.js';
 import {
   checkLmAdd,
+  clockReadFailText,
   earlyDays,
   lmAddAllowed,
   lmAddText,
   lmAddWindow,
+  morningCheckText,
   pacific,
   waiverHourFor,
   waiverChangeText,
   waiverHourToHold,
+  type ClockReadFailure,
   type DayGame,
   type EarlyDay,
   type LmAddCheck,
@@ -39,7 +43,7 @@ import {
   setWaiverHour,
   type EspnLmConfig,
 } from './espnLm.js';
-import { appendAudit, listLmAddRequests, listTransactions, saveLmAddRequest } from './leagueStore.js';
+import { appendAudit, claimSentNotice, listLmAddRequests, listTransactions, saveLmAddRequest } from './leagueStore.js';
 import { gamesForDays, gamesOn } from './nbaDay.js';
 import { postToSlack } from './slack.js';
 
@@ -47,6 +51,9 @@ const dataset = rawDataset as unknown as LeagueDataset;
 
 /** The clock does not touch the hour before this, Pacific. Nobody is up. */
 const SET_HOUR_FROM_PT = 5;
+
+/** On an early day, the run in this hour, Pacific, posts the morning line. */
+const MORNING_HOUR_PT = SET_HOUR_FROM_PT;
 
 /** How many days ahead the early-day list looks. */
 const LOOKAHEAD_DAYS = 7;
@@ -57,6 +64,8 @@ export interface LmClockRun {
   skipped: string | null;
   waiver: { target: WaiverHour; current: number | null; changed: boolean; note: string } | null;
   adds: Array<{ id: string; status: LmAddRequest['status']; note: string }>;
+  /** Reads that failed this run, in words. */
+  trouble: string[];
 }
 
 function readClient(config: EspnLmConfig): EspnClient {
@@ -84,15 +93,58 @@ export async function targetWaiverHour(now: Date): Promise<{ date: string; targe
   return { date: target === tomorrow ? next : pt.date, target };
 }
 
-async function keepWaiverHour(config: EspnLmConfig, now: Date): Promise<LmClockRun['waiver']> {
-  const { date, target } = await targetWaiverHour(now);
+/**
+ * Post one line, once per key. Two runs at once get one post between them.
+ * A store failure is logged, never thrown: it must not stop the clock.
+ */
+async function postOnce(key: string, text: string): Promise<void> {
+  try {
+    if (await claimSentNotice(key, dataset.season)) await postToSlack(text);
+  } catch (err) {
+    console.error(`[lm-clock] could not claim ${key}:`, err instanceof Error ? err.message : err);
+  }
+}
+
+/** Tell Slack a read failed, once per Pacific day per cause. Returns the reason. */
+async function readFailed(cause: ClockReadFailure, today: string, err: unknown): Promise<string> {
+  const detail = err instanceof Error ? err.message : String(err);
+  await postOnce(`lm-read-${cause}-${today}`, clockReadFailText(cause, detail));
+  return `could not read ${cause === 'espn' ? 'ESPN' : 'the scoreboard'}: ${detail}`;
+}
+
+/**
+ * On an early day, the first run after 5 AM that finds ESPN holding today's
+ * hour says so. Silence on an early morning then means the clock is down.
+ */
+async function morningCheck(now: Date, date: string, target: WaiverHour): Promise<void> {
+  const pt = pacific(now);
+  if (date !== pt.date || !target.early || pt.hour !== MORNING_HOUR_PT) return;
+  await postOnce(`lm-morning-${date}`, morningCheckText(target));
+}
+
+async function keepWaiverHour(config: EspnLmConfig, now: Date, trouble: string[]): Promise<LmClockRun['waiver']> {
+  const today = pacific(now).date;
+  let date: string;
+  let target: WaiverHour;
+  try {
+    ({ date, target } = await targetWaiverHour(now));
+  } catch (err) {
+    // No games list, no target. Leave ESPN's hour as it is.
+    trouble.push(await readFailed('scoreboard', today, err));
+    return null;
+  }
   let current: number | null = null;
   try {
     current = await readClient(config).fetchWaiverHour();
   } catch (err) {
-    return { target, current: null, changed: false, note: `could not read ESPN: ${err instanceof Error ? err.message : err}` };
+    const note = await readFailed('espn', today, err);
+    trouble.push(note);
+    return { target, current: null, changed: false, note };
   }
-  if (current === target.hourET) return { target, current, changed: false, note: 'already right' };
+  if (current === target.hourET) {
+    await morningCheck(now, date, target);
+    return { target, current, changed: false, note: 'already right' };
+  }
   const result = await setWaiverHour(config, target.hourET);
   const note = describeWrite(result);
   await appendAudit(null, 'lm.waiverHour', {
@@ -105,6 +157,7 @@ async function keepWaiverHour(config: EspnLmConfig, now: Date): Promise<LmClockR
     result: note,
   });
   await postToSlack(waiverChangeText(target, date, current, result.ok, note));
+  if (result.ok && !result.dryRun) await morningCheck(now, date, target);
   return { target, current, changed: result.ok, note };
 }
 
@@ -147,10 +200,18 @@ async function attemptAdd(config: EspnLmConfig, request: LmAddRequest, by: strin
 }
 
 /** Try every open request whose day it is, and failsafe the ones whose day has passed. */
-async function runAdds(config: EspnLmConfig, now: Date): Promise<LmClockRun['adds']> {
+async function runAdds(config: EspnLmConfig, now: Date, trouble: string[]): Promise<LmClockRun['adds']> {
   const pt = pacific(now);
   const out: LmClockRun['adds'] = [];
-  const games = await gamesOn(pt.date);
+  let games: DayGame[];
+  try {
+    games = await gamesOn(pt.date);
+  } catch (err) {
+    // With no games the window looks shut and today's requests would
+    // failsafe by mistake. Touch nothing; the next run tries again.
+    trouble.push(await readFailed('scoreboard', pt.date, err));
+    return out;
+  }
   const window = lmAddWindow(now, games);
   for (const request of await listLmAddRequests(dataset.season)) {
     if (request.status === 'added' || request.status === 'denied') continue;
@@ -177,10 +238,11 @@ async function runAdds(config: EspnLmConfig, now: Date): Promise<LmClockRun['add
 export async function runLmClock(now = new Date()): Promise<LmClockRun> {
   const pt = pacific(now);
   const config = espnLmConfig();
-  if (!config) return { at: now.toISOString(), date: pt.date, skipped: 'ESPN credentials are not configured', waiver: null, adds: [] };
-  const waiver = pt.hour >= SET_HOUR_FROM_PT ? await keepWaiverHour(config, now) : null;
-  const adds = await runAdds(config, now);
-  return { at: now.toISOString(), date: pt.date, skipped: null, waiver, adds };
+  if (!config) return { at: now.toISOString(), date: pt.date, skipped: 'ESPN credentials are not configured', waiver: null, adds: [], trouble: [] };
+  const trouble: string[] = [];
+  const waiver = pt.hour >= SET_HOUR_FROM_PT ? await keepWaiverHour(config, now, trouble) : null;
+  const adds = await runAdds(config, now, trouble);
+  return { at: now.toISOString(), date: pt.date, skipped: null, waiver, adds, trouble };
 }
 
 // ─── What the page shows ────────────────────────────────────────────────────
@@ -197,7 +259,9 @@ export interface LmWeekendView {
 
 export async function lmWeekendView(now = new Date()): Promise<LmWeekendView> {
   const pt = pacific(now);
-  const byDate = await gamesForDays(pt.date, LOOKAHEAD_DAYS);
+  const byDate = await gamesForDays(pt.date, LOOKAHEAD_DAYS, async (err) => {
+    await readFailed('scoreboard', pt.date, err);
+  });
   const today: DayGame[] = byDate[pt.date] ?? [];
   const config = espnLmConfig();
   return {

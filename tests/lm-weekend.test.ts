@@ -177,6 +177,25 @@ test('the Slack line for a waiver change says the hour, the day and what it was'
   assert.match(waiverChangeText(eleven, '2026-10-20', 18, false, 'ESPN refused the sign-in (401)'), /^Waiver hour change failed: wanted 11 AM Pacific for Tue, Oct 20\. ESPN refused/);
 });
 
+test('the morning line confirms the hour and the first tip', async () => {
+  const { morningCheckText } = await import('../src/lib/league/lmWeekend.ts');
+  const eleven = { hourPT: 11, hourET: 14, early: true, firstTip: '2026-10-20T19:00:00.000Z' };
+  assert.equal(morningCheckText(eleven), 'Waivers set for 11 AM today (first tip 12:00 PM).');
+  assert.equal(morningCheckText({ ...eleven, firstTip: '2026-10-24T17:30:00.000Z', hourPT: 9 }), 'Waivers set for 9 AM today (first tip 10:30 AM).');
+});
+
+test('a failed read names what the clock could not see, with one full stop', async () => {
+  const { clockReadFailText } = await import('../src/lib/league/lmWeekend.ts');
+  assert.equal(
+    clockReadFailText('espn', 'Request failed with status code 401'),
+    "Waiver clock could not read ESPN's waiver hour: Request failed with status code 401. It will keep trying. Check the hour on ESPN.",
+  );
+  assert.equal(
+    clockReadFailText('scoreboard', 'timeout of 10000ms exceeded.'),
+    'Waiver clock could not read the NBA scoreboard: timeout of 10000ms exceeded. It left the waiver hour alone and will keep trying.',
+  );
+});
+
 test('the LM button explains weekdays, closed weekends, no games and signed-out access', async () => {
   const { lmAddButtonReason } = await import('../src/lib/league/lmWeekend.ts');
   const games = [{ home: 'DEN', away: 'LAL', tipoff: '2026-10-24T20:00:00.000Z' }];
