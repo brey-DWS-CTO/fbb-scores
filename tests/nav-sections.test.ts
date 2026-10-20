@@ -69,6 +69,7 @@ test('every old page address finds its section', () => {
     ['/history', 'league'],
     ['/league', 'league'],
     ['/activity', 'league'],
+    ['/watch', 'league'],
     ['/dues', 'league'],
     ['/achievements', 'vault'],
     ['/revealed', 'vault'],

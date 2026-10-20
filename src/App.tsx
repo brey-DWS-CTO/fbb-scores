@@ -37,6 +37,10 @@ import RevealedPage from './components/league/RevealedPage.js'
 import PropBetsPage from './components/league/PropBetsPage.js'
 import StatsGate from './components/league/StatsGate.js'
 import MyRankingsPage from './components/draft/MyRankingsPage.js'
+import WatchPage from './components/league/WatchPage.js'
+import PartyPage from './components/league/PartyPage.js'
+import FavoritesPrompt from './components/league/FavoritesPrompt.js'
+import InviteToast from './components/league/InviteToast.js'
 import DraftRecapPage from './components/draft/DraftRecapPage.js'
 
 function App() {
@@ -85,6 +89,8 @@ function App() {
       )}
       {!bareMode && <AppNav />}
       {!bareMode && !sandbox && <AchievementToast />}
+      {!bareMode && !sandbox && <FavoritesPrompt />}
+      {!bareMode && !sandbox && <InviteToast />}
       <ActingAsBanner />
       {!bareMode && <SectionTabs />}
       <Routes>
@@ -117,6 +123,8 @@ function App() {
         <Route path="/projections" element={<StatsGate><ProjectionsPage /></StatsGate>} />
         <Route path="/tiers" element={<StatsGate><TiersPage /></StatsGate>} />
         <Route path="/schedule" element={<SchedulePage />} />
+        <Route path="/watch" element={<WatchPage />} />
+        <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
         <Route path="/scores/:matchupId" element={<MatchupPage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />

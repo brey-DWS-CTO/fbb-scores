@@ -7,6 +7,7 @@ import type { SavedBoard } from './mockBoard.js';
 import type { SharedMockRoom } from './sharedMock.js';
 import type { MockTrade } from './mockTrades.js';
 import type { NbaWatch } from './nbaWatch.js';
+import type { FavoritesByOwner, HouseParty, NbaGame, PendingInvite, RostersByOwner, RsvpAnswer } from './houseParty.js';
 import axios from 'axios';
 import { TEST_DRAFT_HEADER, draftRoomHeaders, type DraftRoom, type TestDraftMeta } from './testDraft.js';
 import { callClock, clockExpired, isPaused, pauseClock, pickTiming, resumeClock, startPickClock, yieldPick } from './draftClock.js';
@@ -1954,4 +1955,111 @@ export async function fetchAchievementNews(c: Credentials): Promise<AchievementN
 /** The toast for these went up; do not show them again. */
 export async function markAchievementsSeen(c: Credentials, ids: AchievementId[]): Promise<void> {
   await axios.post('/api/league/achievements/seen', { ids }, { headers: authHeaders(c) });
+}
+
+/* ── Favorite teams and house parties ───────────────────────────────────── */
+
+export interface WatchResponse {
+  now: string;
+  fetchedAt: string;
+  /** ESPN did not answer, or answered late. The games may be the last read. */
+  error: string | null;
+  games: NbaGame[];
+  favorites: FavoritesByOwner;
+  rosters: RostersByOwner;
+  parties: HouseParty[];
+}
+
+/** The next two weeks of NBA games with everyone's favorites, players and parties. */
+export async function fetchWatch(c: Credentials, fresh = false): Promise<WatchResponse> {
+  const { data } = await axios.get<WatchResponse>(`/api/league/watch${fresh ? '?fresh=1' : ''}`, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function fetchFavorites(c: Credentials): Promise<FavoritesByOwner> {
+  const { data } = await axios.get<{ favorites: FavoritesByOwner }>('/api/league/favorites', { headers: authHeaders(c) });
+  return data.favorites;
+}
+
+/** Set your favorite teams. A null first team clears them. */
+export async function saveFavorites(c: Credentials, first: string | null, second: string | null): Promise<FavoritesByOwner> {
+  const { data } = await axios.put<{ favorites: FavoritesByOwner }>('/api/league/favorites', { first, second }, { headers: authHeaders(c) });
+  return data.favorites;
+}
+
+/** Commish only: set anyone's favorite teams. */
+export async function saveFavoritesFor(c: Credentials, owner: string, first: string | null, second: string | null): Promise<FavoritesByOwner> {
+  const { data } = await axios.put<{ favorites: FavoritesByOwner }>(
+    `/api/league/favorites/${encodeURIComponent(owner)}`,
+    { first, second },
+    { headers: authHeaders(c) },
+  );
+  return data.favorites;
+}
+
+export interface PartyResponse {
+  party: HouseParty;
+}
+
+/** Throw a party (`hosting`) or say you are up for the games. */
+export async function openHouseParty(c: Credentials, input: { gameIds: string[]; hosting: boolean; note: string }): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>('/api/league/parties', input, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function answerHouseParty(c: Credentials, id: string, answer: RsvpAnswer): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/rsvp`, { answer }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function hostHouseParty(c: Credentials, id: string, note: string): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/host`, { note }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function editHouseParty(c: Credentials, id: string, changes: { gameIds?: string[]; note?: string }): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/edit`, changes, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function cancelHouseParty(c: Credentials, id: string): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/cancel`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** What a share link shows. No sign-in needed. */
+export interface PublicParty {
+  party: {
+    id: string;
+    host: string | null;
+    games: HouseParty['games'];
+    note: string;
+    cancelledAt: string | null;
+    guests: string[];
+  };
+  headline: string;
+  now: string;
+}
+
+export async function fetchPublicParty(id: string): Promise<PublicParty> {
+  const { data } = await axios.get<PublicParty>(`/api/league/parties/${encodeURIComponent(id)}/public`);
+  return data;
+}
+
+/** Ask people to a party. Anyone in it may. */
+export async function inviteToHouseParty(c: Credentials, id: string, owners: string[]): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/invite`, { owners }, { headers: authHeaders(c) });
+  return data;
+}
+
+/** LATER on an invite popup: it stays down, the party stays open to you. */
+export async function putOffHouseInvite(c: Credentials, id: string): Promise<PartyResponse> {
+  const { data } = await axios.post<PartyResponse>(`/api/league/parties/${encodeURIComponent(id)}/invite/later`, {}, { headers: authHeaders(c) });
+  return data;
+}
+
+/** The invites waiting on you. */
+export async function fetchHouseInvites(c: Credentials): Promise<{ invites: PendingInvite[]; now: string }> {
+  const { data } = await axios.get<{ invites: PendingInvite[]; now: string }>('/api/league/invites', { headers: authHeaders(c) });
+  return data;
 }
