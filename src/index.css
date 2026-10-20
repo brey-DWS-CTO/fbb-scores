@@ -6107,6 +6107,15 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 @media (max-width: 639px) { .score-player-team { display: none; } }
 @media (min-width: 840px) { .score-team-heading .score-side-name { font-size: 0.9rem; } .score-card .score-side-scoreline .score-side-total { font-size: 1.6rem; } }
 
+/* Keep the kind of player points visible, including before tipoff. */
+.score-player-top:has(.score-player-points) { align-items: flex-start; }
+.score-player-points { flex: 0 0 auto; max-width: 52px; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1.15; }
+.score-player-pts.is-labeled { margin-left: 0; display: inline-flex; align-items: baseline; gap: 4px; }
+.score-points-label { font-size: 0.55rem; font-weight: 600; color: var(--text-mid); line-height: 1; }
+.score-points-projected { font-size: 0.61rem; font-weight: 400; color: var(--text-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.score-player.is-overage .score-player-pts.is-labeled { text-decoration: none; }
+.score-player.is-overage .score-player-pts.is-labeled > :last-child { text-decoration: line-through; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

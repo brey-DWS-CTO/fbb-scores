@@ -170,6 +170,15 @@ function cardClass(started: boolean, player: ScorePlayer): string {
   return ['score-player', started ? '' : 'is-bench', badge?.tone === 'out' ? 'is-out' : ''].filter(Boolean).join(' ');
 }
 
+function PlayerPoints({ actual, projected }: { actual: string; projected: number | null }) {
+  return (
+    <span className="score-player-points">
+      <span className="score-player-pts is-labeled"><span className="score-points-label">Actual</span><span>{actual}</span></span>
+      {projected !== null && <span className="score-points-projected">Projected {projText(projected)}</span>}
+    </span>
+  );
+}
+
 interface DayCellProps {
   player: ScorePlayer | undefined;
   week: ScoresWeek;
@@ -179,10 +188,8 @@ interface DayCellProps {
 }
 
 /**
- * One player on one day. Until his game tips off the big number is his
- * projection; once it starts the real points take over, with the
- * projection kept on the game line while it is live. A bench player gets
- * the same, so you can see what he would give.
+ * Actual points stay prominent before, during and after the game.
+ * A smaller projected finish sits below until the game is complete.
  */
 function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
@@ -191,18 +198,15 @@ function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellPr
   const proj = playerDayProjection(player, week, expected, scoringPeriodId, true);
   const status = day?.game?.status;
   const underway = day?.played === true || status === 'live' || status === 'final';
-  const showProjAsNumber = !underway && proj !== null && proj > 0;
+  const projected = status !== 'final' && proj !== null && proj > 0 && (!underway || status === 'live') ? proj : null;
   return (
     <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}`}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={slot} />
-        {showProjAsNumber
-          ? <span className="score-player-pts is-proj" title="Projected">{projText(proj)}</span>
-          : <span className="score-player-pts">{day ? day.points.toFixed(1) : '0.0'}</span>}
+        <PlayerPoints actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
       <div className="score-player-game">
         {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
-        {status === 'live' && proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
       {overage && <div className="score-overage-label">OVERAGE · −{projText(overage.deduction)}</div>}
@@ -218,8 +222,8 @@ interface WeekCellProps {
 }
 
 /**
- * One player over the week: his projected week above, his real points
- * below, and how many games he has played and has left. A bench player's
+ * One player over the week: actual points above a muted projected finish,
+ * and how many games he has played and has left. A bench player's
  * games and projection count every game his team has, as if started.
  */
 function WeekCell({ player, week, expected, overages }: WeekCellProps) {
@@ -233,10 +237,7 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
     <div className={cardClass(started, player)}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={latestSlot(player)} />
-        <span className="score-player-stack">
-          {proj !== null && <span className="score-player-pts is-proj" title="Projected">{projText(proj)}</span>}
-          <span className="score-player-pts">{summary.total.toFixed(1)}</span>
-        </span>
+        <PlayerPoints actual={summary.total.toFixed(1)} projected={proj} />
       </div>
       <div className="score-player-game">
         {summary.played} played · {summary.left} left
@@ -414,12 +415,12 @@ export default function MatchupPage() {
             && ((homeProj.byDay[String(view.scoringPeriodId)] ?? 0) + (awayProj.byDay[String(view.scoringPeriodId)] ?? 0) > 0
               || homeProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)
               || awayProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)) && (
-            <div className="score-proj-grid" aria-label="Projected points for the day">
+            <div className="score-proj-grid" aria-label="Actual and projected points for the day">
               <span>
-                {(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Proj <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
+                Actual {(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Projected <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
               </span>
               <span className="is-right">
-                {(matchup.away.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Proj <b>{projText(awayProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
+                Actual {(matchup.away.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Projected <b>{projText(awayProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
               </span>
             </div>
           )}
