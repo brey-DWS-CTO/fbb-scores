@@ -10,6 +10,7 @@ import NavIcon from '../league/NavIcon.js';
 import BoardGrid from './BoardGrid.js';
 import { ClockReadout, DraftTimingPanel } from './DraftClock.js';
 import { recentPicks } from './boardUtils.js';
+import { shortName } from '../../lib/league/format.js';
 
 /** Full-screen wall board for the draft-night TV. Read-only, 3s poll. */
 export default function DraftTvPage() {
@@ -188,7 +189,7 @@ export default function DraftTvPage() {
           )}
           {last && (
             <div style={{ color: 'var(--text-soft)', fontSize: 'clamp(0.7rem, 1.7vh, 1rem)' }}>
-              LAST: <span style={{ color: 'var(--text-max)', fontWeight: 700 }}>{last.playerName}</span> ·{' '}
+              LAST: <span style={{ color: 'var(--text-max)', fontWeight: 700 }}>{shortName(last.playerName)}</span> ·{' '}
               {last.owner} · {last.label}
             </div>
           )}

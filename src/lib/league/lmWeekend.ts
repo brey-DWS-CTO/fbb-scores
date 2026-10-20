@@ -1,3 +1,4 @@
+import { shortName } from './format.js';
 /**
  * The weekend league-manager rules, as the app runs them.
  *
@@ -290,7 +291,7 @@ export function waiverChangeText(target: WaiverHour, forDate: string, wasET: num
 
 /** The feed line for one request. */
 export function lmAddText(request: Pick<LmAddRequest, 'owner' | 'playerName' | 'proTeam' | 'status'>): string {
-  const who = request.proTeam ? `${request.playerName} (${request.proTeam})` : request.playerName;
+  const who = request.proTeam ? `${shortName(request.playerName)} (${request.proTeam})` : shortName(request.playerName);
   switch (request.status) {
     case 'added': return `${request.owner}: LM add ${who}, added`;
     case 'waiting-for-drop': return `${request.owner}: LM add ${who}, waiting for a drop`;

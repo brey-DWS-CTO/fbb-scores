@@ -35,6 +35,7 @@ import {
 } from '../../lib/league/pickSheet.js';
 import { parseWriteIn, WRITE_IN_POSITIONS, type WriteInPosition } from '../../lib/league/writeIn.js';
 import { POSITION_ORDER, positionTheme } from './boardUtils.js';
+import { shortName } from '../../lib/league/format.js';
 
 /** Name, team and position for a player the pool does not have. */
 function WriteInForm({
@@ -129,7 +130,7 @@ function WriteInForm({
           fontSize: '0.95rem',
         }}
       >
-        {busy ? 'ENTERING…' : check.ok ? `DRAFT ${check.player.name.toUpperCase()}` : 'DRAFT WRITE-IN'}
+        {busy ? 'ENTERING…' : check.ok ? `DRAFT ${shortName(check.player.name).toUpperCase()}` : 'DRAFT WRITE-IN'}
       </button>
       {!check.ok && (name || proTeam || positions.length > 0) && (
         <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>{check.error}</div>
@@ -530,7 +531,7 @@ export default function PickSheet({ room: displayedRoom, cell, pool, onClose, nu
               fontWeight: 700,
             }}
           >
-            <span>{busy && picking ? `ENTERING ${(picking.fullName ?? picking.name).toUpperCase()}…` : `${filtered.length} AVAILABLE`}</span>
+            <span>{busy && picking ? `ENTERING ${shortName(picking.fullName ?? picking.name).toUpperCase()}…` : `${filtered.length} AVAILABLE`}</span>
             <span>{showNumbers ? `BY ${SORT_LABELS[sort]}${thenBy ? `, THEN ${SORT_LABELS[thenBy]}` : ''} · MEMBERS SEE NO NUMBERS` : `BY ${SORT_LABELS[sort]}`}</span>
           </div>
 
@@ -584,7 +585,7 @@ export default function PickSheet({ room: displayedRoom, cell, pool, onClose, nu
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {player.fullName ?? player.name}
+                      {shortName(player.fullName ?? player.name)}
                     </span>
                     <span style={{ display: 'block', marginTop: 3, color: 'var(--text-mid)', fontSize: '0.76rem' }}>
                       <strong style={{ color: theme.color }}>{player.positions.join(' / ') || '—'}</strong>
@@ -652,7 +653,7 @@ export default function PickSheet({ room: displayedRoom, cell, pool, onClose, nu
                   <button
                     className="tap-btn"
                     type="button"
-                    aria-label={`Draft ${player.fullName ?? player.name}`}
+                    aria-label={`Draft ${shortName(player.fullName ?? player.name)}`}
                     disabled={busy}
                     onClick={() => choose(player)}
                     style={{
@@ -732,7 +733,7 @@ export function ClearPickSheet({ room: displayedRoom, cell, onClose }: { room: D
         PICK {pickLabel(cell.pick)} — {cell.pick.currentOwner.toUpperCase()}
       </div>
       <div style={{ color: 'var(--text-hi)', fontSize: '1.05rem', fontWeight: 700, marginBottom: 12 }}>
-        {cell.selection?.playerName ?? 'Unknown player'}
+        {cell.selection?.playerName ? shortName(cell.selection.playerName) : 'Unknown player'}
         <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: '0.8rem' }}>
           {' '}· #{cell.pick.overall} overall
         </span>

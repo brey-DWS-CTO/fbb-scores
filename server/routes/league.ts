@@ -324,6 +324,7 @@ import { LmAddRefused, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
+import { shortName } from '../../src/lib/league/format.js';
 import { parseRoast } from '../../src/lib/league/draftRecap.js';
 import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
@@ -1827,10 +1828,10 @@ router.post('/draft/pick', requireAuth, async (req, res) => {
     if (writeIn) {
       const wanted = player.name.toLowerCase();
       const inPool = dataset.players.find((entry) => entry.name.toLowerCase() === wanted || entry.fullName?.toLowerCase() === wanted);
-      if (inPool) throw new HttpError(409, `${inPool.fullName ?? inPool.name} is in the player pool. Pick him from the list.`);
-      if (nameTaken(player.name, draft.draft.picks, [], new Set())) throw new HttpError(409, `${player.name} is already on the board`);
+      if (inPool) throw new HttpError(409, `${shortName(inPool.fullName ?? inPool.name)} is in the player pool. Pick him from the list.`);
+      if (nameTaken(player.name, draft.draft.picks, [], new Set())) throw new HttpError(409, `${shortName(player.name)} is already on the board`);
     } else if (!availablePlayers(dataset, draft).some((candidate) => candidate.key === player.key)) {
-      throw new HttpError(409, `${player.name} is already off the board`);
+      throw new HttpError(409, `${shortName(player.name)} is already off the board`);
     }
     const yielded = draft.draft.skipped?.[String(overallPick)];
     draft.draft.picks[String(overallPick)] = {

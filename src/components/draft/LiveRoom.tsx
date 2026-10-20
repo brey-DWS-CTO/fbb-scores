@@ -3,7 +3,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { BoardCell, DatasetPlayer } from '../../lib/keeper/types.js';
 import { pickLabel } from '../../lib/keeper/engine.js';
 import { apiErrorMessage, saveDraftQueue, submitDraftPick } from '../../lib/league/api.js';
-import { moveQueued, shortName, toggleQueued } from '../../lib/league/draftRoom.js';
+import { shortName } from '../../lib/league/format.js';
+import { moveQueued, toggleQueued } from '../../lib/league/draftRoom.js';
 import { POSITIONS } from '../../lib/league/draftValue.js';
 import {
   DEFAULT_ROOM_SORT,
@@ -222,7 +223,7 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
           return (
             <li key={key}>
               <span className="room-upcoming-num">{index + 1}</span>
-              <button type="button" className="room-queue-name" onClick={() => look(key)}>{player.fullName ?? player.name}</button>
+              <button type="button" className="room-queue-name" onClick={() => look(key)} title={player.fullName ?? player.name}>{shortName(player.fullName ?? player.name)}</button>
               <small style={{ color: positionColor(player.positions), fontWeight: 800 }}>{player.positions.join('/')}</small>
               {canDraft && (
                 <button type="button" className="tap-btn mock-mini-btn is-primary" disabled={busyKey !== null} onClick={() => draft(player)}>DRAFT</button>
@@ -364,10 +365,7 @@ export default function LiveRoom({ room, board, everyone, available, onClock, pe
                       )}
                     </td>
                     <td className="room-player-col">
-                      <span className="room-player-name">
-                        <span className="room-name-full">{fullName}</span>
-                        <span className="room-name-short">{shortName(fullName)}</span>
-                      </span>
+                      <span className="room-player-name" title={fullName}>{shortName(fullName)}</span>
                       <small className="live-room-sub">
                         {player.proTeam.toUpperCase()} – <span style={{ color: positionColor(player.positions), fontWeight: 800 }}>{player.positions.join('/')}</span>
                       </small>
@@ -449,7 +447,7 @@ function LiveCard({ player, projection, gone, takenBy, queued, canDraft, busy, o
               <span className="room-card-taken">{takenBy.keeper ? 'Kept' : 'Drafted'} {takenBy.label} by {takenBy.owner}</span>
             </div>
           )}
-          <div className="room-card-name">{player.fullName ?? player.name}</div>
+          <div className="room-card-name" title={player.fullName ?? player.name}>{shortName(player.fullName ?? player.name)}</div>
           <div className="room-card-meta">
             <span style={{ color: positionColor(player.positions), fontWeight: 800 }}>{player.positions.join('/')}</span>
             {' | '}{player.proTeam.toUpperCase()}

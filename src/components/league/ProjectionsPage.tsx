@@ -26,7 +26,7 @@ import {
   type ProjectionSort,
   type Tone,
 } from '../../lib/league/projections.js';
-import { shortName } from '../../lib/league/draftRoom.js';
+import { shortName } from '../../lib/league/format.js';
 import { leagueSchedule2027 } from '../../lib/league/scheduleData.js';
 import { useDraftData, useIdentity, useKeeperScenario } from '../../hooks/useLeague.js';
 import { PROJECTION_EDITS_KEY, useProjectionData } from '../../hooks/useProjectionData.js';
@@ -490,10 +490,7 @@ export default function ProjectionsPage() {
                     if (column.id === 'name') {
                       return (
                         <td key={column.id} className={classes}>
-                          <span className="proj-name">
-                            <span className="proj-name-full">{text}</span>
-                            <span className="proj-name-short">{shortName(row.name)}</span>
-                          </span>
+                          <span className="proj-name" title={row.name}>{shortName(row.name)}</span>
                           {row.espnId !== null && row.line !== null && !open && (
                             <button
                               type="button"
