@@ -224,6 +224,14 @@ export interface LeagueDynamicState {
   pickTransfers?: PickTransfer[];
   /** Every member-to-member pick trade proposal, live and settled. */
   pickTradeProposals?: PickTradeProposal[];
+  /** The commissioner's roasts for the draft recap. Hidden from members until the draft closes. */
+  draftRecap?: DraftRecapState;
+}
+
+export interface DraftRecapState {
+  season: number;
+  /** Owner to roast. An empty string means the recap shows the line the numbers write. */
+  roasts: Record<string, string>;
 }
 
 /* ---------- member-to-member pick trades ---------- */

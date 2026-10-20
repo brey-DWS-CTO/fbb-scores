@@ -60,6 +60,11 @@ import type {
   StoredScheduleSnapshot,
 } from './schedule.js';
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
+import type { ScoresWeek } from './scores.js';
+import type { GamesCapRow } from './gamesCap.js';
+import type { FillLine } from './expertProjections.js';
+import type { LeagueTransaction } from './transactions.js';
+import type { EarlyDay, LmAddCheck, LmAddRequest, LmAddWindow, WaiverHour } from './lmWeekend.js';
 
 export interface StateMeta {
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
@@ -722,6 +727,12 @@ export async function setCommishBlind(c: Credentials, blind: boolean): Promise<S
   return data;
 }
 
+/** The commissioner saves one team's recap roast. An empty text hands it back to the numbers. */
+export async function saveRecapRoast(c: Credentials, owner: string, text: string): Promise<StateResponse> {
+  const { data } = await axios.post('/api/league/draft-recap/roast', { owner, text }, { headers: authHeaders(c) });
+  return data;
+}
+
 export async function setOverrides(
   c: Credentials,
   overrides: { cap?: number | null; playerRounds?: Record<string, number | null> },
@@ -918,6 +929,12 @@ export async function fetchProjectionEdits(c: Credentials): Promise<ProjectionEd
   return data.edits as ProjectionEdit[];
 }
 
+/** The commissioner's edits, which the draft recap grades with. */
+export async function fetchRecapEdits(c: Credentials): Promise<{ edits: ProjectionEdit[]; fills: FillLine[] }> {
+  const { data } = await axios.get('/api/league/draft-recap/edits', { headers: authHeaders(c) });
+  return { edits: data.edits as ProjectionEdit[], fills: (data.fills ?? []) as FillLine[] };
+}
+
 /** Save one player's edit. */
 export async function saveProjectionEdit(
   c: Credentials,
@@ -934,6 +951,37 @@ export async function deleteProjectionEdit(c: Credentials, espnId: number): Prom
 }
 
 /** The accepted ESPN draft rankings, or the empty fallback. Commissioner-only for now. */
+/**
+ * One fantasy week of scores from ESPN, every day of it. No week means the
+ * current one. Nothing here is secret, so no sign-in is needed.
+ */
+export async function fetchScoresWeek(matchupPeriod: number | null): Promise<ScoresWeek> {
+  const { data } = await axios.get<ScoresWeek>('/api/espn/week', {
+    params: matchupPeriod === null ? undefined : { matchupPeriod },
+  });
+  return data;
+}
+
+export interface GamesCapsResponse {
+  season: number;
+  defaultCap: number;
+  caps: GamesCapRow[];
+}
+
+/** The weekly games caps the commissioner has set. Anyone may read them. */
+export async function fetchGamesCaps(): Promise<GamesCapsResponse> {
+  const { data } = await axios.get<GamesCapsResponse>('/api/league/games-caps');
+  return data;
+}
+
+/** Set one week's games cap. Commissioner only. */
+export async function saveGamesCap(c: Credentials, matchupPeriodId: number, cap: number): Promise<GamesCapsResponse> {
+  const { data } = await axios.put<GamesCapsResponse>(`/api/league/games-caps/${matchupPeriodId}`, { cap }, {
+    headers: authHeaders(c),
+  });
+  return data;
+}
+
 export async function fetchDraftRankings(
   c: Credentials,
 ): Promise<{ snapshot: DraftRankingSnapshot; fallback: boolean }> {
@@ -1219,6 +1267,66 @@ export interface DuesResponse extends DuesBoard {
   venmo: string;
   /** The owner who collects. Empty until a commissioner sets it. */
   payee: string;
+}
+
+// ─── Moves ───────────────────────────────────────────────────────────────────
+
+export interface TransactionsResponse {
+  season: number;
+  rows: LeagueTransaction[];
+  /** When ESPN was last asked, ISO, or null before the first pull. */
+  pulledAt: string | null;
+  /** Why the last pull failed, or null. The rows are the last good ones. */
+  pullError: string | null;
+}
+
+/** Anyone may read the season's adds, drops, claims and trades. */
+export async function fetchTransactions(): Promise<TransactionsResponse> {
+  const { data } = await axios.get<TransactionsResponse>('/api/league/transactions');
+  return data;
+}
+
+// ─── Weekend LM adds ─────────────────────────────────────────────────────────
+
+export interface LmWeekendResponse {
+  season: number;
+  today: { date: string; games: number; waiver: WaiverHour; window: LmAddWindow };
+  earlyDays: EarlyDay[];
+  requests: LmAddRequest[];
+  /** Why writes to ESPN are down, or null. */
+  espnWriteTrouble: string | null;
+  dryRun: boolean;
+}
+
+/** Anyone may read today's waiver hour, the early days ahead and every request. */
+export async function fetchLmWeekend(): Promise<LmWeekendResponse> {
+  const { data } = await axios.get<LmWeekendResponse>('/api/league/lm-adds');
+  return data;
+}
+
+/** A member asks for a Saturday or Sunday LM add. A 400 carries the failed checks. */
+export async function requestLmAdd(c: Credentials, playerId: number): Promise<{ request: LmAddRequest; checks: LmAddCheck[] }> {
+  const { data } = await axios.post<{ request: LmAddRequest; checks: LmAddCheck[] }>('/api/league/lm-adds', { playerId }, { headers: authHeaders(c) });
+  return data;
+}
+
+export async function retryLmAdd(c: Credentials, id: string): Promise<LmAddRequest> {
+  const { data } = await axios.post<{ request: LmAddRequest }>(`/api/league/lm-adds/${encodeURIComponent(id)}/retry`, {}, { headers: authHeaders(c) });
+  return data.request;
+}
+
+export async function denyLmAdd(c: Credentials, id: string, note: string): Promise<LmAddRequest> {
+  const { data } = await axios.post<{ request: LmAddRequest }>(`/api/league/lm-adds/${encodeURIComponent(id)}/deny`, { note }, { headers: authHeaders(c) });
+  return data.request;
+}
+
+/** The failed checks a refused LM add came back with, if any. */
+export function lmAddChecksOf(error: unknown): LmAddCheck[] {
+  if (axios.isAxiosError(error)) {
+    const checks = (error.response?.data as { checks?: unknown } | undefined)?.checks;
+    if (Array.isArray(checks)) return checks as LmAddCheck[];
+  }
+  return [];
 }
 
 /** Anyone may read who has paid. */
