@@ -45,6 +45,7 @@ import BoardGrid from './BoardGrid.js';
 import LiveRoom from './LiveRoom.js';
 import { AutoButton, AutoChips } from './AutoPanel.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
+import EspnPushPanel from './EspnPushPanel.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
   ACTION_BUTTON,
@@ -820,6 +821,10 @@ export default function DraftPage() {
         )}
       </div>
 
+      {started && !onClock && identity?.isCommissioner && (
+        <EspnPushPanel board={board} teams={dataset.teams} teamNames={state.teamNames} />
+      )}
+
       {/* The pick that just landed, one line, as in the mock room. */}
       {started && allPicks[0] && (
         <div
@@ -860,6 +865,9 @@ export default function DraftPage() {
 
       {started && !onClock && (
         <div className={tabClass('picks')}>
+          {(state.draft.closedAt || identity?.isCommissioner) && (
+            <Link to="/draft/recap" className="tap-btn recap-board-link">SEE THE GRADES: DRAFT RECAP</Link>
+          )}
           <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
         </div>
       )}

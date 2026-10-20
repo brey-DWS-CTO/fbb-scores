@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SEASON_START, onLanding, onPath, seasonUnderway, sectionFor, sectionHome, todayIso, visibleSections } from '../src/lib/league/navSections.ts';
+import { SEASON_START, activeTab, onLanding, onPath, seasonUnderway, sectionFor, sectionHome, todayIso, visibleSections } from '../src/lib/league/navSections.ts';
 
 /** The week before the draft: keepers and the draft are the whole app. */
 const PRESEASON = '2026-10-12';
@@ -17,8 +17,8 @@ test('members see seven sections, the commish eight', () => {
 
 test('everyone sees the mock draft, projections and tiers', () => {
   const draft = (sections: typeof member) => sections.find((section) => section.id === 'draft')!.tabs.map((tab) => tab.to);
-  assert.deepEqual(draft(member), ['/draft', '/my-rankings', '/mock', '/projections', '/tiers']);
-  assert.deepEqual(draft(commish), ['/draft', '/my-rankings', '/mock', '/projections', '/tiers']);
+  assert.deepEqual(draft(member), ['/draft', '/draft/recap', '/my-rankings', '/mock', '/projections', '/tiers']);
+  assert.deepEqual(draft(commish), ['/draft', '/draft/recap', '/my-rankings', '/mock', '/projections', '/tiers']);
 });
 
 test('the phone bar holds five sections until keepers go public, then four', () => {
@@ -57,6 +57,7 @@ test('every old page address finds its section', () => {
   const cases: Array<[string, string | null]> = [
     ['/keepers/Brey', 'keepers'],
     ['/draft', 'draft'],
+    ['/draft/recap', 'draft'],
     ['/mock', 'draft'],
     ['/my-rankings', 'draft'],
     ['/projections', 'draft'],
@@ -67,6 +68,7 @@ test('every old page address finds its section', () => {
     ['/teams', 'league'],
     ['/history', 'league'],
     ['/league', 'league'],
+    ['/activity', 'league'],
     ['/dues', 'league'],
     ['/achievements', 'vault'],
     ['/revealed', 'vault'],
@@ -104,4 +106,12 @@ test('DRAFT opens on its landing page, where the tabs stay hidden', () => {
   assert.ok(!onLanding('/mock', draft));
   // Sections without a home are never a landing page.
   assert.ok(!onLanding('/league', member.find((section) => section.id === 'league')!));
+});
+
+test('a page lights one tab, the closest one', () => {
+  const tabs = [{ to: '/draft', label: 'BOARD' }, { to: '/draft/recap', label: 'RECAP' }, { to: '/keepers', label: 'KEEPERS' }];
+  assert.equal(activeTab('/draft/recap', tabs), '/draft/recap');
+  assert.equal(activeTab('/draft', tabs), '/draft');
+  assert.equal(activeTab('/keepers/Brey', tabs), '/keepers');
+  assert.equal(activeTab('/trades', tabs), null);
 });

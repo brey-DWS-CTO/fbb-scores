@@ -6,14 +6,37 @@
  */
 import type { PickRef, PickTradeProposal } from '../keeper/types.js';
 import { exactPickLabel, type DraftOrder } from './pickTrades.js';
+import type { Move } from './transactions.js';
 
 export interface ActivityEntry {
   id: string;
   /** When it happened, ISO. */
   at: string;
-  kind: 'trade';
+  /** A pick trade in the app, or a move on ESPN. */
+  kind: 'trade' | 'move';
   title: string;
   lines: string[];
+}
+
+const byNewest = (a: ActivityEntry, b: ActivityEntry) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id);
+
+/**
+ * Pick trades and ESPN moves in one list, newest first, cut to `limit`.
+ * LEAGUE HQ shows the top of it; the ACTIVITY page shows every move.
+ */
+export function mergedActivity(
+  trades: readonly ActivityEntry[],
+  moves: readonly Move[],
+  limit = 8,
+): ActivityEntry[] {
+  const fromMoves = moves.map((move): ActivityEntry => ({
+    id: `move:${move.id}`,
+    at: move.at,
+    kind: 'move',
+    title: move.title,
+    lines: move.lines,
+  }));
+  return [...trades, ...fromMoves].sort(byNewest).slice(0, limit);
 }
 
 const picks = (order: DraftOrder, refs: readonly PickRef[]) =>
@@ -33,5 +56,5 @@ export function leagueActivity(proposals: readonly PickTradeProposal[], order: D
         `${proposal.recipient} gets ${picks(order, proposal.offer)}.`,
       ],
     }))
-    .sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
+    .sort(byNewest);
 }
