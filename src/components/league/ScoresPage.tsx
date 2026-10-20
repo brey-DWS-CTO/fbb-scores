@@ -18,6 +18,7 @@ import {
   type ScoresWeek,
 } from '../../lib/league/scores.js';
 import LineupGamesSummary from './LineupGamesSummary.js';
+import FantasyTeamLogo from './FantasyTeamLogo.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import { ScoresNotice, WeekPicker, WinBar } from './ScoresBits.js';
@@ -41,14 +42,14 @@ interface SideProps {
 function CardSide({ side, week, owner, leading, mine, proj, deduction, projAhead, right }: SideProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
-      <div className="score-side-name">{side.name}</div>
+      <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name}</div></div>
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
-      <div className="score-side-total">{side.total.toFixed(1)}</div>
-      <LineupGamesSummary side={side} week={week} />
+      <div className="score-side-scoreline"><div className="score-side-total">{side.total.toFixed(1)}</div>
       {proj !== null && (
-        <div className={`score-side-proj${projAhead ? ' is-up' : ''}`}>Proj <b>{projText(proj)}</b></div>
+        <div className={`score-side-proj${projAhead ? ' is-up' : ''}`} title={deduction > 0 ? `${projText(deduction)} overage points deducted` : undefined}>Proj <b>{projText(proj)}</b></div>
       )}
-      {proj !== null && deduction > 0 && <div className="score-overage-label">{projText(deduction)} overage pts deducted</div>}
+      </div>
+      <LineupGamesSummary side={side} week={week} />
     </div>
   );
 }
@@ -172,12 +173,7 @@ export default function ScoresPage() {
       )}
 
       {week && (
-        <p className="score-foot">
-          Proj is where each team should finish the week. Win chance comes from the same numbers: points so far plus each player&apos;s expected points for every game left.
-          A player&apos;s expected points are ESPN&apos;s projection for the day when it has one, else a blend of his last 15 days, his season and his preseason projection.
-          {' If a team projects over the games cap, its highest-scoring games on its last day with games are deducted. Open the matchup to see those games in red.'}
-          {week.matchupPeriodId === week.currentMatchupPeriodId && !demo && ' Updates every minute while you watch.'}
-        </p>
+        <p className="score-foot">Projections include overage deductions.{week.matchupPeriodId === week.currentMatchupPeriodId && !demo && ' Updates every minute.'}</p>
       )}
     </div>
   );

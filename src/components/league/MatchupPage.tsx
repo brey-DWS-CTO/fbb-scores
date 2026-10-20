@@ -6,10 +6,9 @@ import { GAMES_CAPS_KEY, useExpectedPoints, useGamesCaps, useScoresWeek } from '
 import { apiErrorMessage, saveGamesCap } from '../../lib/league/api.js';
 import { playerDayProjection, playerWeekProjection, projText, sideProjection } from '../../lib/league/dailyProjection.js';
 import { leagueDataset } from '../../lib/league/data.js';
-import { MAX_GAMES_CAP, MIN_GAMES_CAP, gamesText, parseGamesCap } from '../../lib/league/gamesCap.js';
+import { MAX_GAMES_CAP, MIN_GAMES_CAP, parseGamesCap } from '../../lib/league/gamesCap.js';
 import {
   defaultDay,
-  gamesPlayed,
   gameText,
   injuryBadge,
   latestSlot,
@@ -32,6 +31,9 @@ import {
   type ScoresWeek,
   type OverageGame,
 } from '../../lib/league/scores.js';
+import FantasyTeamLogo from './FantasyTeamLogo.js';
+import TeamLogo from './TeamLogo.js';
+import MatchupStrip from './MatchupStrip.js';
 import LineupGamesSummary from './LineupGamesSummary.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
@@ -52,7 +54,6 @@ function viewFromKey(key: string): View {
 interface SideHeadProps {
   side: ScoreSide;
   owner: string | undefined;
-  chance: number;
   /** Where the side should finish the week. Null once the matchup is settled. */
   proj: number | null;
   deduction: number;
@@ -60,15 +61,15 @@ interface SideHeadProps {
   right?: boolean;
 }
 
-function SideHead({ side, owner, chance, proj, deduction, leading, right }: SideHeadProps) {
+function SideHead({ side, owner, proj, deduction, leading, right }: SideHeadProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}`}>
-      <div className="score-side-name">{side.name}</div>
+      <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name}</div></div>
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
-      <div className="score-side-total">{side.total.toFixed(1)}</div>
-      <div className="score-side-chance">{chance}% to win</div>
+      <div className="score-side-scoreline"><div className="score-side-total">{side.total.toFixed(1)}</div>
       {proj !== null && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
-      {proj !== null && deduction > 0 && <div className="score-overage-label">{projText(deduction)} overage pts deducted</div>}
+      {proj !== null && deduction > 0 && <div className="score-overage-label">−{projText(deduction)} overage</div>}
+      </div>
     </div>
   );
 }
@@ -76,27 +77,15 @@ function SideHead({ side, owner, chance, proj, deduction, leading, right }: Side
 interface GamesLineProps {
   side: ScoreSide;
   week: ScoresWeek;
-  played: number;
-  cap: number;
   right?: boolean;
-  /** Set when the viewer may change the cap. */
   onEdit?: () => void;
 }
 
-/** "Games 14 of 30", with a pencil for the commissioner. */
-function GamesLine({ side, week, played, cap, right, onEdit }: GamesLineProps) {
+function GamesLine({ side, week, right, onEdit }: GamesLineProps) {
   return (
-    <div className={`score-games${right ? ' is-right' : ''}${played > cap ? ' is-over' : ''}`}>
-      <span className="score-games-title hub-heading">Games</span>
-      <span className="score-games-count">
-        {gamesText(played, cap)}
-        {onEdit && (
-          <button type="button" className="tap-btn score-cap-btn" aria-label="Change this week's games cap" onClick={onEdit}>
-            <NavIcon name="pencil" size={12} />
-          </button>
-        )}
-      </span>
+    <div className={`score-games${right ? ' is-right' : ''}`}>
       <LineupGamesSummary side={side} week={week} />
+      {onEdit && <button type="button" className="tap-btn score-cap-btn" aria-label="Change this week's games cap" onClick={onEdit}><NavIcon name="pencil" size={12} /></button>}
     </div>
   );
 }
@@ -168,8 +157,8 @@ function PlayerTop({ player, slot }: { player: ScorePlayer; slot: number }) {
     <>
       <span className="score-slot">{slotLabel(slot)}</span>
       <span className="score-player-who">
-        <span className="score-player-name">{shortName(player.name)}</span>
-        <span className="score-player-team">{player.position || '—'} · {player.proTeam || 'FA'}</span>
+        <span className="score-player-name"><span className="score-player-name-text">{shortName(player.name)}</span><TeamLogo code={player.proTeam || null} size={14} /></span>
+        <span className="score-player-team">{player.position || '—'}</span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
       </span>
     </>
@@ -216,7 +205,7 @@ function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellPr
         {status === 'live' && proj !== null && proj > 0 && <span className="score-player-proj"> · Proj {projText(proj)}</span>}
       </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
-      {overage && <div className="score-overage-label">OVERAGE · {projText(overage.deduction)} pts excluded from team projection</div>}
+      {overage && <div className="score-overage-label">OVERAGE · −{projText(overage.deduction)}</div>}
     </div>
   );
 }
@@ -252,7 +241,7 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
       <div className="score-player-game">
         {summary.played} played · {summary.left} left
       </div>
-      {excluded.length > 0 && <div className="score-overage-label">{excluded.length} overage{excluded.length === 1 ? '' : 's'} · {projText(deduction)} pts excluded</div>}
+      {excluded.length > 0 && <div className="score-overage-label">{excluded.length} overage{excluded.length === 1 ? '' : 's'} · −{projText(deduction)}</div>}
     </div>
   );
 }
@@ -324,6 +313,8 @@ export default function MatchupPage() {
         <IdentityChip />
       </div>
 
+      {week && matchup && <MatchupStrip week={week} selected={matchup.id} demo={demo} day={dayParam} />}
+
       {demo && (
         <div className="score-demo" role="status">
           Demo numbers. Real scores start {longDate(seasonStartDate())}.
@@ -346,8 +337,8 @@ export default function MatchupPage() {
         <>
           <section className="panel score-head">
             <div className="score-head-grid">
-              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} chance={chance.home} proj={homeProj?.week ?? null} deduction={homeForecast?.deduction ?? 0} leading={matchup.home.total > matchup.away.total} />
-              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} chance={chance.away} proj={awayProj?.week ?? null} deduction={awayForecast?.deduction ?? 0} leading={matchup.away.total > matchup.home.total} right />
+              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} proj={homeProj?.week ?? null} deduction={homeForecast?.deduction ?? 0} leading={matchup.home.total > matchup.away.total} />
+              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} proj={awayProj?.week ?? null} deduction={awayForecast?.deduction ?? 0} leading={matchup.away.total > matchup.home.total} right />
             </div>
             <WinBar left={chance.home} right={chance.away} />
             {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
@@ -355,15 +346,11 @@ export default function MatchupPage() {
               <GamesLine
                 side={matchup.home}
                 week={week}
-                played={gamesPlayed(matchup.home, week)}
-                cap={week.gamesCap ?? 0}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}
               />
               <GamesLine
                 side={matchup.away}
                 week={week}
-                played={gamesPlayed(matchup.away, week)}
-                cap={week.gamesCap ?? 0}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}
                 right
               />
@@ -373,12 +360,11 @@ export default function MatchupPage() {
             )}
             {overageDays.size > 0 && (
               <div className="score-overage-note">
-                <p>Overages are deducted from each team’s last day with games, highest scores first. Red games are excluded from the team projection. Selections update as scores change.</p>
                 {week.days.filter((day) => overageDays.has(day.scoringPeriodId)).map((day) => (
                   <button key={day.scoringPeriodId} type="button" className="tap-btn score-overage-jump" onClick={() => {
                     setView({ kind: 'day', scoringPeriodId: day.scoringPeriodId });
                     dayNav.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}>SHOW OVERAGES · {longDate(day.date)}</button>
+                  }}>OVERAGES · {new Date(`${day.date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}</button>
                 ))}
               </div>
             )}
