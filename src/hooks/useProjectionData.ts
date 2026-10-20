@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchDraftRankings, fetchExpertProjections, fetchProjectionEdits } from '../lib/league/api.js';
-import { applyProjectionSource, sourceLabel, type ProjectionSource } from '../lib/league/expertProjections.js';
+import { fetchDraftRankings, fetchExpertProjections, fetchProjectionEdits, fetchProjectionFills } from '../lib/league/api.js';
+import { applyProjectionSource, fillProjectionGaps, sourceLabel, type ProjectionSource } from '../lib/league/expertProjections.js';
 import { applyProjectionEdits, editsById, type ProjectionEdits } from '../lib/league/projectionEdits.js';
 import type { DraftRankingSnapshot } from '../lib/league/draftRankings.js';
 import { useIdentity, useLeagueState } from './useLeague.js';
@@ -21,8 +21,9 @@ export function useProjectionData(enabled = true): {
   /** The chosen source's numbers before any edit. */
   original: DraftRankingSnapshot | null;
   /**
-   * ESPN's numbers with no source swap and no edits. Anything two phones must
-   * agree on (a mock replayed on each phone) reads this, never `snapshot`.
+   * ESPN's numbers, with its blanks filled from Hashtag, and no source swap
+   * and no edits. The same on every phone, so anything two phones must agree
+   * on (a mock replayed on each phone) reads this, never `snapshot`.
    */
   espn: DraftRankingSnapshot | null;
   edits: ProjectionEdits;
@@ -58,7 +59,16 @@ export function useProjectionData(enabled = true): {
     enabled: signedIn && identity?.isCommissioner === true,
     staleTime: Infinity,
   });
-  const espn = rankings.data?.snapshot ?? null;
+  // Players ESPN lists but does not project get Hashtag's line, for everyone.
+  const fillsQuery = useQuery({
+    queryKey: ['projection-fills', identity?.owner ?? 'anon', meta?.draftRankings?.activeSnapshotId ?? 'none'],
+    queryFn: () => fetchProjectionFills(identity as NonNullable<typeof identity>),
+    enabled: signedIn,
+    staleTime: Infinity,
+  });
+  const rawEspn = rankings.data?.snapshot ?? null;
+  const fills = fillsQuery.data ?? null;
+  const espn = useMemo(() => (rawEspn ? fillProjectionGaps(rawEspn, fills) : null), [rawEspn, fills]);
   const expert = expertQuery.data ?? null;
   const original = useMemo(() => (espn ? applyProjectionSource(espn, expert, source) : null), [espn, expert, source]);
   const edits = useMemo(() => editsById(editsQuery.data ?? []), [editsQuery.data]);
@@ -76,6 +86,6 @@ export function useProjectionData(enabled = true): {
     source: expert ? source : 'espn',
     compare,
     compareLabel: sourceLabel(onEspn ? 'hashtag' : 'espn'),
-    loading: rankings.isLoading || editsQuery.isLoading || expertQuery.isLoading,
+    loading: rankings.isLoading || editsQuery.isLoading || expertQuery.isLoading || fillsQuery.isLoading,
   };
 }

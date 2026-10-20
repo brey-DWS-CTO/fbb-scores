@@ -6034,6 +6034,18 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   .score-card .score-side-total { font-size: 1.6rem; }
 }
 
+/* Season mode and the small LM add card. */
+.nav-offseason-label { color: var(--text-dim); font-size: 0.58rem; letter-spacing: 0.12em; padding: 18px 12px 4px; }
+.nav-collapsed .nav-offseason-label { padding: 14px 2px 4px; font-size: 0.45rem; letter-spacing: 0; text-align: center; }
+.season-control { padding: 14px; border-radius: 10px; margin-bottom: 14px; display: grid; gap: 10px; }
+.lm-ask:disabled { color: var(--text-dim); border-color: var(--panel-border); background: var(--cell-bg); opacity: 1; }
+.lm-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lm-requests .league-activity-head { flex-wrap: wrap; }
+.lm-requests .league-activity-head strong { flex: 1 1 180px; min-width: 0; }
+.lm-requests .league-activity-head > span:last-child { flex: 1 1 100%; }
+.lm-panel-head a { color: var(--neon-teal); text-decoration: none; }
+.lm-panel .rules-draft-note { margin: 0; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

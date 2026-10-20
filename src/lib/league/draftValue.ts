@@ -334,8 +334,9 @@ export interface PlayerValue {
   availability: number;
   /**
    * Points over a replacement player for the whole season: his points over
-   * his schedule, less the replacement's over an average schedule. Null when
-   * nothing valued him.
+   * his schedule, less the replacement's over an average schedule, for the
+   * share of the season he plays. A game he misses is a wash: a bench player
+   * or a pickup takes the slot. Null when nothing valued him.
    */
   seasonValue: number | null;
   /**
@@ -349,6 +350,17 @@ export interface PlayerValue {
   rank: number;
   /** 1-based place by `riskValue`: the order a sharp drafter works from. */
   riskRank: number;
+}
+
+/**
+ * A player's season margin over replacement. He earns it only in the games he
+ * plays: a missed game goes to a bench player or a pickup, so it costs his
+ * edge over that man, not his whole score. Below replacement, fewer games
+ * never help, so the share applies only to a positive margin.
+ */
+export function seasonMargin(fppg: number, games: number, replacement: number, averageGames: number, availability: number): number {
+  const margin = fppg * games - replacement * averageGames;
+  return margin > 0 ? margin * availability : margin;
 }
 
 /**
@@ -549,9 +561,9 @@ export function valueBoard(
     // order the board, so games default to 1.
     const own = games ? entry.weightedGames : 1;
     const average = games ? leagueAverageGames : 1;
-    entry.seasonValue = round1(entry.fppg * own * entry.availability - level * average);
+    entry.seasonValue = round1(seasonMargin(entry.fppg, own, level, average, entry.availability));
     const shaded = entry.fppg - RISK_SHADE * (entry.fppg - (entry.fppgLow ?? entry.fppg));
-    entry.riskValue = round1(shaded * own * entry.availability - level * average);
+    entry.riskValue = round1(seasonMargin(shaded, own, level, average, entry.availability));
   }
 
   valued.sort((a, b) => {

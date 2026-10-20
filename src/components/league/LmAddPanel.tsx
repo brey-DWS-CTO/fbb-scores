@@ -1,7 +1,8 @@
 import { shortName } from '../../lib/league/format.js';
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import PlayerCombobox from './PlayerCombobox.js';
-import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
+import { useIdentity, useLeagueData, useLeagueState } from '../../hooks/useLeague.js';
 import {
   apiErrorMessage,
   denyLmAdd,
@@ -11,7 +12,7 @@ import {
   retryLmAdd,
   type LmWeekendResponse,
 } from '../../lib/league/api.js';
-import { hourLabel, lmAddText, type LmAddCheck, type LmAddRequest } from '../../lib/league/lmWeekend.js';
+import { hourLabel, lmAddButtonReason, lmAddText, ownOpenLmRequests, type LmAddCheck, type LmAddRequest } from '../../lib/league/lmWeekend.js';
 import type { DatasetPlayer } from '../../lib/keeper/types.js';
 
 /** "12:00 PM" in Pacific, the league's clock. */
@@ -37,7 +38,12 @@ const STATUS_LABEL: Record<LmAddRequest['status'], string> = {
 const REFRESH_MS = 60_000;
 
 /** The weekend LM rules on the ACTIVITY page: waiver hour, early days, LM add requests. */
-export default function LmAddPanel() {
+export default function LmAddPanel({ compact = false }: { compact?: boolean }) {
+  const { seasonMode } = useLeagueState();
+  return seasonMode === 'in-season' ? <LmAddContent compact={compact} /> : null;
+}
+
+function LmAddContent({ compact }: { compact: boolean }) {
   const { dataset } = useLeagueData();
   const { identity } = useIdentity();
   const [data, setData] = useState<LmWeekendResponse | null>(null);
@@ -95,15 +101,19 @@ export default function LmAddPanel() {
     }
   };
 
-  if (!data && !error) return null;
-
   const isCommish = identity?.isCommissioner === true;
   const today = data?.today;
   const candidates = dataset.players.filter((player) => player.espnId !== null);
+  const canAsk = identity !== null && today?.window.open === true;
+  const reason = lmAddButtonReason(today?.window ?? null, today?.date ?? null, identity !== null);
+  const requests = compact ? ownOpenLmRequests(data?.requests ?? [], identity?.owner ?? null) : data?.requests ?? [];
 
   return (
     <section className="panel lm-panel">
-      <div className="hub-heading lm-title">WAIVERS AND LM ADDS</div>
+      <div className="lm-panel-head">
+        <div className="hub-heading lm-title">{compact ? 'LM ADDS' : 'WAIVERS AND LM ADDS'}</div>
+        {compact && <Link to="/activity" className="mock-mini-btn">SEE ALL</Link>}
+      </div>
       {error && <p className="rules-draft-error">{error}</p>}
       {data?.espnWriteTrouble && <p className="rules-draft-error">ESPN sign-in expired: {data.espnWriteTrouble}</p>}
       {data?.dryRun && <p className="rules-draft-note">Dry run is on. The app logs what it would send to ESPN and sends nothing.</p>}
@@ -116,7 +126,7 @@ export default function LmAddPanel() {
         </p>
       )}
 
-      {data && data.earlyDays.length > 0 && (
+      {!compact && data && data.earlyDays.length > 0 && (
         <ul className="lm-early">
           {data.earlyDays.map((day) => (
             <li key={day.date}>
@@ -127,25 +137,15 @@ export default function LmAddPanel() {
         </ul>
       )}
 
-      {today && (
-        today.window.open ? (
-          identity ? (
-            asking ? (
-              <div className="lm-form">
-                <PlayerCombobox players={candidates} placeholder="Who do you want added?" onSelect={(player) => { void ask(player); }} autoFocus />
-                <button type="button" className="activity-chip" onClick={() => setAsking(false)} disabled={busy}>CANCEL</button>
-              </div>
-            ) : (
-              <button type="button" className="lm-ask" onClick={() => setAsking(true)} disabled={busy}>
-                REQUEST LM ADD
-              </button>
-            )
-          ) : (
-            <p className="rules-draft-note">Sign in to request an LM add. Open until the first tip at {today.window.closesAt ? tipLabel(today.window.closesAt) : 'tip-off'}.</p>
-          )
-        ) : (
-          <p className="rules-draft-note">{today.window.reason}</p>
-        )
+      <button type="button" className="lm-ask" onClick={() => setAsking(true)} disabled={!canAsk || busy} aria-describedby={compact ? 'lm-hq-reason' : 'lm-activity-reason'}>
+        REQUEST LM ADD
+      </button>
+      <p id={compact ? 'lm-hq-reason' : 'lm-activity-reason'} className="rules-draft-note">{reason}</p>
+      {asking && canAsk && (
+        <div className="lm-form">
+          <PlayerCombobox players={candidates} placeholder="Who do you want added?" onSelect={(player) => { void ask(player); }} autoFocus />
+          <button type="button" className="activity-chip" onClick={() => setAsking(false)} disabled={busy}>CANCEL</button>
+        </div>
       )}
 
       {failed.length > 0 && (
@@ -159,9 +159,9 @@ export default function LmAddPanel() {
       )}
       {notice && <p className="rules-draft-note">{notice}</p>}
 
-      {data && data.requests.length > 0 && (
+      {requests.length > 0 && (
         <ol className="league-activity lm-requests">
-          {data.requests.map((request) => (
+          {requests.map((request) => (
             <li key={request.id}>
               <div className="league-activity-head">
                 <span className={`activity-kind lm-status is-${request.status}`}>{STATUS_LABEL[request.status]}</span>
@@ -169,7 +169,7 @@ export default function LmAddPanel() {
                 <span>{dayLabel(request.forDate)}, {whenLabel(request.requestedAt)}</span>
               </div>
               {request.note && <div className="league-activity-line">{request.note}</div>}
-              {isCommish && identity && request.status !== 'added' && request.status !== 'denied' && (
+              {!compact && isCommish && identity && request.status !== 'added' && request.status !== 'denied' && (
                 <div className="lm-actions">
                   <button type="button" className="activity-chip" disabled={busy} onClick={() => { void act(() => retryLmAdd(identity, request.id)); }}>SEND TO ESPN AGAIN</button>
                   <button

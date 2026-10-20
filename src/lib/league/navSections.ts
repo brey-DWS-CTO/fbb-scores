@@ -7,6 +7,7 @@
  * Pure. No server, no browser.
  */
 import { leagueSchedule2027 } from './scheduleData.js';
+import type { SeasonMode } from './seasonMode.js';
 
 export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy';
 
@@ -22,6 +23,7 @@ export interface NavSection {
   icon: SectionIcon;
   /** On the phone's bottom bar; the rest sit behind MORE. */
   primary?: boolean;
+  offSeason?: boolean;
   /** On the bottom bar only until keepers go public, then behind MORE. */
   primaryUntilKeepersPublic?: boolean;
   commishOnly?: boolean;
@@ -112,11 +114,6 @@ export function todayIso(now: Date = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-/** True from the first day of week 1 on. */
-export function seasonUnderway(today: string): boolean {
-  return today >= SEASON_START;
-}
-
 /** True when `pathname` is `to` or a page under it, so /keepers/Brey is KEEPERS. */
 export function onPath(pathname: string, to: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`);
@@ -132,16 +129,8 @@ export function activeTab(pathname: string, tabs: readonly SectionTab[]): string
     .reduce<string | null>((best, tab) => (best === null || tab.to.length > best.length ? tab.to : best), null);
 }
 
-/**
- * The sections a viewer may see, with only the tabs they may see.
- *
- * VAULT sits on the phone bar only until keepers go public. Before the
- * season SCORES sits after DRAFT and behind MORE on a phone: there is
- * nothing to score yet. From the first day of week 1 it moves to the front
- * of the bar, and KEEPERS steps back behind MORE, because the keepers are
- * set and the phone bar holds four sections and no more.
- */
-export function visibleSections(isCommissioner: boolean, keepersPublic = false, today: string = todayIso()): NavSection[] {
+/** The league mode orders sections. Old pages stay reachable, and VAULT keeps its public-keepers rule off season. */
+export function visibleSections(isCommissioner: boolean, keepersPublic: boolean, mode: SeasonMode): NavSection[] {
   const sections = NAV_SECTIONS
     .filter((section) => !section.commishOnly || isCommissioner)
     .map((section) => ({
@@ -149,12 +138,15 @@ export function visibleSections(isCommissioner: boolean, keepersPublic = false, 
       primary: section.primary === true || (section.primaryUntilKeepersPublic === true && !keepersPublic),
       tabs: section.tabs.filter((tab) => !tab.commishOnly || isCommissioner),
     }));
-  if (!seasonUnderway(today)) return sections;
-  const scores = sections.find((section) => section.id === 'scores');
-  const rest = sections
-    .filter((section) => section.id !== 'scores')
-    .map((section) => (section.id === 'keepers' ? { ...section, primary: false } : section));
-  return scores ? [{ ...scores, primary: true }, ...rest] : rest;
+  if (mode === 'off-season') return sections;
+  // Commissioner tools stay above the off-season group, whose old links all work.
+  const order = ['scores', 'league', 'trades', 'rules', 'commish', 'draft', 'keepers', 'vault'];
+  return order.flatMap((id) => {
+    const section = sections.find((entry) => entry.id === id);
+    if (!section) return [];
+    const offSeason = ['draft', 'keepers', 'vault'].includes(id);
+    return [{ ...section, offSeason, primary: !offSeason && id !== 'commish' }];
+  });
 }
 
 /** The section a page belongs to, or null for pages outside the nav. */

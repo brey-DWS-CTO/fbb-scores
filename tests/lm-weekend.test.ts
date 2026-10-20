@@ -176,3 +176,24 @@ test('the Slack line for a waiver change says the hour, the day and what it was'
   );
   assert.match(waiverChangeText(eleven, '2026-10-20', 18, false, 'ESPN refused the sign-in (401)'), /^Waiver hour change failed: wanted 11 AM Pacific for Tue, Oct 20\. ESPN refused/);
 });
+
+test('the LM button explains weekdays, closed weekends, no games and signed-out access', async () => {
+  const { lmAddButtonReason } = await import('../src/lib/league/lmWeekend.ts');
+  const games = [{ home: 'DEN', away: 'LAL', tipoff: '2026-10-24T20:00:00.000Z' }];
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-23T18:00:00Z', games), '2026-10-23', true), 'LM adds open Saturday and Sunday, until the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T19:00:00Z', games), '2026-10-24', true), 'Open until the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T20:00:00Z', games), '2026-10-24', true), 'Closed for today. Opens again tomorrow before the first tip.');
+  const sunday = [{ ...games[0], tipoff: '2026-10-25T20:00:00.000Z' }];
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-25T20:00:00Z', sunday), '2026-10-25', true), 'Closed for today. Opens again next Saturday before the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T18:00:00Z', []), '2026-10-24', true), 'No NBA games today, so no LM adds.');
+  assert.equal(lmAddButtonReason(null, null, false), 'Sign in to request an LM add.');
+  assert.equal(lmAddButtonReason(null, null, true), "Checking today's LM add window.");
+});
+
+test('the HQ list holds only the signed-in member open requests', async () => {
+  const { ownOpenLmRequests } = await import('../src/lib/league/lmWeekend.ts');
+  const requests = ['requested', 'waiting-for-drop', 'failsafe', 'added', 'denied'].map((status) => ({ id: status, owner: 'Brey', status } as import('../src/lib/league/lmWeekend.ts').LmAddRequest));
+  requests.push({ ...requests[0], id: 'other', owner: 'Joel' });
+  assert.deepEqual(ownOpenLmRequests(requests, 'Brey').map((row) => row.id), ['requested', 'waiting-for-drop', 'failsafe']);
+  assert.deepEqual(ownOpenLmRequests(requests, null), []);
+});

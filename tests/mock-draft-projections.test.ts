@@ -151,13 +151,15 @@ test('projections: Jalen Johnson goes early in a sharp room and Cade rarely last
   assert.ok(share(realistic5, 'J. Johnson') - share(sharp5, 'J. Johnson') > 0.25);
   // With four keepers off the board Cade is about the fifth best player left,
   // and a sharp room drafts in order with a few places of give, so he is
-  // usually gone by 1.9. When he does last, Brey's seat takes him. Mitchell
-  // is the usual pick there.
+  // usually gone by 1.9. Since missed games stopped costing the hurt stars a
+  // whole season (2026-10-17) they sit above him less often, and he rarely
+  // lasts. When he does, Brey's seat takes him. Davis, no longer marked down a
+  // whole season for the games he misses, is the usual pick there.
   const sharp9 = availabilityAt(sharpRuns, 9);
   const cadeAt9 = sharp9.rows.find((row) => row.playerName === 'C. Cunningham')!;
-  assert.ok(cadeAt9.availableShare > 0.1 && cadeAt9.availableShare < 0.5, `Cade lasts to 1.9 now and then: ${cadeAt9.availableShare}`);
+  assert.ok(cadeAt9.availableShare < 0.5, `Cade is usually gone by 1.9: ${cadeAt9.availableShare}`);
   assert.ok(cadeAt9.takenHereShare >= cadeAt9.availableShare * 0.7, 'and is taken when he does');
-  assert.equal(takenMostOften(sharp9)[0], 'D. Mitchell');
+  assert.equal(takenMostOften(sharp9)[0], 'A. Davis');
   // Sabonis swings: 45.6 projected, 34.3 last season. A sharp room shades him
   // down for it, so he is usually still there at 1.9.
   assert.ok(share(sharp9, 'D. Sabonis') > 0.6);

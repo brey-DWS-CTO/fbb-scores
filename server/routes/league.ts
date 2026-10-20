@@ -260,6 +260,7 @@ import {
 } from '../../src/lib/league/polls.js';
 import seedRulebook from '../../src/data/source/rulebook-2027.json' with { type: 'json' };
 import hashtagProjections from '../data/hashtag-projections-2027.json' with { type: 'json' };
+import { projectionGaps } from '../../src/lib/league/expertProjections.js';
 import { validateDraft } from '../../src/lib/league/rulebookEdit.js';
 import { rulebookFingerprint } from '../../src/lib/league/rulebookDiff.js';
 import type { Rulebook } from '../../src/lib/league/rulebook.js';
@@ -361,6 +362,7 @@ import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draft
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
 import { shortName } from '../../src/lib/league/format.js';
+import { isSeasonMode, resolveSeasonMode } from '../../src/lib/league/seasonMode.js';
 import { parseRoast } from '../../src/lib/league/draftRecap.js';
 import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
@@ -558,6 +560,7 @@ function stateMeta(state: LeagueDynamicState, viewer: Viewer) {
   }
   const proposals = expireStale(proposalsOf(state), new Date().toISOString()).proposals;
   return {
+    seasonMode: resolveSeasonMode(state),
     pendingTrades: inboxCount(proposals, viewer.owner),
     draftAt: DRAFT_AT_ISO,
     /** The one draft whose picks can be traded right now. */
@@ -1132,6 +1135,17 @@ router.get('/expert-projections', requireAuth, requireCommissioner, (_req, res) 
   res.json(hashtagProjections);
 });
 
+/**
+ * GET /api/league/projection-fills — Hashtag's lines for the players ESPN
+ * lists but does not project, so every owner sees a number for them. Only
+ * those players' lines leave the server.
+ */
+router.get('/projection-fills', requireAuth, async (_req, res) => {
+  const { state } = await getState();
+  const snapshot = await resolveCurrentDraftRankings(state);
+  res.json({ players: projectionGaps(snapshot.players, hashtagProjections) });
+});
+
 /** GET /api/league/draft-rankings — the accepted snapshot, or the empty fallback. */
 router.get('/draft-rankings', requireAuth, async (_req, res) => {
   const { state } = await getState();
@@ -1397,10 +1411,22 @@ router.put('/keepers/:owner', requireAuth, async (req, res) => {
   res.json(redactState(result, { owner: authedOwner, isCommissioner }));
 });
 
-/**
- * POST /api/league/commish-blind — the commissioner stops (or starts) seeing
- * other teams' keepers, so achievement reveals work for him too.
- */
+/** Set the shared league mode. The normal state poll carries it to every member. */
+router.post('/season-mode', requireAuth, requireCommissioner, async (req, res) => {
+  const mode = (req.body as { seasonMode?: unknown } | undefined)?.seasonMode;
+  if (!isSeasonMode(mode)) {
+    res.status(400).json({ error: 'Choose in-season or off-season.' });
+    return;
+  }
+  let previousMode: import('../../src/lib/league/seasonMode.js').SeasonMode | undefined;
+  const result = await mutateState((draft) => {
+    previousMode = resolveSeasonMode(draft);
+    draft.seasonMode = mode;
+  });
+  await appendAudit(actor(res), 'season.mode', { from: previousMode, to: mode });
+  res.json(redactState(result, { owner: res.locals.owner as string, isCommissioner: true }));
+});
+
 router.post('/commish-blind', requireAuth, requireCommissioner, async (req, res) => {
   const blind = (req.body as { blind?: unknown } | undefined)?.blind;
   if (typeof blind !== 'boolean') {

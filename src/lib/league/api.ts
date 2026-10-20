@@ -1,3 +1,4 @@
+import { resolveSeasonMode } from './seasonMode.js';
 import type { ExpertProjections } from './expertProjections.js';
 import type { ProjectionEdit } from './projectionEdits.js';
 import type { MockGrade, MockResultRecord } from './mockGrade.js';
@@ -67,6 +68,7 @@ import type { LeagueTransaction } from './transactions.js';
 import type { EarlyDay, LmAddCheck, LmAddRequest, LmAddWindow, WaiverHour } from './lmWeekend.js';
 
 export interface StateMeta {
+  seasonMode?: import('./seasonMode.js').SeasonMode;
   /** Pending pick-trade offers waiting on this viewer. Drives the nav badge. */
   pendingTrades?: number;
   /** Keeper reveals this viewer has earned and not spent. Drives the VAULT badge. */
@@ -269,7 +271,7 @@ function sandboxResponse(doc: SandboxDoc): StateResponse {
   return {
     state: doc.state,
     version: doc.version,
-    meta: { ...doc.meta, revealed: true, isCommissioner: true, keeperStatus },
+    meta: { ...doc.meta, seasonMode: resolveSeasonMode(doc.state), revealed: true, isCommissioner: true, keeperStatus },
   };
 }
 
@@ -727,6 +729,17 @@ export async function setCommishBlind(c: Credentials, blind: boolean): Promise<S
   return data;
 }
 
+export async function setSeasonMode(c: Credentials, seasonMode: import('./seasonMode.js').SeasonMode): Promise<StateResponse> {
+  const sandbox = readSandbox();
+  if (sandbox) {
+    const result = mutateSandbox(sandbox, (state) => { state.seasonMode = seasonMode; });
+    if (result.meta) result.meta.seasonMode = seasonMode;
+    return result;
+  }
+  const { data } = await axios.post('/api/league/season-mode', { seasonMode }, { headers: authHeaders(c) });
+  return data;
+}
+
 /** The commissioner saves one team's recap roast. An empty text hands it back to the numbers. */
 export async function saveRecapRoast(c: Credentials, owner: string, text: string): Promise<StateResponse> {
   const { data } = await axios.post('/api/league/draft-recap/roast', { owner, text }, { headers: authHeaders(c) });
@@ -921,6 +934,12 @@ export async function deleteMockResult(c: Credentials, id: string): Promise<void
 export async function fetchExpertProjections(c: Credentials): Promise<ExpertProjections> {
   const { data } = await axios.get('/api/league/expert-projections', { headers: authHeaders(c) });
   return data as ExpertProjections;
+}
+
+/** Hashtag's lines for the players ESPN does not project. Every owner reads these. */
+export async function fetchProjectionFills(c: Credentials): Promise<Pick<ExpertProjections, 'players'>> {
+  const { data } = await axios.get('/api/league/projection-fills', { headers: authHeaders(c) });
+  return data as Pick<ExpertProjections, 'players'>;
 }
 
 /** Your own edits to ESPN's projections. */

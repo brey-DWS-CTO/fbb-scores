@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DatasetPlayer } from '../../lib/keeper/types.js';
 import { OWNERS, leagueDataset } from '../../lib/league/data.js';
-import { apiErrorMessage, enterSandbox, exitSandbox, sandboxActive, setOverrides } from '../../lib/league/api.js';
+import { apiErrorMessage, enterSandbox, exitSandbox, sandboxActive, setOverrides, setSeasonMode } from '../../lib/league/api.js';
 import { useApplyStateResponse, useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import PlayerCombobox from './PlayerCombobox.js';
 import CommissionerPanel from './CommissionerPanel.js';
@@ -19,7 +19,7 @@ const baseByKey = new Map(leagueDataset.players.map((p) => [p.key, p]));
 
 /** /admin — commissioner tier & cap controls (the "tweak the sheet" page). */
 export default function AdminPage() {
-  const { state, dataset } = useLeagueData();
+  const { state, dataset, seasonMode } = useLeagueData();
   const { identity } = useIdentity();
   const applyState = useApplyStateResponse();
 
@@ -120,6 +120,24 @@ export default function AdminPage() {
       )}
 
       {/* ── Members: who can get in, and how ───────────────────── */}
+      <section className="panel season-control">
+        <div className="hub-heading lm-title">SEASON MODE</div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={seasonMode === 'in-season'}
+          aria-label="In season"
+          className="lm-ask"
+          disabled={busy}
+          onClick={() => { void run(async () => {
+            applyState(await setSeasonMode(identity, seasonMode === 'in-season' ? 'off-season' : 'in-season'));
+          }); }}
+        >
+          {seasonMode === 'in-season' ? 'IN SEASON' : 'OFF SEASON'}
+        </button>
+        <p className="rules-draft-note">Changes the league menu and shows LM add requests in season. Every page stays open.</p>
+      </section>
+
       <section className="panel" style={{ padding: 14, borderRadius: 10, marginBottom: 14 }}>
         <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--neon-teal)', marginBottom: 6 }}>
           <NavIcon name="people" size={13} className="icon-in-heading" />

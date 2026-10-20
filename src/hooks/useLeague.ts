@@ -28,6 +28,7 @@ import { idleForMs, wakeOnActivity } from './useActivity.js';
 import type { LeagueDynamicState } from '../lib/keeper/types.js';
 import type { KeeperScenario } from '../lib/league/keeperScenario.js';
 import { stateSide, type StateSide } from '../lib/league/testDraft.js';
+import { resolveSeasonMode } from '../lib/league/seasonMode.js';
 
 const EMPTY_KEEPER_SCENARIO: KeeperScenario = {};
 
@@ -90,6 +91,7 @@ export function useLeagueState(fast = false, side: StateSide = 'league') {
   return {
     ...query,
     state: query.data?.state ?? EMPTY_STATE,
+    seasonMode: query.data?.meta?.seasonMode ?? resolveSeasonMode(query.data?.state ?? EMPTY_STATE),
     version: query.data?.version ?? 0,
     meta: query.data?.meta ?? null,
   };

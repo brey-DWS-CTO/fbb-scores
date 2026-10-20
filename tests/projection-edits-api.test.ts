@@ -88,6 +88,14 @@ test('only the commissioner reads Hashtag projections', async () => {
   assert.equal((read.body.players as unknown[]).length, 200);
 });
 
+test('every owner reads the gap fills, which carry only ESPN’s blanks', async () => {
+  assert.equal((await request('/api/league/projection-fills')).status, 401);
+  const read = await request('/api/league/projection-fills', { headers: auth('Joel') });
+  assert.equal(read.status, 200);
+  const players = read.body.players as unknown[];
+  assert.ok(Array.isArray(players) && players.length < 200, 'never the whole Hashtag list');
+});
+
 test('the first read writes the two injury estimates once; save, change and reset work', async () => {
   const first = await request('/api/league/projection-edits', { headers: auth(commissioner) });
   assert.equal(first.status, 200);
