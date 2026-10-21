@@ -222,3 +222,19 @@ test('a party has started once any game has tipped off', () => {
   assert.equal(partyStarted(party, new Date('2026-10-20T02:30:00.000Z')), true);
   assert.equal(partyStarted({ games: [] }, new Date()), false);
 });
+
+
+test('ESPN MM:SS minutes distinguish a short appearance from a DNP', () => {
+  const raw = summary('in', '1st 11:30', [
+    { code: 'DEN', score: '2', homeAway: 'away', athletes: [
+      athlete(1, 'Short Appearance', 'S. Appearance', ['0:30', '2']),
+      athlete(2, 'No Appearance', 'N. Appearance', ['0:00', '0'], true),
+    ] },
+    { code: 'LAL', score: '0', homeAway: 'home', athletes: [] },
+  ]);
+  const parsed = parseBoxScore(raw, 'g');
+  assert.ok(parsed);
+  assert.equal(parsed.lines[0].stats['40'], 0.5);
+  assert.equal(parsed.lines[0].played, true);
+  assert.equal(parsed.lines[1].played, false);
+});

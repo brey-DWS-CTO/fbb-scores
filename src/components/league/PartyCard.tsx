@@ -1,5 +1,5 @@
 import { shortName } from '../../lib/league/format.js';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -129,9 +129,15 @@ export default function PartyCard({ party, rosters, now, onChange, onEdit, linkT
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const viewer = identity?.owner ?? null;
-  const over = partyOver(party, now);
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(new Date()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const currentTime = new Date(Math.max(now.getTime(), clock.getTime()));
+  const over = partyOver(party, currentTime);
   const off = party.cancelledAt !== null;
-  const started = partyStarted(party, now);
+  const started = partyStarted(party, currentTime);
   const mine = viewer ? answerOf(party, viewer) : null;
   const guests = whoIsIn(party);
   const stakes = guestStakes(party, rosters);

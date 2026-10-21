@@ -146,7 +146,12 @@ export function lineStats(keys: readonly string[], values: readonly unknown[]): 
   keys.forEach((key, index) => {
     const ids = STAT_KEYS[key];
     if (!ids || index >= values.length) return;
-    const parts = statValues(values[index]);
+    const raw = values[index];
+    const minutes = key === 'minutes' && typeof raw === 'string'
+      ? /^(\d+):(\d{2})$/.exec(raw.trim()) : null;
+    const parts = minutes
+      ? [Number(minutes[1]) + Number(minutes[2]) / 60]
+      : statValues(raw);
     ids.forEach((id, slot) => {
       stats[id] = parts[slot] ?? 0;
     });
