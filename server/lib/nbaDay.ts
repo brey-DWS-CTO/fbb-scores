@@ -54,8 +54,16 @@ export async function gamesOn(date: string): Promise<DayGame[]> {
   return games;
 }
 
-/** Games for each of the next `days` Pacific dates from `from`, by date. */
-export async function gamesForDays(from: string, days: number): Promise<Record<string, DayGame[]>> {
+/**
+ * Games for each of the next `days` Pacific dates from `from`, by date. A
+ * date the scoreboard will not answer for comes back empty, and `onError`
+ * hears about it: an empty day looks like a normal one.
+ */
+export async function gamesForDays(
+  from: string,
+  days: number,
+  onError?: (err: unknown, date: string) => Promise<void>,
+): Promise<Record<string, DayGame[]>> {
   const out: Record<string, DayGame[]> = {};
   const cursor = new Date(`${from}T12:00:00Z`);
   for (let i = 0; i < days; i += 1) {
@@ -65,6 +73,7 @@ export async function gamesForDays(from: string, days: number): Promise<Record<s
     } catch (err) {
       console.warn(`[nba] scoreboard ${date}:`, err instanceof Error ? err.message : err);
       out[date] = [];
+      await onError?.(err, date);
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }

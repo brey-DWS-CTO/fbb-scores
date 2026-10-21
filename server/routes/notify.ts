@@ -107,7 +107,7 @@ router.get('/lm-clock', async (req: Request, res: Response) => {
       ? `target ${run.waiver.target.hourPT} PT (${run.waiver.target.hourET} ET), ESPN has ${run.waiver.current ?? '?'}, ${run.waiver.changed ? 'changed' : run.waiver.note}`
       : 'hour not checked';
     console.log(`[lm-clock] ${run.date}: ${run.skipped ?? waiver}; adds ${run.adds.length}`);
-    if (run.waiver?.changed || run.adds.length > 0) console.log('[lm-clock]', JSON.stringify(run));
+    if (run.waiver?.changed || run.adds.length > 0 || run.trouble.length > 0) console.log('[lm-clock]', JSON.stringify(run));
     res.json(run);
   } catch (err) {
     console.error('[lm-clock] failed:', err instanceof Error ? err.message : err);
