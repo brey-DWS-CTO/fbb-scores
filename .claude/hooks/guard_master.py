@@ -4,7 +4,7 @@
 Blocks two things in the primary checkout:
 
   * committing straight onto master
-  * `npm run ship`, which pushes and deploys production in one step
+  * the retired `npm run ship` command
 
 Both were fine while nobody else was on the app. They are not fine now that
 ten people sign in with it and the draft is weeks away. Work goes on a branch,
@@ -12,7 +12,7 @@ opens a pull request, and gets checked on the preview before it reaches anyone.
 
 Escape hatch, for a genuine production emergency:
 
-    ALLOW_MASTER=1 npm run ship
+    ALLOW_MASTER=1 git commit ...
 
 Set it deliberately, in one command, and say in the commit why.
 """
@@ -64,14 +64,14 @@ def main() -> None:
 
     if SHIP.search(command):
         deny(
-            "Blocked: npm run ship deploys straight to production, and the "
-            "league is using the app now.\n"
+            "Blocked: npm run ship was retired. The Vercel Git integration deploys the "
+            "production branch.\n"
             "Push the branch and open a pull request instead:\n"
             "  git push -u origin <branch>\n"
             "  gh pr create --fill\n"
-            "Vercel builds a preview for the branch. Merge to master when it "
+            "Vercel builds a preview once the branch has an open PR. Merge to master when it "
             "checks out.\n"
-            "Real emergency only: ALLOW_MASTER=1 npm run ship"
+            "Production deploys when the PR merges."
         )
 
     if COMMIT.search(command) and current_branch() == "master":
