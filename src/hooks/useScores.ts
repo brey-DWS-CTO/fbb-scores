@@ -1,3 +1,4 @@
+import { historicalScoreBaselines } from '../lib/league/scoreBaseline.js';
 import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchGamesCaps, fetchScoresWeek } from '../lib/league/api.js';
@@ -62,7 +63,7 @@ export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabl
 export function useExpectedPoints(): ExpectedPoints {
   const { snapshot } = useProjectionData();
   return useMemo(() => {
-    const byId = new Map<number, number>();
+    const byId = new Map(historicalScoreBaselines);
     if (snapshot) {
       for (const player of snapshot.players) {
         const value = projectedFppg(player.projection, snapshot.scoringItems);

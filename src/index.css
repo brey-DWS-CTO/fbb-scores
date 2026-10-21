@@ -6211,3 +6211,7 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .score-detail p { font-size: .85rem; line-height: 1.6; white-space: normal; }
 .score-detail-close { float: right; }
 .fppg-panel svg { color: var(--neon-teal); }
+
+.score-ppg-jump { margin: .5rem 0 1rem; }
+.score-ppg-target { scroll-margin-top: 1rem; }
+.fppg-sparkline { display: block; min-width: 120px; color: var(--neon-teal); }
