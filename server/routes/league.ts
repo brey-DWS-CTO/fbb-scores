@@ -236,6 +236,7 @@ import {
 import { sendLoginLink, sendPinEmail } from '../lib/mailer.js';
 import {
   notifyKeepersRevealed,
+  notifyPartyInvited,
   sendRulebookSignRequest,
   sendDuesShame,
   notifyTradeAccepted,
@@ -5225,12 +5226,14 @@ async function changeParty(
   res: Response,
   action: string,
   change: (party: HouseParty, owner: string) => ReturnType<typeof rsvp>,
+  onSaved?: (party: HouseParty) => void,
 ): Promise<void> {
   const owner = res.locals.owner as string;
   const id = String(req.params.id);
   let problem: PartyProblem | null = null;
   try {
     const party = await updateParty(id, (current) => {
+      problem = null;
       const result = change(current as HouseParty, owner);
       if (!result.ok) {
         problem = result.problem;
@@ -5241,6 +5244,7 @@ async function changeParty(
     if (problem) return partyProblem(res, problem);
     await appendAudit(actor(res), action, { partyId: id });
     res.json({ party });
+    onSaved?.(party as HouseParty);
   } catch (err) {
     if (err instanceof PartyWriteError) {
       res.status(err.code === 'not-found' ? 404 : 409).json({ error: err.message, code: err.code });
@@ -5313,10 +5317,15 @@ router.post('/parties/:id/invite', requireAuth, async (req, res, next) => {
   try {
     const raw = (req.body as { owners?: unknown } | undefined)?.owners;
     const owners = Array.isArray(raw) ? raw.filter((owner): owner is string => typeof owner === 'string' && isKnownOwner(owner)) : [];
+    let added: string[] = [];
     await changeParty(req, res, 'party-invite', (party, owner) => {
       if (partyOver(party, new Date())) return { ok: false, problem: 'over' };
-      return inviteTo(party, owner, owners, new Date().toISOString());
-    });
+      const previous = new Set((party.invites ?? []).map((invite) => invite.owner));
+      const result = inviteTo(party, owner, owners, new Date().toISOString());
+      // The store may retry this callback. Only the committed attempt's new invites get mail.
+      added = result.ok ? (result.value.invites ?? []).filter((invite) => !previous.has(invite.owner)).map((invite) => invite.owner) : [];
+      return result;
+    }, (party) => notifyPartyInvited(party, added, appOrigin(req)));
   } catch (err) {
     next(err);
   }
