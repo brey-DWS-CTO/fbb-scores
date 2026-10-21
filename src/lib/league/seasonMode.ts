@@ -19,3 +19,8 @@ export function resolveSeasonMode(
   return today >= leagueSchedule2027[0].startDate || (closedDay !== null && today >= closedDay)
     ? 'in-season' : 'off-season';
 }
+
+/** The signed-in home follows the league mode, including commissioner overrides. */
+export function seasonHome(mode: SeasonMode): '/scores' | '/keepers' {
+  return mode === 'in-season' ? '/scores' : '/keepers';
+}

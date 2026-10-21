@@ -2437,17 +2437,19 @@ class NeonBackend implements StoreBackend {
   async updateParty(id: string, mutate: (current: unknown) => unknown): Promise<unknown> {
     await this.ensureInit();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const rows = (await this.sql`SELECT data, updated_at FROM house_parties WHERE id = ${id}`) as Array<{
+      const rows = (await this.sql`SELECT data, updated_at::text AS updated_at FROM house_parties WHERE id = ${id}`) as Array<{
         data: unknown;
-        updated_at: string | Date;
+        updated_at: string;
       }>;
       const row = rows[0];
       if (!row) throw new PartyWriteError('not-found', 'No such party');
       const next = mutate(row.data);
-      const stamp = new Date(row.updated_at).toISOString();
+      // Keep PostgreSQL microseconds: a JavaScript Date truncates them and
+      // makes every update after the first look like a conflicting write.
+      const stamp = row.updated_at;
       const written = (await this.sql`UPDATE house_parties
         SET data = ${JSON.stringify(next)}::jsonb, updated_at = now()
-        WHERE id = ${id} AND updated_at = ${stamp}
+        WHERE id = ${id} AND updated_at = ${stamp}::timestamptz
         RETURNING id`) as Array<{ id: string }>;
       if (written[0]) return next;
     }

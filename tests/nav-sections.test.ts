@@ -117,3 +117,10 @@ test('a page lights one tab, the closest one', () => {
   assert.equal(activeTab('/keepers/Brey', tabs), '/keepers');
   assert.equal(activeTab('/trades', tabs), null);
 });
+
+
+test('the in-season OFF SEASON draft link opens the saved board directly', () => {
+  const draft = visibleSections(false, true, 'in-season').find((section) => section.id === 'draft')!;
+  assert.equal(sectionHome(draft), '/draft');
+  assert.ok(!onLanding('/draft', draft));
+});

@@ -145,7 +145,7 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
     const section = sections.find((entry) => entry.id === id);
     if (!section) return [];
     const offSeason = ['draft', 'keepers', 'vault'].includes(id);
-    return [{ ...section, offSeason, primary: !offSeason && id !== 'commish' }];
+    return [{ ...section, home: id === 'draft' ? '/draft' : section.home, offSeason, primary: !offSeason && id !== 'commish' }];
   });
 }
 

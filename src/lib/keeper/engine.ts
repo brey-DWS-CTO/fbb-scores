@@ -510,8 +510,8 @@ export function buildDraftBoard(
     const skipped = !selection && !keeper && yielded[String(pick.overall)] !== undefined;
     return { pick, selection, keeper, onClock: false, skipped };
   });
-  // Nobody is on the clock until the commissioner starts the draft
-  if (dynamic.draft.startedAt !== null) {
+  // Nobody is on the clock before the draft starts or after it closes.
+  if (dynamic.draft.startedAt !== null && !dynamic.draft.closedAt) {
     for (const cell of cells) {
       if (!cell.selection && !cell.keeper && !cell.skipped && !onClockAssigned) {
         cell.onClock = true;

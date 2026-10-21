@@ -45,7 +45,6 @@ import BoardGrid from './BoardGrid.js';
 import LiveRoom from './LiveRoom.js';
 import { AutoButton, AutoChips } from './AutoPanel.js';
 import { ClockControls, ClockReadout, DraftTimingPanel } from './DraftClock.js';
-import EspnPushPanel from './EspnPushPanel.js';
 import PickSheet, { ClearPickSheet } from './PickSheet.js';
 import {
   ACTION_BUTTON,
@@ -322,7 +321,7 @@ export default function DraftPage() {
   const roomQuery = useQuery({
     queryKey: ['draft-room', identity?.owner ?? 'anon', inTestDraft ? 'test' : 'league'],
     queryFn: () => checkInDraftRoom(identity!, room),
-    enabled: identity !== null && !inSandbox && meta !== null,
+    enabled: identity !== null && !inSandbox && meta !== null && !state.draft.closedAt,
     refetchInterval: PRESENCE_POLL_MS,
   });
   const roomOwners = roomQuery.data?.owners;
@@ -352,7 +351,8 @@ export default function DraftPage() {
   );
 
   const onClockIdx = board.findIndex((c) => c.onClock);
-  const onClock = onClockIdx >= 0 ? board[onClockIdx] : null;
+  const completed = Boolean(state.draft.closedAt) || (started && board.every((cell) => cell.selection || cell.keeper));
+  const onClock = !completed && onClockIdx >= 0 ? board[onClockIdx] : null;
   const nextUp = onClock
     ? board.slice(onClockIdx + 1).filter((c) => !c.selection && !c.keeper).slice(0, 3)
     : [];
@@ -366,7 +366,7 @@ export default function DraftPage() {
   // positions and teams; nothing is fetched or simulated for them. The gone
   // odds run while he can enter the pick on the clock.
   const { numbers, projections, gone } = useDraftNumbers({
-    enabled: started && identity?.isCommissioner === true,
+    enabled: started && !completed && identity?.isCommissioner === true,
     odds: canEnterOnClock,
     dataset,
     state: boardState,
@@ -381,7 +381,7 @@ export default function DraftPage() {
 
   // An open cell takes a pick when it is on the clock, or was yielded (rule 2.3.2.2).
   const onCellTap = (cell: BoardCell) => {
-    if (!started) return;
+    if (!started || completed) return;
     if (cell.keeper) return;
     if (cell.selection) {
       if (identity?.isCommissioner) setClearTarget(cell);
@@ -397,7 +397,7 @@ export default function DraftPage() {
   };
 
   const isTappable = (cell: BoardCell): boolean => {
-    if (!started) return false;
+    if (!started || completed) return false;
     if (cell.keeper) return false;
     if (cell.selection) return identity?.isCommissioner === true;
     if (!poolReady) return false;
@@ -444,7 +444,7 @@ export default function DraftPage() {
 
   // A chime when your pick comes up, beeps at two minutes, an alarm on CLOCK.
   const { soundOn, setSoundOn } = useDraftSounds({
-    enabled: started && identity !== null,
+    enabled: started && !completed && identity !== null,
     clock,
     onClockOverall: onClock?.pick.overall ?? null,
     mine: onClock !== null && onClock.pick.currentOwner === identity?.owner,
@@ -453,7 +453,7 @@ export default function DraftPage() {
   // While the draft runs on a phone the page works like the mock room: the
   // app's bar steps aside and the room's own bar picks Players, Board or Picks.
   const navigate = useNavigate();
-  const roomMode = started && identity !== null;
+  const roomMode = started && !completed && identity !== null;
   const [liveTab, setLiveTab] = useState<'players' | 'board' | 'picks'>('players');
   useLayoutEffect(() => {
     document.documentElement.classList.toggle('in-live-room', roomMode);
@@ -524,7 +524,7 @@ export default function DraftPage() {
         </Link>
       </div>
 
-      {identity && !inSandbox && roomOwners && (
+      {identity && !inSandbox && !completed && roomOwners && (
         <div className="panel draft-room-panel" aria-live="polite">
           <div className="draft-room-line">
             <span className="hub-heading">IN THE DRAFT · {roomOwners.length}</span>
@@ -822,12 +822,8 @@ export default function DraftPage() {
         )}
       </div>
 
-      {started && !onClock && identity?.isCommissioner && (
-        <EspnPushPanel board={board} teams={dataset.teams} teamNames={state.teamNames} />
-      )}
-
       {/* The pick that just landed, one line, as in the mock room. */}
-      {started && allPicks[0] && (
+      {started && !completed && allPicks[0] && (
         <div
           key={allPicks[0].overall}
           className={`panel room-latest live-latest${allPicks[0].owner === identity?.owner ? ' is-mine' : ''}`}
@@ -864,14 +860,7 @@ export default function DraftPage() {
         </div>
       )}
 
-      {started && !onClock && (
-        <div className={tabClass('picks')}>
-          {(state.draft.closedAt || identity?.isCommissioner) && (
-            <Link to="/draft/recap" className="tap-btn recap-board-link">SEE THE GRADES: DRAFT RECAP</Link>
-          )}
-          <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
-        </div>
-      )}
+
 
       {meta && !meta.revealed && started && (
         <div
@@ -891,7 +880,7 @@ export default function DraftPage() {
         </div>
       )}
 
-      {started && !poolReady && (
+      {started && !completed && !poolReady && (
         <div
           role="alert"
           className="panel"
@@ -916,7 +905,7 @@ export default function DraftPage() {
       {roomMode && allPicks.length === 0 && (
         <div className={`panel live-empty ${tabClass('picks')}`}>No picks yet.</div>
       )}
-      {allPicks.length > 0 && (
+      {!completed && allPicks.length > 0 && (
         <div className={`panel ${tabClass('picks')}`} style={{ borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <div className="hub-heading" style={{ fontSize: '0.62rem', color: 'var(--text-mid)' }}>
@@ -1062,6 +1051,15 @@ export default function DraftPage() {
         </div>
       )}
       </div>
+
+      {started && !onClock && (
+        <div className={tabClass('picks')}>
+          {(state.draft.closedAt || identity?.isCommissioner) && (
+            <Link to="/draft/recap" className="tap-btn recap-board-link">SEE THE GRADES: DRAFT RECAP</Link>
+          )}
+          <DraftTimingPanel board={board} owners={dataset.teams.map((team) => team.owner)} />
+        </div>
+      )}
 
       {roomMode && (
         <nav className="live-phone-tabs" aria-label="Draft room">
