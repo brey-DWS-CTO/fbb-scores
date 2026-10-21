@@ -29,11 +29,14 @@ import {
   getOwnerEmails,
   getState,
   issueLoginToken,
+  listParties,
   listSentNotices,
 } from './leagueStore.js';
 import { sendMail, type MailContent } from './mailer.js';
 import { shameEmailCopy, type DuesBoard } from '../../src/lib/league/dues.js';
 import { dueAnnouncements } from '../../src/lib/league/announcements.js';
+import type { HouseParty } from '../../src/lib/league/houseParty.js';
+import { duePartyReminders, partiesDueNow, partyCheckDue, partyReminderCopy } from '../../src/lib/league/partyReminders.js';
 
 const leagueDataset = rawDataset as unknown as LeagueDataset;
 
@@ -421,6 +424,45 @@ export interface ReminderRun {
   sent: number;
   /** One-time announcements that went out on this run. */
   announced?: number;
+  /** Morning-of house party reminders that went out on this run. */
+  parties?: number;
+}
+
+// ─── House parties ───────────────────────────────────────────────────────────
+
+/**
+ * The morning-of party reminder, to everyone who said I'M IN.
+ *
+ * The parties are read only in the nine and ten o'clock hours Pacific, so
+ * the database is asked once a day, twice at most, and never at three in
+ * the morning. With no party today the run ends after that one read. The
+ * key is claimed before the send, like every other reminder here.
+ */
+export async function runPartyReminders(now: Date, origin: string): Promise<number> {
+  if (!partyCheckDue(now)) return 0;
+  const season = leagueDataset.season;
+  const parties = (await listParties(season)) as HouseParty[];
+  if (partiesDueNow(now, parties).length === 0) return 0;
+  const book = await addressBook();
+  const due = duePartyReminders({ now, parties, owners: [...book.keys()], alreadySent: await listSentNotices(season) });
+  let sent = 0;
+  for (const reminder of due) {
+    const address = book.get(reminder.owner);
+    if (!address) continue;
+    if (!(await claimSentNotice(reminder.key, season))) continue;
+    const copy = partyReminderCopy(reminder.party, reminder.owner);
+    const content: MailContent = {
+      subject: copy.subject,
+      preheader: copy.preheader,
+      heading: copy.heading,
+      lines: copy.lines,
+      action: { label: 'OPEN THE PARTY', href: `${origin}/party/${encodeURIComponent(reminder.party.id)}` },
+      notes: ['Plans changed? Open the party and tap CAN\'T MAKE IT.'],
+    };
+    const result = await sendMail(address, content, origin, 'notify');
+    if (result.ok) sent += 1;
+  }
+  return sent;
 }
 
 // ─── Announcements ───────────────────────────────────────────────────────────
@@ -461,9 +503,10 @@ export async function runAnnouncements(now: Date, origin: string): Promise<numbe
  */
 export async function runDueReminders(now: Date, origin: string): Promise<ReminderRun> {
   const announced = await runAnnouncements(now, origin);
+  const parties = await runPartyReminders(now, origin);
   // Most hours of the year nothing can be due. Say so without a query, so
   // the database can stay asleep.
-  if (!anyReminderWindowOpen(now, new Date(DRAFT_AT_ISO))) return { due: 0, sent: 0, announced };
+  if (!anyReminderWindowOpen(now, new Date(DRAFT_AT_ISO))) return { due: 0, sent: 0, announced, parties };
   const { state } = await getState();
   const book = await addressBook();
   const withKeepers = Object.entries(state.keepers)
@@ -488,5 +531,5 @@ export async function runDueReminders(now: Date, origin: string): Promise<Remind
     const result = await sendMail(address, reminderContent(reminder, origin), origin, 'notify');
     if (result.ok) sent += 1;
   }
-  return { due: due.length, sent, announced };
+  return { due: due.length, sent, announced, parties };
 }

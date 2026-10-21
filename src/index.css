@@ -5792,6 +5792,14 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   .party-guest { grid-template-columns: 72px minmax(0, 1fr); }
 }
 
+/* ─── House party scoreboard ──────────────────────────────────────────── */
+.party-game-score { color: var(--text-hi) !important; font-weight: 800; }
+.party-game-score.is-live { color: var(--neon-red) !important; }
+.party-guest-total { color: var(--neon-teal); font-size: 0.9rem; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 2px; }
+.stake-chip.is-scored { display: inline-flex; align-items: center; gap: 5px; }
+.stake-chip.is-scored b { color: var(--neon-teal); font-variant-numeric: tabular-nums; }
+.stake-chip.is-waiting { opacity: 0.6; }
+.stake-chip.is-dnp { opacity: 0.5; text-decoration: line-through; }
 /* ─── Scores card: each team's projection sits under its own total ─────── */
 .score-row-score { flex: 0 0 auto; text-align: right; }
 .score-row-proj { margin-top: -2px; font-size: 0.66rem; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
