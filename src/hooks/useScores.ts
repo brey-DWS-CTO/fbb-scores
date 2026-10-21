@@ -4,7 +4,7 @@ import { fetchGamesCaps, fetchScoresWeek } from '../lib/league/api.js';
 import { expectedPointsForGame } from '../lib/league/dailyProjection.js';
 import { projectedFppg } from '../lib/league/draftRankings.js';
 import { capForWeek, type GamesCapRow } from '../lib/league/gamesCap.js';
-import type { ExpectedPoints, ScorePlayer, ScoresWeek } from '../lib/league/scores.js';
+import { localDateIso, type ExpectedPoints, type ScorePlayer, type ScoresWeek } from '../lib/league/scores.js';
 import { useProjectionData } from './useProjectionData.js';
 
 /** How often the current week asks ESPN again while someone is looking. */
@@ -37,6 +37,11 @@ export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabl
     queryFn: demo
       ? async () => (await import('../lib/league/scoresDemo.js')).demoWeek()
       : () => fetchScoresWeek(matchupPeriod),
+    select: (week) => {
+      if (demo) return week;
+      const today = week.days.find((day) => day.date === localDateIso(new Date()));
+      return today ? { ...week, currentScoringPeriodId: today.scoringPeriodId } : week;
+    },
     enabled,
     staleTime: 30_000,
     retry: demo ? false : 1,

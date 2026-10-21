@@ -39,3 +39,11 @@ test('a week nobody has set is 30; a set week is what the commish said', () => {
 test('games read as played of cap', () => {
   assert.equal(gamesText(14, 30), '14 of 30');
 });
+
+
+test('opening week stays at 26 regardless of a changing inferred ESPN allowance', () => {
+  for (const inferred of [null, 30, 26, 21, 17, 13, 9, 4]) {
+    assert.equal(capForWeek([], 1, inferred), 26);
+  }
+  assert.equal(capForWeek([row(1, 28)], 1, 21), 28, 'an explicit commissioner edit still wins');
+});

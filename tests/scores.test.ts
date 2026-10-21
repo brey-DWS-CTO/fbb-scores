@@ -774,3 +774,14 @@ test('games played counts started games finished or under way, never the bench',
   // Away: Curry played Wednesday and is on the floor now, Giannis is on the floor now.
   assert.equal(gamesPlayed(matchup.away, week), 3);
 });
+
+
+test('opening-week cap is fixed across the week even when a date anchor shifts', () => {
+  for (let current = 1; current <= 6; current++) {
+    const settings = { ...LIVE_SETTINGS, scoringPeriodId: current };
+    for (const date of ['2026-10-20', '2026-10-21']) {
+      const plan = planWeek(settings, 1, { scoringPeriodId: 1, date, source: 'scoring-period' });
+      assert.equal(plan.gamesCap, 26);
+    }
+  }
+});

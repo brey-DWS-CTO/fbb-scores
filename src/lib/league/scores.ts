@@ -14,6 +14,7 @@
  * Pure. No server, no browser.
  */
 import { computeFpts, isActiveSlot, NBA_TEAM_ABBREV, POSITION_MAP, round1 } from '../espn/calculations.js';
+import { OPENING_WEEK_GAMES_CAP } from './gamesCap.js';
 import { normalizeNbaTeamCode, type SchedulePhase } from './schedule.js';
 import { leagueSchedule2027 } from './scheduleData.js';
 import { winChance, type RemainingGame, type SideOdds, type WinChance } from './winOdds.js';
@@ -57,6 +58,7 @@ export interface PlayerDay {
   started: boolean;
   points: number;
   stats: StatLine | null;
+  rawStats?: Record<string, number>;
   /** He took the floor that day. */
   played: boolean;
   game: GameLine | null;
@@ -160,6 +162,7 @@ export interface ScoresWeek extends WeekPlan {
   days: ScoreDay[];
   matchups: ScoreMatchup[];
   fetchedAt: string;
+  scoringItems?: Array<{ statId: number; points: number }>;
 }
 
 // ─── Dates ──────────────────────────────────────────────────────────────────
@@ -453,7 +456,9 @@ export function planWeek(settings: unknown, requested: number | null, anchor: Da
     currentScoringPeriodId,
     days,
     weeks,
-    gamesCap: gamesCapFor(leagueSettings.rosterSettings, days.length),
+    gamesCap: season === 2027 && week.matchupPeriodId === 1
+      ? OPENING_WEEK_GAMES_CAP
+      : gamesCapFor(leagueSettings.rosterSettings, days.length),
     anchor: line,
   };
 }
@@ -544,6 +549,7 @@ export interface EspnWeekInput {
   settings: unknown;
   days: EspnDayInput[];
   fetchedAt: string;
+  scoringItems?: Array<{ statId: number; points: number }>;
 }
 
 interface ScoringItem {
@@ -844,7 +850,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
             ?? (row ? (num(row.appliedTotal) ?? (items.length > 0 ? computeFpts(numbers(row.stats), items) : 0)) : 0);
           const game = day.games && proTeam ? (day.games[proTeam] ?? null) : null;
           const played = (stats?.gp ?? 0) >= 1 || points !== 0 || (stats !== null && game?.status === 'final');
-          known.days[String(day.scoringPeriodId)] = { lineupSlotId, started, points, stats, played, game };
+          known.days[String(day.scoringPeriodId)] = { lineupSlotId, started, points, stats, rawStats: row ? numbers(row.stats) : undefined, played, game };
           if (started) dayPoints += points;
         }
         if (!(String(day.scoringPeriodId) in side.pointsByDay)) {
@@ -871,6 +877,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
 
   return {
     ...plan,
+    scoringItems: items,
     days,
     matchups: [...matchups.entries()]
       .sort((a, b) => a[0] - b[0])
