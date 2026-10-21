@@ -6194,3 +6194,34 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
   .keeper-save-dock { bottom: 12px; }
   .draft-round-head { top: 0; }
 }
+
+.lineup-fppg { color: var(--neon-teal); font-size: .8rem; margin: .6rem 0; }
+.fppg-panel { padding: 1rem; margin-top: 1rem; }
+.fppg-panel h2 { font-size: 1rem; }
+.fppg-panel p { color: var(--text-dim); font-size: .8rem; }
+.fppg-scroll { overflow-x: auto; }
+.fppg-panel table, .score-detail table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.fppg-panel th, .fppg-panel td, .score-detail th, .score-detail td { padding: .65rem .5rem; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.fppg-panel th:first-child, .score-detail th:first-child { text-align: left; white-space: normal; min-width: 8rem; }
+.fppg-panel button, .score-detail-trigger { color: inherit; background: transparent; border: 0; font: inherit; cursor: pointer; padding: .3rem; }
+.score-detail-trigger { text-decoration: underline dotted; text-underline-offset: .25rem; }
+.score-detail { background: var(--bg-panel, #141420); color: var(--text-max, #fff); border: 1px solid var(--neon-teal); border-radius: 1rem; width: min(30rem, calc(100vw - 2rem)); max-height: 85vh; overflow: auto; padding: 1.25rem; }
+.score-detail::backdrop { background: #000b; }
+.score-detail h2 { font-size: 1.2rem; padding-right: 2rem; }
+.score-detail p { font-size: .85rem; line-height: 1.6; white-space: normal; }
+.score-detail-close { float: right; }
+.fppg-panel svg { color: var(--neon-teal); }
+
+.score-ppg-jump { margin: .5rem 0 1rem; }
+.fppg-sparkline { display: block; min-width: 96px; color: var(--neon-teal); }
+
+.weekly-ppg-page .fppg-panel { margin-top: .5rem; padding: .75rem; min-width: 0; }
+.weekly-ppg-page .fppg-panel h2 { margin: 0 0 .35rem; font-size: .9rem; }
+.fppg-help { color: var(--text-dim); font-size: .72rem; line-height: 1.4; margin-bottom: .5rem; }
+.fppg-help details { display: inline; margin-left: .5rem; }
+.fppg-help summary { display: inline; cursor: pointer; text-decoration: underline dotted; }
+.weekly-ppg-page .fppg-panel th, .weekly-ppg-page .fppg-panel td { padding: .2rem .4rem; font-size: .75rem; line-height: 1.2; height: 30px; }
+.weekly-ppg-page .fppg-panel th:first-child { max-width: 14rem; }
+.weekly-ppg-page .fppg-panel button { padding: .35rem .15rem; }
+.weekly-ppg-page .fppg-sparkline { width: 96px; height: 24px; }
+.score-ppg-jump { display: inline-flex; align-items: center; }

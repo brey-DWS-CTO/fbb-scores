@@ -774,3 +774,17 @@ test('games played counts started games finished or under way, never the bench',
   // Away: Curry played Wednesday and is on the floor now, Giannis is on the floor now.
   assert.equal(gamesPlayed(matchup.away, week), 3);
 });
+
+
+test('the full week cap does not shrink as the current scoring day advances', () => {
+  for (let current = 1; current <= 6; current++) {
+    const settings = { ...LIVE_SETTINGS, scoringPeriodId: current };
+    const plan = planWeek(settings, 1, OPENING_NIGHT);
+    assert.equal(plan.days.length, 6);
+    assert.equal(plan.gamesCap, 26);
+  }
+  const settings = { ...LIVE_SETTINGS, settings: { ...LIVE_SETTINGS.settings,
+    rosterSettings: { lineupSlotStatLimits: { '15': { statId: 42, limitValue: 28 } } },
+  } };
+  assert.equal(planWeek(settings, 1, OPENING_NIGHT).gamesCap, 28, 'ESPN can change the opening week cap');
+});

@@ -2,13 +2,12 @@ import axios from 'axios';
 import { EspnClient } from '../../src/lib/espn/client.js';
 import {
   addDaysIso,
-  espnToday,
   firstRegularSeasonDate,
   planWeek,
-  readCurrentScoringPeriod,
   readEspnWeek,
   readNbaScoreboard,
   seasonStartDate,
+  scoringPeriodDates,
   type DateAnchor,
   type EspnDayInput,
   type GameLine,
@@ -35,9 +34,12 @@ async function openingNightAnchor(): Promise<DateAnchor> {
 
 export async function loadWeek(client: EspnClient, requested: number | null): Promise<ScoresWeek> {
   const settings = await client.fetchWeekSettings();
-  const current = readCurrentScoringPeriod(settings);
-  const anchor: DateAnchor = current >= 1
-    ? { scoringPeriodId: current, date: espnToday(), source: 'scoring-period' }
+  // Calendar dates stay pinned to the NBA schedule across midnight and time zones.
+  const league = settings as { settings?: { proTeams?: unknown } } | null;
+  const known = scoringPeriodDates(league?.settings?.proTeams);
+  const first = known.entries().next().value;
+  const anchor: DateAnchor = first
+    ? { scoringPeriodId: first[0], date: first[1], source: 'pro-schedule' }
     : await openingNightAnchor();
   const plan = planWeek(settings, requested, anchor);
 

@@ -1,3 +1,5 @@
+import { FppgLabel } from './LineupFppg.js';
+import ScoreBreakdown from './ScoreBreakdown.js';
 import { Fragment, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -66,6 +68,7 @@ function SideHead({ side, owner, proj, deduction, leading, right }: SideHeadProp
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}`}>
       <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name}</div></div>
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
+      <FppgLabel side={side} />
       <div className="score-side-scoreline"><div className="score-side-total">{side.total.toFixed(1)}</div>
       {proj !== null && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
       {proj !== null && deduction > 0 && <div className="score-overage-label">−{projText(deduction)} overage</div>}
@@ -170,11 +173,11 @@ function cardClass(started: boolean, player: ScorePlayer): string {
   return ['score-player', started ? '' : 'is-bench', badge?.tone === 'out' ? 'is-out' : ''].filter(Boolean).join(' ');
 }
 
-function PlayerPoints({ actual, projected }: { actual: string; projected: number | null }) {
+function PlayerPoints({ actual, projected, player, week, period }: { actual: string; projected: number | null; player: ScorePlayer; week: ScoresWeek; period?: number }) {
   return (
     <span className="score-player-points">
-      <span className="score-player-pts is-labeled"><span className="score-points-label">Actual</span><span>{actual}</span></span>
-      {projected !== null && <span className="score-points-projected">Projected {projText(projected)}</span>}
+      <span className="score-player-pts is-labeled"><span className="score-points-label">Actual</span><ScoreBreakdown player={player} week={week} period={period} total={Number(actual)} /></span>
+      {projected !== null && <span className="score-points-projected">Projected <ScoreBreakdown player={player} week={week} period={period} total={projected} projected /></span>}
     </span>
   );
 }
@@ -203,7 +206,7 @@ function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellPr
     <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}`}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={slot} />
-        <PlayerPoints actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
+        <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
       <div className="score-player-game">
         {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
@@ -237,7 +240,7 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
     <div className={cardClass(started, player)}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={latestSlot(player)} />
-        <PlayerPoints actual={summary.total.toFixed(1)} projected={proj} />
+        <PlayerPoints player={player} week={week} actual={summary.total.toFixed(1)} projected={proj} />
       </div>
       <div className="score-player-game">
         {summary.played} played · {summary.left} left
@@ -406,6 +409,7 @@ export default function MatchupPage() {
             </button>
           </div>
 
+          <div className="score-head-grid"><FppgLabel side={matchup.home} period={view.kind === 'day' ? view.scoringPeriodId : undefined} /><div className="is-right"><FppgLabel side={matchup.away} period={view.kind === 'day' ? view.scoringPeriodId : undefined} /></div></div>
           <div className="score-grid-head">
             <span>{owners.get(matchup.home.teamId) ?? matchup.home.name}</span>
             <span className="is-right">{owners.get(matchup.away.teamId) ?? matchup.away.name}</span>

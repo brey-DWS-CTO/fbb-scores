@@ -1,10 +1,11 @@
+import { historicalScoreBaselines } from '../lib/league/scoreBaseline.js';
 import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchGamesCaps, fetchScoresWeek } from '../lib/league/api.js';
 import { expectedPointsForGame } from '../lib/league/dailyProjection.js';
 import { projectedFppg } from '../lib/league/draftRankings.js';
 import { capForWeek, type GamesCapRow } from '../lib/league/gamesCap.js';
-import type { ExpectedPoints, ScorePlayer, ScoresWeek } from '../lib/league/scores.js';
+import { localDateIso, type ExpectedPoints, type ScorePlayer, type ScoresWeek } from '../lib/league/scores.js';
 import { useProjectionData } from './useProjectionData.js';
 
 /** How often the current week asks ESPN again while someone is looking. */
@@ -37,6 +38,11 @@ export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabl
     queryFn: demo
       ? async () => (await import('../lib/league/scoresDemo.js')).demoWeek()
       : () => fetchScoresWeek(matchupPeriod),
+    select: (week) => {
+      if (demo) return week;
+      const today = week.days.find((day) => day.date === localDateIso(new Date()));
+      return today ? { ...week, currentScoringPeriodId: today.scoringPeriodId } : week;
+    },
     enabled,
     staleTime: 30_000,
     retry: demo ? false : 1,
@@ -57,7 +63,7 @@ export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabl
 export function useExpectedPoints(): ExpectedPoints {
   const { snapshot } = useProjectionData();
   return useMemo(() => {
-    const byId = new Map<number, number>();
+    const byId = new Map(historicalScoreBaselines);
     if (snapshot) {
       for (const player of snapshot.players) {
         const value = projectedFppg(player.projection, snapshot.scoringItems);

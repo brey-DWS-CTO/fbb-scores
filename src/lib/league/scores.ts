@@ -57,6 +57,7 @@ export interface PlayerDay {
   started: boolean;
   points: number;
   stats: StatLine | null;
+  rawStats?: Record<string, number>;
   /** He took the floor that day. */
   played: boolean;
   game: GameLine | null;
@@ -160,6 +161,7 @@ export interface ScoresWeek extends WeekPlan {
   days: ScoreDay[];
   matchups: ScoreMatchup[];
   fetchedAt: string;
+  scoringItems?: Array<{ statId: number; points: number }>;
 }
 
 // ─── Dates ──────────────────────────────────────────────────────────────────
@@ -544,6 +546,7 @@ export interface EspnWeekInput {
   settings: unknown;
   days: EspnDayInput[];
   fetchedAt: string;
+  scoringItems?: Array<{ statId: number; points: number }>;
 }
 
 interface ScoringItem {
@@ -844,7 +847,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
             ?? (row ? (num(row.appliedTotal) ?? (items.length > 0 ? computeFpts(numbers(row.stats), items) : 0)) : 0);
           const game = day.games && proTeam ? (day.games[proTeam] ?? null) : null;
           const played = (stats?.gp ?? 0) >= 1 || points !== 0 || (stats !== null && game?.status === 'final');
-          known.days[String(day.scoringPeriodId)] = { lineupSlotId, started, points, stats, played, game };
+          known.days[String(day.scoringPeriodId)] = { lineupSlotId, started, points, stats, rawStats: row ? numbers(row.stats) : undefined, played, game };
           if (started) dayPoints += points;
         }
         if (!(String(day.scoringPeriodId) in side.pointsByDay)) {
@@ -871,6 +874,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
 
   return {
     ...plan,
+    scoringItems: items,
     days,
     matchups: [...matchups.entries()]
       .sort((a, b) => a[0] - b[0])

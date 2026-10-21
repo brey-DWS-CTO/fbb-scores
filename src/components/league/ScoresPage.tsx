@@ -1,3 +1,4 @@
+import { FppgLabel } from './LineupFppg.js';
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -44,6 +45,7 @@ function CardSide({ side, week, owner, leading, mine, proj, deduction, projAhead
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
       <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name}</div></div>
       <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
+      <FppgLabel side={side} />
       <div className="score-side-scoreline"><div className="score-side-total">{side.total.toFixed(1)}</div>
       {proj !== null && (
         <div className={`score-side-proj${projAhead ? ' is-up' : ''}`} title={deduction > 0 ? `${projText(deduction)} overage points deducted` : undefined}>Proj <b>{projText(proj)}</b></div>
@@ -108,6 +110,8 @@ export default function ScoresPage() {
         <WeekPicker weeks={week?.weeks ?? []} selected={selectedWeek} onChange={setWeek} />
       )}
 
+      {week && week.matchups.length > 0 && <Link className="tap-btn mock-mini-btn score-ppg-jump" to={`/scores/ppg${scoresQuery({ week: week.matchupPeriodId, demo })}`}>Weekly PPG &amp; trends →</Link>}
+
       {preseason && (
         <ScoresNotice>
           Week 1 starts {longDate(seasonStartDate())}. Scores show up here once the games do.
@@ -171,6 +175,7 @@ export default function ScoresPage() {
           })}
         </div>
       )}
+
 
       {week && (
         <p className="score-foot">Projections include overage deductions.{week.matchupPeriodId === week.currentMatchupPeriodId && !demo && ' Updates every minute.'}</p>

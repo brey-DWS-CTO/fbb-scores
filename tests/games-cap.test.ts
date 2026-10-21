@@ -39,3 +39,13 @@ test('a week nobody has set is 30; a set week is what the commish said', () => {
 test('games read as played of cap', () => {
   assert.equal(gamesText(14, 30), '14 of 30');
 });
+
+
+test('ESPN supplies every week cap unless that particular week has an override', () => {
+  assert.equal(capForWeek([], 1, 26), 26);
+  assert.equal(capForWeek([], 1, 28), 28, 'opening week is not hardcoded');
+  assert.equal(capForWeek([], 7, 30), 30);
+  assert.equal(capForWeek([row(7, 24)], 7, 30), 24, 'NBA Cup week override');
+  assert.equal(capForWeek([row(7, 24)], 8, 30), 30, 'override does not leak to another week');
+  assert.equal(capForWeek([], 1), 30, 'missing ESPN data uses the standard fallback');
+});

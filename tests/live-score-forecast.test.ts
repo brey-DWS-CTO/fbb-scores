@@ -1,3 +1,5 @@
+import { historicalScoreBaselines } from '../src/lib/league/scoreBaseline.js';
+import { leagueDataset } from '../src/lib/league/data.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { blendExpected, expectedPointsForGame, playerDayProjection, sideProjection } from '../src/lib/league/dailyProjection.js';
@@ -69,4 +71,23 @@ test('early-week odds include shared forecast uncertainty and resist small score
   assert.ok(smallLead <= 53, `ten early points should not swing the week much, got ${smallLead}`);
   assert.ok(projectedEdge < 85, `a preseason edge should not look settled with 50 games left, got ${projectedEdge}`);
   assert.equal(winChance({ points: 100, remaining: [] }, { points: 90, remaining: [] }).a, 100);
+});
+
+
+test('a signed-out opening-night forecast includes stars who have not played yet', () => {
+  const week = warningWeek();
+  const player = week.matchups[0].away.players[0];
+  const jokic = leagueDataset.players.find(p => p.fullName === 'Nikola Jokic');
+  assert.ok(jokic?.espnId);
+  Object.assign(player, { id: jokic.espnId, seasonAvg: null, last15: null, projByDay: {} });
+  const prior = historicalScoreBaselines.get(player.id);
+  assert.ok(prior && prior > 40, 'the public historical baseline must exist without signing in');
+  const baseline = expectedPointsForGame(player, { scoringPeriodId: 18, preseason: prior });
+  assert.equal(baseline, prior, 'missing current-season data does not make future games worth zero');
+  const forecast = sideProjection(week.matchups[0].away, week, (p, id) => expectedPointsForGame(p, {
+    scoringPeriodId: id, preseason: historicalScoreBaselines.get(p.id) ?? null,
+  }));
+  assert.ok(forecast.week > week.matchups[0].away.total + 2 * prior);
+  player.projByDay['18'] = 48;
+  assert.equal(expectedPointsForGame(player, { scoringPeriodId: 18, preseason: prior }), 48, 'daily ESPN projection retains priority');
 });
