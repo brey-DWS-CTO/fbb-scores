@@ -52,10 +52,17 @@ const game = (id: string, home: string, away: string, tipoff: string, tv: string
   id, home, away, tipoff, tv, state: 'pre', detail: '', homeScore: null, awayScore: null,
 });
 
+// Anchor future games in the Pacific afternoon. Relative +30/+32 hour
+// offsets can straddle midnight and make a valid multi-game party fail.
+const futureAfternoon = new Date();
+futureAfternoon.setUTCDate(futureAfternoon.getUTCDate() + 3);
+futureAfternoon.setUTCHours(20, 0, 0, 0);
+const futureGame = (hours: number) => new Date(futureAfternoon.getTime() + hours * 60 * 60 * 1000).toISOString();
+
 const GAMES: NbaGame[] = [
-  game('g1', 'GSW', 'LAL', soon(30), 'TNT'),
-  game('g2', 'DEN', 'MIN', soon(32)),
-  game('g3', 'SAC', 'PHX', soon(72)),
+  game('g1', 'GSW', 'LAL', futureGame(0), 'TNT'),
+  game('g2', 'DEN', 'MIN', futureGame(2)),
+  game('g3', 'SAC', 'PHX', futureGame(48)),
   { ...game('g0', 'BOS', 'MIA', soon(-30)), state: 'post' },
   // Tipped off an hour ago and still going: a party on it has started but is not over.
   { ...game('g5', 'DEN', 'LAL', soon(-1)), state: 'in', detail: '3rd 5:12', homeScore: 88, awayScore: 80 },
