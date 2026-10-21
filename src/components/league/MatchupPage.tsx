@@ -176,8 +176,8 @@ function cardClass(started: boolean, player: ScorePlayer): string {
 function PlayerPoints({ actual, projected, player, week, period }: { actual: string; projected: number | null; player: ScorePlayer; week: ScoresWeek; period?: number }) {
   return (
     <span className="score-player-points">
-      <span className="score-player-pts is-labeled"><span className="score-points-label">Actual</span><ScoreBreakdown player={player} week={week} period={period} total={Number(actual)} /></span>
-      {projected !== null && <span className="score-points-projected">Projected <ScoreBreakdown player={player} week={week} period={period} total={projected} projected /></span>}
+      <span className="score-player-pts is-labeled"><ScoreBreakdown player={player} week={week} period={period} total={Number(actual)} /></span>
+      {projected !== null && <span className="score-points-projected" aria-label="Projected points"><ScoreBreakdown player={player} week={week} period={period} total={projected} projected /></span>}
     </span>
   );
 }
@@ -410,21 +410,16 @@ export default function MatchupPage() {
           </div>
 
           <div className="score-head-grid"><FppgLabel side={matchup.home} period={view.kind === 'day' ? view.scoringPeriodId : undefined} /><div className="is-right"><FppgLabel side={matchup.away} period={view.kind === 'day' ? view.scoringPeriodId : undefined} /></div></div>
-          <div className="score-grid-head">
-            <span>{owners.get(matchup.home.teamId) ?? matchup.home.name}</span>
-            <span className="is-right">{owners.get(matchup.away.teamId) ?? matchup.away.name}</span>
-          </div>
-
           {view.kind === 'day' && homeProj && awayProj && view.scoringPeriodId >= week.currentScoringPeriodId
             && ((homeProj.byDay[String(view.scoringPeriodId)] ?? 0) + (awayProj.byDay[String(view.scoringPeriodId)] ?? 0) > 0
               || homeProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)
               || awayProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)) && (
             <div className="score-proj-grid" aria-label="Actual and projected points for the day">
               <span>
-                Actual {(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Projected <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
+                <strong>{(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)}</strong><small>Proj <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b></small>
               </span>
               <span className="is-right">
-                Actual {(matchup.away.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)} · Projected <b>{projText(awayProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b>
+                <strong>{(matchup.away.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)}</strong><small>Proj <b>{projText(awayProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b></small>
               </span>
             </div>
           )}

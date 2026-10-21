@@ -6115,12 +6115,16 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 @media (max-width: 639px) { .score-player-team { display: none; } }
 @media (min-width: 840px) { .score-team-heading .score-side-name { font-size: 0.9rem; } .score-card .score-side-scoreline .score-side-total { font-size: 1.6rem; } }
 
-/* Keep the kind of player points visible, including before tipoff. */
-.score-player-top:has(.score-player-points) { align-items: flex-start; }
-.score-player-points { flex: 0 0 auto; max-width: 52px; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1.15; }
+/* Reserve a score column so names and scores never overlap. */
+.score-player-top:has(.score-player-points) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4px 6px; }
+.score-player-top:has(.score-player-points) .score-slot { grid-column: 1; justify-self: start; }
+.score-player-top:has(.score-player-points) .score-player-who { grid-column: 1; grid-row: 2; width: 100%; align-items: center; flex-wrap: wrap; overflow: visible; }
+.score-player-top:has(.score-player-points) .score-player-points { grid-column: 2; grid-row: 1 / 3; }
+.score-player-top:has(.score-player-points) .score-player-name { max-width: 100%; }
+.score-player-points { flex: 0 0 auto; min-width: 3.2ch; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1.15; }
 .score-player-pts.is-labeled { margin-left: 0; display: inline-flex; align-items: baseline; gap: 4px; }
 .score-points-label { font-size: 0.55rem; font-weight: 600; color: var(--text-mid); line-height: 1; }
-.score-points-projected { font-size: 0.61rem; font-weight: 400; color: var(--text-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.score-points-projected { font-size: 0.65rem; font-weight: 400; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .score-player.is-overage .score-player-pts.is-labeled { text-decoration: none; }
 .score-player.is-overage .score-player-pts.is-labeled > :last-child { text-decoration: line-through; }
 
@@ -6213,7 +6217,7 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .fppg-panel th:first-child, .score-detail th:first-child { text-align: left; white-space: normal; min-width: 8rem; }
 .fppg-panel button, .score-detail-trigger { color: inherit; background: transparent; border: 0; font: inherit; cursor: pointer; padding: .3rem; }
 .score-detail-trigger { text-decoration: underline dotted; text-underline-offset: .25rem; }
-.score-detail { background: var(--bg-panel, #141420); color: var(--text-max, #fff); border: 1px solid var(--neon-teal); border-radius: 1rem; width: min(30rem, calc(100vw - 2rem)); max-height: 85vh; overflow: auto; padding: 1.25rem; }
+.score-detail { background: var(--panel-bg); color: var(--text-max, #fff); border: 1px solid var(--neon-teal); border-radius: 1rem; width: min(30rem, calc(100vw - 2rem)); max-height: 85vh; overflow: auto; padding: 1.25rem; }
 .score-detail::backdrop { background: #000b; }
 .score-detail h2 { font-size: 1.2rem; padding-right: 2rem; }
 .score-detail p { font-size: .85rem; line-height: 1.6; white-space: normal; }
@@ -6233,3 +6237,18 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .weekly-ppg-page .fppg-panel button { padding: .35rem .15rem; }
 .weekly-ppg-page .fppg-sparkline { width: 96px; height: 24px; }
 .score-ppg-jump { display: inline-flex; align-items: center; }
+
+/* Scores use the same hierarchy in the weekly header and daily totals. */
+.score-side-scoreline { flex-direction: column; align-items: flex-start; gap: 2px; }
+.is-right .score-side-scoreline { align-items: flex-end; }
+.score-side-head { display: flex; flex-direction: column; }
+.score-team-heading { min-height: 2.5em; }
+.score-side-head > .score-side-scoreline { margin-top: auto; padding-top: 4px; }
+.score-player-pts.is-labeled { font-size: 1.05rem; }
+.score-player-points .score-detail-trigger { padding: 0; min-height: 24px; }
+.score-proj-grid > span { display: flex; flex-direction: column; gap: 2px; }
+.score-proj-grid strong { font-size: 1rem; color: var(--text-max); font-variant-numeric: tabular-nums; }
+.score-proj-grid small { font-size: .65rem; }
+.score-detail table { font-variant-numeric: tabular-nums; }
+.score-detail th, .score-detail td { border-color: var(--cell-border); }
+.score-detail-trigger:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 3px; }
