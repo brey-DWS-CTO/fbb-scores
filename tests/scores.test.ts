@@ -776,12 +776,15 @@ test('games played counts started games finished or under way, never the bench',
 });
 
 
-test('opening-week cap is fixed across the week even when a date anchor shifts', () => {
+test('the full week cap does not shrink as the current scoring day advances', () => {
   for (let current = 1; current <= 6; current++) {
     const settings = { ...LIVE_SETTINGS, scoringPeriodId: current };
-    for (const date of ['2026-10-20', '2026-10-21']) {
-      const plan = planWeek(settings, 1, { scoringPeriodId: 1, date, source: 'scoring-period' });
-      assert.equal(plan.gamesCap, 26);
-    }
+    const plan = planWeek(settings, 1, OPENING_NIGHT);
+    assert.equal(plan.days.length, 6);
+    assert.equal(plan.gamesCap, 26);
   }
+  const settings = { ...LIVE_SETTINGS, settings: { ...LIVE_SETTINGS.settings,
+    rosterSettings: { lineupSlotStatLimits: { '15': { statId: 42, limitValue: 28 } } },
+  } };
+  assert.equal(planWeek(settings, 1, OPENING_NIGHT).gamesCap, 28, 'ESPN can change the opening week cap');
 });

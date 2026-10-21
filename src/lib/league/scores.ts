@@ -14,7 +14,6 @@
  * Pure. No server, no browser.
  */
 import { computeFpts, isActiveSlot, NBA_TEAM_ABBREV, POSITION_MAP, round1 } from '../espn/calculations.js';
-import { OPENING_WEEK_GAMES_CAP } from './gamesCap.js';
 import { normalizeNbaTeamCode, type SchedulePhase } from './schedule.js';
 import { leagueSchedule2027 } from './scheduleData.js';
 import { winChance, type RemainingGame, type SideOdds, type WinChance } from './winOdds.js';
@@ -456,9 +455,7 @@ export function planWeek(settings: unknown, requested: number | null, anchor: Da
     currentScoringPeriodId,
     days,
     weeks,
-    gamesCap: season === 2027 && week.matchupPeriodId === 1
-      ? OPENING_WEEK_GAMES_CAP
-      : gamesCapFor(leagueSettings.rosterSettings, days.length),
+    gamesCap: gamesCapFor(leagueSettings.rosterSettings, days.length),
     anchor: line,
   };
 }

@@ -9,8 +9,6 @@
  */
 
 export const DEFAULT_GAMES_CAP = 30;
-/** This league's opening-week allowance is fixed for the entire matchup. */
-export const OPENING_WEEK_GAMES_CAP = 26;
 export const MIN_GAMES_CAP = 1;
 export const MAX_GAMES_CAP = 70;
 
@@ -34,12 +32,10 @@ export function parseGamesCap(input: unknown): number | null {
 /**
  * The cap for one week: what the commissioner set, else ESPN's limit for
  * that week (`espnCap`, from the lineup settings), else the default.
- * Opening week has a fixed 26-game allowance, independent of elapsed days.
  */
 export function capForWeek(rows: readonly GamesCapRow[], matchupPeriodId: number, espnCap: number | null = null): number {
   const set = rows.find((row) => row.matchupPeriodId === matchupPeriodId)?.cap;
   if (set !== undefined) return set;
-  if (matchupPeriodId === 1) return OPENING_WEEK_GAMES_CAP;
   return espnCap !== null && espnCap > 0 ? espnCap : DEFAULT_GAMES_CAP;
 }
 

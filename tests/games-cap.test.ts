@@ -41,9 +41,11 @@ test('games read as played of cap', () => {
 });
 
 
-test('opening week stays at 26 regardless of a changing inferred ESPN allowance', () => {
-  for (const inferred of [null, 30, 26, 21, 17, 13, 9, 4]) {
-    assert.equal(capForWeek([], 1, inferred), 26);
-  }
-  assert.equal(capForWeek([row(1, 28)], 1, 21), 28, 'an explicit commissioner edit still wins');
+test('ESPN supplies every week cap unless that particular week has an override', () => {
+  assert.equal(capForWeek([], 1, 26), 26);
+  assert.equal(capForWeek([], 1, 28), 28, 'opening week is not hardcoded');
+  assert.equal(capForWeek([], 7, 30), 30);
+  assert.equal(capForWeek([row(7, 24)], 7, 30), 24, 'NBA Cup week override');
+  assert.equal(capForWeek([row(7, 24)], 8, 30), 30, 'override does not leak to another week');
+  assert.equal(capForWeek([], 1), 30, 'missing ESPN data uses the standard fallback');
 });
