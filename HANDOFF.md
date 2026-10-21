@@ -11,7 +11,7 @@ landed. What is actually left is in "What is left" near the bottom.
 The Nerds fantasy basketball league's keeper/draft app for the **2027 season** (draft: **Sun Oct 18, 2026, 2:00 PM PT**). Rebuilt from the old ESPN live-scores app in one day; the scores UI was deleted (recover from git history, pre-`5a024a0`) but the ESPN proxy routes remain server-side for the data pipeline and future live scoring.
 
 - **Prod:** https://fbb-scores.dowhatsolutions.com (alias: nerds-league.vercel.app)
-- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores`; run `npm run ship` from a clean `master` branch. The Vercel team's GitHub app still needs access to `brey-DWS-CTO/fbb-scores` before pushes can deploy without the CLI.
+- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores`; the Git integration deploys merges to `master` to production. Open PRs get previews, except for commits changing only Markdown or `docs/`. Do not deploy with the CLI or a deploy hook.
 - **DB:** Neon Postgres `neon-cordovan-ball` (Vercel Marketplace, `DATABASE_URL`); local dev falls back to `.data/league-state.json`
 - **DNS:** `fbb-scores` CNAME → `cname.vercel-dns.com` at domain.com; old Render service is defunct
 
@@ -131,13 +131,9 @@ npm run build
 As of 2026-09-01: **372 tests pass**, lint is clean, the production build succeeds
 with one pre-existing non-blocking chunk-size warning. Local browser checks also pass for the mobile owner picker, owner-to-owner navigation, sticky projection banner, back-to-my-keepers action, server-backed save and reload, fresh-tab sync, correct traded-pick placement on the private mock board, clear projected labels, the `COMMISH` bottom tab, the Commish schedule snapshot status, no-write diff preview, and two-step acceptance control. The build still reports one non-blocking JavaScript chunk-size warning.
 
-`npm run check` runs the full local gate. During prelaunch, ship each complete user-visible batch instead of leaving it only on a local branch:
-
-1. Commit the batch to `master`.
-2. Run `npm run ship`.
-3. Check the changed flow on the custom domain.
-
-The ship command refuses a dirty tree or any branch other than `master`, runs tests, lint, and the production build, pushes GitHub, deploys the same clean checkout through the Vercel CLI, then checks the real domain. Once the Vercel GitHub app has repo access, replace the CLI deploy step with a wait for the Git-triggered deployment.
+`npm run check` runs the full local gate. Commit work on a branch, push once it is
+ready, and open a PR immediately. Check its preview, then merge to `master` for
+the Git integration to deploy production. Do not deploy through the CLI.
 
 ## What is left
 

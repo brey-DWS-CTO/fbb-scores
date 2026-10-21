@@ -79,14 +79,10 @@ notice is claimed before sending, so failed sends are not retried automatically.
 Production uses the existing `CRON_SECRET`, ESPN credentials, `RESEND_API_KEY`, and
 `LEAGUE_MAIL_FROM` settings; without a mail key, the mailer only logs the send.
 
-```bash
-npm run ship
-```
-
-The ship command requires a clean `master`, runs the full check, pushes GitHub, deploys
-through the Vercel CLI, and checks the real domain. Vercel project
-`do-what-solutions-llc/fbb-scores` does not yet have GitHub app access to the repo, so a
-Git push alone does not deploy. Neon is attached through the Vercel Marketplace (env
-`DATABASE_URL`). ESPN cookie env vars must be refreshed when they expire. Never commit
+Merge reviewed pull requests to `master`. The Vercel Git integration is the only
+production deploy path. PR branches get previews unless the commit changes only
+Markdown or `docs/`. Open the PR after the first push; if needed, push an empty
+commit after opening it to request a preview. Neon is attached through the Vercel
+Marketplace (`DATABASE_URL`). ESPN cookie env vars must be refreshed when they expire. Never commit
 a real PIN. Manage commissioner PINs through Commish Mode or `scripts/admin-pins.ts`
 with a production `DATABASE_URL`.
