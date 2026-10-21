@@ -15,7 +15,7 @@ function DailySparkline({ daily, dates }: { daily: Array<number | null>; dates: 
   const x = (index: number) => 5 + index * 110 / Math.max(1, dates.length - 1);
   const y = (value: number) => high === low ? 18 : 30 - (value - low) / (high - low) * 24;
   const points = daily.flatMap((value, index) => value === null ? [] : [`${x(index)},${y(value)}`]).join(' ');
-  return <svg className="fppg-sparkline" viewBox="0 0 120 36" width="120" height="36" role="img"
+  return <svg className="fppg-sparkline" viewBox="0 0 120 36" width="96" height="24" role="img"
     aria-label={`Daily FPPG: ${daily.map((value, index) => `${shortDate(dates[index])}: ${fppgText(value)}`).join(', ')}`}>
     <title>{daily.map((value, index) => `${shortDate(dates[index])}: ${fppgText(value)}`).join(' · ')}</title>
     <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
@@ -39,7 +39,7 @@ export default function LineupFppg({ week }: { week: ScoresWeek }) {
   }}>{label}{sort === key ? ascending ? ' ↑' : ' ↓' : ''}</button>;
 
   return <section className="panel fppg-panel"><h2>Weekly PPG · Week {week.matchupPeriodId}</h2>
-    <p>Fantasy points per game (FPPG): starter points ÷ player-games played (GP). Daily columns show each date’s average. Includes live games; excludes bench and DNPs. Before overage deductions. Tap a column to sort.</p>
+    <div className="fppg-help">FPPG = starter points ÷ GP. Tap headers to sort. <details><summary>How it’s counted</summary>Daily columns show each date’s average. Includes live games; excludes bench and DNPs. Before overage deductions.</details></div>
     <div className="fppg-scroll"><table><thead><tr><th>Team</th>
       {days.map(day => <th key={day.scoringPeriodId}>{heading(String(day.scoringPeriodId), shortDate(day.date))}</th>)}
       <th>{heading('week', 'Week FPPG')}</th><th>GP</th><th>Daily trend</th></tr></thead>

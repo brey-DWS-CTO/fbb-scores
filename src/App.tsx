@@ -28,6 +28,7 @@ import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
 import ScoresPage from './components/league/ScoresPage.js'
+import WeeklyPpgPage from './components/league/WeeklyPpgPage.js'
 import MatchupPage from './components/league/MatchupPage.js'
 import SharedMockPage from './components/league/SharedMockPage.js'
 import AchievementsPage from './components/league/AchievementsPage.js'
@@ -126,6 +127,7 @@ function App() {
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/scores/ppg" element={<WeeklyPpgPage />} />
         <Route path="/scores/:matchupId" element={<MatchupPage />} />
         <Route path="/awards" element={<NbaWatchPage view="awards" />} />
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />

@@ -1,5 +1,5 @@
-import LineupFppg, { FppgLabel } from './LineupFppg.js';
-import { useMemo, useRef } from 'react';
+import { FppgLabel } from './LineupFppg.js';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
@@ -59,7 +59,6 @@ function CardSide({ side, week, owner, leading, mine, proj, deduction, projAhead
 /** The five matchups of one fantasy week, your own on top. */
 export default function ScoresPage() {
   const [params, setParams] = useSearchParams();
-  const ppgSection = useRef<HTMLDivElement>(null);
   const demo = params.get('demo') === '1';
   const requestedWeek = numberParam(params.get('week'));
   const { identity } = useIdentity();
@@ -111,10 +110,7 @@ export default function ScoresPage() {
         <WeekPicker weeks={week?.weeks ?? []} selected={selectedWeek} onChange={setWeek} />
       )}
 
-      {week && week.matchups.length > 0 && <button type="button" className="tap-btn mock-mini-btn score-ppg-jump" onClick={() => {
-        ppgSection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        ppgSection.current?.focus({ preventScroll: true });
-      }}>Weekly PPG &amp; trends ↓</button>}
+      {week && week.matchups.length > 0 && <Link className="tap-btn mock-mini-btn score-ppg-jump" to={`/scores/ppg${scoresQuery({ week: week.matchupPeriodId, demo })}`}>Weekly PPG &amp; trends →</Link>}
 
       {preseason && (
         <ScoresNotice>
@@ -180,7 +176,6 @@ export default function ScoresPage() {
         </div>
       )}
 
-      {week && week.matchups.length > 0 && <div ref={ppgSection} tabIndex={-1} className="score-ppg-target"><LineupFppg week={week} /></div>}
 
       {week && (
         <p className="score-foot">Projections include overage deductions.{week.matchupPeriodId === week.currentMatchupPeriodId && !demo && ' Updates every minute.'}</p>

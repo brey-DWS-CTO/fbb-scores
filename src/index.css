@@ -6213,5 +6213,15 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .fppg-panel svg { color: var(--neon-teal); }
 
 .score-ppg-jump { margin: .5rem 0 1rem; }
-.score-ppg-target { scroll-margin-top: 1rem; }
-.fppg-sparkline { display: block; min-width: 120px; color: var(--neon-teal); }
+.fppg-sparkline { display: block; min-width: 96px; color: var(--neon-teal); }
+
+.weekly-ppg-page .fppg-panel { margin-top: .5rem; padding: .75rem; min-width: 0; }
+.weekly-ppg-page .fppg-panel h2 { margin: 0 0 .35rem; font-size: .9rem; }
+.fppg-help { color: var(--text-dim); font-size: .72rem; line-height: 1.4; margin-bottom: .5rem; }
+.fppg-help details { display: inline; margin-left: .5rem; }
+.fppg-help summary { display: inline; cursor: pointer; text-decoration: underline dotted; }
+.weekly-ppg-page .fppg-panel th, .weekly-ppg-page .fppg-panel td { padding: .2rem .4rem; font-size: .75rem; line-height: 1.2; height: 30px; }
+.weekly-ppg-page .fppg-panel th:first-child { max-width: 14rem; }
+.weekly-ppg-page .fppg-panel button { padding: .35rem .15rem; }
+.weekly-ppg-page .fppg-sparkline { width: 96px; height: 24px; }
+.score-ppg-jump { display: inline-flex; align-items: center; }
