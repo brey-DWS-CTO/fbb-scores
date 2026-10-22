@@ -51,6 +51,7 @@ import FavoritesPrompt from './components/league/FavoritesPrompt.js'
 import InviteToast from './components/league/InviteToast.js'
 import DraftRecapPage from './components/draft/DraftRecapPage.js'
 import FantasyCastPage from './components/league/FantasyCastPage.js'
+import FantasyCastBubble from './components/league/FantasyCastBubble.js'
 
 function App() {
   const location = useLocation()
@@ -150,6 +151,7 @@ function App() {
         <Route path="/depth" element={<NbaWatchPage view="depth" />} />
         <Route path="*" element={<SplashPage />} />
       </Routes>
+      <FantasyCastBubble />
     </div>
   )
 }
