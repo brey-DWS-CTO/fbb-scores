@@ -1203,7 +1203,7 @@ export function statLineText(stats: StatLine | null): string {
     [stats.reb, 'REB'], [stats.ast, 'AST'], [stats.stl, 'STL'], [stats.blk, 'BLK'], [stats.threes, '3PM'], [stats.to, 'TO'],
   ];
   for (const [value, label] of extras) if (value > 0) parts.push(`${value} ${label}`);
-  parts.push(`${stats.fouls ?? 0} FOULS`);
+  parts.push(`${stats.fouls ?? 0} FL`);
   return parts.join(', ');
 }
 
