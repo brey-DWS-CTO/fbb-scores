@@ -177,7 +177,7 @@ function PlayerPoints({ actual, projected, player, week, period }: { actual: str
   return (
     <span className="score-player-points">
       <span className="score-player-pts is-labeled"><ScoreBreakdown player={player} week={week} period={period} total={Number(actual)} /></span>
-      {projected !== null && <span className="score-points-projected" aria-label="Projected points"><ScoreBreakdown player={player} week={week} period={period} total={projected} projected /></span>}
+      {projected !== null && <span className="score-points-projected" aria-label="Projected points">{projected.toFixed(1)}</span>}
     </span>
   );
 }
@@ -203,12 +203,13 @@ function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellPr
   const underway = day?.played === true || status === 'live' || status === 'final';
   const projected = status !== 'final' && proj !== null && proj > 0 && (!underway || status === 'live') ? proj : null;
   return (
-    <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}`}>
+    <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${status === 'live' ? ' is-live' : ''}`}>
       <div className="score-player-top">
         <PlayerTop player={player} slot={slot} />
         <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
-      <div className="score-player-game">
+      <div className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>
+        {status === 'live' && <span className="score-live-label">LIVE</span>}
         {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
       </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
@@ -373,6 +374,16 @@ export default function MatchupPage() {
               </div>
             )}
           </section>
+
+          <div className="score-sticky-summary" aria-label="Matchup score">
+            {[matchup.home, matchup.away].map((side, index) => (
+              <div key={side.teamId} className={`score-sticky-side${index === 1 ? ' is-right' : ''}`}>
+                <FantasyTeamLogo side={side} size={30} />
+                <span className="score-sticky-name">{side.abbrev || side.name}</span>
+                <strong aria-label={`${side.name}: ${side.total.toFixed(1)} points`}>{side.total.toFixed(1)}</strong>
+              </div>
+            ))}
+          </div>
 
           <div ref={dayNav} className="score-week score-day-nav" role="group" aria-label="Day">
             <button
