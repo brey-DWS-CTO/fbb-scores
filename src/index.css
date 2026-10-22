@@ -6264,3 +6264,47 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .score-player-game.is-live { color: var(--neon-teal); }
 .score-live-label { display: inline-block; margin-right: 4px; font-size: .55rem; font-weight: 800; letter-spacing: .04em; }
 .score-detail { position: fixed; inset: 0; margin: auto; box-sizing: border-box; }
+
+/* Daily fantasy leaders and their NBA game. */
+.daily-scorers { margin-top: 18px; padding: 14px; }
+.daily-scorers-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.daily-scorers h2, .nba-game-sort h2 { font-size: 1rem; margin: 0; color: var(--text-max); }
+.daily-scorers-heading p, .daily-scorers-note { color: var(--text-soft); font-size: .72rem; line-height: 1.5; }
+.daily-scorers-heading p { margin: 4px 0 0; }
+.daily-scorers-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin: 14px 0; }
+.daily-scorers-filters label { display: flex; flex-direction: column; gap: 5px; min-width: 0; color: var(--text-soft); font-size: .68rem; }
+.daily-scorers-filters select { width: 100%; min-width: 0; font-size: .75rem; }
+.daily-scorer-columns { display: flex; justify-content: space-between; padding: 6px 0; font-size: .6rem; color: var(--text-soft); letter-spacing: .04em; }
+.daily-scorer-list { padding: 0; margin: 0; list-style: none; }
+.daily-scorer-row, .nba-game-player { display: flex; gap: 9px; align-items: center; padding: 10px 0; border-top: 1px solid var(--cell-border); text-decoration: none; color: var(--text-body); }
+.daily-scorer-row:hover { background: var(--cell-bg); }
+.daily-scorer-row:focus-visible, .score-player-game-link:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.daily-scorer-rank { width: 1.4em; text-align: right; font-size: .68rem; color: var(--text-soft); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.daily-scorer-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.daily-scorer-info strong { font-size: .8rem; color: var(--text-max); overflow-wrap: anywhere; }
+.daily-scorer-info small { font-size: .65rem; line-height: 1.4; color: var(--text-soft); }
+.daily-scorer-total { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.daily-scorer-total strong { font-size: 1.1rem; color: var(--text-max); }
+.daily-scorer-total small { font-size: .6rem; color: var(--text-soft); }
+.daily-scorers-more { display: block; margin: 12px auto 0; }
+.daily-game-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.daily-game-links a { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--cell-border); padding: 9px; border-radius: 6px; font-size: .75rem; color: var(--text-body); text-decoration: none; }
+.daily-game-links small { color: var(--text-soft); }
+.nba-game-header { margin: 14px 0; padding: 16px; }
+.nba-game-header > p { text-align: center; color: var(--text-soft); font-size: .75rem; }
+.nba-game-title { text-align: center; font-size: 1rem; color: var(--text-max); }
+.nba-game-scoreboard { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.nba-game-scoreboard > div { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.nba-game-scoreboard span { color: var(--text-body); font-size: .8rem; }
+.nba-game-scoreboard strong { font-size: 2rem; color: var(--text-max); font-variant-numeric: tabular-nums; }
+.nba-game-sort { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 16px 0; }
+.nba-game-sort label { font-size: .65rem; color: var(--text-soft); }
+.nba-game-sort select { font-size: .7rem; margin-left: 5px; }
+.nba-game-teams { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.nba-game-teams > section { padding: 12px; min-width: 0; }
+.nba-game-teams h3 { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--text-max); }
+.nba-game-player.is-selected { border-left: 3px solid var(--neon-teal); padding-left: 8px; background: color-mix(in srgb, var(--neon-teal) 7%, var(--panel-bg)); }
+.nba-selected-label { display: inline-block; margin-left: 5px; color: var(--neon-teal); font-size: .55rem; }
+.score-player-game-link { color: inherit; text-decoration: none; }
+.score-player-game-link:hover { text-decoration: underline; }
+@media (max-width: 639px) { .nba-game-teams { grid-template-columns: minmax(0, 1fr); } }

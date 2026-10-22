@@ -1,5 +1,6 @@
 import { FppgLabel } from './LineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
+import { nbaGameHref } from '../../lib/league/dailyScorers.js';
 import { Fragment, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -154,13 +155,13 @@ function CapEditor({ matchupPeriodId, cap, onClose }: CapEditorProps) {
   );
 }
 
-function PlayerTop({ player, slot }: { player: ScorePlayer; slot: number }) {
+function PlayerTop({ player, slot, gameHref }: { player: ScorePlayer; slot: number; gameHref?: string }) {
   const badge = injuryBadge(player.injuryStatus);
   return (
     <>
       <span className="score-slot">{slotLabel(slot)}</span>
       <span className="score-player-who">
-        <span className="score-player-name"><span className="score-player-name-text">{shortName(player.name)}</span><TeamLogo code={player.proTeam || null} size={14} /></span>
+        <span className="score-player-name">{gameHref ? <Link className="score-player-name-text score-player-game-link" to={gameHref}>{shortName(player.name)}</Link> : <span className="score-player-name-text">{shortName(player.name)}</span>}<TeamLogo code={player.proTeam || null} size={14} /></span>
         <span className="score-player-team">{player.position || '—'}</span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
       </span>
@@ -188,24 +189,26 @@ interface DayCellProps {
   scoringPeriodId: number;
   expected: ExpectedPoints;
   overage?: OverageGame;
+  demo?: boolean;
 }
 
 /**
  * Actual points stay prominent before, during and after the game.
  * A smaller projected finish sits below until the game is complete.
  */
-function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellProps) {
+function DayCell({ player, week, scoringPeriodId, expected, overage, demo = false }: DayCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const day = player.days[String(scoringPeriodId)];
   const slot = slotOn(player, scoringPeriodId);
   const proj = playerDayProjection(player, week, expected, scoringPeriodId, true);
   const status = day?.game?.status;
+  const date = week.days.find(entry => entry.scoringPeriodId === scoringPeriodId)?.date;
   const underway = day?.played === true || status === 'live' || status === 'final';
   const projected = status !== 'final' && proj !== null && proj > 0 && (!underway || status === 'live') ? proj : null;
   return (
     <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${status === 'live' ? ' is-live' : ''}`}>
       <div className="score-player-top">
-        <PlayerTop player={player} slot={slot} />
+        <PlayerTop player={player} slot={slot} gameHref={day?.game && date && !demo ? nbaGameHref(date, { team: player.proTeam, player: String(player.id) }) : undefined} />
         <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
       <div className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>
@@ -443,8 +446,8 @@ export default function MatchupPage() {
               <div className="score-grid">
                 {Array.from({ length: rows }, (_, index) => (
                   <Fragment key={home[index]?.id ?? `h${index}`}>
-                    <DayCell player={home[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={homeForecast?.overages.find((game) => game.playerId === home[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
-                    <DayCell player={away[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={awayForecast?.overages.find((game) => game.playerId === away[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
+                    <DayCell demo={demo} player={home[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={homeForecast?.overages.find((game) => game.playerId === home[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
+                    <DayCell demo={demo} player={away[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={awayForecast?.overages.find((game) => game.playerId === away[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
                   </Fragment>
                 ))}
               </div>
