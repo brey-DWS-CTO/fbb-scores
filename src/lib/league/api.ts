@@ -62,6 +62,7 @@ import type {
 } from './schedule.js';
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 import type { ScoresWeek } from './scores.js';
+import type { DailyNbaScores } from './dailyScorers.js';
 import type { GamesCapRow } from './gamesCap.js';
 import type { FillLine } from './expertProjections.js';
 import type { LeagueTransaction } from './transactions.js';
@@ -978,6 +979,11 @@ export async function fetchScoresWeek(matchupPeriod: number | null): Promise<Sco
   const { data } = await axios.get<ScoresWeek>('/api/espn/week', {
     params: matchupPeriod === null ? undefined : { matchupPeriod },
   });
+  return data;
+}
+
+export async function fetchDailyScorers(date: string): Promise<DailyNbaScores> {
+  const { data } = await axios.get<DailyNbaScores>('/api/league/daily-scorers', { params: { date } });
   return data;
 }
 

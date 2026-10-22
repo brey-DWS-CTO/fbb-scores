@@ -322,6 +322,7 @@ import {
 } from '../lib/draftRankingService.js';
 import { getNbaWatch } from '../lib/nbaWatchService.js';
 import { getScoreboard } from '../lib/scoreboardService.js';
+import { getDailyNbaScores, validScoreDate } from '../lib/dailyScorersService.js';
 import {
   cancelParty,
   cleanFavorites,
@@ -369,6 +370,20 @@ import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/ex
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
+
+/** Public NBA box scores; no sign-in is needed on the scores page. */
+router.get('/daily-scorers', async (req, res, next) => {
+  const date = typeof req.query.date === 'string' ? req.query.date : '';
+  if (!validScoreDate(date)) {
+    res.status(400).json({ error: 'Use a date in YYYY-MM-DD format' });
+    return;
+  }
+  try {
+    res.json(await getDailyNbaScores(date));
+  } catch (error) {
+    next(new HttpError(502, error instanceof Error ? error.message : 'NBA scores are unavailable'));
+  }
+});
 
 const routeParam = (value: string | string[] | undefined): string =>
   Array.isArray(value) ? (value[0] ?? '') : (value ?? '');

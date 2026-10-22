@@ -110,6 +110,9 @@ export default function ScoresPage() {
         <WeekPicker weeks={week?.weeks ?? []} selected={selectedWeek} onChange={setWeek} />
       )}
 
+      {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/performers">Top Performers →</Link>}
+      {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/nba-scoreboard">NBA Scoreboard →</Link>}
+
       {week && week.matchups.length > 0 && <Link className="tap-btn mock-mini-btn score-ppg-jump" to={`/scores/ppg${scoresQuery({ week: week.matchupPeriodId, demo })}`}>Weekly PPG &amp; trends →</Link>}
 
       {preseason && (
