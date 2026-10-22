@@ -137,3 +137,14 @@ html.cast-docked .app-shell-nav { padding-bottom:calc(min(300px, 45dvh) + 80px +
 .cast-controls label { flex:1; }
 @media(max-width:560px) { .fantasy-cast-page .cast-change { grid-template-columns:20px minmax(0,1fr) 44px; } .cast-action { font-size:.71rem; } }
 .cast-embedded .cast-action { font-size:.71rem; }
+.cast-player-line { display:flex; align-items:center; gap:5px; min-width:0; }
+.cast-player-line > strong { flex:none; font-size:.74rem; }
+.cast-inline-team { color:var(--text-muted,#aaa); font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cast-player-line .cast-you { color:inherit; border-color:currentColor; flex:none; }
+.fantasy-cast-page .cast-change { min-height:29px; }
+.cast-play.panel { padding-top:4px; padding-bottom:4px; }
+.cast-action { font-size:.72rem; line-height:1.3; }
+.cast-action .cast-hoop { width:25px; height:18px; }
+.cast-game-total { display:block; color:var(--text-muted,#aaa); font-size:.57rem; margin-top:2px; white-space:nowrap; }
+.cast-embedded .cast-play.panel { padding-top:4px; padding-bottom:4px; }
+.cast-change + .cast-change { margin-top:2px; padding-top:2px; }

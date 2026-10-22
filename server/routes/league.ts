@@ -371,12 +371,19 @@ import { parseRoast } from '../../src/lib/league/draftRecap.js';
 import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
 import { getFantasyCast } from '../lib/fantasyCastService.js';
+import { castCacheSeconds } from '../../src/lib/league/castPolling.js';
 
 const router = Router();
 router.get('/fantasy-cast', async (req, res, next) => {
   const date = typeof req.query.date === 'string' ? req.query.date : '';
   if (!validScoreDate(date)) { res.status(400).json({ error: 'Use a date in YYYY-MM-DD format' }); return; }
-  try { res.json(await getFantasyCast(date)); }
+  try {
+    const feed = await getFantasyCast(date);
+    // Public NBA data only: no roster or signed-in identity in this response.
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.setHeader('Vercel-CDN-Cache-Control', feed.error ? 'no-store' : `public, s-maxage=${feed.schedule ? castCacheSeconds(feed.schedule, Date.now()) : 20}`);
+    res.json(feed);
+  }
   catch { next(new HttpError(502, 'Play feed is unavailable. Please try again.')); }
 });
 const leagueDataset = rawDataset as unknown as LeagueDataset;

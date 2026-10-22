@@ -4,12 +4,11 @@
  * of an hour once it is final. A party card asks every minute, and ten
  * phones on the same party should cost ESPN one call, not ten.
  */
-import { parseBoxScore, type BoxScore } from '../../src/lib/league/partyScore.js';
+import type { BoxScore } from '../../src/lib/league/partyScore.js';
+import { forgetNbaSummaries, getNbaSummary } from './nbaSummaryService.js';
 
-const SUMMARY_URL = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary';
 const KEEP_LIVE_MS = 90 * 1000;
 const KEEP_FINAL_MS = 15 * 60 * 1000;
-const TIMEOUT_MS = 10_000;
 
 interface Kept {
   at: number;
@@ -26,11 +25,6 @@ function fresh(entry: Kept, now: number): boolean {
   return now - entry.at < keep;
 }
 
-async function getJson(url: string): Promise<unknown> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: 'application/json' } });
-  if (!response.ok) throw new Error(`ESPN answered ${response.status}`);
-  return response.json();
-}
 
 export interface BoxScoreRead {
   boxScores: BoxScore[];
@@ -39,7 +33,7 @@ export interface BoxScoreRead {
 }
 
 /** The box score for each game, from the last read where it is fresh enough. */
-export async function getBoxScores(gameIds: readonly string[], now = new Date()): Promise<BoxScoreRead> {
+export async function getBoxScores(gameIds: readonly string[], now = new Date(Date.now())): Promise<BoxScoreRead> {
   let reason = '';
   const boxScores: BoxScore[] = [];
   await Promise.all(gameIds.map(async (gameId) => {
@@ -50,7 +44,7 @@ export async function getBoxScores(gameIds: readonly string[], now = new Date())
     }
     if (pinned) return;
     try {
-      const box = parseBoxScore(await getJson(`${SUMMARY_URL}?event=${encodeURIComponent(gameId)}`), gameId);
+      const { box } = await getNbaSummary(gameId, now.getTime());
       kept.set(gameId, { at: now.getTime(), box });
       if (box) boxScores.push(box);
     } catch (error) {
@@ -72,5 +66,6 @@ export function pinBoxScores(boxScores: readonly BoxScore[]): void {
 /** Tests only: forget every read. */
 export function forgetBoxScores(): void {
   kept.clear();
+  forgetNbaSummaries();
   pinned = false;
 }

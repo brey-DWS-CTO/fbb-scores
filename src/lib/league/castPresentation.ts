@@ -1,4 +1,23 @@
 import type { CastPlay } from './fantasyCast.js';
+import { castPoints } from './fantasyCast.js';
+import type { ScoringItem } from './partyScore.js';
+
+export function castShortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(part => !/^(jr\.?|sr\.?|ii|iii|iv)$/i.test(part));
+  return parts.length > 1 ? `${parts[0]} ${parts.at(-1)![0]}.` : name;
+}
+
+/** Input is chronological. Each displayed delta gets its running game total. */
+export function castRunningTotals(plays: readonly CastPlay[], scoring: readonly ScoringItem[]): Map<CastPlay['changes'][number], number> {
+  const running = new Map<string, number>();
+  const totals = new Map<CastPlay['changes'][number], number>();
+  for (const play of plays) for (const change of play.changes) {
+    const key = `${play.gameId}:${change.athleteId}`;
+    const total = Math.round(((running.get(key) ?? 0) + castPoints(change.stats, scoring)) * 10) / 10;
+    running.set(key, total); totals.set(change, total);
+  }
+  return totals;
+}
 
 export function castOwnership(teamId: number | undefined, myTeamId: number | undefined, opponentId: number | undefined): 'own' | 'opponent' | 'neutral' {
   if (teamId === undefined) return 'neutral';
