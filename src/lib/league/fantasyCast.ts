@@ -1,12 +1,13 @@
 import { completeLine, type BoxLine, type ScoringItem } from './partyScore.js';
 import { computeFpts, round1 } from '../espn/calculations.js';
+import type { CastSchedule } from './castPolling.js';
 
 export interface CastPlay {
   id: string; gameId: string; text: string; clock: string; period: number;
   timestamp: string | null; order: number; game: string;
   changes: { athleteId: string; name: string; team: string; stat: string; stats: Record<string, number> }[];
 }
-export interface FantasyCast { plays: CastPlay[]; error: string | null; fetchedAt: string }
+export interface FantasyCast { plays: CastPlay[]; error: string | null; fetchedAt: string; schedule?: CastSchedule }
 type RawPlay = { id?: string; text?: string; scoreValue?: number; pointsAttempted?: number; wallclock?: string; sequenceNumber?: string; period?: { number?: number }; clock?: { displayValue?: string } };
 
 /** Keep every play, including substitutions and team events with no fantasy impact. */
@@ -14,6 +15,7 @@ export function parseCastPlays(raw: unknown, gameId: string, game: string, playe
   const plays = (raw as { plays?: RawPlay[] } | null)?.plays;
   if (!Array.isArray(plays)) return [];
   const totals = new Map<string, Record<string, number>>();
+  const uniquePlayers = [...new Map(players.map(player => [player.athleteId, player])).values()];
   return [...plays].sort((a, b) => Number(a.sequenceNumber ?? a.id ?? 0) - Number(b.sequenceNumber ?? b.id ?? 0)).map((play, index) => {
     const text = play.text ?? '';
     const changes: CastPlay['changes'] = [];
@@ -26,7 +28,7 @@ export function parseCastPlays(raw: unknown, gameId: string, game: string, playe
       totals.set(player.athleteId, next);
       changes.push({ athleteId: player.athleteId, name: player.name, team: player.team, stat, stats });
     };
-    for (const player of new Map(players.map(player => [player.athleteId, player])).values()) {
+    for (const player of uniquePlayers) {
       const name = [player.name, player.shortName].filter(Boolean).find(name => text.startsWith(`${name} `));
       if (name) {
         const action = text.slice(name.length).trim().toLowerCase();
@@ -72,11 +74,14 @@ export function reconcileCastPlays(plays: CastPlay[], players: readonly BoxLine[
   if (!plays.length) return plays;
   const changes: CastPlay['changes'] = [];
   const ids = ['0', '1', '2', '3', '6', '11', '13', '14', '15', '16', '17', '23', '24', '37', '38', '39'];
+  const totals = new Map<string, Record<string, number>>();
+  for (const play of plays) for (const change of play.changes) {
+    const sum = totals.get(change.athleteId) ?? {};
+    for (const [id, value] of Object.entries(change.stats)) sum[id] = (sum[id] ?? 0) + value;
+    totals.set(change.athleteId, sum);
+  }
   for (const player of new Map(players.map(player => [player.athleteId, player])).values()) {
-    const summed: Record<string, number> = {};
-    for (const change of plays.flatMap(play => play.changes).filter(change => change.athleteId === player.athleteId)) {
-      for (const [id, value] of Object.entries(change.stats)) summed[id] = (summed[id] ?? 0) + value;
-    }
+    const summed = totals.get(player.athleteId) ?? {};
     const stats = Object.fromEntries(ids.filter(id => player.stats[id] !== undefined && player.stats[id] !== (summed[id] ?? 0)).map(id => [id, player.stats[id] - (summed[id] ?? 0)]));
     if (Object.keys(stats).length) changes.push({ athleteId: player.athleteId, name: player.name, team: player.team, stat: 'Official stat correction', stats });
   }

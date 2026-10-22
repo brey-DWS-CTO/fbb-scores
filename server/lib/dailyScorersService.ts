@@ -3,7 +3,7 @@ import type { DailyNbaScores } from '../../src/lib/league/dailyScorers.js';
 import { getBoxScores } from './boxScoreService.js';
 
 const SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
-const cache = new Map<string, { at: number; read: Promise<DailyNbaScores> }>();
+const cache = new Map<string, { expires: number; read: Promise<DailyNbaScores> }>();
 const KEEP_MS = 45_000;
 
 export function validScoreDate(date: string): boolean {
@@ -17,10 +17,11 @@ export function getDailyNbaScores(date: string): Promise<DailyNbaScores> {
   if (!validScoreDate(date)) return Promise.reject(new Error('Invalid score date'));
   const now = Date.now();
   const hit = cache.get(date);
-  if (hit && now - hit.at < KEEP_MS) return hit.read;
+  if (hit && now < hit.expires) return hit.read;
   // Bound memory even if readers explore many historical dates.
-  for (const [key, entry] of cache) if (now - entry.at >= KEEP_MS) cache.delete(key);
+  for (const [key, entry] of cache) if (now >= entry.expires) cache.delete(key);
   if (cache.size >= 32) cache.delete(cache.keys().next().value!);
+  const entry = { expires: now + KEEP_MS, read: null as unknown as Promise<DailyNbaScores> };
   const read = (async (): Promise<DailyNbaScores> => {
     const response = await fetch(`${SCOREBOARD_URL}?dates=${date.replace(/-/g, '')}`, {
       signal: AbortSignal.timeout(10_000), headers: { accept: 'application/json' },
@@ -31,6 +32,11 @@ export function getDailyNbaScores(date: string): Promise<DailyNbaScores> {
       throw new Error('ESPN did not provide a scoreboard');
     }
     const games = parseScoreboard(raw);
+    // Do not carry a pregame scoreboard across a scheduled tipoff.
+    for (const game of games) {
+      const tipoff = Date.parse(game.tipoff);
+      if (game.state === 'pre' && tipoff > now) entry.expires = Math.min(entry.expires, tipoff);
+    }
     const ids = games.filter(game => game.state !== 'pre').map(game => game.id);
     // A day's NBA slate is small; read its summaries in parallel so scoreboard
     // + summary timeouts stay inside the API's 30-second execution limit.
@@ -41,6 +47,7 @@ export function getDailyNbaScores(date: string): Promise<DailyNbaScores> {
     }
     return { date, fetchedAt: new Date().toISOString(), games, boxScores, error };
   })().catch(error => { cache.delete(date); throw error; });
-  cache.set(date, { at: now, read });
+  entry.read = read;
+  cache.set(date, entry);
   return read;
 }
