@@ -4843,8 +4843,8 @@ html.theme-light {
 .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
 .score-player { min-width: 0; padding: 7px 8px; border: 1px solid var(--cell-border); border-radius: 8px; background: var(--cell-bg); color: var(--text-mid); }
 .score-player.is-empty { border-style: dashed; opacity: 0.35; }
-.score-player.is-bench { opacity: 0.55; }
-.score-player.is-out { opacity: 0.65; }
+.score-player.is-bench { opacity: 0.85; }
+.score-player.is-out { opacity: 0.9; }
 /* One line: the slot, the name, position and team, any injury badge, then points. */
 .score-player-top { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
 .score-slot {
@@ -6333,3 +6333,20 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 .score-sticky-numbers > strong, .score-sticky-side.is-right .score-sticky-numbers > strong { margin: 0; }
 .score-sticky-numbers small { font-size: .6rem; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .score-sticky-summary .score-bar-row { grid-column: 1 / -1; padding: 0; }
+
+.nba-scoreboard-heading { margin: 18px 0; }
+.nba-scoreboard-heading h1 { font-size: 1.2rem; margin: 0; color: var(--text-max); }
+.nba-scoreboard-date { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+.nba-scoreboard-date input { min-width: 0; padding: 8px 10px; color-scheme: dark; }
+html.theme-light .nba-scoreboard-date input { color-scheme: light; }
+.nba-scoreboard-games { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.nba-scoreboard-card { padding: 14px; text-decoration: none; color: var(--text-body); }
+.nba-scoreboard-card:hover, .nba-scoreboard-card:focus-visible { border-color: var(--neon-teal); }
+.nba-scoreboard-card.is-live { border-top: 2px solid var(--neon-teal); }
+.nba-scoreboard-status { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 12px; font-size: .7rem; color: var(--text-soft); }
+.nba-scoreboard-card.is-live .nba-scoreboard-status strong { color: var(--neon-teal); }
+.nba-scoreboard-team { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.nba-scoreboard-team span { font-size: .85rem; }
+.nba-scoreboard-team strong { margin-left: auto; font-size: 1.3rem; font-variant-numeric: tabular-nums; color: var(--text-max); }
+.nba-scoreboard-open { display: block; margin-top: 12px; color: var(--neon-teal); font-size: .65rem; }
+.unowned-badge { display: inline-block; vertical-align: middle; margin-left: 6px; padding: 2px 5px; border: 1px solid var(--neon-teal); border-radius: 4px; font-size: .55rem; font-weight: 700; color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 8%, var(--panel-bg)); }
