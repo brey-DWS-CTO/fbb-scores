@@ -6252,3 +6252,15 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .score-detail table { font-variant-numeric: tabular-nums; }
 .score-detail th, .score-detail td { border-color: var(--cell-border); }
 .score-detail-trigger:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 3px; }
+
+/* Keep the matchup total in view while reading the lineup. */
+.score-sticky-summary { position: sticky; top: 0; z-index: 30; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 10px 8px; margin: 0 0 10px; background: var(--panel-bg); border-bottom: 1px solid var(--panel-border); box-shadow: 0 3px 8px #0001; }
+.score-sticky-side { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.score-sticky-side.is-right { flex-direction: row-reverse; }
+.score-sticky-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .65rem; color: var(--text-soft); }
+.score-sticky-side strong { margin-left: auto; font-size: 1.3rem; font-variant-numeric: tabular-nums; color: var(--text-max); }
+.score-sticky-side.is-right strong { margin-left: 0; margin-right: auto; }
+.score-player.is-live { border-color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 7%, var(--cell-bg)); }
+.score-player-game.is-live { color: var(--neon-teal); }
+.score-live-label { display: inline-block; margin-right: 4px; font-size: .55rem; font-weight: 800; letter-spacing: .04em; }
+.score-detail { position: fixed; inset: 0; margin: auto; box-sizing: border-box; }
