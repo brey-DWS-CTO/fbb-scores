@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useDailyScorers } from '../../hooks/useDailyScorers.js';
 import { teamFullName, normalizeTeam } from '../../lib/league/houseParty.js';
+import { firstNameLastInitial } from '../../lib/league/format.js';
 import { statLine } from '../../lib/league/partyScore.js';
 import { localDateIso } from '../../lib/league/scores.js';
 import TeamLogo from './TeamLogo.js';
@@ -40,10 +41,19 @@ export default function NbaGameScoresPage() {
       {gameRows.length === 0 && <p>{game.state === 'pre' ? 'Player scores appear after tip-off.' : 'Player stats are not available yet. This page updates automatically.'}</p>}
       <div className="nba-game-teams">{[game.away, game.home].map(code => <section className="panel" key={code} aria-label={`${teamFullName(code)} scorers`}>
         <h3><TeamLogo code={code} size={24} />{teamFullName(code)}</h3>
-        <div className="daily-scorer-columns"><span>Player</span><span>FPTS / PTS</span></div>
+        <div className="daily-scorer-columns"><span>Player</span><span>FPTS</span></div>
         <ol className="daily-scorer-list">{gameRows.filter(row => row.team === code).map(row => <li key={row.athleteId} className={`nba-game-player${row.athleteId === selected ? ' is-selected' : ''}`}>
-          <span className="daily-scorer-info"><strong>{row.name}{rosters && !row.roster && <span className="unowned-badge">Unowned</span>}{row.athleteId === selected && <span className="nba-selected-label">Selected</span>}</strong><small>{rosters ? row.roster?.name ?? 'Not rostered' : 'Roster unknown'}</small><small>{statLine(row.stats) || 'No counting stats yet'}</small></span>
-          <span className="daily-scorer-total"><strong>{row.fpts.toFixed(1)}</strong><small>{row.stats['0'] ?? 0} PTS</small></span>
+          <span className="daily-scorer-info">
+            <span className="nba-game-player-heading">
+              <strong title={row.name}>{firstNameLastInitial(row.name)}</strong>
+              {rosters && !row.roster && <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}
+              {row.roster && <small className="nba-game-fantasy-team" title={row.roster.name}>{row.roster.name}</small>}
+              {!rosters && <small className="nba-game-fantasy-team">Roster unknown</small>}
+              {row.athleteId === selected && <span className="nba-selected-label">Selected</span>}
+            </span>
+            <small>{statLine(row.stats) || 'No counting stats yet'}</small>
+          </span>
+          <span className="daily-scorer-total"><strong>{row.fpts.toFixed(1)}</strong></span>
         </li>)}</ol>
         {gameRows.length > 0 && !gameRows.some(row => row.team === code) && <p>No player stats available.</p>}
       </section>)}</div>

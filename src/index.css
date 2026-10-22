@@ -6428,3 +6428,8 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .score-extra-stats { margin-top: 12px; font-size: .7rem; }
 .score-extra-stats strong { color: var(--text-body); }
 .score-head .score-side-scoreline { margin-top: 12px; padding-top: 0; }
+
+.nba-game-player-heading { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.nba-game-player-heading > strong { flex-shrink: 0; }
+.nba-game-player-heading .unowned-badge { margin-left: 0; flex-shrink: 0; }
+.nba-game-player-heading .nba-game-fantasy-team { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

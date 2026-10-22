@@ -23,3 +23,11 @@ export function shortName(fullName: string | null | undefined): string {
   if (parts.length < 2 || /^\d+$/.test(parts[parts.length - 1])) return parts.join(' ');
   return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
 }
+
+/** Compact game rows: first name and surname initial, ignoring generational suffixes. */
+export function firstNameLastInitial(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2 || /^\d+$/.test(parts[parts.length - 1])) return parts.join(' ');
+  while (parts.length > 2 && /^(?:jr\.?|sr\.?|ii|iii|iv|v)$/i.test(parts[parts.length - 1])) parts.pop();
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
