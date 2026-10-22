@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import FantasyCastPage from './FantasyCastPage.js';
 import NavIcon from './NavIcon.js';
@@ -12,8 +12,18 @@ function savedMode(): CastMode {
   catch { return 'float'; }
 }
 
+const DESKTOP_DOCK_QUERY = '(min-width: 1180px)';
+function subscribeDesktopDock(listener: () => void) {
+  const query = window.matchMedia(DESKTOP_DOCK_QUERY);
+  query.addEventListener('change', listener);
+  return () => query.removeEventListener('change', listener);
+}
+const desktopDockSnapshot = () => window.matchMedia(DESKTOP_DOCK_QUERY).matches;
+const serverDockSnapshot = () => false;
+
 export default function FantasyCastBubble() {
   const { pathname, search } = useLocation();
+  const desktopDock = useSyncExternalStore(subscribeDesktopDock, desktopDockSnapshot, serverDockSnapshot);
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [draggingTrigger, setDraggingTrigger] = useState(false);
@@ -81,7 +91,7 @@ export default function FantasyCastBubble() {
         move(rect.left + (event.key === 'ArrowRight' ? 20 : event.key === 'ArrowLeft' ? -20 : 0), rect.top + (event.key === 'ArrowDown' ? 20 : event.key === 'ArrowUp' ? -20 : 0));
       }}><NavIcon name="bolt" size={15} /> Fantasy Cast{mode === 'float' && <NavIcon name="dots" size={14} />}</button><div className="cast-mode-switch"><button type="button" aria-label={mode === 'float' ? 'Dock Fantasy Cast' : 'Pop out Fantasy Cast'} onClick={() => changeMode(mode === 'float' ? 'dock' : 'float')}><NavIcon name={mode === 'float' ? 'book' : 'layers'} size={13} />{mode === 'float' ? 'Dock' : 'Pop out'}</button></div><Link to="/scores/cast" aria-label="Open full Fantasy Cast page" title="Full page">↗</Link><button ref={close} type="button" aria-label="Minimize Fantasy Cast" onClick={minimize}><NavIcon name="close" size={17} /></button></div>
 
-      <div className="cast-bubble-scroll"><FantasyCastPage key={contextKey} embedded peek={mode === 'dock'} initialScope={scope} /></div>
+      <div className="cast-bubble-scroll"><FantasyCastPage key={contextKey} embedded peek={mode === 'dock' && !desktopDock} initialScope={scope} /></div>
     </div>}
     {!open && <div className="cast-launcher">
       <button ref={trigger} type="button" className="cast-bubble-trigger" aria-expanded={false} aria-label="Open Fantasy Cast mini feed. Drag to move." onPointerDown={event => {
