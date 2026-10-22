@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTopPerformers } from '../../hooks/useTopPerformers.js';
 import { filterScorers, matchesPlayerName, nbaGameHref } from '../../lib/league/dailyScorers.js';
-import { fetchPlayerPool } from '../../lib/league/api.js';
+import { localDateIso, seasonStartDate } from '../../lib/league/scores.js';
+import { fetchPerformerDates, fetchPlayerPool } from '../../lib/league/api.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import { playerPoolFromDataset } from '../../lib/league/playerPool.js';
 import { normalizeTeam } from '../../lib/league/houseParty.js';
@@ -16,7 +17,16 @@ const FALLBACK_SEARCH_PLAYERS = playerPoolFromDataset(leagueDataset.players);
 export default function TopPerformersPage() {
   const [params, setParams] = useSearchParams();
   const weekly = params.get('period') === 'week';
-  const { query, rows, rosters, teams, rosterQuery, today: date, dates, gameDates } = useTopPerformers(weekly);
+  const today = localDateIso(new Date());
+  const calendar = useQuery({ queryKey: ['performer-dates', today], queryFn: fetchPerformerDates, staleTime: 60 * 60_000, retry: 1 });
+  const gameDays = calendar.data ?? [today];
+  const requestedDate = params.get('date') ?? today;
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate >= seasonStartDate() && requestedDate <= today
+    && (!calendar.data || gameDays.includes(requestedDate));
+  const selectedDate = validDate ? requestedDate : today;
+  const { query, rows, rosters, teams, rosterQuery, date, dates, gameDates } = useTopPerformers(weekly, selectedDate);
+  const previousDay = gameDays.filter(day => day < date).at(-1);
+  const nextDay = gameDays.find(day => day > date);
   const [expanded, setExpanded] = useState(false);
   const status = params.get('roster') ?? 'all';
   const team = params.get('fantasyTeam') ?? 'all';
@@ -47,10 +57,19 @@ export default function TopPerformersPage() {
     <div className="daily-scorers-heading"><div><h1 id="top-performers-title">Top Performers</h1><p>Fantasy points · {weekly ? `${dates[0]} – ${date}` : new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p></div>
       <button type="button" className="tap-btn mock-mini-btn" disabled={query.isFetching} onClick={() => { void query.refetch(); void rosterQuery.refetch(); }}>Refresh</button></div>
     <div className="top-performers-period" role="group" aria-label="Performance period">
-      <button type="button" className="tap-btn mock-mini-btn" aria-pressed={!weekly} onClick={() => changeFilter('period', 'today')}>Today</button>
+      <button type="button" className="tap-btn mock-mini-btn" aria-pressed={!weekly} onClick={() => changeFilter('period', 'today')}>Daily</button>
       <button type="button" className="tap-btn mock-mini-btn" aria-pressed={weekly} onClick={() => changeFilter('period', 'week')}>Weekly</button>
     </div>
-    {weekly && <p className="daily-scorers-note">Week-to-date totals. Tap a player to open their latest game.</p>}
+    <div className="nba-scoreboard-date" role="group" aria-label="Performance date">
+      <button type="button" className="tap-btn mock-mini-btn" aria-label="Previous game day" disabled={!previousDay} onClick={() => previousDay && changeFilter('date', previousDay)}>‹</button>
+      <select className="hub-input" aria-label="Performance date" value={date} disabled={calendar.isPending} onChange={event => changeFilter('date', event.target.value)}>
+        {[...gameDays].reverse().map(day => <option key={day} value={day}>{day === today ? 'Today' : new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</option>)}
+      </select>
+      <button type="button" className="tap-btn mock-mini-btn" aria-label="Next game day" disabled={!nextDay} onClick={() => nextDay && changeFilter('date', nextDay)}>›</button>
+      {date !== today && <button type="button" className="tap-btn mock-mini-btn" onClick={() => changeFilter('date', today)}>Today</button>}
+    </div>
+    {calendar.isError && <p role="status" className="daily-scorers-note">Game-day calendar unavailable. <button type="button" className="tap-btn mock-mini-btn" onClick={() => void calendar.refetch()}>Retry</button></p>}
+    {weekly && <p className="daily-scorers-note">Week through the selected day. Tap a player to open their latest game.</p>}
     <div className="top-performers-search"><label htmlFor="performer-search">Search players</label>
       <div><input id="performer-search" className="hub-input" type="search" aria-label="Search players" placeholder="Search any player…" value={search} onChange={event => changeFilter('search', event.target.value)} autoComplete="off" />
       {search && <button type="button" className="tap-btn mock-mini-btn" onClick={() => changeFilter('search', '')}>Clear</button>}</div>

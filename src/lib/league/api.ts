@@ -2129,3 +2129,9 @@ export async function fetchHouseInvites(c: Credentials): Promise<{ invites: Pend
   const { data } = await axios.get<{ invites: PendingInvite[]; now: string }>('/api/league/invites', { headers: authHeaders(c) });
   return data;
 }
+
+/** Past NBA game dates in the current season, plus today. */
+export async function fetchPerformerDates(): Promise<string[]> {
+  const { data } = await axios.get<{ dates: string[] }>('/api/league/performer-dates');
+  return data.dates;
+}

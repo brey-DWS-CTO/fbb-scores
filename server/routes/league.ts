@@ -1,3 +1,4 @@
+import { getPerformerDates } from '../lib/performerDatesService.js';
 /**
  * League draft-hub API — keepers, live draft picks, locks, PINs, audit log.
  * Mounted at /api/league.
@@ -387,6 +388,10 @@ router.get('/waiver-calendar', async (req, res, next) => {
 });
 
 /** Public NBA box scores; no sign-in is needed on the scores page. */
+router.get('/performer-dates', async (_req, res, next) => {
+  try { res.json({ dates: await getPerformerDates() }); } catch (error) { next(error); }
+});
+
 router.get('/daily-scorers', async (req, res, next) => {
   const date = typeof req.query.date === 'string' ? req.query.date : '';
   if (!validScoreDate(date)) {

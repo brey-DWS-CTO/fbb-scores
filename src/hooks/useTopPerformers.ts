@@ -5,11 +5,12 @@ import { LEAGUE_SCORING } from '../lib/league/partyScore.js';
 import { localDateIso } from '../lib/league/scores.js';
 import { useScoresWeek } from './useScores.js';
 
-export function useTopPerformers(weekly: boolean) {
+export function useTopPerformers(weekly: boolean, selectedDate?: string) {
   const today = localDateIso(new Date());
   const rosterQuery = useScoresWeek(null, false);
   const week = rosterQuery.data;
-  const dates = performerDates(today, weekly, week);
+  const date = selectedDate ?? today;
+  const dates = performerDates(date, weekly, week);
   const queries = useQueries({ queries: dates.map(date => ({
     queryKey: ['daily-scorers', date],
     queryFn: () => fetchDailyScorers(date),
@@ -23,11 +24,11 @@ export function useTopPerformers(weekly: boolean) {
   const errors = days.flatMap(day => day.error ? [day.error] : []);
   if (queries.some(query => query.isError)) errors.push('Some dates could not be loaded. Totals may be incomplete. Try Refresh.');
   const data: DailyNbaScores | undefined = days.length ? {
-    date: today, fetchedAt: days[0].fetchedAt, games: days.flatMap(day => day.games),
+    date, fetchedAt: days[0].fetchedAt, games: days.flatMap(day => day.games),
     boxScores: days.flatMap(day => day.boxScores), error: [...new Set(errors)].join(' ') || null,
   } : undefined;
   return {
-    today, dates, rosterQuery, rosters,
+    today, date, dates, rosterQuery, rosters,
     gameDates: new Map(days.flatMap(day => day.games.map(game => [game.id, day.date] as const))),
     rows: topPerformers(days, scoring, rosters),
     teams: week?.matchups.flatMap(matchup => [matchup.home, matchup.away]) ?? [],
