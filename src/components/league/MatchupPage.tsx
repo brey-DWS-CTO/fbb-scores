@@ -1,7 +1,8 @@
 import { FppgLabel } from './LineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
 import { nbaGameHref } from '../../lib/league/dailyScorers.js';
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
+import { isActiveSlot } from '../../lib/espn/calculations.js';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -254,6 +255,31 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
   );
 }
 
+/** Keep both benches below the same divider, even when starter counts differ. */
+function LineupGrid({ home, away, isStarter, renderCell }: {
+  home: ScorePlayer[];
+  away: ScorePlayer[];
+  isStarter: (player: ScorePlayer) => boolean;
+  renderCell: (player: ScorePlayer | undefined, side: 'home' | 'away') => ReactNode;
+}) {
+  const groups = [true, false].map(starters => ({
+    starters,
+    home: home.filter(player => isStarter(player) === starters),
+    away: away.filter(player => isStarter(player) === starters),
+  }));
+  return <>{groups.map(group => {
+    const count = Math.max(group.home.length, group.away.length);
+    if (!count) return null;
+    return <Fragment key={String(group.starters)}>
+      {!group.starters && <div className="score-bench-divider" role="separator" aria-label="Bench and injured reserve"><span>BENCH / IR</span></div>}
+      <div className="score-grid">{Array.from({ length: count }, (_, index) => <Fragment key={group.home[index]?.id ?? `h${index}`}>
+        {renderCell(group.home[index], 'home')}
+        {renderCell(group.away[index], 'away')}
+      </Fragment>)}</div>
+    </Fragment>;
+  })}</>;
+}
+
 /** One matchup, Sleeper style: both sides, then one day's lineups or the whole week. */
 export default function MatchupPage() {
   const { matchupId } = useParams();
@@ -438,37 +464,20 @@ export default function MatchupPage() {
             </div>
           )}
 
-          {view.kind === 'day' && (() => {
-            const home = lineupOrder(matchup.home.players, view.scoringPeriodId);
-            const away = lineupOrder(matchup.away.players, view.scoringPeriodId);
-            const rows = Math.max(home.length, away.length);
-            return (
-              <div className="score-grid">
-                {Array.from({ length: rows }, (_, index) => (
-                  <Fragment key={home[index]?.id ?? `h${index}`}>
-                    <DayCell demo={demo} player={home[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={homeForecast?.overages.find((game) => game.playerId === home[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
-                    <DayCell demo={demo} player={away[index]} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={awayForecast?.overages.find((game) => game.playerId === away[index]?.id && game.scoringPeriodId === view.scoringPeriodId)} />
-                  </Fragment>
-                ))}
-              </div>
-            );
-          })()}
+          {view.kind === 'day' && <LineupGrid
+            home={lineupOrder(matchup.home.players, view.scoringPeriodId)}
+            away={lineupOrder(matchup.away.players, view.scoringPeriodId)}
+            isStarter={player => isActiveSlot(slotOn(player, view.scoringPeriodId))}
+            renderCell={(player, side) => <DayCell demo={demo} player={player} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={(side === 'home' ? homeForecast : awayForecast)?.overages.find(game => game.playerId === player?.id && game.scoringPeriodId === view.scoringPeriodId)} />}
+          />}
 
-          {view.kind === 'week' && (() => {
-            const home = weekOrder(matchup.home.players);
-            const away = weekOrder(matchup.away.players);
-            const rows = Math.max(home.length, away.length);
-            return (
-              <div className="score-grid">
-                {Array.from({ length: rows }, (_, index) => (
-                  <Fragment key={home[index]?.id ?? `h${index}`}>
-                    <WeekCell player={home[index]} week={week} expected={expected} overages={homeForecast?.overages ?? []} />
-                    <WeekCell player={away[index]} week={week} expected={expected} overages={awayForecast?.overages ?? []} />
-                  </Fragment>
-                ))}
-              </div>
-            );
-          })()}
+          {view.kind === 'week' && <LineupGrid
+            home={weekOrder(matchup.home.players)}
+            away={weekOrder(matchup.away.players)}
+            isStarter={player => isActiveSlot(latestSlot(player))}
+            renderCell={(player, side) => <WeekCell player={player} week={week} expected={expected} overages={(side === 'home' ? homeForecast : awayForecast)?.overages ?? []} />}
+          />}
+
         </>
       )}
     </div>

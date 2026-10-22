@@ -6312,3 +6312,8 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .top-performers-page h1 { font-size: 1.2rem; color: var(--text-max); margin: 0; }
 .top-performers-period { display: flex; gap: 8px; margin: 16px 0 6px; }
 .top-performers-period [aria-pressed="true"] { color: var(--neon-teal); border-color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 8%, var(--panel-bg)); }
+
+/* A shared boundary keeps starters and reserves visually distinct on both sides. */
+.score-bench-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 9px; color: var(--text-soft); font-size: .6rem; font-weight: 800; letter-spacing: .1em; }
+.score-bench-divider::before, .score-bench-divider::after { content: ''; flex: 1; height: 1px; background: var(--text-dim); opacity: .6; }
+.score-bench-divider span { flex-shrink: 0; }
