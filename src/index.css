@@ -6413,3 +6413,12 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 }
 /* Available players stand out in both themes. */
 .unowned-badge { color: #211b00; background: #ffe600; border-color: #d4b900; }
+.score-field-goal-net { background: none; border: 0; border-bottom: 1px dotted currentColor; padding: 4px 0; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.score-field-goal-net:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.score-field-goal-part th { padding-left: 12px; font-weight: 400; }
+/* Stretch the accessible score button across its player card. */
+.score-player { position: relative; }
+.score-detail-trigger { text-decoration: none; }
+.score-player .score-detail-trigger::after { content: ''; position: absolute; inset: 0; border-radius: 8px; cursor: pointer; }
+.score-player:has(.score-detail-trigger:focus-visible) { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.score-player .score-detail-trigger:focus-visible { outline: none; }
