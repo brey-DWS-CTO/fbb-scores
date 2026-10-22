@@ -6331,7 +6331,6 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 .score-sticky-numbers { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-left: auto; flex-shrink: 0; }
 .score-sticky-side.is-right .score-sticky-numbers { align-items: flex-start; margin-left: 0; margin-right: auto; }
 .score-sticky-numbers > strong, .score-sticky-side.is-right .score-sticky-numbers > strong { margin: 0; }
-.score-sticky-numbers small { font-size: .6rem; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .score-sticky-summary .score-bar-row { grid-column: 1 / -1; padding: 0; }
 
 .nba-scoreboard-heading { margin: 18px 0; }
@@ -6429,3 +6428,8 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .score-extra-stats { margin-top: 12px; font-size: .7rem; }
 .score-extra-stats strong { color: var(--text-body); }
 .score-head .score-side-scoreline { margin-top: 12px; padding-top: 0; }
+
+.nba-game-player-heading { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.nba-game-player-heading > strong { flex-shrink: 0; }
+.nba-game-player-heading .unowned-badge { margin-left: 0; flex-shrink: 0; }
+.nba-game-player-heading .nba-game-fantasy-team { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

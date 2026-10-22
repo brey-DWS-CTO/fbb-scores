@@ -424,13 +424,11 @@ export default function MatchupPage() {
 
           <div className={`score-sticky-summary${showStickyScore ? ' is-visible' : ''}`} aria-hidden={!showStickyScore} aria-label="Matchup score">
             {[matchup.home, matchup.away].map((side, index) => {
-              const dailyTotal = side.pointsByDay[String(view.kind === 'day' ? view.scoringPeriodId : week.currentScoringPeriodId)] ?? 0;
               return <div key={side.teamId} className={`score-sticky-side${index === 1 ? ' is-right' : ''}`}>
                 <FantasyTeamLogo side={side} size={30} />
                 <span className="score-sticky-name">{side.abbrev || side.name}</span>
                 <span className="score-sticky-numbers">
                   <strong aria-label={`${side.name}: ${side.total.toFixed(1)} points`}>{side.total.toFixed(1)}</strong>
-                  <small aria-label={`${side.name}: daily total ${dailyTotal.toFixed(1)} points`}>Day {dailyTotal.toFixed(1)}</small>
                 </span>
               </div>;
             })}
