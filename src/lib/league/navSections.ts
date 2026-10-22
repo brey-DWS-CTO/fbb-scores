@@ -9,7 +9,7 @@
 import { leagueSchedule2027 } from './scheduleData.js';
 import type { SeasonMode } from './seasonMode.js';
 
-export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy';
+export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy' | 'bolt';
 
 export interface SectionTab {
   to: string;
@@ -20,8 +20,9 @@ export interface SectionTab {
 }
 
 export interface NavSection {
-  id: 'scores' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
+  id: 'scores' | 'cast' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
   label: string;
+  shortLabel?: string;
   icon: SectionIcon;
   /** On the phone's bottom bar; the rest sit behind MORE. */
   primary?: boolean;
@@ -53,6 +54,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
+  { id: 'cast', label: 'FANTASY CAST', shortLabel: 'CAST', icon: 'bolt', primary: true, tabs: [{ to: '/scores/cast', label: 'FANTASY CAST' }] },
   { id: 'trades', label: 'TRADES', icon: 'arrows', primary: true, tabs: [{ to: '/trades', label: 'TRADES' }] },
   {
     id: 'league',
@@ -131,8 +133,8 @@ export function activeTab(pathname: string, tabs: readonly SectionTab[]): string
 /** Keep menus focused on the current mode; saved page addresses remain valid. */
 export function visibleSections(isCommissioner: boolean, keepersPublic: boolean, mode: SeasonMode): NavSection[] {
   const order = mode === 'in-season'
-    ? ['scores', 'league', 'trades', 'rules', 'commish', 'draft']
-    : ['keepers', 'draft', 'trades', 'league', 'vault', 'rules', 'commish'];
+    ? ['scores', 'cast', 'league', 'trades', 'rules', 'commish', 'draft']
+    : ['keepers', 'draft', 'cast', 'trades', 'league', 'vault', 'rules', 'commish'];
   return order.flatMap((id) => {
     const section = NAV_SECTIONS.find((entry) => entry.id === id);
     if (!section || (section.commishOnly && !isCommissioner)) return [];
@@ -142,8 +144,8 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
       label: archive ? 'DRAFT RESULTS' : section.label,
       home: archive ? '/draft' : section.home,
       primary: mode === 'in-season'
-        ? ['scores', 'league', 'trades', 'rules'].includes(id)
-        : section.primary === true,
+        ? ['scores', 'cast', 'league', 'trades'].includes(id)
+        : ['keepers', 'draft', 'cast', 'league'].includes(id),
       tabs: section.tabs.filter((tab) =>
         (!tab.commishOnly || isCommissioner)
         && (!tab.mode || tab.mode === mode)

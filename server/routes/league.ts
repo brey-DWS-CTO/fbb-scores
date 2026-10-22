@@ -369,7 +369,15 @@ import { isSeasonMode, resolveSeasonMode } from '../../src/lib/league/seasonMode
 import { parseRoast } from '../../src/lib/league/draftRecap.js';
 import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/expertProjections.js';
 
+import { getFantasyCast } from '../lib/fantasyCastService.js';
+
 const router = Router();
+router.get('/fantasy-cast', async (req, res, next) => {
+  const date = typeof req.query.date === 'string' ? req.query.date : '';
+  if (!validScoreDate(date)) { res.status(400).json({ error: 'Use a date in YYYY-MM-DD format' }); return; }
+  try { res.json(await getFantasyCast(date)); }
+  catch { next(new HttpError(502, 'Play feed is unavailable. Please try again.')); }
+});
 const leagueDataset = rawDataset as unknown as LeagueDataset;
 
 router.get('/waiver-calendar', async (req, res, next) => {
