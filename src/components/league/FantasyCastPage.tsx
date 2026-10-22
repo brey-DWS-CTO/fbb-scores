@@ -12,7 +12,6 @@ import { castMatchesGame } from '../../lib/league/castContext.js';
 import { numberParam } from './scoresUi.js';
 import './fantasyCast.css';
 import TeamLogo from './TeamLogo.js';
-import CastHoop from './CastHoop.js';
 import { castAction, castOwnership, castRunningTotals, castShortName } from '../../lib/league/castPresentation.js';
 import { castPollDelay } from '../../lib/league/castPolling.js';
 
@@ -106,7 +105,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
           const ownership = castOwnership(roster?.team.teamId, mine, opponentId);
           return <div key={`${change.athleteId}:${index}`} className={`cast-change cast-owner-${ownership}`}>
             <TeamLogo code={change.team} size={22} />
-            <div className="cast-player"><div className="cast-player-line"><strong title={change.name}>{castShortName(change.name)}</strong><span className="cast-inline-team" title={roster?.team.name}>{change.team} · {roster ? roster.team.name : day ? 'Free agent' : 'Roster unavailable'}{roster && !roster.started ? ' · BENCH' : ''}</span>{myPlayer && <span className="cast-you">YOU</span>}{ownership === 'opponent' && <span className="cast-you">OPP</span>}</div><div className="cast-action"><span>{castAction(play, change)}</span>{['Field goal made', '3-pointer made', 'Free throw made'].includes(change.stat) && <CastHoop />}{Object.keys(change.stats).some(id => ['37', '38', '39'].includes(id)) ? ' · Milestone bonus' : ''}</div></div>
+            <div className="cast-player"><div className="cast-player-line"><strong title={change.name}>{castShortName(change.name)}</strong><span className="cast-inline-team" title={roster?.team.name}>{change.team} · {roster ? roster.team.name : day ? 'Free agent' : 'Roster unavailable'}{roster && !roster.started ? ' · BENCH' : ''}</span>{myPlayer && <span className="cast-you">YOU</span>}{ownership === 'opponent' && <span className="cast-you">OPP</span>}</div><div className="cast-action"><span>{castAction(play, change)}</span>{Object.keys(change.stats).some(id => ['37', '38', '39'].includes(id)) ? ' · Milestone bonus' : ''}</div></div>
             <div className="cast-impact"><strong key={points} className="cast-points" aria-label={`${points > 0 ? 'plus ' : ''}${points.toFixed(1)} fantasy points`}>{points > 0 ? '+' : ''}{points.toFixed(1)}</strong><span className="cast-game-total" title="Running fantasy points in this NBA game" aria-label={`${(runningTotals.get(change) ?? 0).toFixed(1)} game total`}>{(runningTotals.get(change) ?? 0).toFixed(1)} total</span></div>
           </div>;
         })}

@@ -101,9 +101,10 @@ html.cast-docked .app-shell-nav { padding-bottom:calc(min(300px, 45dvh) + 80px +
   html.cast-docked .app-shell-nav { padding-bottom:calc(min(300px, 45dvh) + 16px); }
 }
 @media (min-width:1180px) {
-  .cast-bubble.is-docked { left:auto; top:12px; right:12px; bottom:auto; width:380px; }
-  .is-docked .cast-bubble-panel { height:auto; max-height:calc(100dvh - 24px); border-radius:10px; }
-  html.cast-docked .app-shell-nav { margin-right:404px; padding-bottom:0; }
+  .cast-bubble.is-docked { left:auto; top:0; right:0; bottom:0; width:380px; height:100dvh; }
+  .is-docked .cast-bubble-panel { flex:1; height:100%; max-height:none; border-radius:0; }
+  .is-docked .cast-bubble-toolbar { flex-shrink:0; }
+  html.cast-docked .app-shell-nav { margin-right:380px; padding-bottom:0; }
 }
 .cast-bubble-toolbar .cast-drag-handle { display:flex; justify-content:flex-start; gap:5px; color:var(--neon-yellow); font-size:.78rem; font-weight:750; margin-right:auto; padding:0; touch-action:none; cursor:grab; user-select:none; }
 .cast-bubble-toolbar .cast-drag-handle:active { cursor:grabbing; }
