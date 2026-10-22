@@ -22,3 +22,20 @@ export function lineupFppg(side: ScoreSide, period?: number) {
 
 export const fppgText = (value: number | null) => value === null ? '—' : (Math.round((value + Number.EPSILON) * 10) / 10).toFixed(1);
 
+
+export function sortLineupFppg(teams: readonly ScoreSide[], column: string, ascending: boolean, periods: readonly number[]): ScoreSide[] {
+  const value = (side: ScoreSide): number | null => {
+    if (column === 'gp') return lineupFppg(side).games;
+    if (column === 'trend') {
+      const daily = periods.map(period => lineupFppg(side, period).average).filter((average): average is number => average !== null);
+      return daily.length < 2 ? null : daily[daily.length - 1] - daily[0];
+    }
+    return lineupFppg(side, column === 'week' ? undefined : Number(column)).average;
+  };
+  return [...teams].sort((a, b) => {
+    if (column === 'team') return a.name.localeCompare(b.name) * (ascending ? 1 : -1);
+    const av = value(a), bv = value(b);
+    if (av === null || bv === null) return av === null ? bv === null ? a.name.localeCompare(b.name) : 1 : -1;
+    return (av - bv) * (ascending ? 1 : -1) || a.name.localeCompare(b.name);
+  });
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lineupFppg, fppgText } from '../src/lib/league/lineupFppg.ts';
+import { lineupFppg, fppgText, sortLineupFppg } from '../src/lib/league/lineupFppg.ts';
 import { planWeek } from '../src/lib/league/scores.ts';
 import type { ScoreSide, ScorePlayer, PlayerDay } from '../src/lib/league/scores.ts';
 const day = (points:number, started=true, played=true):PlayerDay => ({points,started,played,lineupSlotId:0,stats:null,game:null});
@@ -17,4 +17,17 @@ test('opening night anchor keeps scoring dates stable after Eastern midnight',()
  const settings={seasonId:2027,scoringPeriodId:1,status:{currentMatchupPeriod:1},settings:{scheduleSettings:{matchupPeriods:{'1':[1,2,3,4,5,6,7]}}}};
  const plan=planWeek(settings,null,{scoringPeriodId:1,date:'2026-10-20',source:'opening-night'});
  assert.equal(plan.days[0].date,'2026-10-20');
+});
+
+test('weekly table sorts week, GP, dates, names and trend without mutating rows; missing averages remain last',()=>{
+ const a={...side({'1':day(20),'2':day(60)}),teamId:1,name:'Alpha'};
+ const b={...side({'1':day(70)}),teamId:2,name:'Beta'};
+ const empty={...side({'1':day(0,true,false)}),teamId:3,name:'Empty'};
+ const rows=[a,b,empty];
+ const ids=(column:string,ascending=false)=>sortLineupFppg(rows,column,ascending,[1,2]).map(row=>row.teamId);
+ assert.deepEqual(ids('week'),[2,1,3]); assert.deepEqual(ids('week',true),[1,2,3]);
+ assert.deepEqual(ids('gp'),[1,2,3]); assert.deepEqual(ids('gp',true),[3,2,1]);
+ assert.deepEqual(ids('1'),[2,1,3]); assert.deepEqual(ids('2',true),[1,2,3]);
+ assert.deepEqual(ids('team',true),[1,2,3]); assert.deepEqual(ids('team'),[3,2,1]);
+ assert.deepEqual(ids('trend'),[1,2,3]); assert.deepEqual(rows.map(row=>row.teamId),[1,2,3]);
 });

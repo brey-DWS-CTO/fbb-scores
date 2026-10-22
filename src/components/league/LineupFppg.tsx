@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fppgText, lineupFppg } from '../../lib/league/lineupFppg.js';
+import { fppgText, lineupFppg, sortLineupFppg } from '../../lib/league/lineupFppg.js';
 import { shortDate, type ScoreSide, type ScoresWeek } from '../../lib/league/scores.js';
 
 export function FppgLabel({ side, period }: { side: ScoreSide; period?: number }) {
@@ -27,28 +27,26 @@ export default function LineupFppg({ week }: { week: ScoresWeek }) {
   const [sort, setSort] = useState('week');
   const [ascending, setAscending] = useState(false);
   const days = week.days.filter(day => day.scoringPeriodId <= week.currentScoringPeriodId);
-  const teams = week.matchups.flatMap(matchup => [matchup.home, matchup.away]);
-  const value = (side: ScoreSide) => lineupFppg(side, sort === 'week' ? undefined : Number(sort)).average;
-  teams.sort((a, b) => {
-    const av = value(a), bv = value(b);
-    return av === null ? (bv === null ? 0 : 1) : bv === null ? -1 : (av - bv) * (ascending ? 1 : -1);
-  });
-  const heading = (key: string, label: string) => <button type="button" onClick={() => {
-    if (sort === key) setAscending(!ascending);
-    else { setSort(key); setAscending(false); }
-  }}>{label}{sort === key ? ascending ? ' ↑' : ' ↓' : ''}</button>;
+  const teams = sortLineupFppg(week.matchups.flatMap(matchup => [matchup.home, matchup.away]), sort, ascending, days.map(day => day.scoringPeriodId));
+  const heading = (key: string, label: string) => <th key={key} scope="col" aria-sort={sort === key ? ascending ? 'ascending' : 'descending' : 'none'}>
+    <button type="button" onClick={() => {
+      if (sort === key) setAscending(!ascending);
+      else { setSort(key); setAscending(key === 'team'); }
+    }}>{label}{sort === key ? ascending ? ' ↑' : ' ↓' : ''}</button>
+  </th>;
 
   return <section className="panel fppg-panel"><h2>Weekly PPG · Week {week.matchupPeriodId}</h2>
-    <div className="fppg-help">FPPG = starter points ÷ GP. Tap headers to sort. <details><summary>How it’s counted</summary>Daily columns show each date’s average. Includes live games; excludes bench and DNPs. Before overage deductions.</details></div>
-    <div className="fppg-scroll"><table><thead><tr><th>Team</th>
-      {days.map(day => <th key={day.scoringPeriodId}>{heading(String(day.scoringPeriodId), shortDate(day.date))}</th>)}
-      <th>{heading('week', 'Week FPPG')}</th><th>GP</th><th>Daily trend</th></tr></thead>
+    <div className="fppg-help">FPPG = starter points ÷ GP. Tap headers to sort. <details><summary>How it’s counted</summary>Daily columns show each date’s average. Includes live games; excludes bench and DNPs. Before overage deductions. Trend sorts by the change from the first played day to the latest.</details></div>
+    <div className="fppg-scroll"><table><thead><tr>{heading('team', 'Team')}
+      {heading('week', 'Week FPPG')}{heading('gp', 'GP')}
+      {days.map(day => heading(String(day.scoringPeriodId), shortDate(day.date)))}
+      {heading('trend', 'Daily trend')}</tr></thead>
       <tbody>{teams.map(side => {
         const daily = days.map(day => lineupFppg(side, day.scoringPeriodId).average);
         const weekly = lineupFppg(side);
-        return <tr key={side.teamId}><th>{side.name}</th>
-          {daily.map((average, index) => <td key={days[index].scoringPeriodId}>{fppgText(average)}</td>)}
+        return <tr key={side.teamId}><th scope="row">{side.name}</th>
           <td><strong>{fppgText(weekly.average)}</strong></td><td>{weekly.games}</td>
+          {daily.map((average, index) => <td key={days[index].scoringPeriodId}>{fppgText(average)}</td>)}
           <td><DailySparkline daily={daily} dates={days.map(day => day.date)} /></td></tr>;
       })}</tbody></table></div></section>;
 }
