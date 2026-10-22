@@ -6308,3 +6308,7 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .score-player-game-link { color: inherit; text-decoration: none; }
 .score-player-game-link:hover { text-decoration: underline; }
 @media (max-width: 639px) { .nba-game-teams { grid-template-columns: minmax(0, 1fr); } }
+
+.top-performers-page h1 { font-size: 1.2rem; color: var(--text-max); margin: 0; }
+.top-performers-period { display: flex; gap: 8px; margin: 16px 0 6px; }
+.top-performers-period [aria-pressed="true"] { color: var(--neon-teal); border-color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 8%, var(--panel-bg)); }

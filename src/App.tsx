@@ -28,6 +28,7 @@ import TiersPage from './components/league/TiersPage.js'
 import DraftStartPage from './components/league/DraftStartPage.js'
 import MockResultPage from './components/league/MockResultPage.js'
 import ScoresPage from './components/league/ScoresPage.js'
+import TopPerformersPage from './components/league/TopPerformersPage.js'
 import NbaGameScoresPage from './components/league/NbaGameScoresPage.js'
 import WeeklyPpgPage from './components/league/WeeklyPpgPage.js'
 import MatchupPage from './components/league/MatchupPage.js'
@@ -128,6 +129,7 @@ function App() {
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/scores/performers" element={<TopPerformersPage />} />
         <Route path="/scores/nba" element={<NbaGameScoresPage />} />
         <Route path="/scores/nba/:gameId" element={<NbaGameScoresPage />} />
         <Route path="/scores/ppg" element={<WeeklyPpgPage />} />

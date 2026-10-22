@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dailyScorers, filterScorers, nbaGameHref, scorerRosters } from '../src/lib/league/dailyScorers.js';
+import { dailyScorers, filterScorers, nbaGameHref, scorerRosters, performerDates, topPerformers, type DailyNbaScores } from '../src/lib/league/dailyScorers.js';
 import { demoWeek } from '../src/lib/league/scoresDemo.js';
 import { LEAGUE_SCORING, completeLine, type BoxLine, type BoxScore } from '../src/lib/league/partyScore.js';
 import { getDailyNbaScores, validScoreDate } from '../server/lib/dailyScorersService.js';
@@ -10,6 +10,29 @@ const line = (id: string, team: string, stats: Record<string, number>, played = 
   athleteId: id, name: `Player ${id}`, shortName: `P. ${id}`, team, played, stats: completeLine(stats),
 });
 const box = (lines: BoxLine[], gameId = '100'): BoxScore => ({ gameId, state: 'in', detail: '2nd 4:12', home: 'LAL', away: 'DEN', homeScore: 45, awayScore: 48, lines });
+
+test('Top Performers defaults to today; weekly dates stop at today and follow fantasy weeks', () => {
+  assert.deepEqual(performerDates('2026-11-05', false), ['2026-11-05']);
+  const week = demoWeek();
+  assert.deepEqual(performerDates('2026-11-05', true, week), week.days.filter(day => day.date <= '2026-11-05').map(day => day.date));
+  assert.deepEqual(performerDates('2026-10-21', true), ['2026-10-19', '2026-10-20', '2026-10-21']);
+  assert.deepEqual(performerDates('2026-10-19', true), ['2026-10-19']);
+});
+
+test('weekly totals sum per-game bonuses and retain the latest game for each player', () => {
+  const day = (date: string, gameId: string, stats: Record<string, number>): DailyNbaScores => ({ date, fetchedAt: '', games: [], error: null, boxScores: [box([line('1', 'DEN', stats)], gameId)] });
+  const first = day('2026-10-19', '100', { '0': 12, '6': 10, '3': 2 });
+  const last = day('2026-10-21', '101', { '0': 14, '6': 11, '3': 3 });
+  const rows = topPerformers([last, first, first], LEAGUE_SCORING, new Map([['1', { teamId: 7, name: 'A' }]]));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].fpts, 57.6);
+  assert.equal(rows[0].gamesPlayed, 2);
+  assert.equal(rows[0].stats['0'], 26);
+  assert.equal(rows[0].stats['37'], 2);
+  assert.equal(rows[0].gameId, '101');
+  assert.equal(rows[0].date, '2026-10-21');
+  assert.equal(filterScorers(rows, 'rostered', '7')[0].gamesPlayed, 2);
+});
 
 test('daily leaders include free agents, exclude DNPs, deduplicate lines, and use league scoring', () => {
   const a = line('1', 'DEN', { '0': 20, '6': 10, '3': 10 });

@@ -22,7 +22,6 @@ import LineupGamesSummary from './LineupGamesSummary.js';
 import FantasyTeamLogo from './FantasyTeamLogo.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
-import DailyTopScorers from './DailyTopScorers.js';
 import { ScoresNotice, WeekPicker, WinBar } from './ScoresBits.js';
 import { numberParam, scoresQuery } from './scoresUi.js';
 
@@ -111,7 +110,7 @@ export default function ScoresPage() {
         <WeekPicker weeks={week?.weeks ?? []} selected={selectedWeek} onChange={setWeek} />
       )}
 
-      {!demo && <a className="tap-btn mock-mini-btn score-ppg-jump" href="#daily-scorers">Today’s top scorers ↓</a>}
+      {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/performers">Top Performers →</Link>}
 
       {week && week.matchups.length > 0 && <Link className="tap-btn mock-mini-btn score-ppg-jump" to={`/scores/ppg${scoresQuery({ week: week.matchupPeriodId, demo })}`}>Weekly PPG &amp; trends →</Link>}
 
@@ -179,8 +178,6 @@ export default function ScoresPage() {
         </div>
       )}
 
-
-      {!demo && <DailyTopScorers />}
 
       {week && (
         <p className="score-foot">Projections include overage deductions.{week.matchupPeriodId === week.currentMatchupPeriodId && !demo && ' Updates every minute.'}</p>

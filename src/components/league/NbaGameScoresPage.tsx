@@ -12,6 +12,7 @@ export default function NbaGameScoresPage() {
   const [params] = useSearchParams();
   const location = useLocation();
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
+  const performersReturn = returnTo?.startsWith('/scores/performers?') === true;
   const date = params.get('date') ?? localDateIso(new Date());
   const team = normalizeTeam(params.get('team'));
   const selected = params.get('player');
@@ -23,7 +24,7 @@ export default function NbaGameScoresPage() {
   const gameRows = rows.filter(row => row.gameId === game?.id);
   if (sort === 'nba') gameRows.sort((a, b) => (b.stats['0'] ?? 0) - (a.stats['0'] ?? 0) || b.fpts - a.fpts);
   return <div className="mock-page scores-page nba-game-page">
-    <Link className="score-back hub-heading" to={returnTo?.startsWith('/scores?') ? returnTo : '/scores'}>← SCORES</Link>
+    <Link className="score-back hub-heading" to={(performersReturn || returnTo?.startsWith('/scores?')) && returnTo ? returnTo : '/scores'}>{performersReturn ? '← TOP PERFORMERS' : '← SCORES'}</Link>
     {query.isLoading && <p role="status">Loading NBA game…</p>}
     {query.isError && <p role="alert">Could not load this game. <button className="tap-btn mock-mini-btn" onClick={() => void query.refetch()}>Try again</button></p>}
     {data?.error && <p role="status">{data.error}</p>}
