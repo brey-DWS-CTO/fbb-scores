@@ -2,10 +2,7 @@ import type { CastPlay } from './fantasyCast.js';
 import { castPoints } from './fantasyCast.js';
 import type { ScoringItem } from './partyScore.js';
 
-export function castShortName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(part => !/^(jr\.?|sr\.?|ii|iii|iv)$/i.test(part));
-  return parts.length > 1 ? `${parts[0]} ${parts.at(-1)![0]}.` : name;
-}
+export { shortName as castShortName } from './format.js';
 
 /** Input is chronological. Each displayed delta gets its running game total. */
 export function castRunningTotals(plays: readonly CastPlay[], scoring: readonly ScoringItem[]): Map<CastPlay['changes'][number], number> {
