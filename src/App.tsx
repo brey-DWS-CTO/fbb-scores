@@ -1,5 +1,7 @@
-import { Routes, Route, useLocation, Link } from 'react-router-dom'
-import { useLeagueState } from './hooks/useLeague.js';
+import GuestJoinPage from './components/league/GuestJoinPage.js';
+import { guestPageAllowed } from './lib/league/guestAccess.js';
+import { Routes, Route, useLocation, Link, Navigate } from 'react-router-dom'
+import { useLeagueState, useIdentity } from './hooks/useLeague.js';
 import { sandboxActive, testDraftJoined } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
 import NavIcon from './components/league/NavIcon.js'
@@ -55,14 +57,18 @@ import FantasyCastBubble from './components/league/FantasyCastBubble.js'
 
 function App() {
   const location = useLocation()
+  const { identity } = useIdentity()
   const { seasonMode } = useLeagueState()
   // The sign-in link page is bare too: nobody is signed in to navigate with.
   const bareMode =
     location.pathname.startsWith('/draft/tv') ||
     location.pathname.startsWith('/sign-in/') ||
+    location.pathname.startsWith('/guest/') ||
     location.pathname === '/'
 
   const sandbox = sandboxActive()
+
+  if (identity?.isGuest && !guestPageAllowed(location.pathname)) return <Navigate to="/scores" replace />;
 
   return (
     <div
@@ -99,12 +105,14 @@ function App() {
         </Link>
       )}
       {!bareMode && <AppNav />}
-      {!bareMode && !sandbox && seasonMode === 'off-season' && <AchievementToast />}
-      {!bareMode && !sandbox && <FavoritesPrompt />}
-      {!bareMode && !sandbox && <InviteToast />}
+      {!bareMode && !sandbox && !identity?.isGuest && seasonMode === 'off-season' && <AchievementToast />}
+      {!bareMode && !sandbox && !identity?.isGuest && <FavoritesPrompt />}
+      {!bareMode && !sandbox && !identity?.isGuest && <InviteToast />}
+      {identity?.isGuest && !bareMode && <div className="guest-banner" role="status">Guest view · Read-only access</div>}
       <ActingAsBanner />
       {!bareMode && <SectionTabs />}
       <Routes>
+        <Route path="/guest/:token" element={<GuestJoinPage />} />
         <Route path="/" element={<SplashPage />} />
         <Route path="/sign-in/:token" element={<SignInLinkPage />} />
         <Route path="/keepers" element={<KeepersPage />} />

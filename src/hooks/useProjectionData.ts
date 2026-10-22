@@ -38,7 +38,7 @@ export function useProjectionData(enabled = true): {
   const { meta } = useLeagueState();
   // Every signed-in owner reads the numbers. The edits are each owner's own,
   // so the cache keeps one copy per owner.
-  const signedIn = enabled && identity !== null;
+  const signedIn = enabled && identity !== null && !identity.isGuest;
   const rankings = useQuery({
     queryKey: ['mock-draft-rankings', identity?.owner ?? 'anon', meta?.draftRankings?.activeSnapshotId ?? 'none'],
     queryFn: () => fetchDraftRankings(identity as NonNullable<typeof identity>),

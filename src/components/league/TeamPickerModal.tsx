@@ -41,7 +41,7 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
         <div className="account-sheet-header">
           <div>
             {identity && <div className="splash-step">YOUR ACCOUNT</div>}
-            <h2 id="account-sheet-title">{identity ? identity.owner : 'Sign in'}</h2>
+            <h2 id="account-sheet-title">{identity ? identity.isGuest ? `${identity.guestName ?? 'Guest'} · Read-only` : identity.owner : 'Sign in'}</h2>
             {team && <p>{team}</p>}
           </div>
           <button className="tap-btn account-close" type="button" onClick={onClose} aria-label="Close account menu">
@@ -49,9 +49,9 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
           </button>
         </div>
 
-        {identity && <AccountFavorites />}
+        {identity && !identity.isGuest && <AccountFavorites />}
 
-        {identity && <SetPinPanel />}
+        {identity && !identity.isGuest && <SetPinPanel />}
 
         {identity && (
           <button className="tap-btn account-signout" type="button" onClick={logout}>
@@ -59,10 +59,10 @@ export default function TeamPickerModal({ anchor, onClose }: Props) {
           </button>
         )}
 
-        <div className={identity ? 'account-switch account-switch-separated' : 'account-switch'}>
+        {!identity?.isGuest && <div className={identity ? 'account-switch account-switch-separated' : 'account-switch'}>
           {identity && <div className="identity-label">SWITCH OWNER</div>}
           <TeamPickerForm onDone={onClose} />
-        </div>
+        </div>}
       </div>
     </div>, document.body
   );

@@ -6447,3 +6447,12 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .lm-advance-panel form { min-width: 0; }
 .lm-advance-panel form > button { min-height: 44px; justify-self: start; padding: 10px 16px; }
 .activity-view-tab:focus-visible, .waiver-month-nav button:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 3px; }
+
+.guest-banner { padding: 8px 12px; text-align: center; color: var(--text-body); background: var(--panel-bg); border-bottom: 1px solid var(--panel-border); font-size: .8rem; }
+.guest-access-admin { padding: 16px; margin: 16px 0; border-radius: 10px; color: var(--text-body); }
+.guest-access-admin form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 16px 0; }
+.guest-access-admin label { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 160px; }
+.guest-access-admin .hub-input { min-height: 44px; padding: 8px 12px; font-size: 16px; width: 100%; box-sizing: border-box; }
+.guest-access-admin button { min-height: 44px; }
+.guest-access-admin ul { list-style: none; padding: 0; }
+.guest-access-admin li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--panel-border); }

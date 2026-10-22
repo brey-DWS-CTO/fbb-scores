@@ -1095,6 +1095,8 @@ export async function requestLoginLink(email: string): Promise<LoginLinkResult> 
 }
 
 export interface LoginSession {
+  isGuest?: boolean;
+  guestName?: string;
   session: string;
   owner: string;
   email: string;
@@ -2135,3 +2137,26 @@ export async function fetchPerformerDates(): Promise<string[]> {
   const { data } = await axios.get<{ dates: string[] }>('/api/league/performer-dates');
   return data.dates;
 }
+
+export async function consumeGuestInvite(token: string): Promise<LoginSession> {
+  const { data } = await axios.post<LoginSession>('/api/auth/guest/consume', { token }); return data;
+}
+export async function fetchGuestAccess(c: Credentials): Promise<import('./guestAccess.js').GuestAccess[]> {
+  return (await axios.get('/api/league/guests', { headers: authHeaders(c) })).data;
+}
+export async function createGuestInvite(c: Credentials, name: string, days = 0): Promise<import('./guestAccess.js').GuestAccess & { url: string }> {
+  return (await axios.post('/api/league/guests', { name, days }, { headers: authHeaders(c) })).data;
+}
+export async function revokeGuestInvite(c: Credentials, id: string): Promise<void> {
+  await axios.delete(`/api/league/guests/${encodeURIComponent(id)}`, { headers: authHeaders(c) });
+}
+
+// Public score queries also carry the guest role, so the server can enforce its boundary.
+axios.interceptors.request.use(config => {
+  if (!config.url?.startsWith('/api/') || config.headers.has('x-session') || config.headers.has('x-owner')) return config;
+  try {
+    const guest = JSON.parse(localStorage.getItem('fbb-identity') ?? 'null') as { isGuest?: boolean; session?: string } | null;
+    if (guest?.isGuest && guest.session) config.headers.set('x-session', guest.session);
+  } catch { /* No saved identity. */ }
+  return config;
+});

@@ -104,6 +104,16 @@ router.post('/consume', async (req: Request, res: Response) => {
   }
 });
 
+/** A guest link is reusable until revoked or expired. Never grants an owner seat. */
+router.post('/guest/consume', async (req, res, next) => {
+  const token = typeof req.body?.token === 'string' ? req.body.token : '';
+  try {
+    const check = await verifySession(token, new Date());
+    if (!check.ok || !check.isGuest) { res.status(401).json({ error: 'This guest link has expired or been revoked. Ask the commissioner for a new one.' }); return; }
+    res.json({ session: token, owner: check.owner, email: '', isCommissioner: false, isGuest: true, guestName: check.guestName, expiresAt: check.expiresAt });
+  } catch (error) { next(error); }
+});
+
 /** GET /api/auth/me — who the current session belongs to. */
 router.get('/me', async (req: Request, res: Response) => {
   const session = req.header('x-session') ?? '';
@@ -114,6 +124,8 @@ router.get('/me', async (req: Request, res: Response) => {
       return;
     }
     res.json({
+      isGuest: check.isGuest === true,
+      guestName: check.guestName,
       owner: check.owner,
       email: check.email,
       isCommissioner: check.isCommissioner === true,
@@ -128,7 +140,9 @@ router.get('/me', async (req: Request, res: Response) => {
 router.post('/sign-out', async (req: Request, res: Response) => {
   const session = req.header('x-session') ?? '';
   try {
-    await endSession(session);
+    // A guest link is reusable across devices; only the commissioner revokes it.
+    const check = await verifySession(session, new Date());
+    if (!check.isGuest) await endSession(session);
     res.status(204).end();
   } catch (err) {
     console.error('[auth] sign-out failed:', err instanceof Error ? err.message : err);

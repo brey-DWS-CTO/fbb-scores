@@ -13,7 +13,7 @@ export default function SplashPage() {
 
   if (identity) {
     if (isPending) return <main className="splash-page"><p role="status">Opening your league...</p></main>;
-    return <Navigate to={seasonHome(seasonMode)} replace />;
+    return <Navigate to={identity.isGuest ? '/scores' : seasonHome(seasonMode)} replace />;
   }
 
   return (

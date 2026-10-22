@@ -59,7 +59,7 @@ export default function IdentityChip({ placement = 'page' }: Props) {
       >
         {identity ? (
           <>
-            <span className="identity-chip-name">{identity.owner}</span>
+            <span className="identity-chip-name">{identity.isGuest ? `${identity.guestName ?? 'Guest'} · Guest` : identity.owner}</span>
             {identity.isCommissioner && <NavIcon name="crown" size={15} label="Commish" />}
             <span aria-hidden="true" style={{ fontSize: '0.65rem', opacity: 0.75 }}>▼</span>
           </>

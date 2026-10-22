@@ -86,3 +86,9 @@ commit after opening it to request a preview. Neon is attached through the Verce
 Marketplace (`DATABASE_URL`). ESPN cookie env vars must be refreshed when they expire. Never commit
 a real PIN. Manage commissioner PINs through Commish Mode or `scripts/admin-pins.ts`
 with a production `DATABASE_URL`.
+
+## Guest spectators
+
+In **Commish → Guest access**, enter a guest name and create a permanent link. Copy and share the link yourself. Guests see scores, Fantasy Cast, team rosters, and league history with a read-only badge. They cannot submit keepers, trades, claims, or commissioner changes, and unrevealed keepers stay hidden.
+
+New guest links never expire and are reusable by anyone who has them until revoked. The active-link list only stores the token hash; the raw link is shown when created. **Revoke** removes access immediately. Signing out of a guest device leaves the invitation usable on other devices.

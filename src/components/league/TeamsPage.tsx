@@ -19,7 +19,7 @@ export default function TeamsPage() {
   const postseasonGames = usePostseasonGames();
   const [selected, setSelected] = useState<string | null>(null);
 
-  const owner = selected ?? identity?.owner ?? OWNERS[0];
+  const owner = selected ?? (identity?.isGuest ? null : identity?.owner) ?? OWNERS[0];
   const index = Math.max(0, OWNERS.indexOf(owner));
 
   const board = useMemo(() => buildDraftBoard(dataset, state), [state, dataset]);
@@ -97,7 +97,7 @@ export default function TeamsPage() {
             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-max)' }}>{owner}</div>
             <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>{teamName(owner)}</div>
           </div>
-          <Link
+          {!identity?.isGuest && <Link
             to={`/keepers/${encodeURIComponent(owner)}`}
             className="tap-btn"
             style={{
@@ -116,12 +116,12 @@ export default function TeamsPage() {
             }}
           >
             {keeperAction}
-          </Link>
+          </Link>}
         </div>
 
         {/* Looking at someone's picks is exactly when you want to ask for one,
             so the offer starts here instead of sending you off to find them. */}
-        {identity && owner !== identity.owner && (
+        {identity && !identity.isGuest && owner !== identity.owner && (
           <div style={{ padding: '0 14px 10px' }}>
             <Link className="tap-btn team-trade-btn" to={`/trades?with=${encodeURIComponent(owner)}`}>
               &#8646; TRADE WITH {owner.toUpperCase()}
@@ -138,7 +138,7 @@ export default function TeamsPage() {
 
         {filled.length === 0 && hiddenKeepers === 0 && (
           <div style={{ margin: '0 14px 10px', color: 'var(--text-faint)', fontSize: '0.82rem' }}>
-            No {dataset.season} players yet. Open {keeperAction.toLowerCase()} to browse this team's final roster.
+            No {dataset.season} players yet.{!identity?.isGuest && <> Open {keeperAction.toLowerCase()} to browse this team's final roster.</>}
           </div>
         )}
 

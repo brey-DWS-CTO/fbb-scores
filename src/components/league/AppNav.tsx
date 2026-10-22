@@ -53,7 +53,7 @@ export default function AppNav() {
 
   // One list drives both bars. `primary` sections sit on the phone's bottom
   // bar; the rest live behind MORE. Desktop shows every section.
-  const sections = visibleSections(identity?.isCommissioner === true, meta?.revealed === true, seasonMode);
+  const sections = visibleSections(identity?.isCommissioner === true, meta?.revealed === true, seasonMode, identity?.isGuest === true);
   const current = sectionFor(location.pathname, sections);
   const primary = sections.filter((section) => section.primary);
   const secondary = sections.filter((section) => !section.primary);
@@ -96,7 +96,7 @@ export default function AppNav() {
       <header className="top-nav" id="app-sidebar">
         <div className="top-nav-inner">
           <div className="top-nav-head">
-            <NavLink to={seasonHome(seasonMode)} className="top-nav-brand hub-heading">
+            <NavLink to={identity?.isGuest ? '/scores' : seasonHome(seasonMode)} className="top-nav-brand hub-heading">
               <img src="/logo.png" alt="" aria-hidden="true" />
               <span>FBB Scores</span>
             </NavLink>
@@ -157,7 +157,7 @@ export default function AppNav() {
             <span className="hub-heading bottom-nav-label">{t.shortLabel ?? t.label}</span>
           </NavLink>
         ))}
-        <button
+        {secondary.length > 0 && <button
           type="button"
           className={moreActive || moreOpen ? 'bottom-nav-tab tap-btn active' : 'bottom-nav-tab tap-btn'}
           aria-expanded={moreOpen}
@@ -168,7 +168,7 @@ export default function AppNav() {
         >
           <span className="bottom-nav-icon" aria-hidden="true"><NavIcon name="menu" /></span>
           <span className="hub-heading bottom-nav-label">MORE</span>
-        </button>
+        </button>}
       </nav>
 
       {moreOpen && (

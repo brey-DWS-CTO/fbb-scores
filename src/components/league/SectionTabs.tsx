@@ -7,7 +7,7 @@ export default function SectionTabs() {
   const { identity } = useIdentity();
   const { meta, seasonMode } = useLeagueState();
   const { pathname } = useLocation();
-  const section = sectionFor(pathname, visibleSections(identity?.isCommissioner === true, meta?.revealed === true, seasonMode));
+  const section = sectionFor(pathname, visibleSections(identity?.isCommissioner === true, meta?.revealed === true, seasonMode, identity?.isGuest === true));
   if (!section || section.tabs.length < 2 || onLanding(pathname, section)) return null;
   const active = activeTab(pathname, section.tabs);
   const pages = section.tabs.find(tab => tab.to === active)?.pages;

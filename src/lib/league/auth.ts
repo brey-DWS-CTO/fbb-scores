@@ -1,3 +1,4 @@
+import { PERMANENT_GUEST_EXPIRY } from './guestAccess.js';
 /**
  * Signing in: the link a member is emailed, the session it grants, and how
  * often one address may ask for another link.
@@ -77,11 +78,12 @@ export function sessionExpiresAt(issuedAt: Date): string {
  * commissioner sitting in someone's seat keeps its own short end.
  */
 export function sessionEndsAt(row: {
+  owner?: string;
   issuedAt: string;
   expiresAt: string;
   impersonatedBy?: string | null;
 }): string {
-  if (row.impersonatedBy) return row.expiresAt;
+  if (row.impersonatedBy || row.owner?.startsWith('guest:')) return row.expiresAt;
   const issued = Date.parse(row.issuedAt);
   if (Number.isNaN(issued)) return row.expiresAt;
   const seasonEnd = sessionExpiresAt(new Date(issued));
@@ -98,6 +100,7 @@ export function sessionEndsAt(row: {
  * treated as expired too, because a broken row must never hand out a session.
  */
 export function isExpired(expiresAt: string, now: Date): boolean {
+  if (expiresAt === PERMANENT_GUEST_EXPIRY) return false;
   const ends = Date.parse(expiresAt);
   if (Number.isNaN(ends)) return true;
   return now.getTime() >= ends;

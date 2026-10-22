@@ -1,3 +1,4 @@
+import GuestAccessAdmin from './GuestAccessAdmin.js';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DatasetPlayer } from '../../lib/keeper/types.js';
@@ -144,6 +145,7 @@ export default function AdminPage() {
           MEMBERS: EMAILS, SIGN-IN LINKS, PINS
         </div>
         <SignInAdmin />
+        <GuestAccessAdmin />
       </section>
 
       <FavoritesAdmin />
