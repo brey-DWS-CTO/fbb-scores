@@ -15,6 +15,9 @@ function savedMode(): CastMode {
 export default function FantasyCastBubble() {
   const { pathname, search } = useLocation();
   const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [draggingTrigger, setDraggingTrigger] = useState(false);
+  const movedTrigger = useRef(false);
   const [mode, setMode] = useState<CastMode>(savedMode);
   const trigger = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
@@ -28,7 +31,7 @@ export default function FantasyCastBubble() {
     const navSpace = window.innerWidth < 840 ? 72 : 8;
     setPosition({ left: Math.max(8, Math.min(left, window.innerWidth - rect.width - 8)), top: Math.max(8, Math.min(top, window.innerHeight - rect.height - navSpace)) });
   };
-  const visible = pathname === '/scores' || (pathname.startsWith('/scores/') && pathname !== '/scores/cast');
+  const visible = !dismissed && (pathname === '/scores' || (pathname.startsWith('/scores/') && pathname !== '/scores/cast'));
   const minimize = () => { restoreFocus.current = true; setOpen(false); };
   const changeMode = (next: CastMode) => {
     drag.current = null;
@@ -41,9 +44,11 @@ export default function FantasyCastBubble() {
       if (!rect) return;
       setPosition(previous => previous ? { left: Math.max(8, Math.min(previous.left, window.innerWidth - rect.width - 8)), top: Math.max(8, Math.min(previous.top, window.innerHeight - rect.height - (window.innerWidth < 840 ? 72 : 8))) } : previous);
     };
+    const observer = new ResizeObserver(keepOnScreen);
+    if (shell.current) observer.observe(shell.current);
     window.addEventListener('resize', keepOnScreen);
-    return () => window.removeEventListener('resize', keepOnScreen);
-  }, []);
+    return () => { observer.disconnect(); window.removeEventListener('resize', keepOnScreen); };
+  }, [visible]);
   useLayoutEffect(() => {
     document.documentElement.classList.toggle('cast-docked', open && visible && mode === 'dock');
     return () => document.documentElement.classList.remove('cast-docked');
@@ -62,7 +67,7 @@ export default function FantasyCastBubble() {
   const pageParams = new URLSearchParams(search);
   const scope = castPageScope(pathname, pageParams);
   const contextKey = [pathname, ...['date', 'week', 'day', 'demo', 'team', 'fantasyTeam'].map(key => pageParams.get(key))].join('|');
-  return <aside ref={shell} style={open && mode === 'float' && position ? { left: position.left, top: position.top, right: 'auto', bottom: 'auto' } : undefined} className={`cast-bubble${open && mode === 'dock' ? ' is-docked' : ''}`} aria-label={`${mode === 'dock' ? 'Docked' : 'Floating'} Fantasy Cast`}>
+  return <aside ref={shell} style={(!open || mode === 'float') && position ? { left: position.left, top: position.top, right: 'auto', bottom: 'auto' } : undefined} className={`cast-bubble${open && mode === 'dock' ? ' is-docked' : ''}`} aria-label={`${mode === 'dock' ? 'Docked' : 'Floating'} Fantasy Cast`}>
     {open && <div id="floating-cast-panel" className="cast-bubble-panel" role="region" aria-label="Fantasy Cast mini feed">
       <div className="cast-bubble-toolbar"><button className="cast-drag-handle" type="button" disabled={mode === 'dock'} aria-label="Move Fantasy Cast. Drag or use arrow keys." onPointerDown={event => {
         if (mode !== 'float' || event.button !== 0) return;
@@ -74,10 +79,32 @@ export default function FantasyCastBubble() {
         event.preventDefault();
         const rect = shell.current!.getBoundingClientRect();
         move(rect.left + (event.key === 'ArrowRight' ? 20 : event.key === 'ArrowLeft' ? -20 : 0), rect.top + (event.key === 'ArrowDown' ? 20 : event.key === 'ArrowUp' ? -20 : 0));
-      }}><NavIcon name="bolt" size={15} /> Fantasy Cast{mode === 'float' && <NavIcon name="dots" size={14} />}</button><Link to="/scores/cast" aria-label="Open full Fantasy Cast page">Full page ↗</Link><button ref={close} type="button" aria-label="Minimize Fantasy Cast" onClick={minimize}><NavIcon name="close" size={17} /></button></div>
-      <div className="cast-mode-switch" role="group" aria-label="Cast display mode"><button type="button" aria-pressed={mode === 'float'} onClick={() => changeMode('float')}><NavIcon name="layers" size={13} />Pop out</button><button type="button" aria-pressed={mode === 'dock'} onClick={() => changeMode('dock')}><NavIcon name="book" size={13} />Dock</button><span>{mode === 'float' ? 'Drag header to move' : 'Latest 3 plays'}</span></div>
+      }}><NavIcon name="bolt" size={15} /> Fantasy Cast{mode === 'float' && <NavIcon name="dots" size={14} />}</button><div className="cast-mode-switch"><button type="button" aria-label={mode === 'float' ? 'Dock Fantasy Cast' : 'Pop out Fantasy Cast'} onClick={() => changeMode(mode === 'float' ? 'dock' : 'float')}><NavIcon name={mode === 'float' ? 'book' : 'layers'} size={13} />{mode === 'float' ? 'Dock' : 'Pop out'}</button></div><Link to="/scores/cast" aria-label="Open full Fantasy Cast page" title="Full page">↗</Link><button ref={close} type="button" aria-label="Minimize Fantasy Cast" onClick={minimize}><NavIcon name="close" size={17} /></button></div>
+
       <div className="cast-bubble-scroll"><FantasyCastPage key={contextKey} embedded peek={mode === 'dock'} initialScope={scope} /></div>
     </div>}
-    <button ref={trigger} type="button" className="cast-bubble-trigger" aria-expanded={open} aria-controls={open ? 'floating-cast-panel' : undefined} aria-label={open ? 'Minimize Fantasy Cast' : 'Open Fantasy Cast mini feed'} onClick={() => setOpen(value => !value)}><NavIcon name="bolt" size={20} /><span>CAST</span><span className="cast-bubble-dot" aria-hidden="true" /></button>
+    {!open && <div className="cast-launcher">
+      <button ref={trigger} type="button" className="cast-bubble-trigger" aria-expanded={false} aria-label="Open Fantasy Cast mini feed. Drag to move." onPointerDown={event => {
+        if (event.button !== 0) return;
+        const rect = shell.current!.getBoundingClientRect();
+        movedTrigger.current = false;
+        drag.current = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }} onPointerMove={event => {
+        const start = drag.current;
+        if (!start) return;
+        if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) { movedTrigger.current = true; setDraggingTrigger(true); }
+        if (movedTrigger.current) move(start.left + event.clientX - start.x, start.top + event.clientY - start.y);
+      }} onPointerUp={event => {
+        if (movedTrigger.current && event.clientY > window.innerHeight - 110 && Math.abs(event.clientX - window.innerWidth / 2) < 70) { setDismissed(true); setOpen(false); }
+        drag.current = null; setDraggingTrigger(false);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }} onPointerCancel={() => { drag.current = null; setDraggingTrigger(false); }} onLostPointerCapture={() => { drag.current = null; setDraggingTrigger(false); }} onClick={() => {
+        if (!movedTrigger.current) setOpen(true);
+        movedTrigger.current = false;
+      }}><NavIcon name="bolt" size={20} /><span>CAST</span></button>
+      <button type="button" className="cast-launcher-dismiss" aria-label="Dismiss Fantasy Cast button" onClick={() => setDismissed(true)}><NavIcon name="close" size={16} /></button>
+    </div>}
+    {draggingTrigger && <div className="cast-dismiss-target" aria-hidden="true"><NavIcon name="close" size={22} />Drop to hide</div>}
   </aside>;
 }

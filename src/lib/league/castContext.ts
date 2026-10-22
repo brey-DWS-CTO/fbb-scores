@@ -5,14 +5,8 @@ import type { CastPlay } from './fantasyCast.js';
 export function castPageScope(pathname: string, params: URLSearchParams): string {
   const matchup = /^\/scores\/(\d+)$/.exec(pathname)?.[1];
   if (matchup) return `matchup:${matchup}`;
-  const game = /^\/scores\/nba\/(\d+)$/.exec(pathname)?.[1];
-  if (game) return `game:${game}`;
-  if (pathname === '/scores/nba') {
-    const team = normalizeTeam(params.get('team'));
-    if (team) return `nba:${team}`;
-  }
-  const team = pathname === '/scores/performers' ? params.get('fantasyTeam') : pathname === '/scores' ? params.get('team') : null;
-  return team && /^\d+$/.test(team) ? `team:${team}` : 'all';
+  void params;
+  return 'all';
 }
 
 export function castMatchesGame(play: CastPlay, scope: string): boolean {
