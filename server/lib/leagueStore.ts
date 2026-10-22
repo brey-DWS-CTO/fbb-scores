@@ -1,4 +1,4 @@
-import { guestName, isGuestOwner, type GuestAccess } from '../../src/lib/league/guestAccess.js';
+import { guestName, isGuestOwner, PERMANENT_GUEST_EXPIRY, type GuestAccess } from '../../src/lib/league/guestAccess.js';
 /**
  * League dynamic-state storage abstraction.
  *
@@ -1419,6 +1419,7 @@ class NeonBackend implements StoreBackend {
     const issuedCutoff = seasonCutoff(now);
     await this.sql`DELETE FROM sessions
       WHERE expires_at < ${now}
+        AND expires_at <> ${PERMANENT_GUEST_EXPIRY}
         AND (impersonated_by IS NOT NULL OR owner LIKE 'guest:%' OR issued_at < ${issuedCutoff})`;
   }
 
@@ -2934,7 +2935,7 @@ class FileBackend implements StoreBackend {
     await this.enqueueWrite(() => {
       const doc = this.readDoc();
       doc.loginTokens = doc.loginTokens.filter((row) => row.expiresAt >= now);
-      doc.sessions = doc.sessions.filter((row) => sessionEndsAt(row) >= now);
+      doc.sessions = doc.sessions.filter((row) => !isExpired(sessionEndsAt(row), new Date(now)));
       this.writeDoc(doc);
     });
   }
@@ -4488,18 +4489,18 @@ export async function transitionLmClaim(row: LmAddRequest, expected: LmAddReques
 }
 
 /** Guest links use the existing hashed session store; no owner privileges attach. */
-export async function createGuestAccess(name: string, days: number, now = new Date()): Promise<GuestAccess & { token: string }> {
+export async function createGuestAccess(name: string, days = 0, now = new Date()): Promise<GuestAccess & { token: string }> {
   const label = name.trim();
-  if (!label || label.length > 60 || ![7, 30, 90].includes(days)) throw new Error('Enter a guest name (up to 60 characters) and choose 7, 30, or 90 days.');
+  if (!label || label.length > 60 || ![0, 7, 30, 90].includes(days)) throw new Error('Enter a guest name (up to 60 characters) and choose permanent access or 7, 30, or 90 days.');
   const active = (await getBackend().listGuestSessions()).filter(row => !isExpired(row.expiresAt, now));
   if (active.length >= 100) throw new Error('Revoke an old guest link before creating another.');
   const token = newToken();
-  const row: SessionRow = { tokenHash: hashToken(token), owner: `guest:${crypto.randomUUID()}:${label}`, email: '', issuedAt: now.toISOString(), expiresAt: new Date(now.getTime() + days * 86400_000).toISOString() };
+  const row: SessionRow = { tokenHash: hashToken(token), owner: `guest:${crypto.randomUUID()}:${label}`, email: '', issuedAt: now.toISOString(), expiresAt: days === 0 ? PERMANENT_GUEST_EXPIRY : new Date(now.getTime() + days * 86400_000).toISOString() };
   await getBackend().createSession(row);
-  return { id: row.tokenHash, name: label, issuedAt: row.issuedAt, expiresAt: row.expiresAt, token };
+  return { id: row.tokenHash, name: label, issuedAt: row.issuedAt, expiresAt: days === 0 ? null : row.expiresAt, token };
 }
 export async function listGuestAccess(now = new Date()): Promise<GuestAccess[]> {
-  return (await getBackend().listGuestSessions()).filter(row => !isExpired(row.expiresAt, now)).map(row => ({ id: row.tokenHash, name: guestName(row.owner), issuedAt: row.issuedAt, expiresAt: row.expiresAt }));
+  return (await getBackend().listGuestSessions()).filter(row => !isExpired(row.expiresAt, now)).map(row => ({ id: row.tokenHash, name: guestName(row.owner), issuedAt: row.issuedAt, expiresAt: row.expiresAt === PERMANENT_GUEST_EXPIRY ? null : row.expiresAt }));
 }
 export async function revokeGuestAccess(id: string): Promise<void> {
   const row = await getBackend().getSession(id);

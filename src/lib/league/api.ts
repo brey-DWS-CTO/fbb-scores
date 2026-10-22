@@ -2144,7 +2144,7 @@ export async function consumeGuestInvite(token: string): Promise<LoginSession> {
 export async function fetchGuestAccess(c: Credentials): Promise<import('./guestAccess.js').GuestAccess[]> {
   return (await axios.get('/api/league/guests', { headers: authHeaders(c) })).data;
 }
-export async function createGuestInvite(c: Credentials, name: string, days: number): Promise<import('./guestAccess.js').GuestAccess & { url: string }> {
+export async function createGuestInvite(c: Credentials, name: string, days = 0): Promise<import('./guestAccess.js').GuestAccess & { url: string }> {
   return (await axios.post('/api/league/guests', { name, days }, { headers: authHeaders(c) })).data;
 }
 export async function revokeGuestInvite(c: Credentials, id: string): Promise<void> {

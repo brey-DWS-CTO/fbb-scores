@@ -5497,8 +5497,8 @@ router.get('/guests', requireAuth, requireCommissioner, async (_req, res, next) 
 });
 router.post('/guests', requireAuth, requireCommissioner, async (req, res, next) => {
   const name = req.body?.name;
-  const days = req.body?.days ?? 30;
-  if (typeof name !== 'string' || !name.trim() || name.trim().length > 60 || ![7, 30, 90].includes(days)) { res.status(400).json({ error: 'Enter a guest name and choose 7, 30, or 90 days.' }); return; }
+  const days = req.body?.days ?? 0;
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 60 || ![0, 7, 30, 90].includes(days)) { res.status(400).json({ error: 'Enter a guest name and a valid access duration.' }); return; }
   try {
     const invite = await createGuestAccess(name, days);
     await appendAudit(actor(res), 'guest.invited', { id: invite.id, name: invite.name, expiresAt: invite.expiresAt });

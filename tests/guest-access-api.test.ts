@@ -102,3 +102,16 @@ test('expired guest links fail, reusable links survive local sign-out, and revoc
   const result = await fetch(`${base}/api/auth/guest/consume`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: guestToken }) });
   assert.equal(result.status, 401);
 });
+
+test('new guest links are permanent by default and can still be revoked', async () => {
+  const response = await fetch(`${base}/api/league/guests`, { method: 'POST', headers: commish, body: JSON.stringify({ name: 'Permanent guest' }) });
+  assert.equal(response.status, 200);
+  const invite = await response.json();
+  assert.equal(invite.expiresAt, null);
+  const token = new URL(invite.url).pathname.split('/').at(-1)!;
+  assert.equal((await store.verifySession(token, new Date('2200-01-01T00:00:00Z'))).isGuest, true);
+  const listed = await (await fetch(`${base}/api/league/guests`, { headers: commish })).json();
+  assert.equal(listed.find((entry: { id: string }) => entry.id === invite.id).expiresAt, null);
+  await fetch(`${base}/api/league/guests/${invite.id}`, { method: 'DELETE', headers: commish });
+  assert.equal((await store.verifySession(token, new Date())).ok, false);
+});
