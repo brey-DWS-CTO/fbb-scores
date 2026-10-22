@@ -6125,6 +6125,7 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .score-player-pts.is-labeled { margin-left: 0; display: inline-flex; align-items: baseline; gap: 4px; }
 .score-points-label { font-size: 0.55rem; font-weight: 600; color: var(--text-mid); line-height: 1; }
 .score-points-projected { font-size: 0.65rem; font-weight: 400; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight: 600; color: var(--text-hi); }
 .score-player.is-overage .score-player-pts.is-labeled { text-decoration: none; }
 .score-player.is-overage .score-player-pts.is-labeled > :last-child { text-decoration: line-through; }
 
