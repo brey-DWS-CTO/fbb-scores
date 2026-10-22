@@ -137,7 +137,10 @@ export function activeTab(pathname: string, tabs: readonly SectionTab[]): string
 }
 
 /** Keep menus focused on the current mode; saved page addresses remain valid. */
-export function visibleSections(isCommissioner: boolean, keepersPublic: boolean, mode: SeasonMode): NavSection[] {
+export function visibleSections(isCommissioner: boolean, keepersPublic: boolean, mode: SeasonMode, isGuest = false): NavSection[] {
+  if (isGuest) return NAV_SECTIONS.filter(section => ['scores', 'cast', 'league'].includes(section.id)).map(section => section.id === 'league'
+    ? { ...section, primary: true, home: '/teams', tabs: section.tabs.filter(tab => ['/teams', '/history'].includes(tab.to)) }
+    : { ...section, primary: true });
   const order = mode === 'in-season'
     ? ['scores', 'cast', 'league', 'trades', 'rules', 'commish', 'draft']
     : ['keepers', 'draft', 'cast', 'trades', 'league', 'vault', 'rules', 'commish'];

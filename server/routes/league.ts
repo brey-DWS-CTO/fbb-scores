@@ -7,6 +7,7 @@ import { getPerformerDates } from '../lib/performerDatesService.js';
  * Owner names are case-sensitive exact matches to the league config.
  * Commissioner status comes from src/data/source/league-2027-config.json.
  */
+import { createGuestAccess, listGuestAccess, revokeGuestAccess } from '../lib/leagueStore.js';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import rawDataset from '../../src/data/league-2027.json' with { type: 'json' };
 import {
@@ -507,6 +508,7 @@ async function requireAuth(req: Request, res: Response, next: NextFunction): Pro
         res.status(401).json({ error: 'Your sign-in has expired' });
         return;
       }
+      if (check.isGuest) { res.status(403).json({ error: 'Guest access is read-only.' }); return; }
       res.locals.owner = check.owner;
       res.locals.isCommissioner = check.isCommissioner === true;
       res.locals.mustChangePin = false;
@@ -5487,6 +5489,25 @@ router.get('/parties/:id/public', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+
+router.get('/guests', requireAuth, requireCommissioner, async (_req, res, next) => {
+  try { res.json(await listGuestAccess()); } catch (error) { next(error); }
+});
+router.post('/guests', requireAuth, requireCommissioner, async (req, res, next) => {
+  const name = req.body?.name;
+  const days = req.body?.days ?? 30;
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 60 || ![7, 30, 90].includes(days)) { res.status(400).json({ error: 'Enter a guest name and choose 7, 30, or 90 days.' }); return; }
+  try {
+    const invite = await createGuestAccess(name, days);
+    await appendAudit(actor(res), 'guest.invited', { id: invite.id, name: invite.name, expiresAt: invite.expiresAt });
+    const { token, ...summary } = invite;
+    res.json({ ...summary, url: `${appOrigin(req)}/guest/${encodeURIComponent(token)}` });
+  } catch (error) { next(error); }
+});
+router.delete('/guests/:id', requireAuth, requireCommissioner, async (req, res, next) => {
+  try { const id = String(req.params.id); await revokeGuestAccess(id); await appendAudit(actor(res), 'guest.revoked', { id }); res.status(204).end(); } catch (error) { next(error); }
 });
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

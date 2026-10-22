@@ -77,11 +77,12 @@ export function sessionExpiresAt(issuedAt: Date): string {
  * commissioner sitting in someone's seat keeps its own short end.
  */
 export function sessionEndsAt(row: {
+  owner?: string;
   issuedAt: string;
   expiresAt: string;
   impersonatedBy?: string | null;
 }): string {
-  if (row.impersonatedBy) return row.expiresAt;
+  if (row.impersonatedBy || row.owner?.startsWith('guest:')) return row.expiresAt;
   const issued = Date.parse(row.issuedAt);
   if (Number.isNaN(issued)) return row.expiresAt;
   const seasonEnd = sessionExpiresAt(new Date(issued));

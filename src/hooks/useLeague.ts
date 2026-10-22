@@ -202,6 +202,8 @@ const ID_KEY = 'fbb-identity';
 const REAL_ID_KEY = 'fbb-identity-real';
 
 export interface Identity extends Credentials {
+  isGuest?: boolean;
+  guestName?: string;
   isCommissioner: boolean;
   /** The address the link went to. Only set on a link sign-in. */
   email?: string;
@@ -308,6 +310,8 @@ export function useIdentity() {
   const signInWithSession = useCallback((result: LoginSession) => {
     const id: Identity = {
       owner: result.owner,
+      isGuest: result.isGuest === true,
+      guestName: result.guestName,
       session: result.session,
       email: result.email,
       isCommissioner: result.isCommissioner,
