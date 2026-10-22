@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useDailyScorers } from '../../hooks/useDailyScorers.js';
 import { teamFullName, normalizeTeam } from '../../lib/league/houseParty.js';
-import { firstNameLastInitial } from '../../lib/league/format.js';
+import { shortName } from '../../lib/league/format.js';
 import { statLine } from '../../lib/league/partyScore.js';
 import { localDateIso } from '../../lib/league/scores.js';
 import TeamLogo from './TeamLogo.js';
@@ -45,7 +45,7 @@ export default function NbaGameScoresPage() {
         <ol className="daily-scorer-list">{gameRows.filter(row => row.team === code).map(row => <li key={row.athleteId} className={`nba-game-player${row.athleteId === selected ? ' is-selected' : ''}`}>
           <span className="daily-scorer-info">
             <span className="nba-game-player-heading">
-              <strong title={row.name}>{firstNameLastInitial(row.name)}</strong>
+              <strong title={row.name}>{shortName(row.name)}</strong>
               {rosters && !row.roster && <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}
               {row.roster && <small className="nba-game-fantasy-team" title={row.roster.name}>{row.roster.name}</small>}
               {!rosters && <small className="nba-game-fantasy-team">Roster unknown</small>}
