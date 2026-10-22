@@ -6433,3 +6433,17 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .nba-game-player-heading > strong { flex-shrink: 0; }
 .nba-game-player-heading .unowned-badge { margin-left: 0; flex-shrink: 0; }
 .nba-game-player-heading .nba-game-fantasy-team { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* Activity shares one League tab, with roomy controls for each view. */
+.activity-view-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; max-width: 720px; margin: 14px auto 0; padding: 0 12px; box-sizing: border-box; }
+.activity-view-tab { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px; border: 1px solid var(--panel-border); border-radius: 8px; color: var(--text-mid); font-size: .75rem; font-weight: 700; text-decoration: none; }
+.activity-view-tab.active { border-color: var(--neon-teal); color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 8%, var(--panel-bg)); }
+.activity-controls { display: flex; gap: 12px; margin: 16px 0; }
+.activity-control { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; max-width: 360px; font-size: .8rem; color: var(--text-soft); }
+.activity-control .hub-input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 48px; padding: 10px 12px; font-size: 16px; }
+.waiver-month-nav { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 12px; }
+.waiver-month-nav h2 { margin: 0; text-align: center; line-height: 1.4; }
+.waiver-month-nav button { width: 44px; min-width: 44px; min-height: 44px; padding: 0; font-size: 1.5rem; }
+.lm-advance-panel form { min-width: 0; }
+.lm-advance-panel form > button { min-height: 44px; justify-self: start; padding: 10px 16px; }
+.activity-view-tab:focus-visible, .waiver-month-nav button:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 3px; }

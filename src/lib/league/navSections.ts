@@ -17,6 +17,7 @@ export interface SectionTab {
   commishOnly?: boolean;
   mode?: SeasonMode;
   beforeReveal?: boolean;
+  pages?: readonly SectionTab[];
 }
 
 export interface NavSection {
@@ -34,6 +35,13 @@ export interface NavSection {
   home?: string;
   tabs: SectionTab[];
 }
+
+/** Views share one League tab while preserving existing saved links. */
+export const ACTIVITY_VIEWS: readonly SectionTab[] = [
+  { to: '/activity', label: 'MOVES' },
+  { to: '/waivers', label: 'WAIVERS', mode: 'in-season' },
+  { to: '/lm-adds', label: 'LM ADDS', mode: 'in-season' },
+];
 
 /** The sections in their pre-season order. `visibleSections` reorders them once the season starts. */
 export const NAV_SECTIONS: readonly NavSection[] = [
@@ -63,10 +71,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     primary: true,
     tabs: [
       { to: '/league', label: 'LEAGUE HQ' },
-      { to: '/lm-adds', label: 'LM ADDS', mode: 'in-season' },
-      { to: '/waivers', label: 'WAIVERS', mode: 'in-season' },
       { to: '/watch', label: 'WATCH', mode: 'in-season' },
-      { to: '/activity', label: 'ACTIVITY' },
+      { to: '/activity', label: 'ACTIVITY', pages: ACTIVITY_VIEWS },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
       { to: '/history', label: 'HISTORY' },
@@ -126,7 +132,7 @@ export function onPath(pathname: string, to: string): boolean {
  */
 export function activeTab(pathname: string, tabs: readonly SectionTab[]): string | null {
   return tabs
-    .filter((tab) => onPath(pathname, tab.to))
+    .filter((tab) => onPath(pathname, tab.to) || tab.pages?.some(page => onPath(pathname, page.to)))
     .reduce<string | null>((best, tab) => (best === null || tab.to.length > best.length ? tab.to : best), null);
 }
 
@@ -149,7 +155,8 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
       tabs: section.tabs.filter((tab) =>
         (!tab.commishOnly || isCommissioner)
         && (!tab.mode || tab.mode === mode)
-        && (!tab.beforeReveal || !keepersPublic)),
+        && (!tab.beforeReveal || !keepersPublic))
+        .map(tab => ({ ...tab, pages: tab.pages?.filter(page => !page.mode || page.mode === mode) })),
     }];
   });
 }

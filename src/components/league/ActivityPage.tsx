@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import IdentityChip from './IdentityChip.js';
-import LmAddPanel from './LmAddPanel.js';
 import NavIcon from './NavIcon.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { apiErrorMessage, fetchTransactions, type TransactionsResponse } from '../../lib/league/api.js';
@@ -91,27 +90,14 @@ export default function ActivityPage() {
         <p className="rules-draft-error">ESPN did not answer the last check: {data.pullError}. This is the last good list.</p>
       )}
 
-      <LmAddPanel />
-
-      <div className="activity-filters" role="group" aria-label="Show moves by team">
-        <button type="button" className={owner === null ? 'activity-chip is-on' : 'activity-chip'} onClick={() => setOwner(null)}>
-          ALL
-        </button>
-        {mine && (
-          <button type="button" className={owner === mine ? 'activity-chip is-on' : 'activity-chip'} onClick={() => setOwner(mine)}>
-            MINE
-          </button>
-        )}
-        {owners.filter((name) => name !== mine).map((name) => (
-          <button
-            key={name}
-            type="button"
-            className={owner === name ? 'activity-chip is-on' : 'activity-chip'}
-            onClick={() => setOwner(name)}
-          >
-            {name.toUpperCase()}
-          </button>
-        ))}
+      <div className="activity-controls">
+        <label className="activity-control">Team
+          <select className="hub-input" value={owner ?? ''} onChange={event => setOwner(event.target.value || null)}>
+            <option value="">All teams</option>
+            {mine && <option value={mine}>My team · {mine}</option>}
+            {owners.filter(name => name !== mine).map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </label>
       </div>
 
       {data && shown.length === 0 && (

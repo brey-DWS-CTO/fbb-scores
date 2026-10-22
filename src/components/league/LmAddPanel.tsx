@@ -115,7 +115,7 @@ function LmAddContent({ compact }: { compact: boolean }) {
     <section className="panel lm-panel">
       <div className="lm-panel-head">
         <div className="hub-heading lm-title">{compact ? 'LM ADDS' : 'WAIVERS AND LM ADDS'}</div>
-        {compact && <Link to="/activity" className="mock-mini-btn">SEE ALL</Link>}
+        {compact && <Link to="/lm-adds" className="mock-mini-btn">SEE ALL</Link>}
       </div>
       {error && <p className="rules-draft-error">{error}</p>}
       {data?.espnWriteTrouble && <p className="rules-draft-error">ESPN sign-in expired: {data.espnWriteTrouble}</p>}
