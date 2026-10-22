@@ -40,13 +40,12 @@ export default function LmAddsPage() {
   return <main className="mock-page lm-adds-page">
     <Link className="score-back hub-heading" to="/league">← LEAGUE</Link>
     <h1>LM Adds</h1>
-    <Link className="tap-btn mock-mini-btn" to="/waivers">Waiver Calendar →</Link>
     <section className="panel lm-advance-panel">
       <h2>Advance LM Add claims</h2>
       <p>Submit ahead of an eligible Saturday or Sunday. Claims close 10 minutes before the earliest tip-off. First submitted gets priority. The player must be unrostered, have cleared normal waivers, and play that day. Make room on your ESPN roster before the claim runs.</p>
       {!identity && <p>Sign in to submit a claim.</p>}
       {identity && <form onSubmit={event => { event.preventDefault(); void submit(); }}>
-        <label>LM Add date<input type="date" className="hub-input" aria-label="LM Add date" min={today} value={date} onChange={event => setDate(event.target.value)} required /></label>
+        <label className="activity-control">LM Add date<input type="date" className="hub-input" aria-label="LM Add date" min={today} value={date} onChange={event => setDate(event.target.value)} required /></label>
         <PlayerCombobox players={dataset.players.filter(entry => entry.espnId !== null)} placeholder="Search for a player to claim…" onSelect={setPlayer} />
         {player && <p>Selected: <strong>{player.fullName ?? player.name}</strong></p>}
         <button type="submit" className="tap-btn mock-mini-btn" disabled={busy || !player?.espnId}>{busy ? 'Saving…' : 'Queue claim'}</button>

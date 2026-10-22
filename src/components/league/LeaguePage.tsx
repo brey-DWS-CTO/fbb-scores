@@ -82,8 +82,7 @@ export default function LeaguePage() {
       </Section>
 
       <div className="league-season-actions">
-        <Link className="league-lm-highlight" to="/lm-adds"><strong>LM Adds</strong><span>Advance claims and eligible-day adds →</span></Link>
-        <Link className="tap-btn mock-mini-btn" to="/waivers">Waiver Calendar →</Link>
+        <Link className="league-lm-highlight" to="/activity"><strong>Activity</strong><span>Moves, waivers and LM Adds →</span></Link>
       </div>
       <LmAddPanel compact />
 

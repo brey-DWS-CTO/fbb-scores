@@ -17,7 +17,7 @@ for (const mode of ['off-season', 'in-season'] as const) {
             assert.ok(!tab.beforeReveal || !revealed);
           }
         }
-        const paths = sections.flatMap(s => s.tabs.map(t => t.to));
+        const paths = sections.flatMap(s => s.tabs.flatMap(t => [t.to, ...(t.pages ?? []).map(page => page.to)]));
         if (mode === 'in-season') {
           assert.equal(sections[0].id, 'scores');
           for (const path of ['/mock', '/my-rankings', '/projections', '/tiers', '/keepers', '/revealed', '/props', '/league/offseason']) assert.ok(!paths.includes(path), path);
@@ -59,4 +59,18 @@ test('Fantasy Cast has its own main button and active state in both season modes
     assert.equal(sectionFor('/scores/cast', sections)?.id, 'cast');
     assert.equal(sections.filter(section => section.primary).length, 4);
   }
+});
+
+test('Moves, Waivers and LM Adds share one Activity tab and preserve direct links', () => {
+  const sections = visibleSections(false, true, 'in-season');
+  const league = sections.find(section => section.id === 'league')!;
+  const activity = league.tabs.find(tab => tab.to === '/activity')!;
+  assert.deepEqual(activity.pages?.map(page => page.to), ['/activity', '/waivers', '/lm-adds']);
+  assert.ok(!league.tabs.some(tab => tab.to === '/waivers' || tab.to === '/lm-adds'));
+  for (const path of ['/activity', '/waivers', '/lm-adds']) {
+    assert.equal(sectionFor(path, sections)?.id, 'league');
+    assert.equal(activeTab(path, league.tabs), '/activity');
+  }
+  const offseason = visibleSections(false, true, 'off-season').find(section => section.id === 'league')!;
+  assert.deepEqual(offseason.tabs.find(tab => tab.to === '/activity')?.pages?.map(page => page.to), ['/activity']);
 });

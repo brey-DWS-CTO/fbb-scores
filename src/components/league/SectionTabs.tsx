@@ -10,7 +10,9 @@ export default function SectionTabs() {
   const section = sectionFor(pathname, visibleSections(identity?.isCommissioner === true, meta?.revealed === true, seasonMode));
   if (!section || section.tabs.length < 2 || onLanding(pathname, section)) return null;
   const active = activeTab(pathname, section.tabs);
+  const pages = section.tabs.find(tab => tab.to === active)?.pages;
   return (
+    <>
     <nav className="section-tabs" aria-label={`${section.label} pages`}>
       {section.tabs.map((tab) => (
         <NavLink
@@ -24,5 +26,11 @@ export default function SectionTabs() {
         </NavLink>
       ))}
     </nav>
+    {pages && pages.length > 1 && <nav className="activity-view-tabs" aria-label="Activity views">
+      {pages.map(page => <NavLink key={page.to} to={page.to} end className={({ isActive }) => `activity-view-tab${isActive ? ' active' : ''}`}>
+        {page.label}
+      </NavLink>)}
+    </nav>}
+    </>
   );
 }
