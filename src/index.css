@@ -6422,3 +6422,10 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .score-player .score-detail-trigger::after { content: ''; position: absolute; inset: 0; border-radius: 8px; cursor: pointer; }
 .score-player:has(.score-detail-trigger:focus-visible) { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
 .score-player .score-detail-trigger:focus-visible { outline: none; }
+/* The matchup summary keeps secondary numbers behind one disclosure. */
+.score-matchup-details { margin-top: 8px; border-top: 1px solid var(--cell-border); }
+.score-matchup-details > summary { cursor: pointer; padding: 10px 0 2px; color: var(--text-soft); font-size: .7rem; }
+.score-matchup-details > summary:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.score-extra-stats { margin-top: 12px; font-size: .7rem; }
+.score-extra-stats strong { color: var(--text-body); }
+.score-head .score-side-scoreline { margin-top: 12px; padding-top: 0; }
