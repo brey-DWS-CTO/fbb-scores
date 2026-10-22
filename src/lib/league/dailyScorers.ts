@@ -20,6 +20,12 @@ export interface DailyScorer extends BoxLine {
 
 export interface TopPerformer extends DailyScorer { date: string; gamesPlayed: number }
 
+export function matchesPlayerName(name: string, search: string): boolean {
+  const normalize = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const normalized = normalize(name);
+  return normalize(search).split(/\s+/).filter(Boolean).every(part => normalized.includes(part));
+}
+
 /** Weekly means the current fantasy week, through today; Monday is the fallback without league dates. */
 export function performerDates(today: string, weekly: boolean, week?: ScoresWeek): string[] {
   if (!weekly) return [today];

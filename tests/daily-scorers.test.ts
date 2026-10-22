@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dailyScorers, filterScorers, nbaGameHref, scorerRosters, performerDates, topPerformers, type DailyNbaScores } from '../src/lib/league/dailyScorers.js';
+import { dailyScorers, filterScorers, matchesPlayerName, nbaGameHref, scorerRosters, performerDates, topPerformers, type DailyNbaScores } from '../src/lib/league/dailyScorers.js';
 import { demoWeek } from '../src/lib/league/scoresDemo.js';
 import { LEAGUE_SCORING, completeLine, type BoxLine, type BoxScore } from '../src/lib/league/partyScore.js';
 import { getDailyNbaScores, validScoreDate } from '../server/lib/dailyScorersService.js';
@@ -10,6 +10,14 @@ const line = (id: string, team: string, stats: Record<string, number>, played = 
   athleteId: id, name: `Player ${id}`, shortName: `P. ${id}`, team, played, stats: completeLine(stats),
 });
 const box = (lines: BoxLine[], gameId = '100'): BoxScore => ({ gameId, state: 'in', detail: '2nd 4:12', home: 'LAL', away: 'DEN', homeScore: 45, awayScore: 48, lines });
+
+test('player search matches partial names, accents, punctuation and reversed name tokens', () => {
+  assert.equal(matchesPlayerName('Nikola Jokić', 'jokic'), true);
+  assert.equal(matchesPlayerName('Nikola Jokić', 'JOK nik'), true);
+  assert.equal(matchesPlayerName("De’Aaron Fox", 'de aaron'), true);
+  assert.equal(matchesPlayerName('LeBron James', '  '), true);
+  assert.equal(matchesPlayerName('LeBron James', 'james harden'), false);
+});
 
 test('Top Performers defaults to today; weekly dates stop at today and follow fantasy weeks', () => {
   assert.deepEqual(performerDates('2026-11-05', false), ['2026-11-05']);
