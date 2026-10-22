@@ -4,6 +4,7 @@ import { fetchDailyScorers } from '../../lib/league/api.js';
 import { nbaGameHref } from '../../lib/league/dailyScorers.js';
 import { teamFullName } from '../../lib/league/houseParty.js';
 import { addDaysIso, localDateIso } from '../../lib/league/scores.js';
+import { sortScoreboardGames } from '../../lib/league/scoreboardOrder.js';
 import TeamLogo from './TeamLogo.js';
 import { tipoffText } from './scoresUi.js';
 
@@ -30,8 +31,8 @@ export default function NbaScoreboardPage() {
     {query.isError && <p role="alert">Could not load NBA scores. Try Refresh.</p>}
     {data?.error && <p className="daily-scorers-note" role="status">{data.error}</p>}
     {data && data.games.length === 0 && <p>No NBA games on this date.</p>}
-    <div className="nba-scoreboard-games">{data?.games.map(game => {
-      const box = data.boxScores.find(entry => entry.gameId === game.id);
+    <div className="nba-scoreboard-games">{(data ? sortScoreboardGames(data.games) : []).map(game => {
+      const box = data?.boxScores.find(entry => entry.gameId === game.id);
       return <Link key={game.id} className={`panel nba-scoreboard-card${game.state === 'in' ? ' is-live' : ''}`} state={{ returnTo: `/scores/nba-scoreboard?date=${date}` }} to={nbaGameHref(date, { gameId: game.id })} aria-label={`${game.away} at ${game.home}, ${game.state === 'pre' ? 'upcoming' : box?.detail || game.detail}. View player fantasy points`}>
         <div className="nba-scoreboard-status"><strong>{game.state === 'in' ? 'LIVE' : game.state === 'post' ? 'FINAL' : tipoffText(game.tipoff) ?? 'TBD'}</strong><span>{game.state === 'pre' ? game.tv : box?.detail || game.detail}</span></div>
         {[game.away, game.home].map(code => <div className="nba-scoreboard-team" key={code}><TeamLogo code={code} size={30} /><span>{teamFullName(code)}</span><strong>{game.state === 'pre' ? '—' : (code === game.home ? box?.homeScore ?? game.homeScore : box?.awayScore ?? game.awayScore) ?? '—'}</strong></div>)}

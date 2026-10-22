@@ -59,20 +59,17 @@ interface SideHeadProps {
   owner: string | undefined;
   /** Where the side should finish the week. Null once the matchup is settled. */
   proj: number | null;
-  deduction: number;
   leading: boolean;
   right?: boolean;
 }
 
-function SideHead({ side, owner, proj, deduction, leading, right }: SideHeadProps) {
+function SideHead({ side, owner, proj, leading, right }: SideHeadProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}`}>
       <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name}</div></div>
-      <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
-      <FppgLabel side={side} />
+      <div className="score-side-owner">{owner ?? 'Unknown owner'}</div>
       <div className="score-side-scoreline"><div className="score-side-total">{side.total.toFixed(1)}</div>
       {proj !== null && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
-      {proj !== null && deduction > 0 && <div className="score-overage-label">−{projText(deduction)} overage</div>}
       </div>
     </div>
   );
@@ -378,11 +375,24 @@ export default function MatchupPage() {
         <>
           <section ref={scoreHeader} className="panel score-head">
             <div className="score-head-grid">
-              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} proj={homeProj?.week ?? null} deduction={homeForecast?.deduction ?? 0} leading={matchup.home.total > matchup.away.total} />
-              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} proj={awayProj?.week ?? null} deduction={awayForecast?.deduction ?? 0} leading={matchup.away.total > matchup.home.total} right />
+              <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} proj={homeProj?.week ?? null} leading={matchup.home.total > matchup.away.total} />
+              <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} proj={awayProj?.week ?? null} leading={matchup.away.total > matchup.home.total} right />
             </div>
             <WinBar left={chance.home} right={chance.away} />
             {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
+            <details className="score-matchup-details">
+              <summary>Matchup details</summary>
+              <div className="score-head-grid score-extra-stats">
+                {[matchup.home, matchup.away].map((side, index) => {
+                  const deduction = (index === 0 ? homeForecast : awayForecast)?.deduction ?? 0;
+                  return <div key={side.teamId} className={index === 1 ? 'is-right' : undefined}>
+                    <strong>{side.abbrev || side.name}</strong>
+                    <div className="score-side-owner">Record {recordText(side.record)}</div>
+                    <FppgLabel side={side} />
+                    {deduction > 0 && <div className="score-overage-label">−{projText(deduction)} projected overage</div>}
+                  </div>;
+                })}
+              </div>
             <div className="score-games-grid">
               <GamesLine
                 side={matchup.home}
@@ -409,6 +419,7 @@ export default function MatchupPage() {
                 ))}
               </div>
             )}
+            </details>
           </section>
 
           <div className={`score-sticky-summary${showStickyScore ? ' is-visible' : ''}`} aria-hidden={!showStickyScore} aria-label="Matchup score">
