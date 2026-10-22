@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { DraftCountdown } from '../../hooks/useCountdown.js';
 import { formatDraftAt } from '../../lib/league/format.js';
@@ -29,6 +29,9 @@ export default function DraftStartPage() {
   const live = phase === 'live';
   const done = phase === 'done';
   const underWay = mockUnderWay(owner);
+
+  // Once closed, the draft section opens the saved board instead of the lobby.
+  if (done) return <Navigate to="/draft" replace />;
 
   return (
     <div className="start-page">

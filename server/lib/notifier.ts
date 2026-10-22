@@ -1,7 +1,7 @@
 /**
  * The league's email, above the mailer and below the routes.
  *
- * Two kinds of mail live here. Trades and keeper reveals go out as a side
+ * Two kinds of mail live here. Trades, party invites and keeper reveals go out as a side
  * effect of a route, after the state is saved and the answer is already on its
  * way back. Reminders go out on a clock, from the cron route.
  *
@@ -35,7 +35,7 @@ import {
 import { sendMail, type MailContent } from './mailer.js';
 import { shameEmailCopy, type DuesBoard } from '../../src/lib/league/dues.js';
 import { dueAnnouncements } from '../../src/lib/league/announcements.js';
-import type { HouseParty } from '../../src/lib/league/houseParty.js';
+import { matchupLabel, partyHeadline, type HouseParty } from '../../src/lib/league/houseParty.js';
 import { duePartyReminders, partiesDueNow, partyCheckDue, partyReminderCopy } from '../../src/lib/league/partyReminders.js';
 
 const leagueDataset = rawDataset as unknown as LeagueDataset;
@@ -87,6 +87,37 @@ async function mailTo(owner: string, content: MailContent, origin: string): Prom
   const address = book.get(owner);
   if (!address) return;
   await sendMail(address, content, origin, 'notify');
+}
+
+// House party invitations
+
+/** Send newly saved house party invitations alongside the in-app popup. */
+export function notifyPartyInvited(party: HouseParty, owners: readonly string[], origin: string): void {
+  if (owners.length === 0) return;
+  const recipients = new Set(owners);
+  queueMail('party invited', async () => {
+    const book = await addressBook();
+    for (const invite of party.invites ?? []) {
+      if (!recipients.has(invite.owner)) continue;
+      const address = book.get(invite.owner);
+      if (!address) continue;
+      // A retry or two simultaneous invite requests must not send two emails.
+      if (!(await claimSentNotice(`party-invite-${party.id}-${invite.owner}`, party.season))) continue;
+      const game = party.games[0];
+      await sendMail(address, {
+        subject: `${invite.by} invited you: ${game ? matchupLabel(game) : 'House party'}`,
+        preheader: partyHeadline(party),
+        heading: `${invite.by} invited you`,
+        lines: [
+          partyHeadline(party),
+          ...(party.note ? [party.note] : []),
+          ...party.games.slice(1).map((extra) => `Also watching: ${matchupLabel(extra)}.`),
+        ],
+        action: { label: 'OPEN PARTY & RSVP', href: `${origin}/party/${encodeURIComponent(party.id)}` },
+        notes: ["Open the party to say I'M IN or CAN'T MAKE IT."],
+      }, origin, 'notify');
+    }
+  });
 }
 
 // ─── Trades ──────────────────────────────────────────────────────────────────

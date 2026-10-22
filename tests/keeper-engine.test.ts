@@ -170,3 +170,17 @@ test('zero games is 25 or fewer: the season before sets the tier, and only no av
   assert.equal(haliburton.keeper.round, 2);
   assert.ok(haliburton.keeper.zeroGp2026 && haliburton.keeper.usesPriorYear);
 });
+
+
+test('a closed draft keeps its board without assigning a new on-clock pick', () => {
+  const draft = {
+    startedAt: '2026-10-18T21:00:00Z',
+    closedAt: '2026-10-19T03:00:00Z',
+    picks: { '1': { owner: 'Joel', playerKey: 'camara', playerName: 'Toumani Camara', pickedAt: '2026-10-19T02:59:00Z' } },
+  };
+  const closed = buildDraftBoard(dataset, state({ draft }));
+  assert.equal(closed[0].selection?.playerName, 'Toumani Camara');
+  assert.equal(closed.some((cell) => cell.onClock), false);
+  const reopened = buildDraftBoard(dataset, state({ draft: { ...draft, closedAt: null } }));
+  assert.equal(reopened.find((cell) => cell.onClock)?.pick.overall, 2);
+});

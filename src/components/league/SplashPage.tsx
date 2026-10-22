@@ -1,15 +1,20 @@
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useIdentity } from '../../hooks/useLeague.js';
+import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 import { leagueDataset } from '../../lib/league/data.js';
+import { seasonHome } from '../../lib/league/seasonMode.js';
 import NavIcon from './NavIcon.js';
 import TeamPickerForm from './TeamPickerForm.js';
 
-/** / — a focused sign-in page. Signed-in owners go straight to their worksheet. */
+/** / — a focused sign-in page. Signed-in owners open scores in season and keepers off season. */
 export default function SplashPage() {
   const { identity } = useIdentity();
+  const { seasonMode, isPending } = useLeagueState();
   const navigate = useNavigate();
 
-  if (identity) return <Navigate to="/keepers" replace />;
+  if (identity) {
+    if (isPending) return <main className="splash-page"><p role="status">Opening your league...</p></main>;
+    return <Navigate to={seasonHome(seasonMode)} replace />;
+  }
 
   return (
     <main className="splash-page">
@@ -38,7 +43,7 @@ export default function SplashPage() {
             <div className="splash-lock"><NavIcon name="lock" size={20} /></div>
           </div>
 
-          <TeamPickerForm onDone={() => navigate('/keepers')} />
+          <TeamPickerForm onDone={() => navigate('/')} />
         </section>
 
         <footer className="splash-footer">

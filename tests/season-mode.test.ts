@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isSeasonMode, resolveSeasonMode } from '../src/lib/league/seasonMode.ts';
+import { isSeasonMode, resolveSeasonMode, seasonHome } from '../src/lib/league/seasonMode.ts';
 
 test('automatic mode starts on week 1 in Pacific, not the host time zone', () => {
   const state = { draft: {} };
@@ -21,4 +21,12 @@ test('either explicit mode wins over the calendar and the closed draft', () => {
   for (const value of [null, undefined, true, 'auto', 'IN SEASON', {}]) assert.equal(isSeasonMode(value), false);
   assert.ok(isSeasonMode('in-season'));
   assert.ok(isSeasonMode('off-season'));
+});
+
+
+test('sign-in opens scores in season and keepers off season, respecting mode overrides', () => {
+  const duringSeason = new Date('2026-10-21T23:00:00Z');
+  assert.equal(seasonHome(resolveSeasonMode({ draft: {} }, duringSeason)), '/scores');
+  assert.equal(seasonHome(resolveSeasonMode({ seasonMode: 'off-season', draft: {} }, duringSeason)), '/keepers');
+  assert.equal(seasonHome(resolveSeasonMode({ seasonMode: 'in-season', draft: {} }, new Date('2026-08-01'))), '/scores');
 });

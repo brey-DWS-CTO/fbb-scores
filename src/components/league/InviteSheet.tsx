@@ -13,7 +13,7 @@ interface Props {
 
 const OWNERS_A_TO_Z = [...OWNERS].sort((a, b) => a.localeCompare(b));
 
-/** Pick who to ask. They see a popup the next time they open the app. */
+/** Pick who to ask. They get an in-app popup and an email if they have an address on file. */
 export default function InviteSheet({ party, onDone, onClose }: Props) {
   const { identity } = useIdentity();
   const viewer = identity?.owner ?? '';
@@ -44,7 +44,7 @@ export default function InviteSheet({ party, onDone, onClose }: Props) {
           <div>
             <div className="splash-step">INVITE</div>
             <h2 id="invite-sheet-title">{party.games[0] ? matchupLabel(party.games[0]) : 'House party'}</h2>
-            <p>They see a popup the next time they open the app.</p>
+            <p>They get an in-app popup and an email if they have an address on file.</p>
           </div>
           <button className="tap-btn account-close" type="button" onClick={onClose} aria-label="Close">×</button>
         </div>

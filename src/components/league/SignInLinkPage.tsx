@@ -47,7 +47,7 @@ export default function SignInLinkPage() {
       });
   }, [token, signInWithSession]);
 
-  // Home sends a signed-in owner straight on to their keeper worksheet,
+  // Home sends a signed-in owner to the season-appropriate page,
   // unless the link said where to go.
   if (signedIn) return <Navigate to={next} replace />;
 

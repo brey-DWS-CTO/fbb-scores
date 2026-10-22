@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
+import { seasonHome } from '../../lib/league/seasonMode.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import { readSidebarCollapsed, writeSidebarCollapsed } from '../../lib/league/sidebar.js';
@@ -75,7 +76,7 @@ export default function AppNav() {
       <header className="top-nav" id="app-sidebar">
         <div className="top-nav-inner">
           <div className="top-nav-head">
-            <NavLink to="/keepers" className="top-nav-brand hub-heading">
+            <NavLink to={seasonHome(seasonMode)} className="top-nav-brand hub-heading">
               <img src="/logo.png" alt="" aria-hidden="true" />
               <span>FBB Scores</span>
             </NavLink>

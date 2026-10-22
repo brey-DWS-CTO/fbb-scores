@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import type { Server } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
 import test, { after, before, beforeEach } from 'node:test';
@@ -22,12 +22,18 @@ const pins: Record<string, string> = {
 type StoreModule = typeof import('../server/lib/leagueStore.ts');
 type ScoreboardModule = typeof import('../server/lib/scoreboardService.ts');
 type BoxScoreModule = typeof import('../server/lib/boxScoreService.ts');
+type NotifierModule = typeof import('../server/lib/notifier.ts');
 
 let tempRoot = '';
 let store: StoreModule;
 let scoreboard: ScoreboardModule;
 let boxScores: BoxScoreModule;
 let server: Server;
+let mailServer: Server;
+let notifier: NotifierModule;
+let mailStatus = 200;
+interface CapturedMail { to: string[]; subject: string; text: string; html: string }
+let delivered: CapturedMail[] = [];
 let baseUrl = '';
 let SEASON = 2027;
 
@@ -85,6 +91,21 @@ before(async () => {
 
   process.env.DATABASE_URL = '';
   process.env.DOTENV_CONFIG_QUIET = 'true';
+  // Deliver only to this local fake transport, never to real recipients.
+  mailServer = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      delivered.push(JSON.parse(Buffer.concat(chunks).toString()) as CapturedMail);
+      res.writeHead(mailStatus, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ id: 'test-mail' }));
+    });
+  });
+  mailServer.listen(0, '127.0.0.1');
+  await new Promise<void>((resolve) => mailServer.once('listening', resolve));
+  process.env.RESEND_API_KEY = 'local-test-key';
+  process.env.RESEND_ENDPOINT = `http://127.0.0.1:${(mailServer.address() as AddressInfo).port}/emails`;
+  process.env.PUBLIC_APP_URL = 'https://league.example';
 
   const appUrl = pathToFileURL(path.join(tempRoot, 'server', 'app.ts')).href;
   const storeUrl = pathToFileURL(path.join(tempRoot, 'server', 'lib', 'leagueStore.ts')).href;
@@ -99,6 +120,7 @@ before(async () => {
   store = storeModule;
   scoreboard = boardModule;
   boxScores = boxModule;
+  notifier = await import(pathToFileURL(path.join(tempRoot, 'server', 'lib', 'notifier.ts')).href) as NotifierModule;
   SEASON = (await store.getState()).state.season;
   for (const [owner, pin] of Object.entries(pins)) await store.setPin(owner, pin);
   scoreboard.pinScoreboard(GAMES);
@@ -112,6 +134,8 @@ before(async () => {
 });
 
 after(async () => {
+  if (notifier) await notifier.mailSettled();
+  if (mailServer) await new Promise<void>((resolve) => mailServer.close(() => resolve()));
   if (server) {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
@@ -121,6 +145,10 @@ after(async () => {
 });
 
 beforeEach(async () => {
+  await notifier.mailSettled();
+  delivered = [];
+  mailStatus = 200;
+  for (const owner of Object.keys(pins)) await store.setOwnerEmail(owner, '');
   await store.clearPartiesForSeason(SEASON);
   for (const owner of Object.keys(pins)) await store.setFavorites(owner, null, null);
 });
@@ -333,4 +361,71 @@ test('people in a party can invite; the invited see a popup until they answer or
   await post('Amy', `/api/league/parties/${party.id}/rsvp`, { answer: 'in' });
   const answered = await request('/api/league/invites', { headers: auth('Amy') });
   assert.deepEqual((answered.body as { invites: unknown[] }).invites, []);
+});
+
+
+test('an invite sends an email and popup once, skipping the host, existing guests and missing addresses', async () => {
+  await store.setOwnerEmail('Dustin', 'dustin@example.test');
+  await store.setOwnerEmail('Kyle', 'kyle@example.test');
+  await store.setOwnerEmail('Ryan', 'ryan@example.test');
+  const party = partyOf((await post('Kyle', '/api/league/parties', {
+    gameIds: ['g1', 'g2'], hosting: true, note: 'Bring snacks <please>',
+  })).body);
+  await post('Ryan', `/api/league/parties/${party.id}/rsvp`, { answer: 'in' });
+  const denied = await post('Amy', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin'] });
+  assert.equal(denied.status, 409);
+  await notifier.mailSettled();
+  assert.equal(delivered.length, 0);
+  const invited = await post('Kyle', `/api/league/parties/${party.id}/invite`, {
+    owners: ['Dustin', 'Dustin', 'Amy', 'Kyle', 'Ryan', 'Nobody'],
+  });
+  assert.equal(invited.status, 200);
+  await notifier.mailSettled();
+  assert.equal(delivered.length, 1);
+  const mail = delivered[0];
+  assert.deepEqual(mail.to, ['dustin@example.test']);
+  assert.equal(mail.subject, 'Kyle invited you: Lakers at Warriors');
+  assert.ok(mail.text.includes('Kyle is hosting.'));
+  assert.ok(mail.text.includes('Bring snacks <please>'));
+  assert.ok(mail.html.includes('Bring snacks &lt;please&gt;'));
+  assert.ok(mail.text.includes('Also watching: Timberwolves at Nuggets.'));
+  assert.ok(mail.html.includes('OPEN PARTY &amp; RSVP'));
+  assert.ok(mail.text.includes(`https://league.example/party/${party.id}`));
+  const popup = await request('/api/league/invites', { headers: auth('Dustin') });
+  assert.equal((popup.body as { invites: unknown[] }).invites.length, 1);
+  const noEmailPopup = await request('/api/league/invites', { headers: auth('Amy') });
+  assert.equal((noEmailPopup.body as { invites: unknown[] }).invites.length, 1);
+  await Promise.all([
+    post('Kyle', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin', 'Amy'] }),
+    post('Ryan', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin'] }),
+  ]);
+  await notifier.mailSettled();
+  assert.equal(delivered.length, 1, 'repeat requests do not resend an invitation');
+});
+
+test('a rejected email does not undo the saved invitation or in-app popup', async () => {
+  await store.setOwnerEmail('Dustin', 'dustin@example.test');
+  mailStatus = 503;
+  const party = partyOf((await post('Kyle', '/api/league/parties', { gameIds: ['g1'], hosting: true })).body);
+  const invited = await post('Kyle', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin'] });
+  assert.equal(invited.status, 200);
+  await notifier.mailSettled();
+  assert.equal(delivered.length, 1);
+  const popup = await request('/api/league/invites', { headers: auth('Dustin') });
+  assert.equal((popup.body as { invites: unknown[] }).invites.length, 1);
+});
+
+
+test('simultaneous new invitations from two guests deliver a single email', async () => {
+  await store.setOwnerEmail('Dustin', 'dustin@example.test');
+  const party = partyOf((await post('Kyle', '/api/league/parties', { gameIds: ['g1'], hosting: true })).body);
+  await post('Ryan', `/api/league/parties/${party.id}/rsvp`, { answer: 'in' });
+  const replies = await Promise.all([
+    post('Kyle', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin'] }),
+    post('Ryan', `/api/league/parties/${party.id}/invite`, { owners: ['Dustin'] }),
+  ]);
+  assert.ok(replies.every((reply) => reply.status === 200));
+  await notifier.mailSettled();
+  assert.equal(delivered.length, 1);
+  assert.deepEqual(delivered[0].to, ['dustin@example.test']);
 });
