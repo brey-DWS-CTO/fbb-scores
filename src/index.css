@@ -6322,3 +6322,5 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .top-performers-search > div { display: flex; gap: 8px; }
 .top-performers-search input { flex: 1; min-width: 0; width: 100%; padding: 10px 12px; font-size: .85rem; }
 .performer-search-matches h2 { font-size: .8rem; margin: 14px 0 5px; color: var(--text-soft); }
+
+.score-detail .is-negative { color: var(--neon-red); font-weight: 700; }
