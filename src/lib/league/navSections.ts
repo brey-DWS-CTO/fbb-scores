@@ -15,6 +15,8 @@ export interface SectionTab {
   to: string;
   label: string;
   commishOnly?: boolean;
+  mode?: SeasonMode;
+  beforeReveal?: boolean;
 }
 
 export interface NavSection {
@@ -23,9 +25,6 @@ export interface NavSection {
   icon: SectionIcon;
   /** On the phone's bottom bar; the rest sit behind MORE. */
   primary?: boolean;
-  offSeason?: boolean;
-  /** On the bottom bar only until keepers go public, then behind MORE. */
-  primaryUntilKeepersPublic?: boolean;
   commishOnly?: boolean;
   /**
    * Where the section opens. Without one, its first tab. A home that is not a
@@ -47,10 +46,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     tabs: [
       { to: '/draft', label: 'BOARD' },
       { to: '/draft/recap', label: 'RECAP' },
-      { to: '/my-rankings', label: 'MY RANKINGS' },
-      { to: '/mock', label: 'MOCK DRAFT' },
-      { to: '/projections', label: 'PROJECTIONS' },
-      { to: '/tiers', label: 'TIERS' },
+      { to: '/my-rankings', label: 'MY RANKINGS', mode: 'off-season' },
+      { to: '/mock', label: 'MOCK DRAFT', mode: 'off-season' },
+      { to: '/projections', label: 'PROJECTIONS', mode: 'off-season' },
+      { to: '/tiers', label: 'TIERS', mode: 'off-season' },
     ],
   },
   { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
@@ -62,7 +61,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     primary: true,
     tabs: [
       { to: '/league', label: 'LEAGUE HQ' },
-      { to: '/watch', label: 'WATCH' },
+      { to: '/lm-adds', label: 'LM ADDS', mode: 'in-season' },
+      { to: '/waivers', label: 'WAIVERS', mode: 'in-season' },
+      { to: '/watch', label: 'WATCH', mode: 'in-season' },
       { to: '/activity', label: 'ACTIVITY' },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
@@ -70,15 +71,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    // The pre-draft side games. Reveals mean nothing once keepers are public,
-    // so on draft day it steps off the phone bar and gives the room back.
+    // Pre-draft side games stay behind MORE to keep the phone bar compact.
     id: 'vault',
     label: 'VAULT',
     icon: 'trophy',
-    primaryUntilKeepersPublic: true,
     tabs: [
       { to: '/achievements', label: 'ACHIEVEMENTS' },
-      { to: '/revealed', label: 'REVEALED' },
+      { to: '/revealed', label: 'REVEALED', beforeReveal: true },
       { to: '/props', label: 'PROP BETS' },
     ],
   },
@@ -129,29 +128,37 @@ export function activeTab(pathname: string, tabs: readonly SectionTab[]): string
     .reduce<string | null>((best, tab) => (best === null || tab.to.length > best.length ? tab.to : best), null);
 }
 
-/** The league mode orders sections. Old pages stay reachable, and VAULT keeps its public-keepers rule off season. */
+/** Keep menus focused on the current mode; saved page addresses remain valid. */
 export function visibleSections(isCommissioner: boolean, keepersPublic: boolean, mode: SeasonMode): NavSection[] {
-  const sections = NAV_SECTIONS
-    .filter((section) => !section.commishOnly || isCommissioner)
-    .map((section) => ({
-      ...section,
-      primary: section.primary === true || (section.primaryUntilKeepersPublic === true && !keepersPublic),
-      tabs: section.tabs.filter((tab) => !tab.commishOnly || isCommissioner),
-    }));
-  if (mode === 'off-season') return sections;
-  // Commissioner tools stay above the off-season group, whose old links all work.
-  const order = ['scores', 'league', 'trades', 'rules', 'commish', 'draft', 'keepers', 'vault'];
+  const order = mode === 'in-season'
+    ? ['scores', 'league', 'trades', 'rules', 'commish', 'draft']
+    : ['keepers', 'draft', 'trades', 'league', 'vault', 'rules', 'commish'];
   return order.flatMap((id) => {
-    const section = sections.find((entry) => entry.id === id);
-    if (!section) return [];
-    const offSeason = ['draft', 'keepers', 'vault'].includes(id);
-    return [{ ...section, home: id === 'draft' ? '/draft' : section.home, offSeason, primary: !offSeason && id !== 'commish' }];
+    const section = NAV_SECTIONS.find((entry) => entry.id === id);
+    if (!section || (section.commishOnly && !isCommissioner)) return [];
+    const archive = mode === 'in-season' && id === 'draft';
+    return [{
+      ...section,
+      label: archive ? 'DRAFT RESULTS' : section.label,
+      home: archive ? '/draft' : section.home,
+      primary: mode === 'in-season'
+        ? ['scores', 'league', 'trades', 'rules'].includes(id)
+        : section.primary === true,
+      tabs: section.tabs.filter((tab) =>
+        (!tab.commishOnly || isCommissioner)
+        && (!tab.mode || tab.mode === mode)
+        && (!tab.beforeReveal || !keepersPublic)),
+    }];
   });
 }
 
 /** The section a page belongs to, or null for pages outside the nav. */
 export function sectionFor(pathname: string, sections: readonly NavSection[]): NavSection | null {
-  return sections.find((section) => section.tabs.some((tab) => onPath(pathname, tab.to))) ?? null;
+  return sections.reduce<NavSection | null>((best, section) => {
+    const match = activeTab(pathname, section.tabs);
+    const previous = best && activeTab(pathname, best.tabs);
+    return match && (!previous || match.length > previous.length) ? section : best;
+  }, null);
 }
 
 /** Where a section's link goes: its home, else its first tab. */

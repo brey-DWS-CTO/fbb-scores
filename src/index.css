@@ -6352,3 +6352,73 @@ html.theme-light .nba-scoreboard-date input { color-scheme: light; }
 .unowned-badge { display: inline-block; vertical-align: middle; margin-left: 6px; padding: 2px 5px; border: 1px solid var(--neon-teal); border-radius: 4px; font-size: .55rem; font-weight: 700; color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 8%, var(--panel-bg)); }
 
 .score-player-who .score-badge { flex-shrink: 0; }
+
+.league-season-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.league-lm-highlight { flex-basis: 100%; display: flex; flex-direction: column; gap: 5px; padding: 16px; border: 1px solid var(--neon-teal); border-radius: 10px; background: color-mix(in srgb, var(--neon-teal) 7%, var(--panel-bg)); text-decoration: none; color: var(--neon-teal); }
+.league-lm-highlight strong { font-size: 1rem; }
+.league-lm-highlight span { font-size: .75rem; color: var(--text-body); }
+.league-offseason-page { max-width: 760px; }
+.waiver-calendar-page { max-width: 800px; }
+.waiver-calendar-page h1, .lm-adds-page h1 { color: var(--text-max); font-size: 1.3rem; }
+.waiver-month-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0; }
+.waiver-month-nav h2 { font-size: 1rem; color: var(--text-max); }
+.waiver-calendar-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .7rem; margin-bottom: 12px; }
+.waiver-calendar-legend .is-irregular { color: var(--neon-orange); }
+.waiver-calendar-legend .is-lm { color: var(--neon-teal); }
+.waiver-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.waiver-weekday { font-size: .65rem; text-align: center; color: var(--text-soft); padding: 6px 0; }
+.waiver-calendar-day { min-height: 82px; min-width: 0; border: 1px solid var(--panel-border); border-radius: 6px; padding: 6px 3px; background: var(--panel-bg); color: var(--text-body); display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; }
+.waiver-calendar-day strong { color: var(--text-max); font-size: .85rem; }
+.waiver-calendar-day small { font-size: .58rem; white-space: nowrap; }
+.waiver-calendar-day.is-irregular small { color: var(--neon-orange); font-weight: 800; }
+.waiver-calendar-day.is-lm { background: color-mix(in srgb, var(--neon-teal) 7%, var(--panel-bg)); }
+.waiver-calendar-day > span { color: var(--neon-teal); font-size: .55rem; font-weight: 800; }
+.waiver-calendar-day[aria-pressed="true"] { outline: 2px solid var(--neon-teal); outline-offset: 1px; }
+.waiver-calendar-day.is-today strong { text-decoration: underline; text-underline-offset: 3px; }
+.waiver-day-detail { margin-top: 18px; padding: 16px; color: var(--text-body); font-size: .8rem; }
+.waiver-day-detail h2 { font-size: 1rem; color: var(--text-max); }
+.lm-adds-page .lm-panel { margin-top: 16px; }
+
+.score-sticky-summary:not(.is-visible) { height: 0; min-height: 0; padding: 0; margin: 0; border: 0; overflow: hidden; visibility: hidden; }
+
+.lm-advance-panel { padding: 16px; margin-top: 16px; color: var(--text-body); font-size: .8rem; line-height: 1.5; }
+.lm-advance-panel h2 { font-size: 1rem; color: var(--neon-teal); }
+.lm-advance-panel form { display: grid; gap: 12px; margin: 16px 0; }
+.lm-advance-panel form > label { display: flex; flex-direction: column; gap: 5px; }
+.lm-advance-panel input[type="date"] { padding: 10px; color-scheme: dark; }
+html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
+.lm-claim-queue { list-style: none; padding: 0; }
+.lm-claim-queue li { display: flex; align-items: start; gap: 12px; border-top: 1px solid var(--cell-border); padding: 12px 0; }
+.lm-claim-queue li > div { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.lm-claim-queue small { color: var(--text-soft); }
+/* Keep actual daily points outside the pinned weekly totals. */
+.score-sticky-numbers { flex-direction: row-reverse; align-items: baseline; gap: 6px; }
+.score-sticky-side.is-right .score-sticky-numbers { flex-direction: row; align-items: baseline; }
+.score-side-scoreline { flex-direction: row; align-items: baseline; }
+.is-right .score-side-scoreline { align-items: baseline; }
+/* Top Performers uses a single compact line per player. */
+.top-performers-page .daily-scorer-row { min-height: 40px; padding: 5px 0; gap: 7px; }
+.top-performers-page .daily-scorer-info { flex-direction: row; align-items: baseline; gap: 10px; overflow: hidden; }
+.top-performers-page .daily-scorer-info > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-performers-page .daily-scorer-info > strong { flex: 1 0 120px; font-size: .78rem; }
+.top-performers-page .daily-scorer-info > small { flex: 1 1 120px; font-size: .65rem; }
+.top-performers-page .daily-scorer-total { flex-direction: row; align-items: baseline; gap: 8px; }
+.top-performers-page .daily-scorer-total strong { font-size: .95rem; }
+.top-performers-page .daily-scorer-total small { white-space: nowrap; }
+@media (max-width: 540px) {
+  .top-performers-page .daily-scorer-info { gap: 6px; }
+  .top-performers-page .daily-scorer-info > strong { flex-basis: 95px; font-size: .72rem; }
+  .top-performers-page .daily-scorer-info > small { flex-basis: 65px; font-size: .6rem; }
+  .top-performers-page .daily-scorer-total { gap: 5px; }
+}
+/* Available players stand out in both themes. */
+.unowned-badge { color: #211b00; background: #ffe600; border-color: #d4b900; }
+.score-field-goal-net { background: none; border: 0; border-bottom: 1px dotted currentColor; padding: 4px 0; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.score-field-goal-net:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.score-field-goal-part th { padding-left: 12px; font-weight: 400; }
+/* Stretch the accessible score button across its player card. */
+.score-player { position: relative; }
+.score-detail-trigger { text-decoration: none; }
+.score-player .score-detail-trigger::after { content: ''; position: absolute; inset: 0; border-radius: 8px; cursor: pointer; }
+.score-player:has(.score-detail-trigger:focus-visible) { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.score-player .score-detail-trigger:focus-visible { outline: none; }

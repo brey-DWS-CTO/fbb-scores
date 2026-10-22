@@ -18,7 +18,7 @@ import { runDueReminders } from '../lib/notifier.js';
 import { runGamesWarnings } from '../lib/gamesWarningService.js';
 import { refreshTeamNamesNow } from '../lib/teamNameService.js';
 import { pullTransactionsIfStale } from '../lib/transactionService.js';
-import { runLmClock } from '../lib/lmWeekendService.js';
+import { runLmClock, runLmClaimClock } from '../lib/lmWeekendService.js';
 import { appOrigin } from './auth.js';
 
 const router = Router();
@@ -113,6 +113,12 @@ router.get('/lm-clock', async (req: Request, res: Response) => {
     console.error('[lm-clock] failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'The LM clock failed' });
   }
+});
+
+router.get('/lm-claims', async (req: Request, res: Response) => {
+  if (!allowed(req)) { res.status(401).json({ error: 'Not for you' }); return; }
+  try { res.json({ adds: await runLmClaimClock(new Date()) }); }
+  catch (error) { console.error('[lm-claims]', error instanceof Error ? error.message : error); res.status(500).json({ error: 'LM claim processing failed' }); }
 });
 
 export default router;

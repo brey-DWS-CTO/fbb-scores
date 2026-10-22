@@ -296,9 +296,11 @@ export interface GuestScore {
 export function statLine(stats: Readonly<Record<string, number>>): string {
   const parts: Array<[string, string]> = [['0', 'pts'], ['6', 'reb'], ['3', 'ast'], ['2', 'stl'], ['1', 'blk'], ['17', '3pm'], ['11', 'to']];
   const words = parts.filter(([id]) => (stats[id] ?? 0) > 0).map(([id, label]) => `${stats[id]} ${label}`);
+  if (stats['40'] !== undefined) words.unshift(`${round1(stats['40'])} min`);
   if (stats['39']) words.push('quadruple-double');
   else if (stats['38']) words.push('triple-double');
   else if (stats['37']) words.push('double-double');
+  if (stats['9'] !== undefined) words.push(`${stats['9']} fouls`);
   return words.join(', ');
 }
 

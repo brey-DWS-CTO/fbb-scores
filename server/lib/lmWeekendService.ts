@@ -15,6 +15,7 @@ import type { LeagueDataset } from '../../src/lib/keeper/types.js';
 import { EspnClient } from '../../src/lib/espn/client.js';
 import {
   checkLmAdd,
+  firstTip,
   earlyDays,
   lmAddAllowed,
   lmAddText,
@@ -39,7 +40,10 @@ import {
   setWaiverHour,
   type EspnLmConfig,
 } from './espnLm.js';
-import { appendAudit, listLmAddRequests, listTransactions, saveLmAddRequest } from './leagueStore.js';
+import { appendAudit, getState, listLmAddRequests, listTransactions, saveLmAddRequest, transitionLmClaim } from './leagueStore.js';
+import { resolveCurrentPlayerPool } from './playerPoolService.js';
+import { pullTransactions } from './transactionService.js';
+import { claimPriority, claimReady } from '../../src/lib/league/lmClaims.js';
 import { gamesForDays, gamesOn } from './nbaDay.js';
 import { postToSlack } from './slack.js';
 
@@ -137,6 +141,7 @@ async function attemptAdd(config: EspnLmConfig, request: LmAddRequest, by: strin
     return added;
   }
   if (result.dryRun) return { ...request, note: 'dry run: nothing sent to ESPN', updatedAt };
+  if (request.status === 'processing' && result.status === null) return { ...request, note: `ESPN result is uncertain; ownership must be verified before retrying. ${note}`, updatedAt };
   if (result.authFailed) {
     await postToSlack(`LM add for ${request.owner} (${shortName(request.playerName)}) could not be sent: ${note}`);
     return { ...request, note, updatedAt };
@@ -153,11 +158,11 @@ async function runAdds(config: EspnLmConfig, now: Date): Promise<LmClockRun['add
   const games = await gamesOn(pt.date);
   const window = lmAddWindow(now, games);
   for (const request of await listLmAddRequests(dataset.season)) {
-    if (request.status === 'added' || request.status === 'denied') continue;
+    if (['added', 'denied', 'queued', 'processing', 'cancelled'].includes(request.status)) continue;
     let next = request;
     if (request.forDate === pt.date && request.status !== 'failsafe') {
       if (window.open) next = await attemptAdd(config, request, null);
-      else {
+      else if (firstTip(games) && now.toISOString() >= firstTip(games)!) {
         next = { ...request, status: 'failsafe', note: 'Not added before the first tip. His points count today; the add goes through for tomorrow.', updatedAt: now.toISOString() };
         await postToSlack(lmAddText(next));
       }
@@ -179,7 +184,7 @@ export async function runLmClock(now = new Date()): Promise<LmClockRun> {
   const config = espnLmConfig();
   if (!config) return { at: now.toISOString(), date: pt.date, skipped: 'ESPN credentials are not configured', waiver: null, adds: [] };
   const waiver = pt.hour >= SET_HOUR_FROM_PT ? await keepWaiverHour(config, now) : null;
-  const adds = await runAdds(config, now);
+  const adds = [...await runAdvanceLmClaims(config, now), ...await runAdds(config, now)];
   return { at: now.toISOString(), date: pt.date, skipped: null, waiver, adds };
 }
 
@@ -229,6 +234,9 @@ export async function requestLmAdd(owner: string, playerId: number, now = new Da
   if (!config) throw new LmAddRefused('ESPN credentials are not configured.', []);
 
   const pt = pacific(now);
+  if ((await listLmAddRequests(dataset.season)).some(row => row.forDate === pt.date && row.playerId === playerId && ['queued', 'processing'].includes(row.status))) {
+    throw new LmAddRefused('There is already an advance claim for this player. Join the advance queue so submission priority is preserved.', []);
+  }
   const games = await gamesOn(pt.date);
   const facts = (await readClient(config).fetchPlayerFacts([playerId])).get(playerId);
   if (!facts) throw new LmAddRefused('ESPN does not know that player.', []);
@@ -269,6 +277,7 @@ export async function retryLmAdd(id: string, by: string): Promise<LmAddRequest |
   const config = espnLmConfig();
   const request = (await listLmAddRequests(dataset.season)).find((row) => row.id === id);
   if (!request) return null;
+  if (['queued', 'processing', 'cancelled', 'denied', 'added'].includes(request.status)) return request;
   if (!config) return request;
   const next = await attemptAdd(config, request, by);
   await saveLmAddRequest(next);
@@ -278,8 +287,151 @@ export async function retryLmAdd(id: string, by: string): Promise<LmAddRequest |
 export async function denyLmAdd(id: string, by: string, note: string): Promise<LmAddRequest | null> {
   const request = (await listLmAddRequests(dataset.season)).find((row) => row.id === id);
   if (!request) return null;
+  if (['queued', 'processing'].includes(request.status)) throw new LmAddRefused('Use claim cancellation before processing. A processing claim must finish verification first.', []);
   const next: LmAddRequest = { ...request, status: 'denied', note: note || 'Denied by the commissioner.', updatedAt: new Date().toISOString(), handledBy: by };
   await saveLmAddRequest(next);
   await appendAudit(by, 'lm.add.denied', { id, owner: request.owner, playerName: request.playerName, note: next.note });
   return next;
+}
+
+
+/** A Pacific waiver run as an instant, including daylight-saving transitions. */
+function waiverRunAt(date: string, hour: number): string {
+  const result = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00-08:00`);
+  const actual = pacific(result);
+  result.setUTCHours(result.getUTCHours() + hour - actual.hour);
+  return result.toISOString();
+}
+
+async function latestNormalWaiverAt(now: Date): Promise<string> {
+  const date = pacific(now).date;
+  const previous = new Date(`${date}T12:00:00Z`);
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  const yesterday = previous.toISOString().slice(0, 10);
+  const [todayGames, yesterdayGames] = await Promise.all([gamesOn(date), gamesOn(yesterday)]);
+  const todayRun = waiverRunAt(date, waiverHourFor(todayGames).hourPT);
+  return todayRun <= now.toISOString() ? todayRun : waiverRunAt(yesterday, waiverHourFor(yesterdayGames).hourPT);
+}
+
+/** Save intent now; ownership and normal-waiver clearance are checked only when it can run. */
+export async function queueLmClaim(owner: string, playerId: number, forDate: string, now = new Date()): Promise<LmAddRequest> {
+  const team = dataset.teams.find(entry => entry.owner === owner);
+  if (!team) throw new LmAddRefused('That owner has no team.', []);
+  const today = pacific(now).date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(forDate) || !Number.isFinite(Date.parse(`${forDate}T12:00:00Z`)) || new Date(`${forDate}T12:00:00Z`).toISOString().slice(0, 10) !== forDate) throw new LmAddRefused('Pick a valid LM Add date.', []);
+  const distance = (Date.parse(`${forDate}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000;
+  if (distance < 0 || distance > 35) throw new LmAddRefused('Choose a date from today through the next 35 days.', []);
+  const weekday = new Date(`${forDate}T12:00:00Z`).getUTCDay();
+  if (weekday !== 0 && weekday !== 6) throw new LmAddRefused('LM Adds are eligible on Saturdays and Sundays.', []);
+  const games = await gamesOn(forDate);
+  const tip = firstTip(games);
+  const deadline = tip ? new Date(Date.parse(tip) - 10 * 60_000).toISOString() : null;
+  if (!deadline) throw new LmAddRefused('No NBA games are scheduled on that date.', []);
+  if (now.toISOString() >= deadline) throw new LmAddRefused('Claims closed 10 minutes before the earliest tip-off.', []);
+  const existing = await listLmAddRequests(dataset.season);
+  const duplicate = existing.find(row => row.owner === owner && row.playerId === playerId && row.forDate === forDate && ['queued', 'processing', 'added'].includes(row.status));
+  if (duplicate) return duplicate;
+  if (existing.filter(row => row.owner === owner && ['queued', 'processing'].includes(row.status)).length >= 30) throw new LmAddRefused('You already have 30 open claims. Cancel one before adding another.', []);
+  const { state } = await getState();
+  const pool = await resolveCurrentPlayerPool(state);
+  const player = pool.players.find(entry => entry.espnId === playerId);
+  if (!player) throw new LmAddRefused('Choose a player from the player list.', []);
+  const request: LmAddRequest = { id: randomUUID(), season: dataset.season, owner, teamId: team.espnTeamId, playerId,
+    playerName: player.fullName, proTeam: player.proTeam, requestedAt: now.toISOString(), forDate,
+    status: 'queued', note: 'First submitted gets priority. Player must be free and have cleared normal waivers.', updatedAt: now.toISOString(), handledBy: null };
+  await saveLmAddRequest(request);
+  await appendAudit(owner, 'lm.claim.queued', { id: request.id, playerId, forDate });
+  return request;
+}
+
+export async function cancelLmClaim(id: string, owner: string, commissioner: boolean, now = new Date()): Promise<LmAddRequest | null> {
+  const request = (await listLmAddRequests(dataset.season)).find(row => row.id === id);
+  if (!request) return null;
+  if (request.owner !== owner && !commissioner) throw new LmAddRefused('You may cancel only your own claims.', []);
+  if (request.status !== 'queued') throw new LmAddRefused('Only queued claims can be cancelled.', []);
+  const cancelled: LmAddRequest = { ...request, status: 'cancelled', note: 'Cancelled before processing.', handledBy: owner, updatedAt: now.toISOString() };
+  if (!await transitionLmClaim(cancelled, request)) throw new LmAddRefused('Claim changed while you were cancelling it. Refresh and try again.', []);
+  await appendAudit(owner, 'lm.claim.cancelled', { id });
+  return cancelled;
+}
+
+export interface ClaimRuntime {
+  list: () => Promise<LmAddRequest[]>;
+  save: (request: LmAddRequest) => Promise<void>;
+  transition: (next: LmAddRequest, expected: LmAddRequest) => Promise<boolean>;
+  games: (date: string) => Promise<DayGame[]>;
+  facts: (id: number) => Promise<{ name: string; proTeam: string; onTeamId: number | null } | undefined>;
+  drops: () => Promise<Map<number, string>>;
+  lastRun: (now: Date) => Promise<string>;
+  add: (request: LmAddRequest) => Promise<LmAddRequest>;
+}
+
+/** First-submitted queue. A CAS lease survives overlapping cron runs and uncertain ESPN replies. */
+export async function runAdvanceLmClaims(config: EspnLmConfig, now = new Date(), runtime?: ClaimRuntime): Promise<LmClockRun['adds']> {
+  const deps: ClaimRuntime = runtime ?? {
+    list: () => listLmAddRequests(dataset.season), save: saveLmAddRequest, transition: transitionLmClaim,
+    games: gamesOn, facts: async id => (await readClient(config).fetchPlayerFacts([id])).get(id),
+    drops: async () => { const pull = await pullTransactions(); if (pull.error) throw new Error(pull.error); return lastDrops(); },
+    lastRun: latestNormalWaiverAt, add: request => attemptAdd(config, request, null),
+  };
+  const today = pacific(now).date;
+  const allRequests = await deps.list();
+  const requests = allRequests.filter(row => ['queued', 'processing'].includes(row.status) && row.forDate <= today).sort(claimPriority);
+  if (!requests.length) return [];
+  const output: LmClockRun['adds'] = [];
+  const weekday = pacific(now).weekday;
+  const games = weekday === 0 || weekday === 6 ? await deps.games(today) : [];
+  const beforeTip = firstTip(games) !== null && now.toISOString() < firstTip(games)!;
+  let drops: Map<number, string> | null = null;
+  let lastRun: string | null = null;
+  if (beforeTip) [drops, lastRun] = await Promise.all([deps.drops(), deps.lastRun(now)]);
+  const visited = new Set<number>();
+  let attempts = 0;
+  for (const request of requests) {
+    if (attempts >= 3 || visited.has(request.playerId)) continue;
+    if (request.status === 'queued' && allRequests.some(other => other.id !== request.id && other.forDate === request.forDate && other.playerId === request.playerId && other.status === 'added')) {
+      const denied: LmAddRequest = { ...request, status: 'denied', note: 'This player was already awarded for this LM Add day.', updatedAt: now.toISOString() };
+      if (await deps.transition(denied, request)) output.push({ id: denied.id, status: denied.status, note: denied.note });
+      continue;
+    }
+    if (request.status === 'processing' && Date.parse(request.updatedAt) > now.getTime() - 2 * 60_000) continue;
+    if (request.status === 'queued' && (request.forDate < today || !beforeTip)) {
+      const expired: LmAddRequest = { ...request, status: 'denied', updatedAt: now.toISOString(), note: 'The eligible LM Add window ended before this claim could be awarded.' };
+      if (await deps.transition(expired, request)) output.push({ id: expired.id, status: expired.status, note: expired.note });
+      continue;
+    }
+    const lease: LmAddRequest = { ...request, status: 'processing', updatedAt: now.toISOString(), note: 'Checking ownership and normal-waiver clearance.' };
+    if (!await deps.transition(lease, request)) continue;
+    attempts++;
+    visited.add(request.playerId);
+    try {
+      const facts = await deps.facts(request.playerId);
+      if (!facts || facts.onTeamId === null) { await deps.save({ ...lease, note: 'Ownership is unknown. Waiting for verified ESPN data.' }); continue; }
+      if (request.status === 'processing' && facts.onTeamId === request.teamId) {
+        const recovered: LmAddRequest = { ...lease, status: 'added', note: 'ESPN confirms the player is on your team after the interrupted attempt.' };
+        await deps.save(recovered); output.push({ id: recovered.id, status: recovered.status, note: recovered.note }); continue;
+      }
+      const decision = beforeTip && drops && lastRun ? claimReady({ request, now, games, onTeamId: facts.onTeamId, proTeam: facts.proTeam, lastDroppedAt: drops.get(request.playerId) ?? null, lastWaiverAt: lastRun }) : { action: 'deny', note: 'The eligible LM Add window has ended.' };
+      if (decision.action !== 'ready') {
+        const next: LmAddRequest = { ...lease, status: decision.action === 'deny' ? 'denied' : 'queued', note: decision.note };
+        await deps.save(next); output.push({ id: next.id, status: next.status, note: next.note }); continue;
+      }
+      const result = await deps.add({ ...lease, proTeam: facts.proTeam });
+      const next: LmAddRequest = result.status === 'added' || (result.status === 'processing' && !result.note.startsWith('dry run')) ? result : { ...result, status: 'queued' };
+      await deps.save(next); output.push({ id: next.id, status: next.status, note: next.note });
+    } catch (error) {
+      // Leave the lease in processing: the write may have succeeded. The next
+      // worker verifies actual ownership before it considers sending again.
+      await deps.save({ ...lease, note: `Needs verification after an interrupted attempt: ${error instanceof Error ? error.message : 'unknown error'}` });
+    }
+  }
+  return output;
+}
+
+/** The minute clock does only claim processing; waiver-hour maintenance stays on its existing clock. */
+export async function runLmClaimClock(now = new Date()): Promise<LmClockRun['adds']> {
+  const weekday = pacific(now).weekday;
+  if (weekday !== 0 && weekday !== 6) return [];
+  const config = espnLmConfig();
+  return config ? runAdvanceLmClaims(config, now) : [];
 }

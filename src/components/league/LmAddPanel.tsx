@@ -27,6 +27,9 @@ const dayLabel = (date: string) =>
 const whenLabel = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
 const STATUS_LABEL: Record<LmAddRequest['status'], string> = {
+  queued: 'QUEUED',
+  processing: 'PROCESSING',
+  cancelled: 'CANCELLED',
   requested: 'REQUESTED',
   'waiting-for-drop': 'WAITING',
   added: 'ADDED',
@@ -38,9 +41,9 @@ const STATUS_LABEL: Record<LmAddRequest['status'], string> = {
 const REFRESH_MS = 60_000;
 
 /** The weekend LM rules on the ACTIVITY page: waiver hour, early days, LM add requests. */
-export default function LmAddPanel({ compact = false }: { compact?: boolean }) {
+export default function LmAddPanel({ compact = false, always = false }: { compact?: boolean; always?: boolean }) {
   const { seasonMode } = useLeagueState();
-  return seasonMode === 'in-season' ? <LmAddContent compact={compact} /> : null;
+  return always || seasonMode === 'in-season' ? <LmAddContent compact={compact} /> : null;
 }
 
 function LmAddContent({ compact }: { compact: boolean }) {
@@ -169,7 +172,7 @@ function LmAddContent({ compact }: { compact: boolean }) {
                 <span>{dayLabel(request.forDate)}, {whenLabel(request.requestedAt)}</span>
               </div>
               {request.note && <div className="league-activity-line">{request.note}</div>}
-              {!compact && isCommish && identity && request.status !== 'added' && request.status !== 'denied' && (
+              {!compact && isCommish && identity && !['added', 'denied', 'queued', 'processing', 'cancelled'].includes(request.status) && (
                 <div className="lm-actions">
                   <button type="button" className="activity-chip" disabled={busy} onClick={() => { void act(() => retryLmAdd(identity, request.id)); }}>SEND TO ESPN AGAIN</button>
                   <button

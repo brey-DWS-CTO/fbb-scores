@@ -1,7 +1,6 @@
 import { FppgLabel } from './LineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
-import { nbaGameHref } from '../../lib/league/dailyScorers.js';
-import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isActiveSlot } from '../../lib/espn/calculations.js';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -156,13 +155,13 @@ function CapEditor({ matchupPeriodId, cap, onClose }: CapEditorProps) {
   );
 }
 
-function PlayerTop({ player, slot, gameHref }: { player: ScorePlayer; slot: number; gameHref?: string }) {
+function PlayerTop({ player, slot }: { player: ScorePlayer; slot: number }) {
   const badge = injuryBadge(player.injuryStatus);
   return (
     <>
       <span className="score-slot">{slotLabel(slot)}</span>
       <span className="score-player-who">
-        <span className="score-player-name">{gameHref ? <Link className="score-player-name-text score-player-game-link" to={gameHref}>{shortName(player.name)}</Link> : <span className="score-player-name-text">{shortName(player.name)}</span>}<TeamLogo code={player.proTeam || null} size={14} /></span>
+        <span className="score-player-name"><span className="score-player-name-text">{shortName(player.name)}</span><TeamLogo code={player.proTeam || null} size={14} /></span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
       </span>
     </>
@@ -196,19 +195,18 @@ interface DayCellProps {
  * Actual points stay prominent before, during and after the game.
  * A smaller projected finish sits below until the game is complete.
  */
-function DayCell({ player, week, scoringPeriodId, expected, overage, demo = false }: DayCellProps) {
+function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const day = player.days[String(scoringPeriodId)];
   const slot = slotOn(player, scoringPeriodId);
   const proj = playerDayProjection(player, week, expected, scoringPeriodId, true);
   const status = day?.game?.status;
-  const date = week.days.find(entry => entry.scoringPeriodId === scoringPeriodId)?.date;
   const underway = day?.played === true || status === 'live' || status === 'final';
   const projected = status !== 'final' && proj !== null && proj > 0 && (!underway || status === 'live') ? proj : null;
   return (
     <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${status === 'live' ? ' is-live' : ''}`}>
       <div className="score-player-top">
-        <PlayerTop player={player} slot={slot} gameHref={day?.game && date && !demo ? nbaGameHref(date, { team: player.proTeam, player: String(player.id) }) : undefined} />
+        <PlayerTop player={player} slot={slot} />
         <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
       <div className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>
@@ -293,6 +291,8 @@ export default function MatchupPage() {
   const owners = useMemo(() => ownerByEspnTeamId(leagueDataset.teams), []);
   const [editingCap, setEditingCap] = useState(false);
   const dayNav = useRef<HTMLDivElement>(null);
+  const scoreHeader = useRef<HTMLElement>(null);
+  const [showStickyScore, setShowStickyScore] = useState(false);
 
   const loaded = query.data;
   // The commissioner's cap for this week when he set one, else ESPN's.
@@ -333,6 +333,14 @@ export default function MatchupPage() {
   const homeProj = settled ? null : homeForecast;
   const awayProj = settled ? null : awayForecast;
   const overageDays = new Set([...(homeForecast?.overages ?? []), ...(awayForecast?.overages ?? [])].map((game) => game.scoringPeriodId));
+  useEffect(() => {
+    const header = scoreHeader.current;
+    if (!header) return;
+    const observer = new IntersectionObserver(([entry]) => setShowStickyScore(entry.boundingClientRect.bottom <= 0));
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [matchup?.id]);
+
   const back = `/scores${scoresQuery({ week: week?.matchupPeriodId ?? requestedWeek, demo })}`;
   const isCommish = identity?.isCommissioner === true;
 
@@ -368,7 +376,7 @@ export default function MatchupPage() {
 
       {week && matchup && chance && view && (
         <>
-          <section className="panel score-head">
+          <section ref={scoreHeader} className="panel score-head">
             <div className="score-head-grid">
               <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} proj={homeProj?.week ?? null} deduction={homeForecast?.deduction ?? 0} leading={matchup.home.total > matchup.away.total} />
               <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} proj={awayProj?.week ?? null} deduction={awayForecast?.deduction ?? 0} leading={matchup.away.total > matchup.home.total} right />
@@ -403,16 +411,15 @@ export default function MatchupPage() {
             )}
           </section>
 
-          <div className="score-sticky-summary" aria-label="Matchup score">
+          <div className={`score-sticky-summary${showStickyScore ? ' is-visible' : ''}`} aria-hidden={!showStickyScore} aria-label="Matchup score">
             {[matchup.home, matchup.away].map((side, index) => {
-              const forecast = index === 0 ? homeProj : awayProj;
-              const projected = view.kind === 'day' ? forecast?.byDay[String(view.scoringPeriodId)] : forecast?.week;
+              const dailyTotal = side.pointsByDay[String(view.kind === 'day' ? view.scoringPeriodId : week.currentScoringPeriodId)] ?? 0;
               return <div key={side.teamId} className={`score-sticky-side${index === 1 ? ' is-right' : ''}`}>
                 <FantasyTeamLogo side={side} size={30} />
                 <span className="score-sticky-name">{side.abbrev || side.name}</span>
                 <span className="score-sticky-numbers">
                   <strong aria-label={`${side.name}: ${side.total.toFixed(1)} points`}>{side.total.toFixed(1)}</strong>
-                  {projected !== undefined && <small aria-label={`${side.name}: projected ${view.kind === 'day' ? 'daily' : 'weekly'} total ${projText(projected)}`}>{view.kind === 'day' ? 'Day' : 'Week'} proj {projText(projected)}</small>}
+                  <small aria-label={`${side.name}: daily total ${dailyTotal.toFixed(1)} points`}>Day {dailyTotal.toFixed(1)}</small>
                 </span>
               </div>;
             })}

@@ -31,6 +31,9 @@ export interface DayGame {
 /** Waivers run at this hour, Pacific, on a normal day. ESPN stores 18 Eastern. */
 export const NORMAL_WAIVER_HOUR_PT = 15;
 
+/** Leave ten minutes to resolve LM claims before the earliest tip-off. */
+export const LM_ADD_BUFFER_MS = 10 * 60_000;
+
 /** A first tip before this hour, Pacific, makes an early day. */
 export const EARLY_TIP_CUTOFF_PT = 16;
 
@@ -167,33 +170,35 @@ export interface LmAddWindow {
 export function lmAddWindow(now: string | Date, todaysGames: readonly DayGame[]): LmAddWindow {
   const at = pacific(now);
   const tip = firstTip(todaysGames);
-  if (!isWeekend(at)) return { open: false, reason: 'LM adds are for Saturdays and Sundays.', closesAt: tip };
+  const closesAt = tip ? new Date(Date.parse(tip) - LM_ADD_BUFFER_MS).toISOString() : null;
+  if (!isWeekend(at)) return { open: false, reason: 'LM adds are for Saturdays and Sundays.', closesAt };
   if (tip === null) return { open: false, reason: 'No NBA games today, so no LM adds.', closesAt: null };
   const nowIso = typeof now === 'string' ? new Date(now).toISOString() : now.toISOString();
-  if (nowIso >= tip) return { open: false, reason: 'The first game has tipped off. LM adds closed for today.', closesAt: tip };
-  return { open: true, reason: null, closesAt: tip };
+  if (nowIso >= tip) return { open: false, reason: 'The first game has tipped off. LM adds closed for today.', closesAt };
+  if (closesAt && nowIso >= closesAt) return { open: false, reason: 'LM adds close 10 minutes before the first tip.', closesAt };
+  return { open: true, reason: null, closesAt };
 }
 
-export type LmAddStatus = 'requested' | 'waiting-for-drop' | 'added' | 'failsafe' | 'denied';
+export type LmAddStatus = 'requested' | 'waiting-for-drop' | 'added' | 'failsafe' | 'denied' | 'queued' | 'processing' | 'cancelled';
 
 /** Copy for the always-visible button, using the server's window and Pacific date. */
 export function lmAddButtonReason(window: LmAddWindow | null, date: string | null, signedIn: boolean): string {
   if (!signedIn) return 'Sign in to request an LM add.';
   if (!window || !date) return "Checking today's LM add window.";
-  if (window.open) return 'Open until the first tip.';
+  if (window.open) return 'Open until 10 minutes before the first tip.';
   const day = new Date(`${date}T12:00:00Z`).getUTCDay();
   if ((day === 0 || day === 6) && window.closesAt !== null) {
     return day === 6
-      ? 'Closed for today. Opens again tomorrow before the first tip.'
-      : 'Closed for today. Opens again next Saturday before the first tip.';
+      ? 'Closed for today. Opens again tomorrow; closes 10 minutes before the first tip.'
+      : 'Closed for today. Opens again next Saturday; closes 10 minutes before the first tip.';
   }
   return window.closesAt === null && (day === 0 || day === 6)
     ? window.reason ?? 'No NBA games today, so no LM adds.'
-    : 'LM adds open Saturday and Sunday, until the first tip.';
+    : 'LM adds open Saturday and Sunday, until 10 minutes before the first tip.';
 }
 
 export function ownOpenLmRequests(requests: readonly LmAddRequest[], owner: string | null): LmAddRequest[] {
-  return owner === null ? [] : requests.filter((request) => request.owner === owner && request.status !== 'added' && request.status !== 'denied');
+  return owner === null ? [] : requests.filter((request) => request.owner === owner && !['added', 'denied', 'cancelled'].includes(request.status));
 }
 
 export interface LmAddRequest {
@@ -265,7 +270,7 @@ export function checkLmAdd(ctx: LmAddContext): LmAddCheck[] {
   return [
     {
       rule: 'transactions.waivers.lmadd.timing',
-      text: 'Saturday or Sunday, before the first tip',
+      text: 'Saturday or Sunday, at least 10 minutes before the first tip',
       ok: window.open,
       detail: window.reason,
     },
@@ -313,6 +318,9 @@ export function waiverChangeText(target: WaiverHour, forDate: string, wasET: num
 export function lmAddText(request: Pick<LmAddRequest, 'owner' | 'playerName' | 'proTeam' | 'status'>): string {
   const who = request.proTeam ? `${shortName(request.playerName)} (${request.proTeam})` : shortName(request.playerName);
   switch (request.status) {
+    case 'queued': return `${request.owner}: advance LM claim ${who}, queued`;
+    case 'processing': return `${request.owner}: advance LM claim ${who}, checking ESPN`;
+    case 'cancelled': return `${request.owner}: advance LM claim ${who}, cancelled`;
     case 'added': return `${request.owner}: LM add ${who}, added`;
     case 'waiting-for-drop': return `${request.owner}: LM add ${who}, waiting for a drop`;
     case 'failsafe': return `${request.owner}: LM add ${who}, failsafe: his points count today`;

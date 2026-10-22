@@ -583,6 +583,7 @@ interface StoreBackend {
   listLmAddRequests(season: number): Promise<LmAddRequest[]>;
   /** Insert or replace one request by id. */
   saveLmAddRequest(row: LmAddRequest): Promise<void>;
+  transitionLmClaim(row: LmAddRequest, expected: LmAddRequest): Promise<boolean>;
   getPlayerPoolSnapshot(id: string): Promise<PlayerPoolSnapshot | null>;
   acceptPlayerPoolSnapshot(
     snapshot: PlayerPoolSnapshot,
@@ -1906,6 +1907,21 @@ class NeonBackend implements StoreBackend {
       VALUES (${row.id}, ${row.season}, ${row.owner}, ${row.teamId}, ${row.playerId}, ${row.playerName}, ${row.proTeam},
         ${row.requestedAt}, ${row.forDate}, ${row.status}, ${row.note}, ${row.updatedAt}, ${row.handledBy})
       ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note, updated_at = EXCLUDED.updated_at, handled_by = EXCLUDED.handled_by`;
+  }
+
+  /** Compare-and-set lease; earlier queued claims and awarded players cannot be overtaken. */
+  async transitionLmClaim(row: LmAddRequest, expected: LmAddRequest): Promise<boolean> {
+    await this.ensureInit();
+    const changed = await this.sql`UPDATE lm_add_requests AS target
+      SET status = ${row.status}, note = ${row.note}, updated_at = ${row.updatedAt}, handled_by = ${row.handledBy}
+      WHERE target.id = ${row.id} AND target.status = ${expected.status} AND target.updated_at = ${expected.updatedAt}
+      AND (${row.status} <> 'processing' OR NOT EXISTS (
+        SELECT 1 FROM lm_add_requests AS other
+        WHERE other.season = target.season AND other.for_date = target.for_date AND other.player_id = target.player_id AND other.id <> target.id
+        AND (other.status IN ('processing', 'added', 'requested', 'waiting-for-drop', 'failsafe')
+          OR (other.status = 'queued' AND (other.requested_at, other.id) < (target.requested_at, target.id)))
+      )) RETURNING id`;
+    return (changed as Array<{ id: string }>).length > 0;
   }
 
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
@@ -3239,6 +3255,23 @@ class FileBackend implements StoreBackend {
     });
   }
 
+  async transitionLmClaim(row: LmAddRequest, expected: LmAddRequest): Promise<boolean> {
+    let changed = false;
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const requests = doc.lmAddRequests ?? [];
+      const current = requests.find(entry => entry.id === row.id);
+      if (!current || current.status !== expected.status || current.updatedAt !== expected.updatedAt) return;
+      if (row.status === 'processing' && requests.some(other => other.id !== row.id && other.season === row.season && other.forDate === row.forDate && other.playerId === row.playerId
+        && (['processing', 'added', 'requested', 'waiting-for-drop', 'failsafe'].includes(other.status)
+          || (other.status === 'queued' && (other.requestedAt < row.requestedAt || (other.requestedAt === row.requestedAt && other.id < row.id)))))) return;
+      doc.lmAddRequests = requests.map(entry => entry.id === row.id ? row : entry);
+      this.writeDoc(doc);
+      changed = true;
+    });
+    return changed;
+  }
+
   async getRulebookDraft(season: number): Promise<RulebookDraftRow | null> {
     await this.ensureInit();
     const doc = this.readDoc();
@@ -4427,4 +4460,9 @@ export async function acceptDraftRankingSnapshot(
     acceptedAt,
     acceptedBy,
   );
+}
+
+/** Atomic queue transition, shared by workers and cancellation. */
+export async function transitionLmClaim(row: LmAddRequest, expected: LmAddRequest): Promise<boolean> {
+  return getBackend().transitionLmClaim(row, expected);
 }

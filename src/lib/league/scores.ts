@@ -48,6 +48,7 @@ export interface StatLine {
   threes: number;
   to: number;
   min: number;
+  fouls?: number;
   gp: number;
 }
 
@@ -570,6 +571,7 @@ function toStatLine(stats: Record<string, number>): StatLine {
     threes: stats['17'] ?? 0,
     to: stats['11'] ?? 0,
     min: stats['40'] ?? 0,
+    fouls: stats['9'] ?? 0,
     gp: stats['42'] ?? 0,
   };
 }
@@ -1196,11 +1198,12 @@ export function matchupChance(
 /** "32 PTS, 11 REB, 6 AST, 2 STL, 1 BLK, 3 3PM, 2 TO". Zeros stay out, except points. */
 export function statLineText(stats: StatLine | null): string {
   if (!stats) return '';
-  const parts = [`${stats.pts} PTS`, `${round1(stats.min)} MIN`];
+  const parts = [`${round1(stats.min)} MIN`, `${stats.pts} PTS`];
   const extras: Array<[number, string]> = [
     [stats.reb, 'REB'], [stats.ast, 'AST'], [stats.stl, 'STL'], [stats.blk, 'BLK'], [stats.threes, '3PM'], [stats.to, 'TO'],
   ];
   for (const [value, label] of extras) if (value > 0) parts.push(`${value} ${label}`);
+  parts.push(`${stats.fouls ?? 0} FOULS`);
   return parts.join(', ');
 }
 

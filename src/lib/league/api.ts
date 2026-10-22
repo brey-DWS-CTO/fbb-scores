@@ -63,6 +63,7 @@ import type {
 import type { EspnTeamName, TeamNameRefreshPreview } from './teamNames.js';
 import type { ScoresWeek } from './scores.js';
 import type { DailyNbaScores } from './dailyScorers.js';
+import type { WaiverCalendar } from './waiverCalendar.js';
 import type { GamesCapRow } from './gamesCap.js';
 import type { FillLine } from './expertProjections.js';
 import type { LeagueTransaction } from './transactions.js';
@@ -987,6 +988,11 @@ export async function fetchDailyScorers(date: string): Promise<DailyNbaScores> {
   return data;
 }
 
+export async function fetchWaiverCalendar(month: string): Promise<WaiverCalendar> {
+  const { data } = await axios.get<WaiverCalendar>('/api/league/waiver-calendar', { params: { month } });
+  return data;
+}
+
 export interface GamesCapsResponse {
   season: number;
   defaultCap: number;
@@ -1333,6 +1339,16 @@ export async function fetchLmWeekend(): Promise<LmWeekendResponse> {
 export async function requestLmAdd(c: Credentials, playerId: number): Promise<{ request: LmAddRequest; checks: LmAddCheck[] }> {
   const { data } = await axios.post<{ request: LmAddRequest; checks: LmAddCheck[] }>('/api/league/lm-adds', { playerId }, { headers: authHeaders(c) });
   return data;
+}
+
+export async function queueLmClaim(c: Credentials, playerId: number, forDate: string): Promise<LmAddRequest> {
+  const { data } = await axios.post<{ request: LmAddRequest }>('/api/league/lm-claims', { playerId, forDate }, { headers: authHeaders(c) });
+  return data.request;
+}
+
+export async function cancelLmClaim(c: Credentials, id: string): Promise<LmAddRequest> {
+  const { data } = await axios.post<{ request: LmAddRequest }>(`/api/league/lm-claims/${encodeURIComponent(id)}/cancel`, {}, { headers: authHeaders(c) });
+  return data.request;
 }
 
 export async function retryLmAdd(c: Credentials, id: string): Promise<LmAddRequest> {
