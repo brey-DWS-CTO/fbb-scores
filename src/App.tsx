@@ -50,6 +50,7 @@ import PartyPage from './components/league/PartyPage.js'
 import FavoritesPrompt from './components/league/FavoritesPrompt.js'
 import InviteToast from './components/league/InviteToast.js'
 import DraftRecapPage from './components/draft/DraftRecapPage.js'
+import FantasyCastPage from './components/league/FantasyCastPage.js'
 
 function App() {
   const location = useLocation()
@@ -135,6 +136,7 @@ function App() {
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/scores/cast" element={<FantasyCastPage />} />
         <Route path="/league/offseason" element={<LeagueOffseasonPage />} />
         <Route path="/waivers" element={<WaiverCalendarPage />} />
         <Route path="/lm-adds" element={<LmAddsPage />} />

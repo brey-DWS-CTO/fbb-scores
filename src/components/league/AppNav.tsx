@@ -147,13 +147,14 @@ export default function AppNav() {
             key={t.id}
             to={sectionHome(t)}
             className={current?.id === t.id ? 'bottom-nav-tab active' : 'bottom-nav-tab'}
+            aria-label={t.label}
           >
             <span className="bottom-nav-icon" aria-hidden="true">
               <NavIcon name={t.icon} />
               {t.id === 'trades' && <NavBadge count={pendingTrades} label="offers waiting" />}
               {t.id === 'vault' && <NavBadge count={revealsReady} label="keeper reveals ready" />}
             </span>
-            <span className="hub-heading bottom-nav-label">{t.label}</span>
+            <span className="hub-heading bottom-nav-label">{t.shortLabel ?? t.label}</span>
           </NavLink>
         ))}
         <button

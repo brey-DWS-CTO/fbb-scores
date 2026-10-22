@@ -48,3 +48,15 @@ test('old addresses retain their canonical section even when absent from menus',
   assert.ok(!onPath('/draftees', '/draft'));
   assert.equal(activeTab('/draft/recap', [{ to: '/draft', label: 'BOARD' }, { to: '/draft/recap', label: 'RECAP' }]), '/draft/recap');
 });
+
+test('Fantasy Cast has its own main button and active state in both season modes', () => {
+  for (const mode of ['off-season', 'in-season'] as const) {
+    const sections = visibleSections(false, false, mode);
+    const cast = sections.find(section => section.id === 'cast')!;
+    assert.equal(cast.primary, true);
+    assert.equal(cast.shortLabel, 'CAST');
+    assert.equal(sectionHome(cast), '/scores/cast');
+    assert.equal(sectionFor('/scores/cast', sections)?.id, 'cast');
+    assert.equal(sections.filter(section => section.primary).length, 4);
+  }
+});

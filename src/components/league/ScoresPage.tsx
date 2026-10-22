@@ -110,6 +110,7 @@ export default function ScoresPage() {
         <WeekPicker weeks={week?.weeks ?? []} selected={selectedWeek} onChange={setWeek} />
       )}
 
+      {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/cast">Fantasy Cast →</Link>}
       {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/performers">Top Performers →</Link>}
       {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/nba-scoreboard">NBA Scoreboard →</Link>}
 
