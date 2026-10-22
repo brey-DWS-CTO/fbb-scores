@@ -148,3 +148,27 @@ html.cast-docked .app-shell-nav { padding-bottom:calc(min(300px, 45dvh) + 80px +
 .cast-game-total { display:block; color:var(--text-muted,#aaa); font-size:.57rem; margin-top:2px; white-space:nowrap; }
 .cast-embedded .cast-play.panel { padding-top:4px; padding-bottom:4px; }
 .cast-change + .cast-change { margin-top:2px; padding-top:2px; }
+
+/* Keep the mini feed contextual and its controls on one compact header row. */
+.cast-bubble-toolbar { gap: 5px; padding: 7px 8px; }
+.cast-bubble-toolbar .cast-drag-handle { min-width: 0; font-size: .72rem; white-space: nowrap; }
+.cast-bubble-toolbar .cast-mode-switch { padding: 0; border: 0; flex: none; gap: 2px; }
+.cast-bubble-toolbar .cast-mode-switch button { display: inline-flex; padding: 5px 7px; min-height: 36px; color: var(--text-mid); font-size: .65rem; }
+.cast-bubble-toolbar .cast-mode-switch button[aria-pressed=true] { color: var(--neon-yellow); border: 1px solid #ffe60044; }
+.cast-bubble-toolbar > a { display: grid; place-items: center; min-width: 28px; min-height: 36px; text-decoration: none; }
+.cast-launcher { display: flex; align-items: center; pointer-events: auto; border-radius: 24px; background: #242315; box-shadow: 0 4px 20px #0007; }
+.cast-launcher .cast-bubble-trigger { touch-action: none; user-select: none; box-shadow: none; border-right: 0; border-radius: 24px 0 0 24px; padding-right: 9px; }
+.cast-launcher-dismiss { min-width: 36px; min-height: 46px; display: grid; place-items: center; border: 1px solid #ffe60066; border-left: 0; border-radius: 0 24px 24px 0; background: transparent; color: var(--neon-yellow); cursor: pointer; }
+.cast-dismiss-target { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); width: 120px; height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 2px dashed var(--neon-yellow); border-radius: 20px; background: var(--panel-bg); color: var(--neon-yellow); font-size: .7rem; }
+
+/* Light surfaces need dark text, including neutral plays and secondary labels. */
+html.theme-light .fantasy-cast-page { --text-main: #111; --text-muted: #111; }
+html.theme-light .fantasy-cast-page .cast-stat,
+html.theme-light .fantasy-cast-page .daily-scorers-note,
+html.theme-light .cast-bubble-toolbar > a,
+html.theme-light .cast-bubble-toolbar > button:not(.cast-drag-handle),
+html.theme-light .cast-bubble-toolbar .cast-mode-switch button { color: #111; }
+html.theme-light .fantasy-cast-page .cast-owner-own,
+html.theme-light .fantasy-cast-page .cast-legend-own { color: #176b3b; border-left-color: #176b3b; }
+html.theme-light .fantasy-cast-page .cast-owner-opponent,
+html.theme-light .fantasy-cast-page .cast-legend-opponent { color: #a51d2d; border-left-color: #a51d2d; }

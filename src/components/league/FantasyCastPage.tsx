@@ -26,8 +26,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
     return () => { window.clearTimeout(timer); document.removeEventListener('visibilitychange', updateDate); };
   }, [today]);
   const [routeParams, setRouteParams] = useSearchParams();
-  const [bubbleParams, setBubbleParams] = useState(() => new URLSearchParams());
-  const params = embedded ? bubbleParams : routeParams;
+  const params = routeParams;
   const [visibleCount, setVisibleCount] = useState(100);
   const { identity } = useIdentity();
   const queryClient = useQueryClient();
@@ -36,7 +35,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
   const week = weekQuery.data;
   const contextualDay = embedded && initialScope.startsWith('matchup:') && week
     ? week.days.find(day => day.scoringPeriodId === (numberParam(routeParams.get('day')) ?? defaultDay(week)))?.date : null;
-  const requested = params.get('date') ?? (embedded ? routeParams.get('date') : null) ?? contextualDay ?? today;
+  const requested = params.get('date') ?? contextualDay ?? today;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(requested) && Number.isFinite(Date.parse(`${requested}T12:00:00Z`)) && new Date(`${requested}T12:00:00Z`).toISOString().slice(0, 10) === requested ? requested : today;
   const query = useQuery({ queryKey: ['fantasy-cast', date], queryFn: async ({ signal }) => (await axios.get<FantasyCast>('/api/league/fantasy-cast', { params: { date }, signal })).data,
     staleTime: current => {
@@ -46,7 +45,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
     },
     refetchInterval: current => date !== today ? false : current.state.data?.schedule ? castPollDelay(current.state.data.schedule, Date.now()) : 30_000,
     refetchIntervalInBackground: false, retry: 1 });
-  const change = (key: string, value: string) => { const next = new URLSearchParams(params); next.set(key, value); if (key === 'game' && /^(game|nba):/.test(params.get('scope') ?? initialScope)) next.set('scope', 'all'); setVisibleCount(100); if (embedded) setBubbleParams(next); else setRouteParams(next, { replace: true }); };
+  const change = (key: string, value: string) => { const next = new URLSearchParams(params); next.set(key, value); if (key === 'game' && /^(game|nba):/.test(params.get('scope') ?? initialScope)) next.set('scope', 'all'); setVisibleCount(100); setRouteParams(next, { replace: true }); };
   const mine = leagueDataset.teams.find(team => team.owner === identity?.owner)?.espnTeamId;
   const matchups = useMemo(() => week?.matchups ?? [], [week?.matchups]);
   const teams = useMemo(() => matchups.flatMap(matchup => [matchup.home, matchup.away]), [matchups]);
@@ -57,13 +56,13 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
     const entry = day ? player.days[String(day.scoringPeriodId)] : undefined;
     return entry ? [[String(player.id), { team, started: entry.started }] as const] : [];
   }))), [teams, day]);
-  const scope = params.get('scope') ?? initialScope;
+  const scope = embedded ? initialScope : params.get('scope') ?? initialScope;
   const selectedMatchup = scope === 'matchup' ? myMatchup : matchups.find(matchup => `matchup:${matchup.id}` === scope);
   const idsKey = (scope === 'me' ? [mine] : selectedMatchup ? [selectedMatchup.home.teamId, selectedMatchup.away.teamId] : scope.startsWith('team:') ? [Number(scope.slice(5))] : []).filter(id => id !== undefined).join(',');
   const scoring = week?.scoringItems?.length ? week.scoringItems : LEAGUE_SCORING;
-  const newest = peek || params.get('order') !== 'oldest';
+  const newest = embedded || params.get('order') !== 'oldest';
   const gameScope = scope.startsWith('game:') || scope.startsWith('nba:');
-  const selectedGame = params.get('game') ?? 'all';
+  const selectedGame = embedded ? 'all' : params.get('game') ?? 'all';
   const nbaGames = useMemo(() => [...new Map((query.data?.plays ?? []).map(play => [play.gameId, play.game])).entries()], [query.data?.plays]);
   const sorted = useMemo(() => sortCastPlays(query.data?.plays ?? [], newest), [query.data?.plays, newest]);
   const runningTotals = useMemo(() => castRunningTotals(newest ? [...sorted].reverse() : sorted, scoring), [sorted, newest, scoring]);
@@ -75,7 +74,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
   return <Container className={`mock-page scores-page fantasy-cast-page${embedded ? ' cast-embedded' : ''}${peek ? ' cast-peek' : ''}`} aria-label={embedded ? 'Fantasy Cast feed' : undefined}>
     {!embedded && <Link to="/scores" className="score-back hub-heading">← FANTASY SCORES</Link>}
     <div className="cast-heading"><div><span className="cast-eyebrow">{date === today ? 'LIVE PLAY FEED' : 'PLAY REPLAY'}</span><h1>Fantasy Cast</h1></div><button className="tap-btn mock-mini-btn" disabled={query.isFetching} onClick={() => { void query.refetch(); void weekQuery.refetch(); }}>Refresh</button></div>
-    <div className="cast-controls">
+    {!embedded && <div className="cast-controls">
       <label>Date<input className="hub-input" type="date" value={date} onChange={event => { if (event.target.value) change('date', event.target.value); }} /></label>
       <label>Show<select className="hub-input" value={scope} onChange={event => change('scope', event.target.value)}>
         <option value="all">All plays · all games</option><option value="matchup" disabled={!myMatchup || !day}>My matchup · scoring plays</option><option value="me" disabled={mine === undefined || !day}>My team · scoring plays</option>
@@ -87,9 +86,9 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
       </select></label>
       <label>NBA game<select className="hub-input" value={selectedGame} onChange={event => change('game', event.target.value)}><option value="all">All NBA games</option>{nbaGames.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <label>Order<select className="hub-input" value={newest ? 'newest' : 'oldest'} onChange={event => change('order', event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
-    </div>
-    <p className="daily-scorers-note"><span className="cast-legend-own">Green = your players</span> · <span className="cast-legend-opponent">Red = your opponent</span> · Neutral = everyone else · +/− shows the point change.</p>
-    {!day && weekQuery.isSuccess && <p role="status">Roster and matchup filters require a date in the current fantasy week.</p>}
+    </div>}
+    {!embedded && <p className="daily-scorers-note"><span className="cast-legend-own">Green = your players</span> · <span className="cast-legend-opponent">Red = your opponent</span> · Neutral = everyone else · +/− shows the point change.</p>}
+    {!embedded && !day && weekQuery.isSuccess && <p role="status">Roster and matchup filters require a date in the current fantasy week.</p>}
     {weekQuery.isError && <p role="alert">{embedded ? scope === 'all' || gameScope ? 'Rosters unavailable · Showing NBA plays.' : 'Rosters unavailable · Waiting for fantasy scoring.' : 'Roster data unavailable. Player highlights and matchup filters may be unavailable.'}</p>}
     {query.isLoading && <p role="status">Loading the play feed…</p>}
     {query.isError && <p role="alert">Could not load plays. Try Refresh.</p>}
@@ -115,6 +114,6 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
       </li>;
     })}</ol>
     {!peek && plays.length > visibleCount && <button className="tap-btn mock-mini-btn" onClick={() => setVisibleCount(count => count + 100)}>Show more plays ({plays.length - visibleCount} remaining)</button>}
-    <details className="cast-scoring-note"><summary>Scoring &amp; feed notes</summary><p>Fantasy changes use league scoring. Events without timestamps are grouped by game in play order. Unrecognized stat descriptions remain visible without a points estimate. ESPN corrections and official matchup totals may differ.</p></details>
+    {!embedded && <details className="cast-scoring-note"><summary>Scoring &amp; feed notes</summary><p>Fantasy changes use league scoring. Events without timestamps are grouped by game in play order. Unrecognized stat descriptions remain visible without a points estimate. ESPN corrections and official matchup totals may differ.</p></details>}
   </Container>;
 }

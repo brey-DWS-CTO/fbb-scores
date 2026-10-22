@@ -18,10 +18,10 @@ test('ownership stays independent of positive and negative point changes', () =>
   assert.equal(castOwnership(1, undefined, undefined), 'neutral');
 });
 
-test('compact names use first name and last initial, omitting suffixes', () => {
-  assert.equal(castShortName('Darius Garland'), 'Darius G.');
-  assert.equal(castShortName('Michael Porter Jr.'), 'Michael P.');
-  assert.equal(castShortName('Karl-Anthony Towns'), 'Karl-Anthony T.');
+test('compact names use first initial and full surname, preserving suffixes', () => {
+  assert.equal(castShortName('Darius Garland'), 'D. Garland');
+  assert.equal(castShortName('Michael Porter Jr.'), 'M. Porter Jr.');
+  assert.equal(castShortName('Karl-Anthony Towns'), 'K. Towns');
 });
 
 test('running totals include negative plays and reset per NBA game', () => {

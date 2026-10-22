@@ -7,17 +7,12 @@ test('follows the viewed matchup rather than the signed-in owner', () => {
   assert.equal(castPageScope('/scores/42', new URLSearchParams()), 'matchup:42');
   assert.equal(castPageScope('/scores/43', new URLSearchParams()), 'matchup:43');
 });
-test('follows individual NBA games and team-based game links', () => {
-  assert.equal(castPageScope('/scores/nba/401909834', new URLSearchParams('team=BOS')), 'game:401909834');
-  assert.equal(castPageScope('/scores/nba', new URLSearchParams('team=BOS')), 'nba:BOS');
-  assert.equal(castPageScope('/scores/nba', new URLSearchParams('team=invalid')), 'all');
+test('scoreboards always show everyone regardless of page filters', () => {
+  for (const path of ['/scores', '/scores/nba-scoreboard', '/scores/performers', '/scores/nba/401909834', '/scores/nba']) {
+    assert.equal(castPageScope(path, new URLSearchParams('team=4&fantasyTeam=7&game=123')), 'all');
+  }
 });
-test('general scoreboard resets to all, and fantasy-team boards follow their team', () => {
-  assert.equal(castPageScope('/scores/nba-scoreboard', new URLSearchParams('date=2026-10-21')), 'all');
-  assert.equal(castPageScope('/scores', new URLSearchParams('team=4')), 'team:4');
-  assert.equal(castPageScope('/scores/performers', new URLSearchParams('fantasyTeam=7')), 'team:7');
-  assert.equal(castPageScope('/scores/performers', new URLSearchParams('fantasyTeam=all')), 'all');
-});
+
 test('NBA game filter includes both teams and excludes unrelated games', () => {
   const play = { gameId: '123', game: 'BOS @ NY' } as CastPlay;
   assert.equal(castMatchesGame(play, 'game:123'), true);
