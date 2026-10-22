@@ -6324,3 +6324,11 @@ a.mock-mini-btn { text-decoration: none; display: inline-flex; align-items: cent
 .performer-search-matches h2 { font-size: .8rem; margin: 14px 0 5px; color: var(--text-soft); }
 
 .score-detail .is-negative { color: var(--neon-red); font-weight: 700; }
+
+/* Projected daily totals and matchup odds stay beside the pinned weekly score. */
+.score-sticky-summary { row-gap: 5px; }
+.score-sticky-numbers { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.score-sticky-side.is-right .score-sticky-numbers { align-items: flex-start; margin-left: 0; margin-right: auto; }
+.score-sticky-numbers > strong, .score-sticky-side.is-right .score-sticky-numbers > strong { margin: 0; }
+.score-sticky-numbers small { font-size: .6rem; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.score-sticky-summary .score-bar-row { grid-column: 1 / -1; padding: 0; }

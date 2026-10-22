@@ -405,13 +405,19 @@ export default function MatchupPage() {
           </section>
 
           <div className="score-sticky-summary" aria-label="Matchup score">
-            {[matchup.home, matchup.away].map((side, index) => (
-              <div key={side.teamId} className={`score-sticky-side${index === 1 ? ' is-right' : ''}`}>
+            {[matchup.home, matchup.away].map((side, index) => {
+              const forecast = index === 0 ? homeProj : awayProj;
+              const projected = view.kind === 'day' ? forecast?.byDay[String(view.scoringPeriodId)] : forecast?.week;
+              return <div key={side.teamId} className={`score-sticky-side${index === 1 ? ' is-right' : ''}`}>
                 <FantasyTeamLogo side={side} size={30} />
                 <span className="score-sticky-name">{side.abbrev || side.name}</span>
-                <strong aria-label={`${side.name}: ${side.total.toFixed(1)} points`}>{side.total.toFixed(1)}</strong>
-              </div>
-            ))}
+                <span className="score-sticky-numbers">
+                  <strong aria-label={`${side.name}: ${side.total.toFixed(1)} points`}>{side.total.toFixed(1)}</strong>
+                  {projected !== undefined && <small aria-label={`${side.name}: projected ${view.kind === 'day' ? 'daily' : 'weekly'} total ${projText(projected)}`}>{view.kind === 'day' ? 'Day' : 'Week'} proj {projText(projected)}</small>}
+                </span>
+              </div>;
+            })}
+            <WinBar left={chance.home} right={chance.away} />
           </div>
 
           <div ref={dayNav} className="score-week score-day-nav" role="group" aria-label="Day">
