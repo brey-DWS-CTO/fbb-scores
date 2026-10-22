@@ -141,8 +141,8 @@ test('a line scores in the league\'s points', () => {
 });
 
 test('the stat line reads as words and skips zeros', () => {
-  assert.equal(statLine(lineStats(KEYS, JOKIC.stats)), '27 pts, 14 reb, 10 ast, 1 stl, 1 blk, 1 3pm, 3 to, triple-double');
-  assert.equal(statLine(lineStats(KEYS, BENCH.stats)), '');
+  assert.equal(statLine(lineStats(KEYS, JOKIC.stats)), '36 min, 27 pts, 14 reb, 10 ast, 1 stl, 1 blk, 1 3pm, 3 to, triple-double, 2 fouls');
+  assert.equal(statLine(lineStats(KEYS, BENCH.stats)), '0 min, 0 fouls');
 });
 
 // ─── Matching ────────────────────────────────────────────────────────────────

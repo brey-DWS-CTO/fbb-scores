@@ -1,7 +1,7 @@
 import { FppgLabel } from './LineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
 import { nbaGameHref } from '../../lib/league/dailyScorers.js';
-import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isActiveSlot } from '../../lib/espn/calculations.js';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -293,6 +293,8 @@ export default function MatchupPage() {
   const owners = useMemo(() => ownerByEspnTeamId(leagueDataset.teams), []);
   const [editingCap, setEditingCap] = useState(false);
   const dayNav = useRef<HTMLDivElement>(null);
+  const scoreHeader = useRef<HTMLElement>(null);
+  const [showStickyScore, setShowStickyScore] = useState(false);
 
   const loaded = query.data;
   // The commissioner's cap for this week when he set one, else ESPN's.
@@ -333,6 +335,14 @@ export default function MatchupPage() {
   const homeProj = settled ? null : homeForecast;
   const awayProj = settled ? null : awayForecast;
   const overageDays = new Set([...(homeForecast?.overages ?? []), ...(awayForecast?.overages ?? [])].map((game) => game.scoringPeriodId));
+  useEffect(() => {
+    const header = scoreHeader.current;
+    if (!header) return;
+    const observer = new IntersectionObserver(([entry]) => setShowStickyScore(entry.boundingClientRect.bottom <= 0));
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [matchup?.id]);
+
   const back = `/scores${scoresQuery({ week: week?.matchupPeriodId ?? requestedWeek, demo })}`;
   const isCommish = identity?.isCommissioner === true;
 
@@ -368,7 +378,7 @@ export default function MatchupPage() {
 
       {week && matchup && chance && view && (
         <>
-          <section className="panel score-head">
+          <section ref={scoreHeader} className="panel score-head">
             <div className="score-head-grid">
               <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} proj={homeProj?.week ?? null} deduction={homeForecast?.deduction ?? 0} leading={matchup.home.total > matchup.away.total} />
               <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} proj={awayProj?.week ?? null} deduction={awayForecast?.deduction ?? 0} leading={matchup.away.total > matchup.home.total} right />
@@ -403,16 +413,15 @@ export default function MatchupPage() {
             )}
           </section>
 
-          <div className="score-sticky-summary" aria-label="Matchup score">
+          <div className={`score-sticky-summary${showStickyScore ? ' is-visible' : ''}`} aria-hidden={!showStickyScore} aria-label="Matchup score">
             {[matchup.home, matchup.away].map((side, index) => {
-              const forecast = index === 0 ? homeProj : awayProj;
-              const projected = view.kind === 'day' ? forecast?.byDay[String(view.scoringPeriodId)] : forecast?.week;
+              const dailyTotal = side.pointsByDay[String(view.kind === 'day' ? view.scoringPeriodId : week.currentScoringPeriodId)] ?? 0;
               return <div key={side.teamId} className={`score-sticky-side${index === 1 ? ' is-right' : ''}`}>
                 <FantasyTeamLogo side={side} size={30} />
                 <span className="score-sticky-name">{side.abbrev || side.name}</span>
                 <span className="score-sticky-numbers">
                   <strong aria-label={`${side.name}: ${side.total.toFixed(1)} points`}>{side.total.toFixed(1)}</strong>
-                  {projected !== undefined && <small aria-label={`${side.name}: projected ${view.kind === 'day' ? 'daily' : 'weekly'} total ${projText(projected)}`}>{view.kind === 'day' ? 'Day' : 'Week'} proj {projText(projected)}</small>}
+                  <small aria-label={`${side.name}: daily total ${dailyTotal.toFixed(1)} points`}>Day {dailyTotal.toFixed(1)}</small>
                 </span>
               </div>;
             })}

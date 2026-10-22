@@ -1,4 +1,5 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
+import { useLeagueState } from './hooks/useLeague.js';
 import { sandboxActive, testDraftJoined } from './lib/league/api.js'
 import AppNav from './components/league/AppNav.js'
 import NavIcon from './components/league/NavIcon.js'
@@ -30,6 +31,9 @@ import MockResultPage from './components/league/MockResultPage.js'
 import ScoresPage from './components/league/ScoresPage.js'
 import TopPerformersPage from './components/league/TopPerformersPage.js'
 import NbaScoreboardPage from './components/league/NbaScoreboardPage.js'
+import LeagueOffseasonPage from './components/league/LeagueOffseasonPage.js'
+import WaiverCalendarPage from './components/league/WaiverCalendarPage.js'
+import LmAddsPage from './components/league/LmAddsPage.js'
 import NbaGameScoresPage from './components/league/NbaGameScoresPage.js'
 import WeeklyPpgPage from './components/league/WeeklyPpgPage.js'
 import MatchupPage from './components/league/MatchupPage.js'
@@ -49,6 +53,7 @@ import DraftRecapPage from './components/draft/DraftRecapPage.js'
 
 function App() {
   const location = useLocation()
+  const { seasonMode } = useLeagueState()
   // The sign-in link page is bare too: nobody is signed in to navigate with.
   const bareMode =
     location.pathname.startsWith('/draft/tv') ||
@@ -92,7 +97,7 @@ function App() {
         </Link>
       )}
       {!bareMode && <AppNav />}
-      {!bareMode && !sandbox && <AchievementToast />}
+      {!bareMode && !sandbox && seasonMode === 'off-season' && <AchievementToast />}
       {!bareMode && !sandbox && <FavoritesPrompt />}
       {!bareMode && !sandbox && <InviteToast />}
       <ActingAsBanner />
@@ -130,6 +135,9 @@ function App() {
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/league/offseason" element={<LeagueOffseasonPage />} />
+        <Route path="/waivers" element={<WaiverCalendarPage />} />
+        <Route path="/lm-adds" element={<LmAddsPage />} />
         <Route path="/scores/performers" element={<TopPerformersPage />} />
         <Route path="/scores/nba-scoreboard" element={<NbaScoreboardPage />} />
         <Route path="/scores/nba" element={<NbaGameScoresPage />} />

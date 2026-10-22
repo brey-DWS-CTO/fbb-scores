@@ -323,6 +323,7 @@ import {
 import { getNbaWatch } from '../lib/nbaWatchService.js';
 import { getScoreboard } from '../lib/scoreboardService.js';
 import { getDailyNbaScores, validScoreDate } from '../lib/dailyScorersService.js';
+import { getWaiverCalendar } from '../lib/waiverCalendarService.js';
 import {
   cancelParty,
   cleanFavorites,
@@ -359,7 +360,7 @@ import {
   updateParty,
 } from '../lib/leagueStore.js';
 import { transactionsFeed } from '../lib/transactionService.js';
-import { LmAddRefused, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from '../lib/lmWeekendService.js';
+import { LmAddRefused, cancelLmClaim, queueLmClaim, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from '../lib/lmWeekendService.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
@@ -370,6 +371,12 @@ import { missingFromEspn, type ExpertProjections } from '../../src/lib/league/ex
 
 const router = Router();
 const leagueDataset = rawDataset as unknown as LeagueDataset;
+
+router.get('/waiver-calendar', async (req, res, next) => {
+  const month = typeof req.query.month === 'string' ? req.query.month : '';
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { res.status(400).json({ error: 'Use a month in YYYY-MM format' }); return; }
+  try { res.json(await getWaiverCalendar(month)); } catch (error) { next(error); }
+});
 
 /** Public NBA box scores; no sign-in is needed on the scores page. */
 router.get('/daily-scorers', async (req, res, next) => {
@@ -4543,6 +4550,22 @@ router.get('/lm-adds', async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+router.post('/lm-claims', requireAuth, async (req, res, next) => {
+  const playerId = Number(req.body?.playerId);
+  const forDate = typeof req.body?.forDate === 'string' ? req.body.forDate : '';
+  if (!Number.isInteger(playerId) || playerId <= 0) { res.status(400).json({ error: 'Pick a player first.' }); return; }
+  try { res.json({ request: await queueLmClaim(res.locals.owner as string, playerId, forDate) }); }
+  catch (error) { if (error instanceof LmAddRefused) { res.status(400).json({ error: error.message }); return; } next(error); }
+});
+
+router.post('/lm-claims/:id/cancel', requireAuth, async (req, res, next) => {
+  try {
+    const request = await cancelLmClaim(routeParam(req.params.id), res.locals.owner as string, res.locals.isCommissioner === true);
+    if (!request) { res.status(404).json({ error: 'Claim not found.' }); return; }
+    res.json({ request });
+  } catch (error) { if (error instanceof LmAddRefused) { res.status(400).json({ error: error.message }); return; } next(error); }
 });
 
 /** POST /api/league/lm-adds { playerId } — a member asks for a Saturday or Sunday LM add. */

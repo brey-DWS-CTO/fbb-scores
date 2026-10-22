@@ -74,7 +74,7 @@ test('the LM add window is Saturday or Sunday, before the first tip', () => {
   assert.match(lmAddWindow(`${SAT}T19:00:00.000Z`, [noon]).reason ?? '', /tipped off/);
   assert.match(lmAddWindow('2026-10-23T15:00:00.000Z', [noon]).reason ?? '', /Saturdays and Sundays/);
   assert.match(lmAddWindow(`${SAT}T15:00:00.000Z`, []).reason ?? '', /No NBA games/);
-  assert.equal(lmAddWindow(`${SAT}T15:00:00.000Z`, [noon]).closesAt, noon.tipoff);
+  assert.equal(lmAddWindow(`${SAT}T15:00:00.000Z`, [noon]).closesAt, '2026-10-24T18:50:00.000Z');
 });
 
 test('the last waiver run before now is yesterday at 3 PM Pacific', () => {
@@ -180,11 +180,11 @@ test('the Slack line for a waiver change says the hour, the day and what it was'
 test('the LM button explains weekdays, closed weekends, no games and signed-out access', async () => {
   const { lmAddButtonReason } = await import('../src/lib/league/lmWeekend.ts');
   const games = [{ home: 'DEN', away: 'LAL', tipoff: '2026-10-24T20:00:00.000Z' }];
-  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-23T18:00:00Z', games), '2026-10-23', true), 'LM adds open Saturday and Sunday, until the first tip.');
-  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T19:00:00Z', games), '2026-10-24', true), 'Open until the first tip.');
-  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T20:00:00Z', games), '2026-10-24', true), 'Closed for today. Opens again tomorrow before the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-23T18:00:00Z', games), '2026-10-23', true), 'LM adds open Saturday and Sunday, until 10 minutes before the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T18:00:00Z', games), '2026-10-24', true), 'Open until 10 minutes before the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T20:00:00Z', games), '2026-10-24', true), 'Closed for today. Opens again tomorrow; closes 10 minutes before the first tip.');
   const sunday = [{ ...games[0], tipoff: '2026-10-25T20:00:00.000Z' }];
-  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-25T20:00:00Z', sunday), '2026-10-25', true), 'Closed for today. Opens again next Saturday before the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-25T20:00:00Z', sunday), '2026-10-25', true), 'Closed for today. Opens again next Saturday; closes 10 minutes before the first tip.');
   assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T18:00:00Z', []), '2026-10-24', true), 'No NBA games today, so no LM adds.');
   assert.equal(lmAddButtonReason(null, null, false), 'Sign in to request an LM add.');
   assert.equal(lmAddButtonReason(null, null, true), "Checking today's LM add window.");

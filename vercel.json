@@ -11,11 +11,12 @@
   "crons": [
     { "path": "/api/notify/tick", "schedule": "0 * * * *" },
     { "path": "/api/notify/team-names", "schedule": "0 14 * * 1" },
-    { "path": "/api/notify/lm-clock", "schedule": "*/15 * * * *" }
+    { "path": "/api/notify/lm-clock", "schedule": "*/15 * * * *" },
+    { "path": "/api/notify/lm-claims", "schedule": "* * * * 0,1,6" }
   ],
   "functions": {
     "api/index.ts": {
-      "maxDuration": 30,
+      "maxDuration": 120,
       "includeFiles": "{src/data/**,server/assets/**}"
     }
   }

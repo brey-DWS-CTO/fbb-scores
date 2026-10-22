@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
 import { seasonHome } from '../../lib/league/seasonMode.js';
@@ -23,8 +23,11 @@ export default function AppNav() {
   // The sheet is open only for the path it was opened on, so navigating
   // anywhere closes it without an effect.
   const [moreAnchor, setMoreAnchor] = useState<string | null>(null);
-  const moreOpen = moreAnchor === location.pathname;
-  const setMoreOpen = (open: boolean) => setMoreAnchor(open ? location.pathname : null);
+  const menuKey = `${location.pathname}:${seasonMode}`;
+  const moreOpen = moreAnchor === menuKey;
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const setMoreOpen = (open: boolean) => setMoreAnchor(open ? menuKey : null);
 
   // Offers waiting on this member. The server counts them, so the badge cannot
   // give away an offer between two other teams.
@@ -58,14 +61,31 @@ export default function AppNav() {
 
   useEffect(() => {
     if (!moreOpen) return;
+    const trigger = moreButtonRef.current;
+    const previousOverflow = document.body.style.overflow;
+    const drawer = drawerRef.current;
+    const focusable = () => Array.from(drawer?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ?? []);
+    focusable()[0]?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMoreAnchor(null);
+      if (e.key !== 'Tab') return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
+      trigger?.focus();
     };
   }, [moreOpen]);
 
@@ -94,9 +114,8 @@ export default function AppNav() {
           </div>
           <nav className="top-nav-links" aria-label="Main">
             {sections.map((t) => (
-              <Fragment key={t.id}>
-              {t.offSeason && t.id === 'draft' && <div className="nav-offseason-label">OFF SEASON</div>}
               <NavLink
+                key={t.id}
                 to={sectionHome(t)}
                 className={current?.id === t.id ? 'top-nav-link hub-heading active' : 'top-nav-link hub-heading'}
                 {...(collapsed ? { title: t.label, 'aria-label': t.label } : {})}
@@ -113,7 +132,6 @@ export default function AppNav() {
                   </span>
                 )}
               </NavLink>
-              </Fragment>
             ))}
           </nav>
           <div className="top-nav-account">
@@ -143,6 +161,8 @@ export default function AppNav() {
           className={moreActive || moreOpen ? 'bottom-nav-tab tap-btn active' : 'bottom-nav-tab tap-btn'}
           aria-expanded={moreOpen}
           aria-haspopup="dialog"
+          aria-controls="more-pages-menu"
+          ref={moreButtonRef}
           onClick={() => setMoreOpen(!moreOpen)}
         >
           <span className="bottom-nav-icon" aria-hidden="true"><NavIcon name="menu" /></span>
@@ -153,7 +173,7 @@ export default function AppNav() {
       {moreOpen && (
         <>
           <div className="more-backdrop" onClick={() => setMoreOpen(false)} />
-          <div className="more-drawer" role="dialog" aria-modal="true" aria-label="More pages">
+          <div id="more-pages-menu" ref={drawerRef} className="more-drawer" role="dialog" aria-modal="true" aria-label="More pages">
             <div className="more-drawer-head">
               <span className="hub-heading more-drawer-title">More</span>
               <button
