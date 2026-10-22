@@ -146,7 +146,7 @@ function entry(scoringPeriodId: number, input: EntryInput) {
   };
 }
 
-const JOKIC_DAY = { '0': 32, '6': 11, '3': 6, '2': 2, '1': 1, '17': 3, '11': 2, '42': 1 };
+const JOKIC_DAY = { '40': 36, '0': 32, '6': 11, '3': 6, '2': 2, '1': 1, '17': 3, '11': 2, '42': 1 };
 /** 32 + 11 + 6 × 1.4 + 2 × 2.5 + 2.5 + 3 × 0.5 − 2 × 1.8 in league scoring. */
 const JOKIC_DAY_POINTS = 56.8;
 
@@ -462,8 +462,9 @@ test('a player\'s day is his own stat row, his slot and his game', () => {
   assert.ok(day.started);
   assert.equal(day.points, JOKIC_DAY_POINTS);
   assert.equal(day.stats?.pts, 32);
+  assert.equal(day.stats?.min, 36);
   assert.ok(day.played);
-  assert.equal(statLineText(day.stats), '32 PTS, 11 REB, 6 AST, 2 STL, 1 BLK, 3 3PM, 2 TO');
+  assert.equal(statLineText(day.stats), '32 PTS, 36 MIN, 11 REB, 6 AST, 2 STL, 1 BLK, 3 3PM, 2 TO');
   assert.equal(gameText(day.game, null), 'Final W 112-104 vs LAL');
   const today = jokic.days['18'];
   assert.equal(today.stats, null, 'no row for a game not played; the season row is never a day');
@@ -488,7 +489,7 @@ test('words for the screen cover every game state', () => {
   assert.equal(gameText(line({ status: 'live', clock: null, teamScore: 10, oppScore: 8 }), null), 'Live 10-8 vs LAL');
   assert.equal(gameText(line({ status: 'upcoming', teamScore: null, oppScore: null }), null), 'Today vs LAL');
   assert.equal(statLineText(null), '');
-  assert.equal(statLineText({ pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, threes: 0, to: 0, min: 0, gp: 1 }), '0 PTS');
+  assert.equal(statLineText({ pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, threes: 0, to: 0, min: 0, gp: 1 }), '0 PTS, 0 MIN');
   assert.equal(recordText({ wins: 3, losses: 1, ties: 1 }), '3-1-1');
 });
 

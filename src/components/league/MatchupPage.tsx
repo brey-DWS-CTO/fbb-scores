@@ -163,7 +163,6 @@ function PlayerTop({ player, slot, gameHref }: { player: ScorePlayer; slot: numb
       <span className="score-slot">{slotLabel(slot)}</span>
       <span className="score-player-who">
         <span className="score-player-name">{gameHref ? <Link className="score-player-name-text score-player-game-link" to={gameHref}>{shortName(player.name)}</Link> : <span className="score-player-name-text">{shortName(player.name)}</span>}<TeamLogo code={player.proTeam || null} size={14} /></span>
-        <span className="score-player-team">{player.position || '—'}</span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
       </span>
     </>
