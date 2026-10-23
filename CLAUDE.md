@@ -16,7 +16,7 @@ afternoon, not a note in a log.
    `feat/<short-name>`.
 2. Commit there.
 3. `git push -u origin <branch>` then `gh pr create --fill`.
-4. Vercel builds a preview for the branch. Check the change on it.
+4. Check the change on local Vite. If it needs a real preview, ask for one (see Vercel builds).
 5. Merge the pull request. Merging is what deploys production.
 
 ## Two agents never share a checkout
@@ -37,9 +37,9 @@ folder later rather than leaving it registered.
 
 ## Vercel builds
 
-- Every push to a PR branch costs a build. Batch commits and push once when ready for review.
+- A PR push builds nothing unless you ask. Test on local Vite first. To get a preview, push an empty commit (`git commit --allow-empty -m "Preview"`) or put `[preview]` in the commit message. Each preview costs a build, so ask once, when ready for review.
 - Don't merge master into a branch unless there is a real conflict.
-- Open the PR right after the first push. If the PR was opened after the last push, push an empty commit to get a preview.
+- Open the PR right after the first push. A branch with no open PR never builds.
 - The Vercel Git integration is the only deploy path. Do not deploy with the CLI or a deploy hook.
 
 ## Before any PR

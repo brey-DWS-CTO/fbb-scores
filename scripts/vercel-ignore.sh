@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Vercel: exit 0 skips the build; exit 1 builds.
+# Production always builds. A PR preview builds only when asked for:
+# push an empty commit, or put [preview] in the commit message.
 if [[ "${VERCEL_ENV:-}" == "production" ]]; then
   echo "Build: production deployment."
   exit 1
@@ -10,31 +12,18 @@ if [[ -z "${VERCEL_GIT_PULL_REQUEST_ID:-}" ]]; then
   exit 0
 fi
 
-# Inspect both sides of renames, and preserve unusual filenames with NULs.
-# Missing history must build so a shallow clone cannot hide code changes.
-if ! git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-  echo "Build: previous commit unavailable."
+message=${VERCEL_GIT_COMMIT_MESSAGE:-$(git log -1 --format=%B HEAD 2>/dev/null)}
+if [[ "$message" == *"[preview]"* ]]; then
+  echo "Build: commit message asks for a preview."
   exit 1
 fi
 
-changes=$(mktemp) || { echo "Build: cannot inspect changed files."; exit 1; }
-trap 'rm -f "$changes"' EXIT
-if ! git diff --name-only --no-renames -z HEAD^ HEAD > "$changes"; then
-  echo "Build: cannot inspect changed files."
+# An empty commit is the other way to ask. Missing history counts as not
+# empty, so a shallow clone skips rather than builds.
+if git rev-parse --verify HEAD^ >/dev/null 2>&1 && git diff --quiet HEAD^ HEAD; then
+  echo "Build: empty PR commit asks for a preview."
   exit 1
 fi
 
-while IFS= read -r -d '' path; do
-  case "$path" in
-    *.md|docs/*) ;;
-    *) echo "Build: PR commit changes application files."; exit 1 ;;
-  esac
-done < "$changes"
-
-# An empty commit intentionally triggers a preview after opening a PR.
-if [[ ! -s "$changes" ]]; then
-  echo "Build: empty PR commit requests a preview."
-  exit 1
-fi
-echo "Skip: PR commit changes only Markdown or docs/."
+echo "Skip: no preview asked for. Push an empty commit or add [preview] to build one."
 exit 0
