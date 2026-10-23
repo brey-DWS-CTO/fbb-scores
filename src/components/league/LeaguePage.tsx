@@ -81,7 +81,7 @@ export default function LeaguePage() {
       </Section>
 
       <div className="league-season-actions">
-        <Link className="league-lm-highlight" to="/lm-adds"><strong>Waivers &amp; LM Adds</strong><span>Queue a private claim or check waiver times →</span></Link>
+        <Link className="league-lm-highlight" to="/activity"><strong>Waivers &amp; LM Adds</strong><span>Activity, offers report and waiver times →</span></Link>
       </div>
 
       {/* ── d. Account ─────────────────────────────────────────── */}

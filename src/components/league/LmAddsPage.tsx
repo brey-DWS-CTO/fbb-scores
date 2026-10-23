@@ -9,6 +9,7 @@ import type { DatasetPlayer } from '../../lib/keeper/types.js';
 import PlayerCombobox from './PlayerCombobox.js';
 import LmAddPanel from './LmAddPanel.js';
 import NavIcon from './NavIcon.js';
+import WaiverCountdowns from './WaiverCountdowns.js';
 
 const dayLabel = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
@@ -64,6 +65,7 @@ export default function LmAddsPage() {
       <h1>LM Adds</h1><p>Pick your day. Pick your player. We’ll handle the add when eligible.</p>
       <span className="lm-private-note"><NavIcon name="lock" size={14} /> Pending claims are private to you and the commissioner.</span>
     </header>
+    <WaiverCountdowns />
     <section className="panel lm-advance-panel">
       <h2>Queue an LM Add</h2>
       {!identity && <p>Sign in to submit a claim.</p>}

@@ -53,6 +53,7 @@ export interface EspnTransaction {
   id?: string;
   type?: string;
   status?: string;
+  isPending?: boolean;
   teamId?: number;
   bidAmount?: number;
   isLeagueManager?: boolean;
@@ -76,6 +77,39 @@ export interface NormalizeContext {
   teams: readonly Pick<TeamInfo, 'owner' | 'espnTeamId'>[];
   /** By ESPN player id. A player nobody knows reads as "Player 12345". */
   players: ReadonlyMap<number, PlayerLookup>;
+}
+
+export interface WaiverOffer {
+  id: string;
+  owner: string;
+  playerName: string;
+  bid: number | null;
+  outcome: 'successful' | 'unsuccessful';
+  status: string;
+  at: string;
+}
+
+/** Publish only definitively processed claims. Submission timestamps never establish completion. */
+export function normalizeWaiverOffers(raw: EspnTransactionsResponse, ctx: NormalizeContext, now = Date.now()): WaiverOffer[] {
+  return (raw.transactions ?? []).flatMap(tx => {
+    if (!['WAIVER', 'WAIVER_ERROR'].includes(tx.type ?? '') || tx.isPending === true) return [];
+    if (tx.status !== 'EXECUTED' && !tx.status?.startsWith('FAILED')) return [];
+    if (typeof tx.processDate !== 'number' || !Number.isFinite(tx.processDate) || tx.processDate <= 0 || tx.processDate > now) return [];
+    const owner = ownerOf(ctx.teams, tx.teamId);
+    if (!owner || !tx.id) return [];
+    return (tx.items ?? []).filter(item => item.type === 'ADD' && Number.isInteger(item.playerId) && (item.playerId ?? 0) > 0).map(item => ({
+      id: `${tx.id}:${item.playerId}`, owner, playerName: ctx.players.get(item.playerId!)?.name ?? `Player ${item.playerId}`,
+      bid: typeof tx.bidAmount === 'number' && Number.isFinite(tx.bidAmount) ? tx.bidAmount : null,
+      outcome: tx.type === 'WAIVER_ERROR' || tx.status !== 'EXECUTED' ? 'unsuccessful' as const : 'successful' as const,
+      status: tx.status!, at: new Date(tx.processDate!).toISOString(),
+    }));
+  }).sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
+}
+
+export interface WaiverOffersReport {
+  scoringPeriodId: number;
+  rows: WaiverOffer[];
+  fetchedAt: string;
 }
 
 const EXECUTED = new Set(['EXECUTED']);

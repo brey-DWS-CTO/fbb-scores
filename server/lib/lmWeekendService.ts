@@ -22,6 +22,7 @@ import {
   lmAddWindow,
   pacific,
   waiverHourFor,
+  waiverRunAt,
   waiverChangeText,
   waiverHourToHold,
   type DayGame,
@@ -294,14 +295,6 @@ export async function denyLmAdd(id: string, by: string, note: string): Promise<L
   return next;
 }
 
-
-/** A Pacific waiver run as an instant, including daylight-saving transitions. */
-function waiverRunAt(date: string, hour: number): string {
-  const result = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00-08:00`);
-  const actual = pacific(result);
-  result.setUTCHours(result.getUTCHours() + hour - actual.hour);
-  return result.toISOString();
-}
 
 async function latestNormalWaiverAt(now: Date): Promise<string> {
   const date = pacific(now).date;

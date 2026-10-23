@@ -412,6 +412,16 @@ export class EspnClient {
     return data;
   }
 
+  /** ESPN Offers Report query; pending entries are removed again before publication. */
+  async fetchWaiverOffers(scoringPeriodId: number): Promise<EspnTransactionsResponse> {
+    const { data } = await this.http.get<EspnTransactionsResponse>('', {
+      params: { view: 'mTransactions2', scoringPeriodId, _: Date.now() },
+      headers: { 'x-fantasy-filter': JSON.stringify({ transactions: { filterType: { value: ['WAIVER', 'WAIVER_ERROR'] } } }) },
+    });
+    if (!data || !Array.isArray(data.transactions)) throw new Error('ESPN did not return an offers report');
+    return data;
+  }
+
   /**
    * Names and NBA teams for a few player ids, for players the pool snapshot
    * does not know yet. One request, no paging.
