@@ -1,5 +1,10 @@
 import { firstTip, lmAddWindow, pacific, type DayGame, type LmAddRequest } from './lmWeekend.js';
 
+/** Only completed adds are public. Unfinished submissions belong to their owner and the commissioner. */
+export function visibleLmRequests(requests: readonly LmAddRequest[], viewer: { owner: string | null; isCommissioner: boolean }): LmAddRequest[] {
+  return requests.filter(request => viewer.isCommissioner || request.owner === viewer.owner || request.status === 'added');
+}
+
 export function claimPriority(a: LmAddRequest, b: LmAddRequest): number {
   return a.requestedAt.localeCompare(b.requestedAt) || a.id.localeCompare(b.id);
 }

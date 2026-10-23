@@ -363,6 +363,7 @@ import {
 } from '../lib/leagueStore.js';
 import { transactionsFeed } from '../lib/transactionService.js';
 import { LmAddRefused, cancelLmClaim, queueLmClaim, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from '../lib/lmWeekendService.js';
+import { visibleLmRequests } from '../../src/lib/league/lmClaims.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
 import { DRAFT_LIST_MAX_CHARS, buildDraftList, isOnAuto, nextAutoPick, withAuto } from '../../src/lib/league/autoDraft.js';
 import { draftListOwners, getDraftList, isRankingsSteward, setDraftList } from '../lib/leagueStore.js';
@@ -4565,10 +4566,13 @@ router.get('/transactions', async (_req, res, next) => {
 
 // ─── Weekend LM adds ─────────────────────────────────────────────────────────
 
-/** GET /api/league/lm-adds — today's waiver hour, the early days ahead, every request. Public. */
-router.get('/lm-adds', async (_req, res, next) => {
+/** Public waiver clock and completed adds; pending claims are owner/commissioner only. */
+router.get('/lm-adds', async (req, res, next) => {
   try {
-    res.json(await lmWeekendView());
+    res.setHeader('Cache-Control', 'private, no-store');
+    const viewer = await optionalViewer(req);
+    const view = await lmWeekendView();
+    res.json({ ...view, requests: visibleLmRequests(view.requests, viewer) });
   } catch (err) {
     next(err);
   }
