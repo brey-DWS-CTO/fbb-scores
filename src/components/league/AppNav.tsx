@@ -1,3 +1,6 @@
+import { isCastScorePage, openCastDock } from '../../lib/league/castControls.js';
+import type { NavSection } from '../../lib/league/navSections.js';
+import type { ReactNode } from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
@@ -14,6 +17,13 @@ function NavBadge({ count, label }: { count: number; label: string }) {
       {count}
     </span>
   );
+}
+
+/** Cast is an action while reading scores; other sections remain normal links. */
+function SectionLink({ section, children, ...props }: { section: NavSection; children: ReactNode; className: string; title?: string; 'aria-label'?: string }) {
+  const { pathname } = useLocation();
+  if (section.id === 'cast' && isCastScorePage(pathname)) return <button type="button" {...props} onClick={openCastDock}>{children}</button>;
+  return <NavLink to={sectionHome(section)} {...props}>{children}</NavLink>;
 }
 
 export default function AppNav() {
@@ -114,9 +124,9 @@ export default function AppNav() {
           </div>
           <nav className="top-nav-links" aria-label="Main">
             {sections.map((t) => (
-              <NavLink
+              <SectionLink
                 key={t.id}
-                to={sectionHome(t)}
+                section={t}
                 className={current?.id === t.id ? 'top-nav-link hub-heading active' : 'top-nav-link hub-heading'}
                 {...(collapsed ? { title: t.label, 'aria-label': t.label } : {})}
               >
@@ -131,7 +141,7 @@ export default function AppNav() {
                     {revealsReady}
                   </span>
                 )}
-              </NavLink>
+              </SectionLink>
             ))}
           </nav>
           <div className="top-nav-account">
@@ -143,9 +153,9 @@ export default function AppNav() {
 
       <nav className="bottom-nav" aria-label="Main">
         {primary.map((t) => (
-          <NavLink
+          <SectionLink
             key={t.id}
-            to={sectionHome(t)}
+            section={t}
             className={current?.id === t.id ? 'bottom-nav-tab active' : 'bottom-nav-tab'}
             aria-label={t.label}
           >
@@ -155,7 +165,7 @@ export default function AppNav() {
               {t.id === 'vault' && <NavBadge count={revealsReady} label="keeper reveals ready" />}
             </span>
             <span className="hub-heading bottom-nav-label">{t.shortLabel ?? t.label}</span>
-          </NavLink>
+          </SectionLink>
         ))}
         {secondary.length > 0 && <button
           type="button"

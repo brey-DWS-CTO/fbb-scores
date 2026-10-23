@@ -173,3 +173,7 @@ html.theme-light .fantasy-cast-page .cast-owner-own,
 html.theme-light .fantasy-cast-page .cast-legend-own { color: #176b3b; border-left-color: #176b3b; }
 html.theme-light .fantasy-cast-page .cast-owner-opponent,
 html.theme-light .fantasy-cast-page .cast-legend-opponent { color: #a51d2d; border-left-color: #a51d2d; }
+
+/* Cast actions in the navigation share the surrounding link appearance. */
+button.top-nav-link { background: transparent; cursor: pointer; font-family: inherit; text-align: left; }
+button.bottom-nav-tab { background: transparent; cursor: pointer; font-family: inherit; }

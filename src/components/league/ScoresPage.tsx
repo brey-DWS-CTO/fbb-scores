@@ -1,3 +1,4 @@
+import { openCastDock } from '../../lib/league/castControls.js';
 import { FppgLabel } from './LineupFppg.js';
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -110,7 +111,7 @@ export default function ScoresPage() {
         <WeekPicker weeks={week?.weeks ?? []} selected={selectedWeek} onChange={setWeek} />
       )}
 
-      {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/cast">Fantasy Cast →</Link>}
+      {!demo && <button type="button" className="tap-btn mock-mini-btn score-ppg-jump" onClick={openCastDock}>Fantasy Cast →</button>}
       {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/performers">Top Performers →</Link>}
       {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/nba-scoreboard">NBA Scoreboard →</Link>}
 
