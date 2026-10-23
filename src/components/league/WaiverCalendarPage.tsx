@@ -19,7 +19,7 @@ export default function WaiverCalendarPage() {
   };
   const weekday = new Date(`${month}-01T12:00:00Z`).getUTCDay();
   return <main className="mock-page waiver-calendar-page">
-    <Link className="score-back hub-heading" to="/league">← LEAGUE</Link>
+    <Link className="score-back hub-heading" to="/lm-adds">← LM ADDS</Link>
     <h1>Waiver Calendar</h1>
     <p className="daily-scorers-note">All times Pacific. Highlighted waiver times differ from the normal 3 PM run. LM Adds close 10 minutes before the day’s earliest tip-off.</p>
     <div className="waiver-month-nav"><button className="tap-btn mock-mini-btn" onClick={() => changeMonth(-1)} aria-label="Previous month">‹</button><h2>{new Date(`${month}-01T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' })}</h2><button className="tap-btn mock-mini-btn" onClick={() => changeMonth(1)} aria-label="Next month">›</button></div>

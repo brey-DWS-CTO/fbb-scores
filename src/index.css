@@ -6395,6 +6395,34 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .lm-claim-queue li { display: flex; align-items: start; gap: 12px; border-top: 1px solid var(--cell-border); padding: 12px 0; }
 .lm-claim-queue li > div { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .lm-claim-queue small { color: var(--text-soft); }
+.lm-adds-page { max-width: 800px; }
+.waivers-hero { margin: 10px 0 22px; }
+.waivers-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--neon-teal); font-size: .65rem; font-weight: 800; letter-spacing: .1em; }
+.waivers-hero h1 { font-size: 1.8rem; margin: 10px 0 6px; }
+.waivers-hero > p { color: var(--text-body); font-size: .9rem; line-height: 1.5; margin: 0 0 12px; }
+.lm-private-note { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); font-size: .73rem; line-height: 1.5; }
+.lm-date-choice { border: 0; padding: 0; margin: 0; min-width: 0; }
+.lm-date-choice legend, .lm-step-label { color: var(--text-max); font-weight: 750; margin-bottom: 8px; }
+.lm-weekend-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.lm-weekend-options button { min-height: 48px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--cell-bg); color: var(--text-body); font: inherit; font-weight: 700; cursor: pointer; }
+.lm-weekend-options button[aria-pressed="true"] { border-color: var(--neon-teal); color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 9%, var(--panel-bg)); }
+.lm-date-choice label { display: flex; flex-direction: column; gap: 5px; color: var(--text-soft); font-size: .75rem; }
+.lm-deadline { display: flex; flex-direction: column; gap: 3px; border-left: 3px solid var(--neon-teal); padding: 9px 12px; background: var(--cell-bg); border-radius: 0 6px 6px 0; }
+.lm-deadline span { color: var(--text-soft); font-size: .73rem; }
+.lm-deadline a { color: var(--neon-teal); }
+.lm-selected-player { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--neon-teal); border-radius: 8px; color: var(--neon-teal); }
+.lm-selected-player > div { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.lm-selected-player span { color: var(--text-soft); font-size: .72rem; }
+.lm-selected-player button { min-height: 44px; border: 0; background: transparent; color: var(--text-body); text-decoration: underline; cursor: pointer; }
+.lm-roster-reminder { margin: 0; color: var(--text-soft); font-size: .76rem; }
+.lm-advance-panel form > .lm-submit { width: 100%; justify-self: stretch; min-height: 48px; background: var(--neon-teal); color: var(--dark-bg); font-size: .85rem; font-weight: 800; border: 0; border-radius: 8px; }
+.lm-submit:disabled { opacity: .45; cursor: default; }
+.lm-notice { border: 1px solid var(--neon-teal); padding: 12px; border-radius: 8px; color: var(--neon-teal); }
+.lm-notice.is-error { color: var(--neon-red); border-color: var(--neon-red); }
+.lm-queue-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--panel-border); margin-top: 24px; padding-top: 12px; }
+.lm-queue-heading span { color: var(--text-soft); font-size: .72rem; }
+.lm-empty { border: 1px dashed var(--panel-border); border-radius: 8px; padding: 16px; color: var(--text-soft); }
+.lm-weekend-options button:focus-visible, .lm-submit:focus-visible, .lm-selected-player button:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 3px; }
 /* Keep actual daily points outside the pinned weekly totals. */
 .score-sticky-numbers { flex-direction: row-reverse; align-items: baseline; gap: 6px; }
 .score-sticky-side.is-right .score-sticky-numbers { flex-direction: row; align-items: baseline; }

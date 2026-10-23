@@ -12,6 +12,8 @@ interface Props {
   disabledReason?: (player: DatasetPlayer) => string | null;
   maxResults?: number;
   autoFocus?: boolean;
+  ariaLabel?: string;
+  disabled?: boolean;
 }
 
 /** Type-to-search player picker (the spreadsheet dropdown, but good). */
@@ -23,6 +25,8 @@ export default function PlayerCombobox({
   disabledReason,
   maxResults = 30,
   autoFocus,
+  ariaLabel,
+  disabled = false,
 }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -48,6 +52,8 @@ export default function PlayerCombobox({
         value={query}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        aria-label={ariaLabel ?? placeholder}
+        disabled={disabled}
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
@@ -82,6 +88,7 @@ export default function PlayerCombobox({
               return (
                 <button
                   key={p.key}
+                  type="button"
                   className="tap-btn"
                   disabled={!!reason}
                   onClick={() => {

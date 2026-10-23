@@ -1,5 +1,6 @@
 import { shortName } from '../../lib/league/format.js';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import PlayerCombobox from './PlayerCombobox.js';
 import { useIdentity, useLeagueData, useLeagueState } from '../../hooks/useLeague.js';
@@ -10,7 +11,6 @@ import {
   lmAddChecksOf,
   requestLmAdd,
   retryLmAdd,
-  type LmWeekendResponse,
 } from '../../lib/league/api.js';
 import { hourLabel, lmAddButtonReason, lmAddText, ownOpenLmRequests, type LmAddCheck, type LmAddRequest } from '../../lib/league/lmWeekend.js';
 import type { DatasetPlayer } from '../../lib/keeper/types.js';
@@ -41,36 +41,25 @@ const STATUS_LABEL: Record<LmAddRequest['status'], string> = {
 const REFRESH_MS = 60_000;
 
 /** The weekend LM rules on the ACTIVITY page: waiver hour, early days, LM add requests. */
-export default function LmAddPanel({ compact = false, always = false }: { compact?: boolean; always?: boolean }) {
+export default function LmAddPanel({ compact = false, always = false, historyOnly = false }: { compact?: boolean; always?: boolean; historyOnly?: boolean }) {
   const { seasonMode } = useLeagueState();
   const { identity } = useIdentity();
-  return always || seasonMode === 'in-season' ? <LmAddContent key={`${identity?.owner ?? 'anonymous'}:${identity?.isCommissioner === true}`} compact={compact} /> : null;
+  return always || seasonMode === 'in-season' ? <LmAddContent key={`${identity?.owner ?? 'anonymous'}:${identity?.isCommissioner === true}`} compact={compact} historyOnly={historyOnly} /> : null;
 }
 
-function LmAddContent({ compact }: { compact: boolean }) {
+function LmAddContent({ compact, historyOnly }: { compact: boolean; historyOnly: boolean }) {
   const { dataset } = useLeagueData();
   const { identity } = useIdentity();
-  const [data, setData] = useState<LmWeekendResponse | null>(null);
+  const query = useQuery({ queryKey: ['lm-claims', identity?.owner ?? null, identity?.isCommissioner === true], queryFn: () => fetchLmWeekend(identity), staleTime: 20_000, refetchInterval: REFRESH_MS });
+  const data = query.data ?? null;
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<LmAddCheck[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    fetchLmWeekend(identity)
-      .then((next) => {
-        setData(next);
-        setError(null);
-      })
-      .catch((e) => setError(apiErrorMessage(e)));
-  }, [identity]);
-
-  useEffect(() => {
-    load();
-    const timer = window.setInterval(load, REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [load]);
+  const refresh = query.refetch;
+  const load = useCallback(() => { void refresh(); }, [refresh]);
 
   const ask = async (player: DatasetPlayer) => {
     if (!identity || !player.espnId) return;
@@ -110,15 +99,16 @@ function LmAddContent({ compact }: { compact: boolean }) {
   const candidates = dataset.players.filter((player) => player.espnId !== null);
   const canAsk = identity !== null && today?.window.open === true;
   const reason = lmAddButtonReason(today?.window ?? null, today?.date ?? null, identity !== null);
-  const requests = compact ? ownOpenLmRequests(data?.requests ?? [], identity?.owner ?? null) : data?.requests ?? [];
+  const requests = historyOnly ? (data?.requests ?? []).filter(row => !['queued', 'processing'].includes(row.status)) : compact ? ownOpenLmRequests(data?.requests ?? [], identity?.owner ?? null) : data?.requests ?? [];
 
   return (
     <section className="panel lm-panel">
       <div className="lm-panel-head">
-        <div className="hub-heading lm-title">{compact ? 'LM ADDS' : 'WAIVERS AND LM ADDS'}</div>
+        <div className="hub-heading lm-title">{historyOnly ? 'RECENT LM ADDS' : compact ? 'LM ADDS' : 'WAIVERS AND LM ADDS'}</div>
         {compact && <Link to="/lm-adds" className="mock-mini-btn">SEE ALL</Link>}
       </div>
       {error && <p className="rules-draft-error">{error}</p>}
+      {query.isError && <p role="alert" className="rules-draft-error">Could not refresh LM results. <button type="button" onClick={load}>Retry</button></p>}
       {data?.espnWriteTrouble && <p className="rules-draft-error">ESPN sign-in expired: {data.espnWriteTrouble}</p>}
       {data?.dryRun && <p className="rules-draft-note">Dry run is on. The app logs what it would send to ESPN and sends nothing.</p>}
 
@@ -130,7 +120,7 @@ function LmAddContent({ compact }: { compact: boolean }) {
         </p>
       )}
 
-      {!compact && data && data.earlyDays.length > 0 && (
+      {!historyOnly && !compact && data && data.earlyDays.length > 0 && (
         <ul className="lm-early">
           {data.earlyDays.map((day) => (
             <li key={day.date}>
@@ -141,10 +131,10 @@ function LmAddContent({ compact }: { compact: boolean }) {
         </ul>
       )}
 
-      <button type="button" className="lm-ask" onClick={() => setAsking(true)} disabled={!canAsk || busy} aria-describedby={compact ? 'lm-hq-reason' : 'lm-activity-reason'}>
+      {!historyOnly && <><button type="button" className="lm-ask" onClick={() => setAsking(true)} disabled={!canAsk || busy} aria-describedby={compact ? 'lm-hq-reason' : 'lm-activity-reason'}>
         REQUEST LM ADD
       </button>
-      <p id={compact ? 'lm-hq-reason' : 'lm-activity-reason'} className="rules-draft-note">{reason}</p>
+      <p id={compact ? 'lm-hq-reason' : 'lm-activity-reason'} className="rules-draft-note">{reason}</p></>}
       {asking && canAsk && (
         <div className="lm-form">
           <PlayerCombobox players={candidates} placeholder="Who do you want added?" onSelect={(player) => { void ask(player); }} autoFocus />
@@ -194,6 +184,7 @@ function LmAddContent({ compact }: { compact: boolean }) {
           ))}
         </ol>
       )}
+      {historyOnly && data && requests.length === 0 && <p className="rules-draft-note">No recent results. Your queued claims appear above.</p>}
 
       <p className="lm-rule">
         Saturdays and Sundays only, before the first tip. Drop first in ESPN if your roster is full; the app never drops. Post the add in the group chat too, the rule still asks for it.

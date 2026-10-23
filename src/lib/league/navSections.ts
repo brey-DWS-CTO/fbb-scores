@@ -9,7 +9,7 @@
 import { leagueSchedule2027 } from './scheduleData.js';
 import type { SeasonMode } from './seasonMode.js';
 
-export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy' | 'bolt';
+export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy' | 'bolt' | 'calendar';
 
 export interface SectionTab {
   to: string;
@@ -21,7 +21,7 @@ export interface SectionTab {
 }
 
 export interface NavSection {
-  id: 'scores' | 'cast' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
+  id: 'scores' | 'cast' | 'waivers' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
   label: string;
   shortLabel?: string;
   icon: SectionIcon;
@@ -39,8 +39,6 @@ export interface NavSection {
 /** Views share one League tab while preserving existing saved links. */
 export const ACTIVITY_VIEWS: readonly SectionTab[] = [
   { to: '/activity', label: 'MOVES' },
-  { to: '/waivers', label: 'WAIVERS', mode: 'in-season' },
-  { to: '/lm-adds', label: 'LM ADDS', mode: 'in-season' },
 ];
 
 /** The sections in their pre-season order. `visibleSections` reorders them once the season starts. */
@@ -63,6 +61,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
   { id: 'cast', label: 'FANTASY CAST', shortLabel: 'CAST', icon: 'bolt', primary: true, tabs: [{ to: '/scores/cast', label: 'FANTASY CAST' }] },
+  { id: 'waivers', label: 'WAIVERS', icon: 'calendar', primary: true, tabs: [{ to: '/lm-adds', label: 'LM ADDS' }, { to: '/waivers', label: 'CALENDAR' }] },
   { id: 'trades', label: 'TRADES', icon: 'arrows', primary: true, tabs: [{ to: '/trades', label: 'TRADES' }] },
   {
     id: 'league',
@@ -142,7 +141,7 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
     ? { ...section, primary: true, home: '/teams', tabs: section.tabs.filter(tab => ['/teams', '/history'].includes(tab.to)) }
     : { ...section, primary: true });
   const order = mode === 'in-season'
-    ? ['scores', 'cast', 'league', 'trades', 'rules', 'commish', 'draft']
+    ? ['scores', 'cast', 'waivers', 'league', 'trades', 'rules', 'commish', 'draft']
     : ['keepers', 'draft', 'cast', 'trades', 'league', 'vault', 'rules', 'commish'];
   return order.flatMap((id) => {
     const section = NAV_SECTIONS.find((entry) => entry.id === id);
@@ -153,7 +152,7 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
       label: archive ? 'DRAFT RESULTS' : section.label,
       home: archive ? '/draft' : section.home,
       primary: mode === 'in-season'
-        ? ['scores', 'cast', 'league', 'trades'].includes(id)
+        ? ['scores', 'cast', 'waivers', 'league'].includes(id)
         : ['keepers', 'draft', 'cast', 'league'].includes(id),
       tabs: section.tabs.filter((tab) =>
         (!tab.commishOnly || isCommissioner)

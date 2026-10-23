@@ -61,16 +61,20 @@ test('Fantasy Cast has its own main button and active state in both season modes
   }
 });
 
-test('Moves, Waivers and LM Adds share one Activity tab and preserve direct links', () => {
+test('Waivers has its own mobile button and pages, separate from league activity', () => {
   const sections = visibleSections(false, true, 'in-season');
   const league = sections.find(section => section.id === 'league')!;
   const activity = league.tabs.find(tab => tab.to === '/activity')!;
-  assert.deepEqual(activity.pages?.map(page => page.to), ['/activity', '/waivers', '/lm-adds']);
+  assert.deepEqual(activity.pages?.map(page => page.to), ['/activity']);
   assert.ok(!league.tabs.some(tab => tab.to === '/waivers' || tab.to === '/lm-adds'));
-  for (const path of ['/activity', '/waivers', '/lm-adds']) {
-    assert.equal(sectionFor(path, sections)?.id, 'league');
-    assert.equal(activeTab(path, league.tabs), '/activity');
-  }
+  assert.equal(sectionFor('/activity', sections)?.id, 'league');
+  const waivers = sections.find(section => section.id === 'waivers')!;
+  assert.equal(waivers.primary, true);
+  assert.equal(sectionHome(waivers), '/lm-adds');
+  assert.deepEqual(waivers.tabs.map(tab => tab.to), ['/lm-adds', '/waivers']);
+  for (const path of ['/waivers', '/lm-adds']) assert.equal(sectionFor(path, sections)?.id, 'waivers');
+  assert.deepEqual(sections.filter(section => section.primary).map(section => section.id), ['scores', 'cast', 'waivers', 'league']);
+  assert.equal(sections.find(section => section.id === 'trades')?.primary, false);
   const offseason = visibleSections(false, true, 'off-season').find(section => section.id === 'league')!;
   assert.deepEqual(offseason.tabs.find(tab => tab.to === '/activity')?.pages?.map(page => page.to), ['/activity']);
 });
