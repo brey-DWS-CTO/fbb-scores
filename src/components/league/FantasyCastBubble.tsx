@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { OPEN_CAST_EVENT, isCastScorePage } from '../../lib/league/castControls.js';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useLocation } from 'react-router-dom';
 import FantasyCastPage from './FantasyCastPage.js';
 import NavIcon from './NavIcon.js';
 import './fantasyCast.css';
@@ -35,13 +36,22 @@ export default function FantasyCastBubble() {
   const shell = useRef<HTMLElement>(null);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const expand = useCallback(() => {
+    setDismissed(false);
+    setMode(window.matchMedia(DESKTOP_DOCK_QUERY).matches ? 'dock' : savedMode());
+    setOpen(true);
+  }, []);
+  useEffect(() => {
+    window.addEventListener(OPEN_CAST_EVENT, expand);
+    return () => window.removeEventListener(OPEN_CAST_EVENT, expand);
+  }, [expand]);
   const move = (left: number, top: number) => {
     const rect = shell.current?.getBoundingClientRect();
     if (!rect) return;
     const navSpace = window.innerWidth < 840 ? 72 : 8;
     setPosition({ left: Math.max(8, Math.min(left, window.innerWidth - rect.width - 8)), top: Math.max(8, Math.min(top, window.innerHeight - rect.height - navSpace)) });
   };
-  const visible = !dismissed && (pathname === '/scores' || (pathname.startsWith('/scores/') && pathname !== '/scores/cast'));
+  const visible = !dismissed && isCastScorePage(pathname);
   const minimize = () => { restoreFocus.current = true; setOpen(false); };
   const changeMode = (next: CastMode) => {
     drag.current = null;
@@ -89,7 +99,7 @@ export default function FantasyCastBubble() {
         event.preventDefault();
         const rect = shell.current!.getBoundingClientRect();
         move(rect.left + (event.key === 'ArrowRight' ? 20 : event.key === 'ArrowLeft' ? -20 : 0), rect.top + (event.key === 'ArrowDown' ? 20 : event.key === 'ArrowUp' ? -20 : 0));
-      }}><NavIcon name="bolt" size={15} /> Fantasy Cast{mode === 'float' && <NavIcon name="dots" size={14} />}</button><div className="cast-mode-switch"><button type="button" aria-label={mode === 'float' ? 'Dock Fantasy Cast' : 'Pop out Fantasy Cast'} onClick={() => changeMode(mode === 'float' ? 'dock' : 'float')}><NavIcon name={mode === 'float' ? 'book' : 'layers'} size={13} />{mode === 'float' ? 'Dock' : 'Pop out'}</button></div><Link to="/scores/cast" aria-label="Open full Fantasy Cast page" title="Full page">↗</Link><button ref={close} type="button" aria-label="Minimize Fantasy Cast" onClick={minimize}><NavIcon name="close" size={17} /></button></div>
+      }}><NavIcon name="bolt" size={15} /> Fantasy Cast{mode === 'float' && <NavIcon name="dots" size={14} />}</button><div className="cast-mode-switch"><button type="button" aria-label={mode === 'float' ? 'Dock Fantasy Cast' : 'Pop out Fantasy Cast'} onClick={() => changeMode(mode === 'float' ? 'dock' : 'float')}><NavIcon name={mode === 'float' ? 'book' : 'layers'} size={13} />{mode === 'float' ? 'Dock' : 'Pop out'}</button></div><button ref={close} type="button" aria-label="Minimize Fantasy Cast" onClick={minimize}><NavIcon name="close" size={17} /></button></div>
 
       <div className="cast-bubble-scroll"><FantasyCastPage key={contextKey} embedded peek={mode === 'dock' && !desktopDock} initialScope={scope} /></div>
     </div>}
@@ -110,7 +120,7 @@ export default function FantasyCastBubble() {
         drag.current = null; setDraggingTrigger(false);
         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
       }} onPointerCancel={() => { drag.current = null; setDraggingTrigger(false); }} onLostPointerCapture={() => { drag.current = null; setDraggingTrigger(false); }} onClick={() => {
-        if (!movedTrigger.current) setOpen(true);
+        if (!movedTrigger.current) expand();
         movedTrigger.current = false;
       }}><NavIcon name="bolt" size={20} /><span>CAST</span></button>
       <button type="button" className="cast-launcher-dismiss" aria-label="Dismiss Fantasy Cast button" onClick={() => setDismissed(true)}><NavIcon name="close" size={16} /></button>

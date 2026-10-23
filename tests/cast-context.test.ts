@@ -1,3 +1,4 @@
+import { isCastScorePage } from '../src/lib/league/castControls.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { castMatchesGame, castPageScope } from '../src/lib/league/castContext.js';
@@ -20,4 +21,9 @@ test('NBA game filter includes both teams and excludes unrelated games', () => {
   assert.equal(castMatchesGame(play, 'nba:BOS'), true);
   assert.equal(castMatchesGame(play, 'nba:NY'), true);
   assert.equal(castMatchesGame(play, 'nba:LAL'), false);
+});
+
+test('Cast opens as a panel on scoreboards and matchup pages only', () => {
+  for (const path of ['/scores', '/scores/42', '/scores/nba-scoreboard', '/scores/performers']) assert.ok(isCastScorePage(path));
+  for (const path of ['/league', '/scores/cast', '/admin', '/scores-extra']) assert.ok(!isCastScorePage(path));
 });
