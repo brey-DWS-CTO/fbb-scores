@@ -11,7 +11,7 @@ landed. What is actually left is in "What is left" near the bottom.
 The Nerds fantasy basketball league's keeper/draft app for the **2027 season** (draft: **Sun Oct 18, 2026, 2:00 PM PT**). Rebuilt from the old ESPN live-scores app in one day; the scores UI was deleted (recover from git history, pre-`5a024a0`) but the ESPN proxy routes remain server-side for the data pipeline and future live scoring.
 
 - **Prod:** https://fbb-scores.dowhatsolutions.com (alias: nerds-league.vercel.app)
-- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores`; the Git integration deploys merges to `master` to production. Open PRs get previews, except for commits changing only Markdown or `docs/`. Do not deploy with the CLI or a deploy hook.
+- **Hosting:** Vercel `do-what-solutions-llc/fbb-scores`; the Git integration deploys merges to `master` to production. Open PRs get a preview only when a commit asks for one: an empty commit, or `[preview]` in the message (`scripts/vercel-ignore.sh`). Do not deploy with the CLI or a deploy hook.
 - **DB:** Neon Postgres `neon-cordovan-ball` (Vercel Marketplace, `DATABASE_URL`); local dev falls back to `.data/league-state.json`
 - **DNS:** `fbb-scores` CNAME → `cname.vercel-dns.com` at domain.com; old Render service is defunct
 
