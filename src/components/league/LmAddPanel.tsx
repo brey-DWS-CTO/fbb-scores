@@ -43,7 +43,8 @@ const REFRESH_MS = 60_000;
 /** The weekend LM rules on the ACTIVITY page: waiver hour, early days, LM add requests. */
 export default function LmAddPanel({ compact = false, always = false }: { compact?: boolean; always?: boolean }) {
   const { seasonMode } = useLeagueState();
-  return always || seasonMode === 'in-season' ? <LmAddContent compact={compact} /> : null;
+  const { identity } = useIdentity();
+  return always || seasonMode === 'in-season' ? <LmAddContent key={`${identity?.owner ?? 'anonymous'}:${identity?.isCommissioner === true}`} compact={compact} /> : null;
 }
 
 function LmAddContent({ compact }: { compact: boolean }) {
@@ -57,13 +58,13 @@ function LmAddContent({ compact }: { compact: boolean }) {
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    fetchLmWeekend()
+    fetchLmWeekend(identity)
       .then((next) => {
         setData(next);
         setError(null);
       })
       .catch((e) => setError(apiErrorMessage(e)));
-  }, []);
+  }, [identity]);
 
   useEffect(() => {
     load();

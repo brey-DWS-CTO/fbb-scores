@@ -1331,9 +1331,9 @@ export interface LmWeekendResponse {
   dryRun: boolean;
 }
 
-/** Anyone may read today's waiver hour, the early days ahead and every request. */
-export async function fetchLmWeekend(): Promise<LmWeekendResponse> {
-  const { data } = await axios.get<LmWeekendResponse>('/api/league/lm-adds');
+/** Public waiver clock and completed adds, plus the viewer's private requests. */
+export async function fetchLmWeekend(c?: Credentials | null): Promise<LmWeekendResponse> {
+  const { data } = await axios.get<LmWeekendResponse>('/api/league/lm-adds', { headers: c ? authHeaders(c) : undefined });
   return data;
 }
 

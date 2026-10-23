@@ -21,7 +21,7 @@ export default function LmAddsPage() {
   const [player, setPlayer] = useState<DatasetPlayer | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const query = useQuery({ queryKey: ['lm-claims'], queryFn: fetchLmWeekend, staleTime: 20_000, refetchInterval: 30_000 });
+  const query = useQuery({ queryKey: ['lm-claims', identity?.owner ?? null, identity?.isCommissioner === true], queryFn: () => fetchLmWeekend(identity), staleTime: 20_000, refetchInterval: 30_000 });
   const claims = (query.data?.requests ?? []).filter(row => ['queued', 'processing'].includes(row.status)).sort(claimPriority);
   const submit = async () => {
     if (!identity || !player?.espnId) return;
@@ -52,7 +52,8 @@ export default function LmAddsPage() {
       </form>}
       {notice && <p role="status">{notice}</p>}
       {query.isError && <p role="alert">Could not load claims. <button className="tap-btn mock-mini-btn" onClick={() => void query.refetch()}>Retry</button></p>}
-      <h3>Public claim queue</h3>
+      <h3>{identity?.isCommissioner ? 'Commissioner claim queue' : 'Your advance claims'}</h3>
+      <p>Advance claims are private to the submitting owner and commissioner. Completed adds are visible to the league.</p>
       {query.isLoading && <p role="status">Loading claims…</p>}
       {!query.isLoading && !claims.length && <p>No open advance claims.</p>}
       <ol className="lm-claim-queue">{claims.map((claim, index) => <li key={claim.id}>
