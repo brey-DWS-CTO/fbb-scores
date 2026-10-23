@@ -96,7 +96,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
     {query.data?.schedule?.phase === 'complete' && !query.data.schedule.nextPollAt && <p role="status">All games final · Automatic updates paused.</p>}
     {query.data && <p className="daily-scorers-note">{plays.length} plays · Updated {new Date(query.data.fetchedAt).toLocaleTimeString()}</p>}
     {query.data && !plays.length && <div className="panel cast-empty">{scope === 'all' ? 'No plays available for this date yet. The feed starts when games tip off.' : 'No scoring plays for this selection yet.'}</div>}
-    <ol className="cast-feed">{plays.slice(0, peek ? 3 : visibleCount).map(play => {
+    <ol className="cast-feed">{plays.slice(0, visibleCount).map(play => {
       return <li key={play.id} className="panel cast-play">
         <div className="cast-meta"><span>{play.timestamp ? new Date(play.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'Time unavailable'} · {play.game}</span><span>{play.period > 4 ? `OT${play.period - 4}` : `Q${play.period}`} · {play.clock}</span></div>
         <div className="cast-play-body">
@@ -112,7 +112,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
         </div>
       </li>;
     })}</ol>
-    {!peek && plays.length > visibleCount && <button className="tap-btn mock-mini-btn" onClick={() => setVisibleCount(count => count + 100)}>Show more plays ({plays.length - visibleCount} remaining)</button>}
+    {plays.length > visibleCount && <button className="tap-btn mock-mini-btn" onClick={() => setVisibleCount(count => count + 100)}>Show more plays ({plays.length - visibleCount} remaining)</button>}
     {!embedded && <details className="cast-scoring-note"><summary>Scoring &amp; feed notes</summary><p>Fantasy changes use league scoring. Events without timestamps are grouped by game in play order. Unrecognized stat descriptions remain visible without a points estimate. ESPN corrections and official matchup totals may differ.</p></details>}
   </Container>;
 }
