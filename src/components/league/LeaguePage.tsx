@@ -9,7 +9,6 @@ import { movesOf, type Move } from '../../lib/league/transactions.js';
 import IdentityChip from './IdentityChip.js';
 import RecordTables from './RecordTables.js';
 import ScoringTable from './ScoringTable.js';
-import LmAddPanel from './LmAddPanel.js';
 import LeagueOffseasonPage from './LeagueOffseasonPage.js';
 
 function Section({ title, color, children }: { title: string; color: string; children: ReactNode }) {
@@ -82,9 +81,8 @@ export default function LeaguePage() {
       </Section>
 
       <div className="league-season-actions">
-        <Link className="league-lm-highlight" to="/activity"><strong>Activity</strong><span>Moves, waivers and LM Adds →</span></Link>
+        <Link className="league-lm-highlight" to="/lm-adds"><strong>Waivers &amp; LM Adds</strong><span>Queue a private claim or check waiver times →</span></Link>
       </div>
-      <LmAddPanel compact />
 
       {/* ── d. Account ─────────────────────────────────────────── */}
       <Section title="SCORING SYSTEM" color="var(--neon-purple)">
