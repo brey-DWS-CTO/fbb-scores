@@ -362,6 +362,7 @@ import {
   updateParty,
 } from '../lib/leagueStore.js';
 import { transactionsFeed } from '../lib/transactionService.js';
+import { waiverOffersReport } from '../lib/waiverOffersService.js';
 import { LmAddRefused, cancelLmClaim, queueLmClaim, denyLmAdd, lmWeekendView, requestLmAdd, retryLmAdd } from '../lib/lmWeekendService.js';
 import { visibleLmRequests } from '../../src/lib/league/lmClaims.js';
 import { rankBoard, type DraftRankingSnapshot } from '../../src/lib/league/draftRankings.js';
@@ -4562,6 +4563,14 @@ router.get('/transactions', async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+router.get('/waiver-offers', async (req, res, next) => {
+  const input = req.query.period;
+  const period = input === undefined ? undefined : Number(input);
+  if (period !== undefined && (!Number.isInteger(period) || period < 1 || period > 400)) { res.status(400).json({error: 'Choose a scoring period from 1 to 400.'}); return; }
+  try { res.json(await waiverOffersReport(period)); }
+  catch (error) { next(new HttpError(502, error instanceof Error ? error.message : 'ESPN offers report unavailable')); }
 });
 
 // ─── Weekend LM adds ─────────────────────────────────────────────────────────

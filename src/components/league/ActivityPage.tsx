@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import IdentityChip from './IdentityChip.js';
+import WaiverCountdowns from './WaiverCountdowns.js';
+import WaiverOffersReport from './WaiverOffersReport.js';
 import NavIcon from './NavIcon.js';
 import { useIdentity, useLeagueData } from '../../hooks/useLeague.js';
 import { apiErrorMessage, fetchTransactions, type TransactionsResponse } from '../../lib/league/api.js';
@@ -32,6 +34,7 @@ export default function ActivityPage() {
   const [data, setData] = useState<TransactionsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
+  const [view, setView] = useState<'moves' | 'offers'>('moves');
 
   useEffect(() => {
     let alive = true;
@@ -86,6 +89,9 @@ export default function ActivityPage() {
       </header>
 
       {error && <p className="rules-draft-error">{error}</p>}
+      <WaiverCountdowns />
+      <div className="waiver-view-switch" role="group" aria-label="Activity view"><button type="button" aria-pressed={view === 'moves'} onClick={() => setView('moves')}>Activity</button><button type="button" aria-pressed={view === 'offers'} onClick={() => setView('offers')}>Offers report</button></div>
+      {view === 'offers' ? <WaiverOffersReport /> : <>
       {!error && data?.pullError && (
         <p className="rules-draft-error">ESPN did not answer the last check: {data.pullError}. This is the last good list.</p>
       )}
@@ -123,6 +129,7 @@ export default function ActivityPage() {
           </ol>
         </section>
       ))}
+      </>}
     </main>
   );
 }

@@ -46,7 +46,7 @@ export interface TransactionsFeed {
   pullError: string | null;
 }
 
-function espnClient(): EspnClient | null {
+export function espnClient(): EspnClient | null {
   const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
   if (!ESPN_LEAGUE_ID) return null;
   if (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID)) return null;
@@ -61,7 +61,7 @@ function espnClient(): EspnClient | null {
 }
 
 /** Names from the active pool snapshot, then ESPN for anyone it does not know. */
-async function playerLookup(client: EspnClient, ids: readonly number[]): Promise<Map<number, PlayerLookup>> {
+export async function playerLookup(client: EspnClient, ids: readonly number[]): Promise<Map<number, PlayerLookup>> {
   const { state } = await getState();
   const pool = await resolveCurrentPlayerPool(state);
   const known = new Map<number, PlayerLookup>();

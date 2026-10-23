@@ -106,6 +106,25 @@ export function easternHour(hourPT: number): number {
   return (hourPT + EASTERN_OFFSET_HOURS) % 24;
 }
 
+/** A planned Pacific waiver hour as an instant, including daylight-saving transitions. */
+export function waiverRunAt(date: string, hour: number): string {
+  const result = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00-08:00`);
+  const actual = pacific(result);
+  result.setUTCHours(result.getUTCHours() + hour - actual.hour);
+  return result.toISOString();
+}
+
+export function waiverCountdown(target: string, now: number): string {
+  const remaining = Math.max(0, Math.ceil((Date.parse(target) - now) / 1000));
+  if (!remaining) return 'Scheduled time passed';
+  const days = Math.floor(remaining / 86400);
+  const hours = Math.floor(remaining % 86400 / 3600);
+  const minutes = Math.floor(remaining % 3600 / 60);
+  const seconds = remaining % 60;
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${days ? `${days}d ` : ''}${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
 /**
  * Brey's rule for one day. A first tip before 4 PM Pacific means waivers run
  * one hour before it, on the hour (a 12:30 tip runs them at 11). Otherwise

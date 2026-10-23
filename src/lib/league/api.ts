@@ -1319,6 +1319,11 @@ export async function fetchTransactions(): Promise<TransactionsResponse> {
   return data;
 }
 
+export async function fetchWaiverOffers(period?: number): Promise<import('./transactions.js').WaiverOffersReport> {
+  const { data } = await axios.get<import('./transactions.js').WaiverOffersReport>('/api/league/waiver-offers', {params: {period}});
+  return data;
+}
+
 // ─── Weekend LM adds ─────────────────────────────────────────────────────────
 
 export interface LmWeekendResponse {

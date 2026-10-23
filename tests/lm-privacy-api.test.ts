@@ -22,6 +22,7 @@ before(async () => {
   const parent = path.join(root, 'node_modules', '.tmp');
   mkdirSync(parent, { recursive: true });
   tempRoot = mkdtempSync(path.join(parent, 'lm-privacy-'));
+  cpSync(path.join(root, 'package.json'), path.join(tempRoot, 'package.json'));
   for (const folder of ['server', 'src']) cpSync(path.join(root, folder), path.join(tempRoot, folder), { recursive: true });
   process.env.DATABASE_URL = '';
   process.env.DOTENV_CONFIG_QUIET = 'true';
@@ -30,6 +31,16 @@ before(async () => {
   process.env.ESPN_COOKIE_STRING = 'test';
   process.env.ESPN_LM_DRY_RUN = '1';
   axios.defaults.adapter = async config => {
+    if (config.params?.view === 'mSettings') return { config, status: 200, statusText: 'OK', headers: {}, data: {scoringPeriodId: 5} };
+    if (config.params?.view === 'mTransactions2') {
+      assert.deepEqual(JSON.parse(String(config.headers.get('x-fantasy-filter'))).transactions.filterType.value, ['WAIVER', 'WAIVER_ERROR']);
+      return {config, status: 200, statusText:'OK', headers:{}, data:{id:1,transactions:[
+        {id:'win',type:'WAIVER',status:'EXECUTED',teamId:1,processDate:Date.now()-1000,bidAmount:9,items:[{type:'ADD',playerId:100}]},
+        {id:'loss',type:'WAIVER_ERROR',status:'FAILED',teamId:1,processDate:Date.now()-1000,bidAmount:3,items:[{type:'ADD',playerId:100}]},
+        {id:'secret',type:'WAIVER',status:'PENDING',teamId:1,proposedDate:Date.now()-1000,bidAmount:99,items:[{type:'ADD',playerId:101}]},
+      ]}};
+    }
+    if (config.params?.view === 'kona_player_info') return {config, status:200, statusText:'OK', headers:{}, data:{players:[]}};
     assert.ok(config.url?.includes('/scoreboard'), `Unexpected external request: ${config.url}`);
     const date = String(config.params.dates).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
     return { config, status: 200, statusText: 'OK', headers: {}, data: { events: [{ competitions: [{ date: `${date}T23:00:00Z`, competitors: [{ homeAway: 'home', team: { abbreviation: 'DEN' } }, { homeAway: 'away', team: { abbreviation: 'LAL' } }] }] }] } };
@@ -52,6 +63,17 @@ before(async () => {
   server = app.listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+test('offers report reads ESPN reports but never returns pending offers', async () => {
+  const response = await fetch(`${base}/api/league/waiver-offers`);
+  const report = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(report));
+  assert.equal(report.scoringPeriodId, 5);
+  assert.equal(report.rows.length, 2);
+  assert.deepEqual(report.rows.map((row: {bid: number}) => row.bid).sort((a: number,b: number)=>a-b), [3,9]);
+  assert.ok(!JSON.stringify(report).includes('secret'));
+  for (const period of ['0','-1','401','junk','1.5']) assert.equal((await fetch(`${base}/api/league/waiver-offers?period=${period}`)).status,400);
 });
 
 after(async () => {

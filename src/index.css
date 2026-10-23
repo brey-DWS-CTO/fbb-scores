@@ -6395,6 +6395,21 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .lm-claim-queue li { display: flex; align-items: start; gap: 12px; border-top: 1px solid var(--cell-border); padding: 12px 0; }
 .lm-claim-queue li > div { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .lm-claim-queue small { color: var(--text-soft); }
+.waiver-countdowns { padding: 16px; margin: 14px 0 20px; }
+.waiver-countdowns h2 { margin: 0 0 5px; font-size: .9rem; color: var(--text-max); }
+.waiver-countdowns > p { font-size: .72rem; color: var(--text-soft); line-height: 1.5; }
+.waiver-clock-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.waiver-clock-card { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--cell-bg); min-width: 0; }
+.waiver-clock-card > span { color: var(--text-body); font-size: .75rem; font-weight: 700; }
+.waiver-clock-card strong { color: var(--neon-teal); font-size: clamp(.8rem, 2.5vw, 1.15rem); font-variant-numeric: tabular-nums; }
+.waiver-clock-card small { color: var(--text-soft); font-size: .68rem; }
+.waiver-countdowns details { margin-top: 12px; color: var(--text-body); font-size: .75rem; }
+.waiver-countdowns summary { cursor: pointer; padding: 8px 0; }
+.waiver-view-switch { display: flex; gap: 8px; margin: 16px 0; }
+.waiver-view-switch button { flex: 1; min-height: 44px; border-radius: 8px; border: 1px solid var(--panel-border); background: var(--cell-bg); color: var(--text-body); font: inherit; font-size: .8rem; cursor: pointer; }
+.waiver-view-switch button[aria-pressed="true"] { border-color: var(--neon-teal); color: var(--neon-teal); }
+.waiver-offers-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; font-size: .75rem; color: var(--text-body); }
+.waiver-offers-nav button { min-height: 44px; }
 .lm-adds-page { max-width: 800px; }
 .waivers-hero { margin: 10px 0 22px; }
 .waivers-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--neon-teal); font-size: .65rem; font-weight: 800; letter-spacing: .1em; }

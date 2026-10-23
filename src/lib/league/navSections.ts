@@ -36,11 +36,6 @@ export interface NavSection {
   tabs: SectionTab[];
 }
 
-/** Views share one League tab while preserving existing saved links. */
-export const ACTIVITY_VIEWS: readonly SectionTab[] = [
-  { to: '/activity', label: 'MOVES' },
-];
-
 /** The sections in their pre-season order. `visibleSections` reorders them once the season starts. */
 export const NAV_SECTIONS: readonly NavSection[] = [
   { id: 'keepers', label: 'KEEPERS', icon: 'lock', primary: true, tabs: [{ to: '/keepers', label: 'KEEPERS' }] },
@@ -61,7 +56,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
   { id: 'cast', label: 'FANTASY CAST', shortLabel: 'CAST', icon: 'bolt', primary: true, tabs: [{ to: '/scores/cast', label: 'FANTASY CAST' }] },
-  { id: 'waivers', label: 'WAIVERS', icon: 'calendar', primary: true, tabs: [{ to: '/lm-adds', label: 'LM ADDS' }, { to: '/waivers', label: 'CALENDAR' }] },
+  { id: 'waivers', label: 'WAIVERS', icon: 'calendar', primary: true, tabs: [{ to: '/activity', label: 'ACTIVITY' }, { to: '/lm-adds', label: 'LM ADDS' }, { to: '/waivers', label: 'CALENDAR' }] },
   { id: 'trades', label: 'TRADES', icon: 'arrows', primary: true, tabs: [{ to: '/trades', label: 'TRADES' }] },
   {
     id: 'league',
@@ -71,7 +66,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     tabs: [
       { to: '/league', label: 'LEAGUE HQ' },
       { to: '/watch', label: 'WATCH', mode: 'in-season' },
-      { to: '/activity', label: 'ACTIVITY', pages: ACTIVITY_VIEWS },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
       { to: '/history', label: 'HISTORY' },

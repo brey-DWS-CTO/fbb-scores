@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { fetchWaiverCalendar } from '../../lib/league/api.js';
 import { hourLabel, pacific } from '../../lib/league/lmWeekend.js';
+import { SelectedWaiverCountdown } from './WaiverCountdowns.js';
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
 export default function WaiverCalendarPage() {
@@ -37,6 +38,7 @@ export default function WaiverCalendarPage() {
       {selected && <section className="panel waiver-day-detail"><h2>{new Date(`${selected.date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'short', day: 'numeric' })}</h2>
         {selected.games === null ? <p>NBA schedule unavailable. Eligibility and times cannot be confirmed.</p> : <>
           <p>Waivers: <strong>{selected.waiver && hourLabel(selected.waiver.hourPT)} Pacific</strong>{selected.waiver?.early ? ' · earlier than normal' : ''}</p>
+          <SelectedWaiverCountdown day={selected} />
           <p>{selected.games} NBA game{selected.games === 1 ? '' : 's'}{selected.waiver?.firstTip ? ` · First tip ${clock(selected.waiver.firstTip)} PT` : ''}</p>
           <p>{selected.lmClosesAt ? `LM Add eligible · Claims close ${clock(selected.lmClosesAt)} PT` : 'No LM Adds on this day.'}</p>
           {selected.lmEligible && <Link className="tap-btn mock-mini-btn" to={`/lm-adds?date=${selected.date}`}>LM Adds →</Link>}
