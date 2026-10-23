@@ -1,19 +1,16 @@
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useIdentity, useLeagueState } from '../../hooks/useLeague.js';
+import { useIdentity } from '../../hooks/useLeague.js';
 import { leagueDataset } from '../../lib/league/data.js';
-import { seasonHome } from '../../lib/league/seasonMode.js';
 import NavIcon from './NavIcon.js';
 import TeamPickerForm from './TeamPickerForm.js';
 
-/** / — a focused sign-in page. Signed-in owners open scores in season and keepers off season. */
+/** / — a focused sign-in page. Signed-in users always open Scores. */
 export default function SplashPage() {
   const { identity } = useIdentity();
-  const { seasonMode, isPending } = useLeagueState();
   const navigate = useNavigate();
 
   if (identity) {
-    if (isPending) return <main className="splash-page"><p role="status">Opening your league...</p></main>;
-    return <Navigate to={identity.isGuest ? '/scores' : seasonHome(seasonMode)} replace />;
+    return <Navigate to="/scores" replace />;
   }
 
   return (
