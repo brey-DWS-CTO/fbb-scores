@@ -6315,6 +6315,11 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 .top-performers-period [aria-pressed="true"] { color: var(--neon-teal); border-color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 8%, var(--panel-bg)); }
 
 /* A shared boundary keeps starters and reserves visually distinct on both sides. */
+.score-starter-subtotal { margin-top: 10px; padding: 10px 4px 4px; border-top: 2px solid var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-subtotal-label { margin-bottom: 5px; color: var(--text-soft); font-size: .6rem; font-weight: 800; letter-spacing: .1em; }
+.score-subtotal-points { display: block; color: var(--text-max); font-size: 1rem; }
+.score-subtotal-projection { display: block; margin-top: 2px; color: var(--text-dim); font-size: .65rem; }
+.score-subtotal-projection b { color: var(--text-mid); }
 .score-bench-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 9px; color: var(--text-soft); font-size: .6rem; font-weight: 800; letter-spacing: .1em; }
 .score-bench-divider::before, .score-bench-divider::after { content: ''; flex: 1; height: 1px; background: var(--text-dim); opacity: .6; }
 .score-bench-divider span { flex-shrink: 0; }

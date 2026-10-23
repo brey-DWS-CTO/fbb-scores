@@ -250,11 +250,12 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
 }
 
 /** Keep both benches below the same divider, even when starter counts differ. */
-function LineupGrid({ home, away, isStarter, renderCell }: {
+function LineupGrid({ home, away, isStarter, renderCell, starterSummary }: {
   home: ScorePlayer[];
   away: ScorePlayer[];
   isStarter: (player: ScorePlayer) => boolean;
   renderCell: (player: ScorePlayer | undefined, side: 'home' | 'away') => ReactNode;
+  starterSummary?: ReactNode;
 }) {
   const groups = [true, false].map(starters => ({
     starters,
@@ -263,13 +264,14 @@ function LineupGrid({ home, away, isStarter, renderCell }: {
   }));
   return <>{groups.map(group => {
     const count = Math.max(group.home.length, group.away.length);
-    if (!count) return null;
+    if (!count) return group.starters ? <Fragment key="starter-summary">{starterSummary}</Fragment> : null;
     return <Fragment key={String(group.starters)}>
       {!group.starters && <div className="score-bench-divider" role="separator" aria-label="Bench and injured reserve"><span>BENCH / IR</span></div>}
       <div className="score-grid">{Array.from({ length: count }, (_, index) => <Fragment key={group.home[index]?.id ?? `h${index}`}>
         {renderCell(group.home[index], 'home')}
         {renderCell(group.away[index], 'away')}
       </Fragment>)}</div>
+      {group.starters && starterSummary}
     </Fragment>;
   })}</>;
 }
@@ -489,6 +491,19 @@ export default function MatchupPage() {
             home={lineupOrder(matchup.home.players, view.scoringPeriodId)}
             away={lineupOrder(matchup.away.players, view.scoringPeriodId)}
             isStarter={player => isActiveSlot(slotOn(player, view.scoringPeriodId))}
+            starterSummary={<section className="score-starter-subtotal" aria-label="Daily starter totals">
+              <div className="score-subtotal-label">DAILY TOTAL</div>
+              <div className="score-head-grid">
+                {[matchup.home, matchup.away].map((side, index) => {
+                  const projection = (index === 0 ? homeProj : awayProj)?.byDay[String(view.scoringPeriodId)];
+                  return <div key={side.teamId} className={index === 1 ? 'is-right' : undefined}>
+                    <FppgLabel side={side} period={view.scoringPeriodId} />
+                    <strong className="score-subtotal-points" aria-label={`${side.name} daily points`}>{(side.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)}</strong>
+                    {projection !== undefined && view.scoringPeriodId >= week.currentScoringPeriodId && <small className="score-subtotal-projection">Proj <b>{projText(projection)}</b></small>}
+                  </div>;
+                })}
+              </div>
+            </section>}
             renderCell={(player, side) => <DayCell demo={demo} player={player} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={(side === 'home' ? homeForecast : awayForecast)?.overages.find(game => game.playerId === player?.id && game.scoringPeriodId === view.scoringPeriodId)} />}
           />}
 
