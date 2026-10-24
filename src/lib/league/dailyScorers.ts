@@ -86,9 +86,19 @@ export function filterScorers<T extends DailyScorer>(rows: readonly T[], status:
     && (team === 'all' || String(row.roster?.teamId) === team));
 }
 
+/** ESPN's live clock, short: "11:14 - 2nd" is "Q2 11:14", "End of 1st" is "End Q1". */
+export function liveClock(detail: string): string {
+  const text = detail.trim();
+  const running = /^(\d{1,2}:\d{2}|\d{1,2}\.\d)\s*-\s*(1st|2nd|3rd|4th|\d*OT)$/i.exec(text);
+  if (running) return `${/OT$/i.test(running[2]) ? running[2].toUpperCase() : `Q${running[2][0]}`} ${running[1]}`;
+  const end = /^End of (?:the )?(1st|2nd|3rd|4th)/i.exec(text);
+  if (end) return `End Q${end[1][0]}`;
+  return /^half/i.test(text) ? 'Half' : text;
+}
+
 /** A performer's game: "F 128-120" with his team's score first, the live clock, or the tip-off. */
 export function performerGameText(game: Pick<NbaGame, 'state' | 'detail' | 'home' | 'homeScore' | 'awayScore'>, team: string): string {
-  if (game.state === 'in') return `LIVE · ${game.detail}`;
+  if (game.state === 'in') return liveClock(game.detail);
   if (game.state !== 'post') return game.detail;
   const home = game.home === team;
   const mine = home ? game.homeScore : game.awayScore;

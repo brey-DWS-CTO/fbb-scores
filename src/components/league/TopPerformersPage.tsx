@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTopPerformers } from '../../hooks/useTopPerformers.js';
 import { filterScorers, matchesPlayerName, nbaGameHref, performerGameText } from '../../lib/league/dailyScorers.js';
-import { localDateIso, seasonStartDate } from '../../lib/league/scores.js';
+import { localDateIso, ownerByEspnTeamId, seasonStartDate } from '../../lib/league/scores.js';
 import { fetchPerformerDates, fetchPlayerPool } from '../../lib/league/api.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import { playerPoolFromDataset } from '../../lib/league/playerPool.js';
@@ -15,6 +15,8 @@ import TeamLogo from './TeamLogo.js';
 import { tipoffText } from './scoresUi.js';
 
 const FALLBACK_SEARCH_PLAYERS = playerPoolFromDataset(leagueDataset.players);
+// Rows and filters name the owner, not the fantasy team.
+const OWNERS = ownerByEspnTeamId(leagueDataset.teams);
 
 /** The Game filter's word for an NBA game state. */
 function gameStateFilter(state: string | undefined): string {
@@ -65,30 +67,31 @@ export default function TopPerformersPage() {
     <section id="top-performers" className="panel daily-scorers" aria-labelledby="top-performers-title">
     <div className="daily-scorers-heading"><div><h1 id="top-performers-title">Top Performers</h1><p>Fantasy points · {weekly ? `${dates[0]} – ${date}` : new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p></div>
       <button type="button" className="tap-btn mock-mini-btn" disabled={query.isFetching} onClick={() => { void query.refetch(); void rosterQuery.refetch(); }}>Refresh</button></div>
-    <div className="top-performers-period" role="group" aria-label="Performance period">
-      <button type="button" className="tap-btn mock-mini-btn" aria-pressed={!weekly} onClick={() => changeFilter('period', 'today')}>Daily</button>
-      <button type="button" className="tap-btn mock-mini-btn" aria-pressed={weekly} onClick={() => changeFilter('period', 'week')}>Weekly</button>
-    </div>
-    <div className="nba-scoreboard-date" role="group" aria-label="Performance date">
-      <button type="button" className="tap-btn mock-mini-btn" aria-label="Previous game day" disabled={!previousDay} onClick={() => previousDay && changeFilter('date', previousDay)}>‹</button>
-      <select className="hub-input" aria-label="Performance date" value={date} disabled={calendar.isPending} onChange={event => changeFilter('date', event.target.value)}>
-        {[...gameDays].reverse().map(day => <option key={day} value={day}>{day === today ? 'Today' : new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</option>)}
-      </select>
-      <button type="button" className="tap-btn mock-mini-btn" aria-label="Next game day" disabled={!nextDay} onClick={() => nextDay && changeFilter('date', nextDay)}>›</button>
-      {date !== today && <button type="button" className="tap-btn mock-mini-btn" onClick={() => changeFilter('date', today)}>Today</button>}
+    <div className="performer-controls">
+      <div className="performer-segment" role="group" aria-label="Performance period">
+        <button type="button" aria-pressed={!weekly} onClick={() => changeFilter('period', 'today')}>Daily</button>
+        <button type="button" aria-pressed={weekly} onClick={() => changeFilter('period', 'week')}>Weekly</button>
+      </div>
+      <div className="performer-date" role="group" aria-label="Performance date">
+        <button type="button" aria-label="Previous game day" disabled={!previousDay} onClick={() => previousDay && changeFilter('date', previousDay)}>‹</button>
+        <select aria-label="Performance date" value={date} disabled={calendar.isPending} onChange={event => changeFilter('date', event.target.value)}>
+          {[...gameDays].reverse().map(day => <option key={day} value={day}>{day === today ? 'Today' : new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</option>)}
+        </select>
+        <button type="button" aria-label="Next game day" disabled={!nextDay} onClick={() => nextDay && changeFilter('date', nextDay)}>›</button>
+      </div>
     </div>
     {calendar.isError && <p role="status" className="daily-scorers-note">Game-day calendar unavailable. <button type="button" className="tap-btn mock-mini-btn" onClick={() => void calendar.refetch()}>Retry</button></p>}
     {weekly && <p className="daily-scorers-note">Week through the selected day. Tap a player to open their latest game.</p>}
-    <div className="top-performers-search"><label htmlFor="performer-search">Search players</label>
-      <div><input id="performer-search" className="hub-input" type="search" aria-label="Search players" placeholder="Search any player…" value={search} onChange={event => changeFilter('search', event.target.value)} autoComplete="off" />
-      {search && <button type="button" className="tap-btn mock-mini-btn" onClick={() => changeFilter('search', '')}>Clear</button>}</div>
+    <div className="performer-search">
+      <input id="performer-search" className="hub-input" type="search" aria-label="Search players" placeholder="Search any player…" value={search} onChange={event => changeFilter('search', event.target.value)} autoComplete="off" />
+      {search && <button type="button" aria-label="Clear search" onClick={() => changeFilter('search', '')}>×</button>}
     </div>
-    <div className="daily-scorers-filters">
-      <label>Roster status<select className="hub-input" value={status} disabled={!rosters} onChange={event => changeFilter('roster', event.target.value)}>
-        <option value="all">All players</option><option value="rostered">Rostered</option><option value="free">Not rostered</option>
+    <div className="performer-filters">
+      <label>Roster<select className="hub-input" value={status} disabled={!rosters} onChange={event => changeFilter('roster', event.target.value)}>
+        <option value="all">All players</option><option value="rostered">Rostered</option><option value="free">Free agents</option>
       </select></label>
-      <label>Fantasy team<select className="hub-input" value={team} disabled={!rosters} onChange={event => changeFilter('fantasyTeam', event.target.value)}>
-        <option value="all">All fantasy teams</option>{teams.map(side => <option key={side.teamId} value={String(side.teamId)}>{side.name}</option>)}
+      <label>Owner<select className="hub-input" value={team} disabled={!rosters} onChange={event => changeFilter('fantasyTeam', event.target.value)}>
+        <option value="all">All owners</option>{teams.map(side => <option key={side.teamId} value={String(side.teamId)}>{OWNERS.get(side.teamId) ?? side.name}</option>)}
       </select></label>
       <label>Game<select className="hub-input" value={gameFilter} onChange={event => changeFilter('game', event.target.value)}>
         <option value="all">All games</option><option value="live">In progress</option><option value="final">Final</option>
@@ -105,7 +108,7 @@ export default function TopPerformersPage() {
         const position = positions.get(row.athleteId) ?? row.position;
         return <li key={`${row.gameId}:${row.athleteId}`}><div className="daily-scorer-row performer-row">
           <span className="daily-scorer-rank">{index + 1}</span><TeamLogo code={row.team} size={22} />
-          <span className="daily-scorer-info"><strong><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} title={row.name}>{shortName(row.name)}</Link>{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}>{weekly && `${row.gamesPlayed} GP · `}{game ? performerGameText(game, row.team) : row.team}</small><small>{!rosters ? 'Roster unknown' : row.roster ? row.roster.name : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
+          <span className="daily-scorer-info"><strong><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} title={row.name}>{shortName(row.name)}</Link>{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}>{weekly && `${row.gamesPlayed} GP · `}{game ? performerGameText(game, row.team) : row.team}</small><small>{!rosters ? 'Roster unknown' : row.roster ? OWNERS.get(row.roster.teamId) ?? row.roster.name : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
           <span className="daily-scorer-total"><strong><PointsBreakdown name={row.name} label={weekly ? 'Week' : row.date} days={[{ rawStats: row.stats, stats: null }]} scoring={scoring} total={row.fpts} /></strong></span>
         </div></li>;
       })}</ol>
@@ -117,9 +120,10 @@ export default function TopPerformersPage() {
       const code = normalizeTeam(player.proTeam);
       const game = [...data.games].reverse().find(entry => entry.home === code || entry.away === code);
       const id = String(player.espnId);
+      const holder = rosters?.get(id);
       const line = data.boxScores.find(box => box.gameId === game?.id)?.lines.find(entry => entry.athleteId === id);
       const description = query.isLoading ? 'Loading game status…' : !game && data.error ? 'Game status unavailable' : !game ? (weekly ? 'No games played this week' : 'No game today') : game.state === 'pre' ? `Tip-off ${tipoffText(game.tipoff) ?? 'TBD'}` : game.state === 'post' && line && !line.played ? 'Did not play' : game.state === 'in' && line && !line.played ? 'Has not played yet' : 'Player stats not available yet';
-      const content = <><TeamLogo code={code} size={22} /><span className="daily-scorer-info"><strong>{player.fullName}</strong><small>{rosters ? rosters.get(id)?.name ?? 'Not rostered' : 'Roster unknown'}</small><small>{description}{game && ` · ${game.away} @ ${game.home}`}</small></span></>;
+      const content = <><TeamLogo code={code} size={22} /><span className="daily-scorer-info"><strong>{player.fullName}</strong><small>{!rosters ? 'Roster unknown' : holder ? OWNERS.get(holder.teamId) ?? holder.name : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}</small><small>{description}{game && ` · ${game.away} @ ${game.home}`}</small></span></>;
       return <li key={id}>{game ? <Link className="daily-scorer-row" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(gameDates.get(game.id) ?? date, { gameId: game.id, player: id })}>{content}</Link> : <div className="daily-scorer-row">{content}</div>}</li>;
     })}</ul>{otherMatches.length > 30 && <p className="daily-scorers-note">Keep typing to narrow {otherMatches.length} matching players.</p>}</div>}
     {data && shown.length === 0 && otherMatches.length === 0 && !query.isError && <p role="status" className="daily-scorers-note">{searching ? 'No players match this search and the selected filters.' : rows.length > 0 ? 'No scorers match these filters.' : data.games.length === 0 ? 'No NBA games in this period.' : data.games.every(game => game.state === 'pre') ? 'Scores appear once games begin.' : 'Waiting for player stats from ESPN.'}</p>}

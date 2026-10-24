@@ -6,6 +6,7 @@ import type { EspnMatchupRaw, EspnRosterEntry, GameStatus, NbaGameInfo } from '.
 import { NBA_TEAM_ABBREV } from '../../src/lib/espn/calculations.js';
 import type { ScoresWeek } from '../../src/lib/league/scores.js';
 import { loadWeek } from '../lib/scoresWeekService.js';
+import { espnUploadUrl, isEspnUploadId } from '../../src/lib/league/teamLogo.js';
 
 const router = Router();
 
@@ -762,5 +763,45 @@ async function fetchNbaScheduleForDates(dates: string[]): Promise<Map<number, st
 
   return teamGameDates;
 }
+
+/**
+ * GET /api/espn/team-logo/:id
+ * A team logo uploaded to ESPN. ESPN serves these only with a sign-in, so the
+ * browser gets a 401; we fetch it with the league's cookies. The id is the
+ * upload's own, and a new upload gets a new id, so the CDN keeps it a year.
+ */
+router.get('/espn/team-logo/:id', async (req, res) => {
+  const id = routeParam(req.params.id).toLowerCase();
+  if (!isEspnUploadId(id)) {
+    res.status(400).json({ error: 'Invalid logo id' });
+    return;
+  }
+  const { ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
+  const cookie = ESPN_COOKIE_STRING ?? (ESPN_S2 && ESPN_SWID ? `espn_s2=${ESPN_S2}; SWID=${ESPN_SWID}` : '');
+  if (!cookie) {
+    res.status(500).json({ error: 'Missing credentials' });
+    return;
+  }
+  try {
+    const image = await axios.get<ArrayBuffer>(espnUploadUrl(id), {
+      headers: { Cookie: cookie },
+      responseType: 'arraybuffer',
+      maxContentLength: 2_000_000,
+      maxRedirects: 0,
+      timeout: 8_000,
+    });
+    const type = String(image.headers['content-type'] ?? '');
+    if (!type.startsWith('image/')) {
+      res.status(502).json({ error: 'ESPN did not send an image' });
+      return;
+    }
+    res.setHeader('Content-Type', type);
+    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=31536000, immutable');
+    res.send(Buffer.from(image.data));
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    res.status(status === 404 ? 404 : 502).json({ error: 'Could not load the logo from ESPN' });
+  }
+});
 
 export default router;

@@ -1,17 +1,25 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useDailyScorers } from '../../hooks/useDailyScorers.js';
 import { teamFullName, normalizeTeam } from '../../lib/league/houseParty.js';
 import { shortName } from '../../lib/league/format.js';
-import { statLine } from '../../lib/league/partyScore.js';
-import { localDateIso } from '../../lib/league/scores.js';
+import { localDateIso, ownerByEspnTeamId } from '../../lib/league/scores.js';
+import { leagueDataset } from '../../lib/league/data.js';
+import { PointsBreakdown } from './ScoreBreakdown.js';
 import { castClockText, lastGamePlay } from '../../lib/league/castContext.js';
 import { CAST_LIVE_MS } from '../../lib/league/castPolling.js';
 import type { FantasyCast } from '../../lib/league/fantasyCast.js';
 import TeamLogo from './TeamLogo.js';
 import { tipoffText } from './scoresUi.js';
+
+// Rows name the owner, not the fantasy team.
+const OWNERS = ownerByEspnTeamId(leagueDataset.teams);
+
+/** Points, rebounds and assists: what fits under a name in a half-width column. */
+function shortLine(stats: Readonly<Record<string, number>>): string {
+  return [['0', 'pts'], ['6', 'reb'], ['3', 'ast']].map(([id, label]) => `${stats[id] ?? 0} ${label}`).join(' · ');
+}
 
 /** The game's latest play, read from the Cast feed. It polls only while the game is live. */
 function LastPlay({ date, gameId, live }: { date: string; gameId: string; live: boolean }) {
@@ -39,13 +47,11 @@ export default function NbaGameScoresPage() {
   const date = params.get('date') ?? localDateIso(new Date());
   const team = normalizeTeam(params.get('team'));
   const selected = params.get('player');
-  const { query, rows, rosters } = useDailyScorers(date);
-  const [sort, setSort] = useState('fantasy');
+  const { query, rows, rosters, scoring } = useDailyScorers(date);
   const data = query.data;
   const game = data?.games.find(entry => gameId ? entry.id === gameId : entry.home === team || entry.away === team);
   const box = data?.boxScores.find(entry => entry.gameId === game?.id);
   const gameRows = rows.filter(row => row.gameId === game?.id);
-  if (sort === 'nba') gameRows.sort((a, b) => (b.stats['0'] ?? 0) - (a.stats['0'] ?? 0) || b.fpts - a.fpts);
   return <div className="mock-page scores-page nba-game-page">
     <Link className="score-back hub-heading" to={(performersReturn || scoreboardReturn || matchupReturn || returnTo?.startsWith('/scores?')) && returnTo ? returnTo : '/scores'}>{performersReturn ? '← TOP PERFORMERS' : scoreboardReturn ? '← NBA SCOREBOARD' : matchupReturn ? '← MATCHUP' : '← SCORES'}</Link>
     {query.isLoading && <p role="status">Loading NBA game…</p>}
@@ -59,23 +65,16 @@ export default function NbaGameScoresPage() {
         <h1 className="nba-game-title">{game.away} at {game.home}</h1>
         <div className="nba-game-scoreboard">{[game.away, game.home].map(code => <div key={code}><TeamLogo code={code} size={40} /><span>{teamFullName(code)}</span><strong>{(code === game.home ? box?.homeScore ?? game.homeScore : box?.awayScore ?? game.awayScore) ?? '—'}</strong></div>)}</div>
       </section>
-      <div className="nba-game-sort"><h2>Game scorers</h2><label>Rank by <select className="hub-input" value={sort} onChange={event => setSort(event.target.value)}><option value="fantasy">Fantasy points</option><option value="nba">NBA points</option></select></label></div>
       {gameRows.length === 0 && <p>{game.state === 'pre' ? 'Player scores appear after tip-off.' : 'Player stats are not available yet. This page updates automatically.'}</p>}
       <div className="nba-game-teams">{[game.away, game.home].map(code => <section className="panel" key={code} aria-label={`${teamFullName(code)} scorers`}>
-        <h3><TeamLogo code={code} size={24} />{teamFullName(code)}</h3>
+        <h3 title={teamFullName(code)}><TeamLogo code={code} size={22} />{code}</h3>
         <div className="daily-scorer-columns"><span>Player</span><span>FPTS</span></div>
         <ol className="daily-scorer-list">{gameRows.filter(row => row.team === code).map(row => <li key={row.athleteId} className={`nba-game-player${row.athleteId === selected ? ' is-selected' : ''}`}>
-          <span className="daily-scorer-info">
-            <span className="nba-game-player-heading">
-              <strong title={row.name}>{shortName(row.name)}</strong>
-              {rosters && !row.roster && <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}
-              {row.roster && <small className="nba-game-fantasy-team" title={row.roster.name}>{row.roster.name}</small>}
-              {!rosters && <small className="nba-game-fantasy-team">Roster unknown</small>}
-              {row.athleteId === selected && <span className="nba-selected-label">Selected</span>}
-            </span>
-            <small>{statLine(row.stats) || 'No counting stats yet'}</small>
+          <span className="nba-game-player-info">
+            <strong title={row.name}>{shortName(row.name)}</strong>
+            <small>{!rosters ? '' : row.roster ? <span className="nba-game-owner">{OWNERS.get(row.roster.teamId) ?? row.roster.name}</span> : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}<span>{shortLine(row.stats)}</span></small>
           </span>
-          <span className="daily-scorer-total"><strong>{row.fpts.toFixed(1)}</strong></span>
+          <span className="daily-scorer-total"><strong><PointsBreakdown name={row.name} label={date} days={[{ rawStats: row.stats, stats: null }]} scoring={scoring} total={row.fpts} /></strong></span>
         </li>)}</ol>
         {gameRows.length > 0 && !gameRows.some(row => row.team === code) && <p>No player stats available.</p>}
       </section>)}</div>

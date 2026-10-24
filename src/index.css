@@ -6560,3 +6560,37 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .score-quick-links > a { white-space: normal; line-height: 1.2; }
 /* The waiver W on Top Performers sits in line with the row, adding no height. */
 .top-performers-page .daily-scorer-info .unowned-badge { margin-left: 0; padding: 0 5px; line-height: 1.4; vertical-align: baseline; }
+
+/* Top Performers controls: one tidy row for period and date, one for the filters. Every control is 36px. */
+.performer-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 10px; }
+.performer-segment { display: inline-flex; flex: 0 0 auto; height: 36px; border: 1px solid var(--panel-border); border-radius: 8px; overflow: hidden; }
+.performer-segment button { padding: 0 11px; border: 0; background: transparent; color: var(--text-mid); font: inherit; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.performer-segment button + button { border-left: 1px solid var(--panel-border); }
+.performer-segment [aria-pressed="true"] { color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 14%, var(--panel-bg)); }
+.performer-date { display: flex; flex: 1 1 140px; min-width: 0; height: 36px; border: 1px solid var(--panel-border); border-radius: 8px; overflow: hidden; }
+.performer-date button { flex: 0 0 36px; border: 0; background: transparent; color: var(--text-mid); font: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.performer-date button:disabled { opacity: .3; cursor: default; }
+.performer-date select { flex: 1; min-width: 0; padding: 0 6px; border: 0; border-left: 1px solid var(--panel-border); border-right: 1px solid var(--panel-border); background: transparent; color: var(--text-body); font: inherit; font-size: .8rem; text-align: center; text-align-last: center; }
+.performer-date option, .performer-filters option { background: var(--panel-bg); color: var(--text-body); }
+.performer-segment button:focus-visible, .performer-date button:focus-visible, .performer-date select:focus-visible, .performer-search button:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: -2px; }
+.performer-search { position: relative; margin: 0 0 10px; }
+.performer-search input { width: 100%; height: 40px; box-sizing: border-box; padding: 0 38px 0 12px; font-size: 16px; }
+.performer-search button { position: absolute; top: 50%; right: 4px; width: 32px; height: 32px; transform: translateY(-50%); border: 0; background: none; color: var(--text-soft); font-size: 1.2rem; cursor: pointer; }
+.performer-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 0 12px; }
+.performer-filters label { display: flex; flex-direction: column; gap: 3px; min-width: 0; color: var(--text-soft); font-size: .6rem; letter-spacing: .04em; text-transform: uppercase; }
+.performer-filters select { width: 100%; min-width: 0; height: 36px; box-sizing: border-box; padding: 0 6px; font-size: .75rem; letter-spacing: 0; text-transform: none; }
+
+/* Game page: both teams side by side on every screen. Name and FPTS on top, owner and points/rebounds/assists below. */
+.nba-game-teams { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.nba-game-teams > section { padding: 10px 8px; }
+.nba-game-teams h3 { margin: 0 0 4px; font-size: .8rem; }
+.nba-game-teams .nba-game-player { gap: 6px; padding: 7px 0; }
+.nba-game-teams .nba-game-player.is-selected { padding-left: 5px; border-left-width: 2px; }
+.nba-game-player-info { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.nba-game-player-info > strong { overflow: hidden; color: var(--text-max); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+.nba-game-player-info > small { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; color: var(--text-soft); font-size: .6rem; white-space: nowrap; }
+.nba-game-player-info > small > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nba-game-owner { flex-shrink: 0; color: var(--text-body); font-weight: 600; }
+.nba-game-player-info .unowned-badge { flex-shrink: 0; margin-left: 0; padding: 0 4px; line-height: 1.4; }
+.nba-game-teams .daily-scorer-total strong { font-size: .92rem; }
+.nba-game-player .score-detail-trigger { padding: 6px 0 6px 6px; min-height: 32px; text-decoration: none; }
