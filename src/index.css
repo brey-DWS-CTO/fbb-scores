@@ -6558,3 +6558,5 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .player-news-source { font-size: .75rem; }
 /* Three quick links share one row; a long label may wrap to two lines. */
 .score-quick-links > a { white-space: normal; line-height: 1.2; }
+/* The waiver W on Top Performers sits in line with the row, adding no height. */
+.top-performers-page .daily-scorer-info .unowned-badge { margin-left: 0; padding: 0 5px; line-height: 1.4; vertical-align: baseline; }

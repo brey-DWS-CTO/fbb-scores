@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTopPerformers } from '../../hooks/useTopPerformers.js';
-import { filterScorers, matchesPlayerName, nbaGameHref } from '../../lib/league/dailyScorers.js';
+import { filterScorers, matchesPlayerName, nbaGameHref, performerGameText } from '../../lib/league/dailyScorers.js';
 import { localDateIso, seasonStartDate } from '../../lib/league/scores.js';
 import { fetchPerformerDates, fetchPlayerPool } from '../../lib/league/api.js';
 import { leagueDataset } from '../../lib/league/data.js';
@@ -105,7 +105,7 @@ export default function TopPerformersPage() {
         const position = positions.get(row.athleteId) ?? row.position;
         return <li key={`${row.gameId}:${row.athleteId}`}><div className="daily-scorer-row performer-row">
           <span className="daily-scorer-rank">{index + 1}</span><TeamLogo code={row.team} size={22} />
-          <span className="daily-scorer-info"><strong><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} title={row.name}>{shortName(row.name)}</Link>{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}>{weekly && `${row.gamesPlayed} GP · `}{game ? (game.state === 'in' ? `LIVE · ${game.detail}` : game.state === 'post' ? 'Final' : game.detail) : row.team}</small><small>{rosters ? row.roster?.name ?? 'Not rostered' : 'Roster unknown'}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
+          <span className="daily-scorer-info"><strong><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} title={row.name}>{shortName(row.name)}</Link>{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}>{weekly && `${row.gamesPlayed} GP · `}{game ? performerGameText(game, row.team) : row.team}</small><small>{!rosters ? 'Roster unknown' : row.roster ? row.roster.name : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
           <span className="daily-scorer-total"><strong><PointsBreakdown name={row.name} label={weekly ? 'Week' : row.date} days={[{ rawStats: row.stats, stats: null }]} scoring={scoring} total={row.fpts} /></strong></span>
         </div></li>;
       })}</ol>
