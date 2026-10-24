@@ -6315,12 +6315,17 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 .top-performers-period [aria-pressed="true"] { color: var(--neon-teal); border-color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 8%, var(--panel-bg)); }
 
 /* A shared boundary keeps starters and reserves visually distinct on both sides. */
-.score-starter-subtotal { margin-top: 10px; padding: 10px 4px 4px; border-top: 2px solid var(--text-dim); font-variant-numeric: tabular-nums; }
-.score-subtotal-label { margin-bottom: 5px; color: var(--text-soft); font-size: .6rem; font-weight: 800; letter-spacing: .1em; }
-.score-subtotal-points { display: block; color: var(--text-max); font-size: 1rem; }
-.score-subtotal-projection { display: block; margin-top: 2px; color: var(--text-dim); font-size: .65rem; }
+.score-starter-subtotal { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin: 8px 0; padding: 6px 4px 0; border-top: 2px solid var(--text-dim); font-variant-numeric: tabular-nums; }
+.score-subtotal-label { color: var(--text-soft); font-size: .55rem; font-weight: 800; letter-spacing: .1em; line-height: 1.2; text-align: center; }
+.score-subtotal-side { min-width: 0; }
+.score-subtotal-line { display: flex; align-items: baseline; gap: 6px; }
+.score-subtotal-side.is-right .score-subtotal-line { justify-content: flex-end; }
+.score-subtotal-points { color: var(--text-max); font-size: 1rem; }
+.score-subtotal-projection { color: var(--text-dim); font-size: .65rem; white-space: nowrap; }
 .score-subtotal-projection b { color: var(--text-mid); }
-.score-bench-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 9px; color: var(--text-soft); font-size: .6rem; font-weight: 800; letter-spacing: .1em; }
+.score-subtotal-fppg { color: var(--text-dim); font-size: .62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-subtotal-side.is-right .score-subtotal-fppg { text-align: right; }
+.score-bench-divider { display: flex; align-items: center; gap: 10px; margin: 10px 0 8px; color: var(--text-soft); font-size: .6rem; font-weight: 800; letter-spacing: .1em; }
 .score-bench-divider::before, .score-bench-divider::after { content: ''; flex: 1; height: 1px; background: var(--text-dim); opacity: .6; }
 .score-bench-divider span { flex-shrink: 0; }
 
