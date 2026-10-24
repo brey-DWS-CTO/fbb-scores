@@ -1,4 +1,3 @@
-import { openCastDock } from '../../lib/league/castControls.js';
 import { FppgLabel } from './LineupFppg.js';
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -111,11 +110,11 @@ export default function ScoresPage() {
         <WeekPicker weeks={week?.weeks ?? []} selected={selectedWeek} onChange={setWeek} />
       )}
 
-      {!demo && <button type="button" className="tap-btn mock-mini-btn score-ppg-jump" onClick={openCastDock}>Fantasy Cast →</button>}
-      {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/performers">Top Performers →</Link>}
-      {!demo && <Link className="tap-btn mock-mini-btn score-ppg-jump" to="/scores/nba-scoreboard">NBA Scoreboard →</Link>}
-
-      {week && week.matchups.length > 0 && <Link className="tap-btn mock-mini-btn score-ppg-jump" to={`/scores/ppg${scoresQuery({ week: week.matchupPeriodId, demo })}`}>Weekly PPG &amp; trends →</Link>}
+      <nav className="score-quick-links" aria-label="Score tools">
+        {!demo && <Link className="tap-btn mock-mini-btn" to="/scores/performers" aria-label="Top performers">Performers</Link>}
+        {!demo && <Link className="tap-btn mock-mini-btn" to="/scores/nba-scoreboard" aria-label="NBA scoreboard">NBA Scores</Link>}
+        {week && week.matchups.length > 0 && <Link className="tap-btn mock-mini-btn" to={`/scores/ppg${scoresQuery({ week: week.matchupPeriodId, demo })}`} aria-label="Weekly PPG and trends">Weekly Trends</Link>}
+      </nav>
 
       {preseason && (
         <ScoresNotice>

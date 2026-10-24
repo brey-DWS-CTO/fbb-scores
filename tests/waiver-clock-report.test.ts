@@ -30,6 +30,8 @@ test('offers report includes processed wins and failures, preserving bids', () =
   assert.deepEqual(rows.map(row=>row.outcome).sort(),['successful','unsuccessful']);
   assert.equal(rows.find(row=>row.outcome==='unsuccessful')?.bid,3);
   assert.ok(rows.every(row=>row.playerName==='Test Player' && row.owner==='Joel'));
+  assert.ok(rows.every(row => !('status' in row)), 'raw ESPN failure codes are not public explanations');
+  assert.ok(!JSON.stringify(rows).includes('INVALIDPLAYERSOURCE'));
 });
 
 test('pending, cancelled, future, undated and unrelated offers cannot leak', () => {
