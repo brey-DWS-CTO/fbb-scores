@@ -6129,12 +6129,8 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 .score-player.is-overage .score-player-pts.is-labeled { text-decoration: none; }
 .score-player.is-overage .score-player-pts.is-labeled > :last-child { text-decoration: line-through; }
 
-/* Foul trouble on a player card: hot while in it, quiet once out of it. */
-.score-foul { display: inline-block; margin-top: 5px; padding: 1px 6px; border: 1px solid currentColor; border-radius: 4px; font-size: 0.58rem; font-weight: 800; letter-spacing: 0.03em; line-height: 1.5; }
-.score-foul.is-trouble { color: var(--neon-orange); background: color-mix(in srgb, var(--neon-orange) 16%, transparent); }
-.score-foul.is-fouled-out { color: var(--neon-red); background: color-mix(in srgb, var(--neon-red) 16%, transparent); }
-.score-foul.is-cleared { color: var(--text-soft); border-style: dashed; }
-.score-foul.is-past { color: var(--text-mid); border-style: dashed; }
+/* FL beside the name while a player is in foul trouble. */
+.score-badge.is-foul { background: var(--neon-orange); }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

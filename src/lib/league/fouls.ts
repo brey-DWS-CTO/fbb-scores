@@ -83,14 +83,9 @@ export function periodName(period: number): string {
   return ['1st', '2nd', '3rd', '4th'][period - 1] ?? `${period}th`;
 }
 
-/** The badge words and the longer line behind them. Live and final read differently. */
-export function foulText(read: FoulRead, final: boolean): { label: string; title: string } {
-  const pf = `${read.fouls} PF`;
-  if (read.state === 'fouled-out') return { label: 'FOULED OUT', title: `Fouled out with ${read.fouls} fouls.` };
-  const when = `In foul trouble in the ${periodName(read.since)}`;
-  if (final) return { label: `HAD FOUL TROUBLE · ${pf}`, title: `${when}. Finished with ${read.fouls} fouls.` };
-  if (read.state === 'trouble') return { label: `FOUL TROUBLE · ${pf}`, title: `${when}. ${read.fouls} fouls now.` };
-  return { label: `OUT OF FOUL TROUBLE · ${pf}`, title: `${when}. Out of it now with ${read.fouls} fouls.` };
+/** The line behind the FL badge: "Foul trouble: 3 fouls, since the 2nd". */
+export function foulTitle(read: FoulRead): string {
+  return `Foul trouble: ${read.fouls} fouls, since ${read.since > 4 ? '' : 'the '}${periodName(read.since)}`;
 }
 
 export interface CourtRead {

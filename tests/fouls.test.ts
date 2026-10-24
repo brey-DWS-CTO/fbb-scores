@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { courtReads, foulRead, foulsByPeriod, foulText, troubleAt } from '../src/lib/league/fouls.js';
+import { courtReads, foulRead, foulsByPeriod, foulTitle, troubleAt } from '../src/lib/league/fouls.js';
 import { parseBoxScore, type BoxScore } from '../src/lib/league/partyScore.js';
 
 const play = (kind: string, period: number, athleteId = '1') => ({
@@ -56,12 +56,9 @@ test('five in the 4th or overtime is trouble, six is gone', () => {
   assert.equal(foulRead([1, 1, 1, 2, 1], 5)?.state, 'fouled-out');
 });
 
-test('the badge says live and final apart', () => {
-  assert.equal(foulText({ state: 'trouble', fouls: 3, since: 2 }, false).label, 'FOUL TROUBLE · 3 PF');
-  assert.equal(foulText({ state: 'cleared', fouls: 2, since: 1 }, false).label, 'OUT OF FOUL TROUBLE · 2 PF');
-  assert.equal(foulText({ state: 'cleared', fouls: 2, since: 1 }, false).title, 'In foul trouble in the 1st. Out of it now with 2 fouls.');
-  assert.equal(foulText({ state: 'cleared', fouls: 4, since: 3 }, true).label, 'HAD FOUL TROUBLE · 4 PF');
-  assert.equal(foulText({ state: 'fouled-out', fouls: 6, since: 2 }, false).label, 'FOULED OUT');
+test('the badge title says how many and since when', () => {
+  assert.equal(foulTitle({ state: 'trouble', fouls: 3, since: 2 }), 'Foul trouble: 3 fouls, since the 2nd');
+  assert.equal(foulTitle({ state: 'trouble', fouls: 5, since: 5 }), 'Foul trouble: 5 fouls, since OT');
 });
 
 const summary = (state: string, period: number) => ({
