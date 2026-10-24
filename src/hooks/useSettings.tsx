@@ -12,14 +12,14 @@ interface SettingsContextValue extends Settings {
 
 const STORAGE_KEY = 'fbb-scores-settings';
 
-const defaults: Settings = { theme: 'dark' };
+const defaults: Settings = { theme: 'light' };
 
 function loadSettings(): Settings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as Partial<Settings>;
-      return { theme: parsed.theme === 'light' ? 'light' : 'dark' };
+      return { theme: parsed.theme === 'dark' ? 'dark' : 'light' };
     }
   } catch { /* ignore */ }
   return defaults;
