@@ -85,12 +85,14 @@ interface GamesLineProps {
   week: ScoresWeek;
   right?: boolean;
   onEdit?: () => void;
+  /** The first day this side goes over the cap. Tapping "1 over" opens it. */
+  overage?: { label: string; open: () => void };
 }
 
-function GamesLine({ side, week, right, onEdit }: GamesLineProps) {
+function GamesLine({ side, week, right, onEdit, overage }: GamesLineProps) {
   return (
     <div className={`score-games${right ? ' is-right' : ''}`}>
-      <LineupGamesSummary side={side} week={week} />
+      <LineupGamesSummary side={side} week={week} onOver={overage?.open} overDay={overage?.label} />
       {onEdit && <button type="button" className="tap-btn score-cap-btn" aria-label="Change this week's games cap" onClick={onEdit}><NavIcon name="pencil" size={12} /></button>}
     </div>
   );
@@ -386,9 +388,21 @@ export default function MatchupPage() {
   const settled = matchup?.winner !== 'UNDECIDED';
   const homeForecast = week && matchup ? sideProjection(matchup.home, week, expected) : null;
   const awayForecast = week && matchup ? sideProjection(matchup.away, week, expected) : null;
+  // "1 over" jumps to the first day that side's lineup runs past the games cap.
+  const firstOverage = (forecast: typeof homeForecast) => {
+    const first = forecast?.overages.reduce<number | null>((min, game) => (min === null || game.scoringPeriodId < min ? game.scoringPeriodId : min), null) ?? null;
+    const day = first === null ? undefined : week?.days.find((entry) => entry.scoringPeriodId === first);
+    if (!day) return undefined;
+    return { scoringPeriodId: day.scoringPeriodId, label: new Date(`${day.date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) };
+  };
+  const homeOver = firstOverage(homeForecast);
+  const awayOver = firstOverage(awayForecast);
+  const openDay = (scoringPeriodId: number) => {
+    setView({ kind: 'day', scoringPeriodId });
+    dayNav.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const homeProj = settled ? null : homeForecast;
   const awayProj = settled ? null : awayForecast;
-  const overageDays = new Set([...(homeForecast?.overages ?? []), ...(awayForecast?.overages ?? [])].map((game) => game.scoringPeriodId));
   // The box scores behind on-the-floor and foul trouble: today only, and only once a game has tipped.
   const courtDay = !demo && week && view?.kind === 'day' && view.scoringPeriodId === week.currentScoringPeriodId
     ? week.days.find((day) => day.scoringPeriodId === view.scoringPeriodId) ?? null
@@ -476,26 +490,18 @@ export default function MatchupPage() {
                 side={matchup.home}
                 week={week}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}
+                overage={homeOver ? { label: homeOver.label, open: () => openDay(homeOver.scoringPeriodId) } : undefined}
               />
               <GamesLine
                 side={matchup.away}
                 week={week}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}
+                overage={awayOver ? { label: awayOver.label, open: () => openDay(awayOver.scoringPeriodId) } : undefined}
                 right
               />
             </div>
             {editingCap && isCommish && (
               <CapEditor matchupPeriodId={week.matchupPeriodId} cap={week.gamesCap ?? 0} onClose={() => setEditingCap(false)} />
-            )}
-            {overageDays.size > 0 && (
-              <div className="score-overage-note">
-                {week.days.filter((day) => overageDays.has(day.scoringPeriodId)).map((day) => (
-                  <button key={day.scoringPeriodId} type="button" className="tap-btn score-overage-jump" onClick={() => {
-                    setView({ kind: 'day', scoringPeriodId: day.scoringPeriodId });
-                    dayNav.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}>OVERAGES · {new Date(`${day.date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}</button>
-                ))}
-              </div>
             )}
             </details>
           </section>

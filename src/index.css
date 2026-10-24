@@ -6594,3 +6594,7 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .nba-game-player-info .unowned-badge { flex-shrink: 0; margin-left: 0; padding: 0 4px; line-height: 1.4; }
 .nba-game-teams .daily-scorer-total strong { font-size: .92rem; }
 .nba-game-player .score-detail-trigger { padding: 6px 0 6px 6px; min-height: 32px; text-decoration: none; }
+/* "1 over" is a button that opens the overage day. It keeps the status text's size, so the line does not grow. */
+.lineup-games-over { padding: 0 6px; border: 0; border-radius: 4px; background: color-mix(in srgb, var(--neon-red) 12%, transparent); color: var(--neon-red); font: inherit; font-weight: 700; line-height: inherit; white-space: nowrap; cursor: pointer; }
+.lineup-games-over::after { content: ' ›'; }
+.lineup-games-over:focus-visible { outline: 2px solid var(--neon-red); outline-offset: 2px; }
