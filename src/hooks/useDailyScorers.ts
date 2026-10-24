@@ -20,5 +20,5 @@ export function useDailyScorers(date: string) {
   const scoring = week?.scoringItems?.length ? week.scoringItems : LEAGUE_SCORING;
   const rows = dailyScorers(query.data?.boxScores ?? [], scoring, rosters);
   const teams = week?.matchups.flatMap(matchup => [matchup.home, matchup.away]) ?? [];
-  return { query, rows, rosters, teams, rosterQuery };
+  return { query, rows, rosters, teams, rosterQuery, scoring };
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dailyScorers, filterScorers, matchesPlayerName, nbaGameHref, performerGameText, scorerRosters, performerDates, topPerformers, type DailyNbaScores } from '../src/lib/league/dailyScorers.js';
+import { dailyScorers, filterScorers, matchesPlayerName, nbaGameHref, liveClock, performerGameText, scorerRosters, performerDates, topPerformers, type DailyNbaScores } from '../src/lib/league/dailyScorers.js';
 import { demoWeek } from '../src/lib/league/scoresDemo.js';
 import { LEAGUE_SCORING, completeLine, type BoxLine, type BoxScore } from '../src/lib/league/partyScore.js';
 import { getDailyNbaScores, validScoreDate } from '../server/lib/dailyScorersService.js';
@@ -16,7 +16,17 @@ test('a performer game reads F and the score, his team first', () => {
   assert.equal(performerGameText(game, 'POR'), 'F 128-120');
   assert.equal(performerGameText(game, 'SAC'), 'F 120-128');
   assert.equal(performerGameText({ ...game, homeScore: null }, 'SAC'), 'F');
-  assert.equal(performerGameText({ ...game, state: 'in', detail: '3rd 5:12' }, 'SAC'), 'LIVE · 3rd 5:12');
+  assert.equal(performerGameText({ ...game, state: 'in', detail: '11:14 - 2nd' }, 'SAC'), 'Q2 11:14');
+});
+
+test('the live clock reads short so it fits one line', () => {
+  assert.equal(liveClock('11:14 - 2nd'), 'Q2 11:14');
+  assert.equal(liveClock('0:42.3'), '0:42.3');
+  assert.equal(liveClock('4.2 - 4th'), 'Q4 4.2');
+  assert.equal(liveClock('2:30 - OT'), 'OT 2:30');
+  assert.equal(liveClock('1:05 - 2OT'), '2OT 1:05');
+  assert.equal(liveClock('End of 1st'), 'End Q1');
+  assert.equal(liveClock('Halftime'), 'Half');
 });
 
 test('player search matches partial names, accents, punctuation and reversed name tokens', () => {
