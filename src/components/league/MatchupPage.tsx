@@ -6,7 +6,8 @@ import { isActiveSlot } from '../../lib/espn/calculations.js';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
-import { GAMES_CAPS_KEY, useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
+import { GAMES_CAPS_KEY, useCourt, useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
+import { foulTitle, type CourtRead } from '../../lib/league/fouls.js';
 import { apiErrorMessage, saveGamesCap } from '../../lib/league/api.js';
 import { playerDayProjection, playerWeekProjection, projText, sideProjection } from '../../lib/league/dailyProjection.js';
 import { leagueDataset } from '../../lib/league/data.js';
@@ -154,7 +155,7 @@ function CapEditor({ matchupPeriodId, cap, onClose }: CapEditorProps) {
   );
 }
 
-function PlayerTop({ player, slot }: { player: ScorePlayer; slot: number }) {
+function PlayerTop({ player, slot, foulTrouble }: { player: ScorePlayer; slot: number; foulTrouble?: string }) {
   const badge = injuryBadge(player.injuryStatus);
   return (
     <>
@@ -162,6 +163,7 @@ function PlayerTop({ player, slot }: { player: ScorePlayer; slot: number }) {
       <span className="score-player-who">
         <span className="score-player-name"><span className="score-player-name-text">{shortName(player.name)}</span><TeamLogo code={player.proTeam || null} size={14} /></span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
+        {foulTrouble && <span className="score-badge is-foul" title={foulTrouble} aria-label={foulTrouble}>FL</span>}
       </span>
     </>
   );
@@ -187,14 +189,17 @@ interface DayCellProps {
   scoringPeriodId: number;
   expected: ExpectedPoints;
   overage?: OverageGame;
+  /** On the floor and foul trouble, when his game has started. */
+  court?: CourtRead;
   demo?: boolean;
 }
 
 /**
  * Actual points stay prominent before, during and after the game.
  * A smaller projected finish sits below until the game is complete.
+ * The card lights only while he is on the floor, not for his whole game.
  */
-function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellProps) {
+function DayCell({ player, week, scoringPeriodId, expected, overage, court }: DayCellProps) {
   if (!player) return <div className="score-player is-empty" aria-hidden="true" />;
   const day = player.days[String(scoringPeriodId)];
   const slot = slotOn(player, scoringPeriodId);
@@ -202,10 +207,12 @@ function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellPr
   const status = day?.game?.status;
   const underway = day?.played === true || status === 'live' || status === 'final';
   const projected = status !== 'final' && proj !== null && proj > 0 && (!underway || status === 'live') ? proj : null;
+  const onCourt = status === 'live' && court?.onCourt === true;
+  const foulTrouble = status === 'live' && court?.foul?.state === 'trouble' ? foulTitle(court.foul) : undefined;
   return (
-    <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${status === 'live' ? ' is-live' : ''}`}>
+    <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${onCourt ? ' is-live' : ''}`}>
       <div className="score-player-top">
-        <PlayerTop player={player} slot={slot} />
+        <PlayerTop player={player} slot={slot} foulTrouble={foulTrouble} />
         <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
       <div className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>
@@ -213,7 +220,7 @@ function DayCell({ player, week, scoringPeriodId, expected, overage }: DayCellPr
         {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
       </div>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
-      {overage && <div className="score-overage-label">OVERAGE · −{projText(overage.deduction)}</div>}
+      {overage &&<div className="score-overage-label">OVERAGE · −{projText(overage.deduction)}</div>}
     </div>
   );
 }
@@ -359,6 +366,16 @@ export default function MatchupPage() {
   const homeProj = settled ? null : homeForecast;
   const awayProj = settled ? null : awayForecast;
   const overageDays = new Set([...(homeForecast?.overages ?? []), ...(awayForecast?.overages ?? [])].map((game) => game.scoringPeriodId));
+  // The box scores behind on-the-floor and foul trouble: today only, and only once a game has tipped.
+  const courtDay = !demo && week && view?.kind === 'day' && view.scoringPeriodId === week.currentScoringPeriodId
+    ? week.days.find((day) => day.scoringPeriodId === view.scoringPeriodId) ?? null
+    : null;
+  const courtLive = courtDay !== null && matchup !== undefined && [...matchup.home.players, ...matchup.away.players]
+    .some((player) => {
+      const status = player.days[String(courtDay.scoringPeriodId)]?.game?.status;
+      return status === 'live' || status === 'final';
+    });
+  const court = useCourt(courtDay?.date ?? null, courtLive);
   useEffect(() => {
     const header = scoreHeader.current;
     if (!header) return;
@@ -516,7 +533,7 @@ export default function MatchupPage() {
             away={lineupOrder(rosterOn(matchup.away.players, view.scoringPeriodId), view.scoringPeriodId)}
             isStarter={player => isActiveSlot(slotOn(player, view.scoringPeriodId))}
             starterSummary={dayTotals('Daily starter totals')}
-            renderCell={(player, side) => <DayCell demo={demo} player={player} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} overage={(side === 'home' ? homeForecast : awayForecast)?.overages.find(game => game.playerId === player?.id && game.scoringPeriodId === view.scoringPeriodId)} />}
+            renderCell={(player, side) => <DayCell demo={demo} player={player} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} court={player ? court.get(String(player.id)) : undefined} overage={(side === 'home' ? homeForecast : awayForecast)?.overages.find(game => game.playerId === player?.id && game.scoringPeriodId === view.scoringPeriodId)} />}
           />}
 
           {view.kind === 'week' && <LineupGrid
