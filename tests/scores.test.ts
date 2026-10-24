@@ -26,6 +26,7 @@ import {
   readNbaScoreboard,
   recordText,
   remainingGames,
+  rosterOn,
   scoringPeriodDates,
   seasonStartDate,
   shortName,
@@ -725,6 +726,18 @@ test('a lineup lists starters by slot, then the bench', () => {
   ];
   assert.deepEqual(lineupOrder(players, 15).map((p) => p.name), ['Guard', 'Center', 'Bench', 'Missing']);
   assert.deepEqual(weekOrder(players).map((p) => p.name), ['Guard', 'Center', 'Bench', 'Missing']);
+});
+
+test('a day lists only the players on the roster that day', () => {
+  const kept = player('Kept', { '14': { lineupSlotId: 0, started: true, points: 10 }, '15': { lineupSlotId: 0, started: true, points: 10 }, '16': { lineupSlotId: 0, started: true, points: 0 } });
+  const dropped = player('Dropped', { '14': { lineupSlotId: 4, started: true, points: 20 } });
+  const added = player('Added', { '15': { lineupSlotId: 12, started: false, points: 0 }, '16': { lineupSlotId: 4, started: true, points: 0 } });
+  const players = [kept, dropped, added];
+  assert.deepEqual(rosterOn(players, 14).map((p) => p.name), ['Kept', 'Dropped']);
+  assert.deepEqual(rosterOn(players, 16).map((p) => p.name), ['Kept', 'Added']);
+  // A day the server never fetched keeps the last roster before it.
+  assert.deepEqual(rosterOn(players, 18).map((p) => p.name), ['Kept', 'Added']);
+  assert.deepEqual(rosterOn(players, 12).map((p) => p.name), ['Kept', 'Dropped', 'Added']);
 });
 
 test('the lineup reads PG, SG, SF, PF, C, F, G, FLEX, then the bench, then IR', () => {
