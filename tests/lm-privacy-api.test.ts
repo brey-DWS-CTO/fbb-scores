@@ -73,6 +73,7 @@ test('offers report reads ESPN reports but never returns pending offers', async 
   assert.equal(report.rows.length, 2);
   assert.deepEqual(report.rows.map((row: {bid: number}) => row.bid).sort((a: number,b: number)=>a-b), [3,9]);
   assert.ok(!JSON.stringify(report).includes('secret'));
+  assert.ok(report.rows.every((row: Record<string, unknown>) => !('status' in row) && !('reason' in row)));
   for (const period of ['0','-1','401','junk','1.5']) assert.equal((await fetch(`${base}/api/league/waiver-offers?period=${period}`)).status,400);
 });
 

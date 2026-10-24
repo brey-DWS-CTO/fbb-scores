@@ -85,7 +85,6 @@ export interface WaiverOffer {
   playerName: string;
   bid: number | null;
   outcome: 'successful' | 'unsuccessful';
-  status: string;
   at: string;
 }
 
@@ -101,7 +100,7 @@ export function normalizeWaiverOffers(raw: EspnTransactionsResponse, ctx: Normal
       id: `${tx.id}:${item.playerId}`, owner, playerName: ctx.players.get(item.playerId!)?.name ?? `Player ${item.playerId}`,
       bid: typeof tx.bidAmount === 'number' && Number.isFinite(tx.bidAmount) ? tx.bidAmount : null,
       outcome: tx.type === 'WAIVER_ERROR' || tx.status !== 'EXECUTED' ? 'unsuccessful' as const : 'successful' as const,
-      status: tx.status!, at: new Date(tx.processDate!).toISOString(),
+      at: new Date(tx.processDate!).toISOString(),
     }));
   }).sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
 }

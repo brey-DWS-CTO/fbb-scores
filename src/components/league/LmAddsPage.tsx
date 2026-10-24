@@ -71,7 +71,7 @@ export default function LmAddsPage() {
       {!identity && <p>Sign in to submit a claim.</p>}
       {identity && <form onSubmit={event => { event.preventDefault(); void submit(); }}>
         <fieldset className="lm-date-choice"><legend>1 · Choose your day</legend><div className="lm-weekend-options">{weekend.map(option => <button key={option} type="button" aria-pressed={date === option} disabled={busy} onClick={() => setDate(option)}>{dayLabel(option)}</button>)}</div>
-          <label>Another weekend date<input type="date" className="hub-input" aria-label="LM Add date" min={today} max={last.toISOString().slice(0, 10)} value={date} disabled={busy} onChange={event => setDate(event.target.value)} required /></label>
+          {!weekend.includes(date) && <p className="daily-scorers-note">Selected from calendar: {dayLabel(date)}</p>}
         </fieldset>
         <div className="lm-deadline" aria-live="polite">{dateProblem ? <strong>{dateProblem}</strong> : selectedDay?.lmClosesAt ? <><strong>Claims close {clock(selectedDay.lmClosesAt)} PT · {dayLabel(date)}</strong><span>Waivers must clear first · 10 minutes before the first tip</span></> : <span>{calendar.isLoading ? 'Checking the NBA schedule…' : 'Deadline: 10 minutes before the earliest tip. The server checks eligibility when you submit.'} <Link to={`/waivers?month=${date.slice(0, 7)}&day=${date}`}>View calendar</Link></span>}</div>
         <div><div className="lm-step-label">2 · Choose your player</div><PlayerCombobox key={pickerKey} ariaLabel="Player to claim" disabled={busy} players={dataset.players.filter(entry => entry.espnId !== null)} placeholder="Search for a player to claim…" onSelect={setPlayer} /></div>
