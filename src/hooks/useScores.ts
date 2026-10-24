@@ -1,7 +1,8 @@
 import { historicalScoreBaselines } from '../lib/league/scoreBaseline.js';
 import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchGamesCaps, fetchScoresWeek } from '../lib/league/api.js';
+import { fetchDailyScorers, fetchGamesCaps, fetchScoresWeek } from '../lib/league/api.js';
+import { courtReads, type CourtRead } from '../lib/league/fouls.js';
 import { expectedPointsForGame } from '../lib/league/dailyProjection.js';
 import { projectedFppg } from '../lib/league/draftRankings.js';
 import { capForWeek, type GamesCapRow } from '../lib/league/gamesCap.js';
@@ -73,4 +74,23 @@ export function useExpectedPoints(): ExpectedPoints {
     return (player: ScorePlayer, scoringPeriodId: number) =>
       expectedPointsForGame(player, { scoringPeriodId, preseason: byId.get(player.id) ?? null });
   }, [snapshot]);
+}
+
+const NO_COURT: ReadonlyMap<string, CourtRead> = new Map();
+
+/**
+ * Who is on the floor and who is in foul trouble, by ESPN athlete id, for
+ * one date's started games. Shares the Top Performers read, so a phone on
+ * both pages asks once. Off unless a game that day is live or just ended.
+ */
+export function useCourt(date: string | null, enabled: boolean): ReadonlyMap<string, CourtRead> {
+  const query = useQuery({
+    queryKey: ['daily-scorers', date],
+    queryFn: () => fetchDailyScorers(date!),
+    enabled: enabled && date !== null,
+    staleTime: 30_000,
+    refetchInterval: enabled ? SCORES_POLL_MS : false,
+    retry: 1,
+  });
+  return useMemo(() => (query.data ? courtReads(query.data.boxScores) : NO_COURT), [query.data]);
 }

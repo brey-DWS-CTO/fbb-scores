@@ -17,6 +17,7 @@
  * Pure. No server, no browser.
  */
 import { computeFpts, round1 } from '../espn/calculations.js';
+import { foulsByPeriod } from './fouls.js';
 import { normalizeTeam, whoIsIn, type GameState, type HouseParty, type RosterPlayer, type RostersByOwner } from './houseParty.js';
 
 // ─── Scoring ────────────────────────────────────────────────────────────────
@@ -98,6 +99,10 @@ export interface BoxLine {
   played: boolean;
   /** ESPN fantasy stat ids to values, misses and double-doubles filled in. */
   stats: Record<string, number>;
+  /** On the floor now, by ESPN's box score. Only means something while the game runs. */
+  onCourt?: boolean;
+  /** Personal fouls in each period, 1st quarter first, from the play feed. */
+  foulsByPeriod?: number[];
 }
 
 export interface BoxScore {
@@ -109,6 +114,8 @@ export interface BoxScore {
   away: string;
   homeScore: number | null;
   awayScore: number | null;
+  /** The period now, or the last one played. 0 before tip-off. */
+  period?: number;
   lines: BoxLine[];
 }
 
@@ -190,6 +197,7 @@ export function parseBoxScore(raw: unknown, gameId: string): BoxScore | null {
     }
   }
   const lines: BoxLine[] = [];
+  const fouls = foulsByPeriod(root);
   const boxscore = record(root.boxscore);
   for (const entry of Array.isArray(boxscore?.players) ? boxscore.players : []) {
     const side = record(entry);
@@ -206,7 +214,12 @@ export function parseBoxScore(raw: unknown, gameId: string): BoxScore | null {
         const values = Array.isArray(athleteRow?.stats) ? athleteRow.stats : [];
         const stats = lineStats(keys, values);
         const played = athleteRow?.didNotPlay !== true && (stats['40'] ?? 0) > 0;
-        lines.push({ athleteId, name, shortName: text(athlete?.shortName), team, played, stats });
+        const byPeriod = fouls.get(athleteId);
+        lines.push({
+          athleteId, name, shortName: text(athlete?.shortName), team, played, stats,
+          onCourt: athleteRow?.active === true,
+          ...(byPeriod ? { foulsByPeriod: byPeriod } : {}),
+        });
       }
     }
   }
@@ -219,6 +232,7 @@ export function parseBoxScore(raw: unknown, gameId: string): BoxScore | null {
     away,
     homeScore,
     awayScore,
+    period: number(status?.period) ?? 0,
     lines,
   };
 }
