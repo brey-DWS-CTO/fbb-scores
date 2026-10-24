@@ -1308,6 +1308,18 @@ export function latestSlot(player: ScorePlayer): number {
   return latest;
 }
 
+/**
+ * Who was on the roster on a day. A dropped player is gone from the days after
+ * the drop, and a pickup is missing before it. A day nobody has, the server
+ * never fetched, so it keeps the last roster known before it.
+ */
+export function rosterOn(players: readonly ScorePlayer[], scoringPeriodId: number): ScorePlayer[] {
+  const known = players.flatMap((player) => Object.keys(player.days).map(Number));
+  const day = known.includes(scoringPeriodId) ? scoringPeriodId : Math.max(-1, ...known.filter((id) => id < scoringPeriodId));
+  if (day < 0) return [...players];
+  return players.filter((player) => String(day) in player.days);
+}
+
 /** The lineup on one day: PG to FLEX, then the bench, then IR. */
 export function lineupOrder(players: readonly ScorePlayer[], scoringPeriodId: number): ScorePlayer[] {
   return [...players].sort((a, b) =>

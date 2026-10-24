@@ -1,4 +1,5 @@
 import { FppgLabel } from './LineupFppg.js';
+import { fppgText, lineupFppg } from '../../lib/league/lineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isActiveSlot } from '../../lib/espn/calculations.js';
@@ -22,6 +23,7 @@ import {
   ownerByEspnTeamId,
   playerWeek,
   recordText,
+  rosterOn,
   seasonStartDate,
   shortName,
   slotLabel,
@@ -256,6 +258,31 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
   );
 }
 
+/** One day's points for both sides on two short lines: points and projection, then FPPG. */
+function DayTotals({ label, sides, period, projections }: {
+  label: string;
+  sides: [ScoreSide, ScoreSide];
+  period: number;
+  projections: [number | undefined, number | undefined];
+}) {
+  return <section className="score-starter-subtotal" aria-label={label}>
+    {sides.map((side, index) => {
+      const projection = projections[index];
+      const fppg = lineupFppg(side, period);
+      return <Fragment key={side.teamId}>
+        {index === 1 && <div className="score-subtotal-label">DAY<br />TOTAL</div>}
+        <div className={index === 1 ? 'score-subtotal-side is-right' : 'score-subtotal-side'}>
+          <div className="score-subtotal-line">
+            <strong className="score-subtotal-points" aria-label={`${side.name} daily points`}>{(side.pointsByDay[String(period)] ?? 0).toFixed(1)}</strong>
+            {projection !== undefined && <small className="score-subtotal-projection">Proj <b>{projText(projection)}</b></small>}
+          </div>
+          <div className="score-subtotal-fppg">{fppgText(fppg.average)} FPPG · {fppg.games} GP{fppg.live ? ' · live' : ''}</div>
+        </div>
+      </Fragment>;
+    })}
+  </section>;
+}
+
 /** Keep both benches below the same divider, even when starter counts differ. */
 function LineupGrid({ home, away, isStarter, renderCell, starterSummary }: {
   home: ScorePlayer[];
@@ -359,6 +386,15 @@ export default function MatchupPage() {
 
   const back = `/scores${scoresQuery({ week: week?.matchupPeriodId ?? requestedWeek, demo })}`;
   const isCommish = identity?.isCommissioner === true;
+
+  const dayTotals = (label: string) => matchup && view?.kind === 'day' && week ? <DayTotals
+    label={label}
+    sides={[matchup.home, matchup.away]}
+    period={view.scoringPeriodId}
+    projections={view.scoringPeriodId >= week.currentScoringPeriodId
+      ? [homeProj?.byDay[String(view.scoringPeriodId)], awayProj?.byDay[String(view.scoringPeriodId)]]
+      : [undefined, undefined]}
+  /> : null;
 
   return (
     <div className="mock-page scores-page">
@@ -489,38 +525,14 @@ export default function MatchupPage() {
             </button>
           </div>
 
-          <div className="score-head-grid"><FppgLabel side={matchup.home} period={view.kind === 'day' ? view.scoringPeriodId : undefined} /><div className="is-right"><FppgLabel side={matchup.away} period={view.kind === 'day' ? view.scoringPeriodId : undefined} /></div></div>
-          {view.kind === 'day' && homeProj && awayProj && view.scoringPeriodId >= week.currentScoringPeriodId
-            && ((homeProj.byDay[String(view.scoringPeriodId)] ?? 0) + (awayProj.byDay[String(view.scoringPeriodId)] ?? 0) > 0
-              || homeProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)
-              || awayProj.overages.some((game) => game.scoringPeriodId === view.scoringPeriodId)) && (
-            <div className="score-proj-grid" aria-label="Actual and projected points for the day">
-              <span>
-                <strong>{(matchup.home.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)}</strong><small>Proj <b>{projText(homeProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b></small>
-              </span>
-              <span className="is-right">
-                <strong>{(matchup.away.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)}</strong><small>Proj <b>{projText(awayProj.byDay[String(view.scoringPeriodId)] ?? 0)}</b></small>
-              </span>
-            </div>
-          )}
+          {view.kind === 'day' ? dayTotals('Daily totals')
+            : <div className="score-head-grid"><FppgLabel side={matchup.home} /><div className="is-right"><FppgLabel side={matchup.away} /></div></div>}
 
           {view.kind === 'day' && <LineupGrid
-            home={lineupOrder(matchup.home.players, view.scoringPeriodId)}
-            away={lineupOrder(matchup.away.players, view.scoringPeriodId)}
+            home={lineupOrder(rosterOn(matchup.home.players, view.scoringPeriodId), view.scoringPeriodId)}
+            away={lineupOrder(rosterOn(matchup.away.players, view.scoringPeriodId), view.scoringPeriodId)}
             isStarter={player => isActiveSlot(slotOn(player, view.scoringPeriodId))}
-            starterSummary={<section className="score-starter-subtotal" aria-label="Daily starter totals">
-              <div className="score-subtotal-label">DAILY TOTAL</div>
-              <div className="score-head-grid">
-                {[matchup.home, matchup.away].map((side, index) => {
-                  const projection = (index === 0 ? homeProj : awayProj)?.byDay[String(view.scoringPeriodId)];
-                  return <div key={side.teamId} className={index === 1 ? 'is-right' : undefined}>
-                    <FppgLabel side={side} period={view.scoringPeriodId} />
-                    <strong className="score-subtotal-points" aria-label={`${side.name} daily points`}>{(side.pointsByDay[String(view.scoringPeriodId)] ?? 0).toFixed(1)}</strong>
-                    {projection !== undefined && view.scoringPeriodId >= week.currentScoringPeriodId && <small className="score-subtotal-projection">Proj <b>{projText(projection)}</b></small>}
-                  </div>;
-                })}
-              </div>
-            </section>}
+            starterSummary={dayTotals('Daily starter totals')}
             renderCell={(player, side) => <DayCell demo={demo} player={player} week={week} scoringPeriodId={view.scoringPeriodId} expected={expected} court={player ? court.get(String(player.id)) : undefined} overage={(side === 'home' ? homeForecast : awayForecast)?.overages.find(game => game.playerId === player?.id && game.scoringPeriodId === view.scoringPeriodId)} />}
           />}
 
