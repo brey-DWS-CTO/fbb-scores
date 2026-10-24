@@ -70,6 +70,11 @@ export default function FantasyCastBubble() {
     return () => { observer.disconnect(); window.removeEventListener('resize', keepOnScreen); };
   }, [visible]);
   useLayoutEffect(() => {
+    // The game page hides its last-play line while Cast is open.
+    document.documentElement.classList.toggle('cast-open', open && visible);
+    return () => document.documentElement.classList.remove('cast-open');
+  }, [open, visible]);
+  useLayoutEffect(() => {
     document.documentElement.classList.toggle('cast-docked', open && visible && mode === 'dock');
     return () => document.documentElement.classList.remove('cast-docked');
   }, [open, visible, mode]);

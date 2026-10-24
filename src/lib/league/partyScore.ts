@@ -95,6 +95,8 @@ export interface BoxLine {
   shortName: string;
   /** ESPN's team code. */
   team: string;
+  /** ESPN's position letter, "G", "F" or "C". Missing on older saved box scores. */
+  position?: string;
   /** False for a player listed but on the bench all night. */
   played: boolean;
   /** ESPN fantasy stat ids to values, misses and double-doubles filled in. */
@@ -217,6 +219,7 @@ export function parseBoxScore(raw: unknown, gameId: string): BoxScore | null {
         const byPeriod = fouls.get(athleteId);
         lines.push({
           athleteId, name, shortName: text(athlete?.shortName), team, played, stats,
+          ...(text(record(athlete?.position)?.abbreviation) ? { position: text(record(athlete?.position)?.abbreviation) } : {}),
           onCourt: athleteRow?.active === true,
           ...(byPeriod ? { foulsByPeriod: byPeriod } : {}),
         });

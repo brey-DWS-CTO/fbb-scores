@@ -86,6 +86,16 @@ export function filterScorers<T extends DailyScorer>(rows: readonly T[], status:
     && (team === 'all' || String(row.roster?.teamId) === team));
 }
 
+/** A performer's game: "F 128-120" with his team's score first, the live clock, or the tip-off. */
+export function performerGameText(game: Pick<NbaGame, 'state' | 'detail' | 'home' | 'homeScore' | 'awayScore'>, team: string): string {
+  if (game.state === 'in') return `LIVE · ${game.detail}`;
+  if (game.state !== 'post') return game.detail;
+  const home = game.home === team;
+  const mine = home ? game.homeScore : game.awayScore;
+  const theirs = home ? game.awayScore : game.homeScore;
+  return mine === null || theirs === null ? 'F' : `F ${mine}-${theirs}`;
+}
+
 export function nbaGameHref(date: string, input: { gameId?: string; team?: string; player?: string }): string {
   const query = new URLSearchParams({ date });
   if (input.team) query.set('team', input.team);

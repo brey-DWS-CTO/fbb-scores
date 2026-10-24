@@ -9,7 +9,7 @@
 import { leagueSchedule2027 } from './scheduleData.js';
 import type { SeasonMode } from './seasonMode.js';
 
-export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy' | 'bolt' | 'calendar';
+export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy' | 'bolt' | 'calendar' | 'people';
 
 export interface SectionTab {
   to: string;
@@ -21,7 +21,7 @@ export interface SectionTab {
 }
 
 export interface NavSection {
-  id: 'scores' | 'cast' | 'waivers' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
+  id: 'scores' | 'cast' | 'watch' | 'waivers' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
   label: string;
   shortLabel?: string;
   icon: SectionIcon;
@@ -56,6 +56,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
   { id: 'cast', label: 'FANTASY CAST', shortLabel: 'CAST', icon: 'bolt', primary: true, tabs: [{ to: '/scores/cast', label: 'FANTASY CAST' }] },
+  { id: 'watch', label: 'WATCH PARTIES', shortLabel: 'WATCH', icon: 'people', tabs: [{ to: '/watch', label: 'WATCH PARTIES', mode: 'in-season', pages: [{ to: '/party', label: 'PARTY' }] }] },
   { id: 'waivers', label: 'WAIVERS', icon: 'calendar', primary: true, tabs: [{ to: '/activity', label: 'ACTIVITY' }, { to: '/lm-adds', label: 'LM ADDS' }, { to: '/waivers', label: 'CALENDAR' }] },
   { id: 'trades', label: 'TRADES', icon: 'arrows', primary: true, tabs: [{ to: '/trades', label: 'TRADES' }] },
   {
@@ -65,7 +66,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     primary: true,
     tabs: [
       { to: '/league', label: 'LEAGUE HQ' },
-      { to: '/watch', label: 'WATCH', mode: 'in-season' },
       { to: '/teams', label: 'TEAMS' },
       { to: '/dues', label: 'DUES' },
       { to: '/history', label: 'HISTORY' },
@@ -135,7 +135,7 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
     ? { ...section, primary: true, home: '/teams', tabs: section.tabs.filter(tab => ['/teams', '/history'].includes(tab.to)) }
     : { ...section, primary: true });
   const order = mode === 'in-season'
-    ? ['scores', 'cast', 'waivers', 'league', 'trades', 'rules', 'commish', 'draft']
+    ? ['scores', 'cast', 'watch', 'waivers', 'league', 'trades', 'rules', 'commish', 'draft']
     : ['keepers', 'draft', 'cast', 'trades', 'league', 'vault', 'rules', 'commish'];
   return order.flatMap((id) => {
     const section = NAV_SECTIONS.find((entry) => entry.id === id);

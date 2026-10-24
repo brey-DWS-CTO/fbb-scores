@@ -6514,3 +6514,49 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .guest-access-admin button { min-height: 44px; }
 .guest-access-admin ul { list-style: none; padding: 0; }
 .guest-access-admin li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--panel-border); }
+
+/* Player cards: the card opens his NBA game, his name opens his news, his points open the breakdown. */
+.score-player .score-detail-trigger::after { content: none; }
+.score-player-game-link { display: block; }
+.score-player-game-link::after { content: ''; position: absolute; inset: 0; border-radius: 8px; cursor: pointer; }
+.score-player-game-link:hover { text-decoration: none; }
+.score-player .score-player-game-link:focus-visible { outline: none; }
+.score-player:has(.score-player-game-link:focus-visible) { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.score-player .score-detail-trigger, .player-news-trigger { position: relative; z-index: 1; }
+.player-news-trigger { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.player-news-trigger:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.player-news h2 { display: flex; align-items: center; gap: 8px; }
+.player-news-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 14px; }
+.player-news-list li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--cell-border); font-size: .85rem; line-height: 1.5; }
+.player-news-list time { font-size: .7rem; color: var(--text-soft); }
+.player-news-list strong { color: var(--text-max); }
+.player-news-list span { color: var(--text-mid); }
+.player-news-source { color: var(--text-soft); }
+.player-news-source a { color: var(--neon-teal); }
+/* Top Performers: the row opens the game, the points open the breakdown. */
+.performer-row { position: relative; }
+.performer-row:hover { background: var(--cell-bg); }
+.performer-game-link { color: inherit; text-decoration: none; }
+.performer-game-link::after { content: ''; position: absolute; inset: 0; }
+.performer-game-link:focus-visible { outline: none; }
+.performer-row:has(.performer-game-link:focus-visible) { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.performer-position { font-weight: 400; color: var(--text-soft); }
+.performer-live { color: var(--neon-teal); }
+.performer-row .score-detail-trigger { position: relative; z-index: 1; padding: 6px 0 6px 10px; min-height: 32px; }
+/* The game page's latest play sits above the score. Cast replaces it while open. */
+.nba-last-play { display: flex; flex-direction: column; gap: 4px; margin: 14px 0 0; padding: 10px 14px; font-size: .8rem; line-height: 1.5; color: var(--text-body); border-left: 3px solid var(--neon-teal); }
+.nba-last-play-label { font-size: .65rem; font-weight: 700; letter-spacing: .05em; color: var(--neon-teal); }
+.cast-open .nba-last-play { display: none; }
+/* The news card sits inside the bold, no-wrap name label. Reset what it inherits so notes wrap on phones. */
+.player-news { white-space: normal; overflow-wrap: anywhere; font-size: 1rem; font-weight: 400; text-align: left; letter-spacing: normal; text-transform: none; width: min(30rem, calc(100vw - 32px)); box-sizing: border-box; }
+.player-news h2 { font-size: 1.1rem; font-weight: 800; }
+.player-news > p { font-weight: 600; }
+.player-news-list strong { font-size: .85rem; font-weight: 700; line-height: 1.45; }
+.player-news-list span { font-size: .8rem; line-height: 1.5; }
+.player-news-list .player-news-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: .7rem; }
+.player-news-list .player-news-meta a, .player-news-source a { color: var(--neon-teal); font-weight: 700; }
+.player-news-source { font-size: .75rem; }
+/* Three quick links share one row; a long label may wrap to two lines. */
+.score-quick-links > a { white-space: normal; line-height: 1.2; }
+/* The waiver W on Top Performers sits in line with the row, adding no height. */
+.top-performers-page .daily-scorer-info .unowned-badge { margin-left: 0; padding: 0 5px; line-height: 1.4; vertical-align: baseline; }

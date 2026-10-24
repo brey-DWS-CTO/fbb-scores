@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dailyScorers, filterScorers, matchesPlayerName, nbaGameHref, scorerRosters, performerDates, topPerformers, type DailyNbaScores } from '../src/lib/league/dailyScorers.js';
+import { dailyScorers, filterScorers, matchesPlayerName, nbaGameHref, performerGameText, scorerRosters, performerDates, topPerformers, type DailyNbaScores } from '../src/lib/league/dailyScorers.js';
 import { demoWeek } from '../src/lib/league/scoresDemo.js';
 import { LEAGUE_SCORING, completeLine, type BoxLine, type BoxScore } from '../src/lib/league/partyScore.js';
 import { getDailyNbaScores, validScoreDate } from '../server/lib/dailyScorersService.js';
@@ -10,6 +10,14 @@ const line = (id: string, team: string, stats: Record<string, number>, played = 
   athleteId: id, name: `Player ${id}`, shortName: `P. ${id}`, team, played, stats: completeLine(stats),
 });
 const box = (lines: BoxLine[], gameId = '100'): BoxScore => ({ gameId, state: 'in', detail: '2nd 4:12', home: 'LAL', away: 'DEN', homeScore: 45, awayScore: 48, lines });
+
+test('a performer game reads F and the score, his team first', () => {
+  const game = { state: 'post' as const, detail: 'Final', home: 'SAC', homeScore: 120, awayScore: 128 };
+  assert.equal(performerGameText(game, 'POR'), 'F 128-120');
+  assert.equal(performerGameText(game, 'SAC'), 'F 120-128');
+  assert.equal(performerGameText({ ...game, homeScore: null }, 'SAC'), 'F');
+  assert.equal(performerGameText({ ...game, state: 'in', detail: '3rd 5:12' }, 'SAC'), 'LIVE · 3rd 5:12');
+});
 
 test('player search matches partial names, accents, punctuation and reversed name tokens', () => {
   assert.equal(matchesPlayerName('Nikola Jokić', 'jokic'), true);

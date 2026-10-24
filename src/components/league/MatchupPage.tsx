@@ -1,9 +1,12 @@
 import { FppgLabel } from './LineupFppg.js';
 import { fppgText, lineupFppg } from '../../lib/league/lineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
+import PlayerNews from './PlayerNews.js';
+import { cardGame } from '../../lib/league/playerCard.js';
+import { nbaGameHref } from '../../lib/league/dailyScorers.js';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isActiveSlot } from '../../lib/espn/calculations.js';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { GAMES_CAPS_KEY, useCourt, useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
@@ -25,7 +28,6 @@ import {
   recordText,
   rosterOn,
   seasonStartDate,
-  shortName,
   slotLabel,
   slotOn,
   statLineText,
@@ -161,11 +163,32 @@ function PlayerTop({ player, slot, foulTrouble }: { player: ScorePlayer; slot: n
     <>
       <span className="score-slot">{slotLabel(slot)}</span>
       <span className="score-player-who">
-        <span className="score-player-name"><span className="score-player-name-text">{shortName(player.name)}</span><TeamLogo code={player.proTeam || null} size={14} /></span>
+        <span className="score-player-name"><PlayerNews player={player} /><TeamLogo code={player.proTeam || null} size={14} /></span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
         {foulTrouble && <span className="score-badge is-foul" title={foulTrouble} aria-label={foulTrouble}>FL</span>}
       </span>
     </>
+  );
+}
+
+/**
+ * His game line. When he has a game it links to that game's NBA box score,
+ * and the link stretches across the card, so a tap anywhere on the card
+ * opens it. His name and his points sit above it with their own taps.
+ */
+function GameLink({ player, week, scoringPeriodId, className, children }: { player: ScorePlayer; week: ScoresWeek; scoringPeriodId?: number; className: string; children: ReactNode }) {
+  const location = useLocation();
+  const game = cardGame(player, week, scoringPeriodId);
+  if (!game) return <div className={className}>{children}</div>;
+  return (
+    <Link
+      className={`${className} score-player-game-link`}
+      to={nbaGameHref(game.date, { team: game.team, player: String(player.id) })}
+      state={{ returnTo: `${location.pathname}${location.search}` }}
+      aria-label={`${player.name}: open his NBA game`}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -215,10 +238,10 @@ function DayCell({ player, week, scoringPeriodId, expected, overage, court }: Da
         <PlayerTop player={player} slot={slot} foulTrouble={foulTrouble} />
         <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
-      <div className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>
+      <GameLink player={player} week={week} scoringPeriodId={scoringPeriodId} className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>
         {status === 'live' && <span className="score-live-label">LIVE</span>}
         {gameText(day?.game ?? null, tipoffText(day?.game?.tipoff ?? null))}
-      </div>
+      </GameLink>
       {day?.stats && <div className="score-player-line">{statLineText(day.stats)}</div>}
       {overage &&<div className="score-overage-label">OVERAGE · −{projText(overage.deduction)}</div>}
     </div>
@@ -250,9 +273,9 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
         <PlayerTop player={player} slot={latestSlot(player)} />
         <PlayerPoints player={player} week={week} actual={summary.total.toFixed(1)} projected={proj} />
       </div>
-      <div className="score-player-game">
+      <GameLink player={player} week={week} className="score-player-game">
         {summary.played} played · {summary.left} left
-      </div>
+      </GameLink>
       {excluded.length > 0 && <div className="score-overage-label">{excluded.length} overage{excluded.length === 1 ? '' : 's'} · −{projText(deduction)}</div>}
     </div>
   );
@@ -525,8 +548,7 @@ export default function MatchupPage() {
             </button>
           </div>
 
-          {view.kind === 'day' ? dayTotals('Daily totals')
-            : <div className="score-head-grid"><FppgLabel side={matchup.home} /><div className="is-right"><FppgLabel side={matchup.away} /></div></div>}
+          {view.kind === 'week' && <div className="score-head-grid"><FppgLabel side={matchup.home} /><div className="is-right"><FppgLabel side={matchup.away} /></div></div>}
 
           {view.kind === 'day' && <LineupGrid
             home={lineupOrder(rosterOn(matchup.home.players, view.scoringPeriodId), view.scoringPeriodId)}
