@@ -163,6 +163,7 @@ export async function sendMail(
   content: MailContent,
   origin: string,
   tag = 'mail',
+  idempotencyKey?: string,
 ): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
@@ -175,6 +176,7 @@ export async function sendMail(
       headers: {
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
+        ...(idempotencyKey ? {'Idempotency-Key': idempotencyKey} : {}),
       },
       body: JSON.stringify({
         from: fromAddress(),

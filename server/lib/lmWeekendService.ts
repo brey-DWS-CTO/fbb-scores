@@ -47,6 +47,8 @@ import { pullTransactions } from './transactionService.js';
 import { claimPriority, claimReady } from '../../src/lib/league/lmClaims.js';
 import { gamesForDays, gamesOn } from './nbaDay.js';
 import { postToSlack } from './slack.js';
+import { flushLmResultEmails } from './lmResultNotifier.js';
+import { isRosterCapacityError, LM_NO_ROSTER_SPOT, LM_ROSTER_SPOT_EXPIRED } from '../../src/lib/league/lmResultEmail.js';
 
 const dataset = rawDataset as unknown as LeagueDataset;
 
@@ -147,6 +149,7 @@ async function attemptAdd(config: EspnLmConfig, request: LmAddRequest, by: strin
     await postToSlack(`LM add for ${request.owner} (${shortName(request.playerName)}) could not be sent: ${note}`);
     return { ...request, note, updatedAt };
   }
+  if (isRosterCapacityError(result.body)) return {...request, status:'waiting-for-drop', note:LM_NO_ROSTER_SPOT, updatedAt};
   // ESPN refused the move itself. Almost always no roster spot yet.
   const status: LmAddRequest['status'] = request.status === 'failsafe' ? 'failsafe' : 'waiting-for-drop';
   return { ...request, status, note, updatedAt };
@@ -186,6 +189,10 @@ export async function runLmClock(now = new Date()): Promise<LmClockRun> {
   if (!config) return { at: now.toISOString(), date: pt.date, skipped: 'ESPN credentials are not configured', waiver: null, adds: [] };
   const waiver = pt.hour >= SET_HOUR_FROM_PT ? await keepWaiverHour(config, now) : null;
   const adds = [...await runAdvanceLmClaims(config, now), ...await runAdds(config, now)];
+  if (!config.dryRun) {
+    try { await flushLmResultEmails(dataset.season, now); }
+    catch (error) { console.error('[lm-result] Email retry deferred:', error instanceof Error ? error.message : 'unknown error'); }
+  }
   return { at: now.toISOString(), date: pt.date, skipped: null, waiver, adds };
 }
 
@@ -389,7 +396,7 @@ export async function runAdvanceLmClaims(config: EspnLmConfig, now = new Date(),
     }
     if (request.status === 'processing' && Date.parse(request.updatedAt) > now.getTime() - 2 * 60_000) continue;
     if (request.status === 'queued' && (request.forDate < today || !beforeTip)) {
-      const expired: LmAddRequest = { ...request, status: 'denied', updatedAt: now.toISOString(), note: 'The eligible LM Add window ended before this claim could be awarded.' };
+      const expired: LmAddRequest = { ...request, status: 'denied', updatedAt: now.toISOString(), note: request.note === LM_NO_ROSTER_SPOT ? LM_ROSTER_SPOT_EXPIRED : 'The eligible LM Add window ended before this claim could be awarded.' };
       if (await deps.transition(expired, request)) output.push({ id: expired.id, status: expired.status, note: expired.note });
       continue;
     }
@@ -426,5 +433,11 @@ export async function runLmClaimClock(now = new Date()): Promise<LmClockRun['add
   const weekday = pacific(now).weekday;
   if (weekday !== 0 && weekday !== 6) return [];
   const config = espnLmConfig();
-  return config ? runAdvanceLmClaims(config, now) : [];
+  if (!config) return [];
+  const adds = await runAdvanceLmClaims(config, now);
+  if (!config.dryRun) {
+    try { await flushLmResultEmails(dataset.season, now); }
+    catch (error) { console.error('[lm-result] Email retry deferred:', error instanceof Error ? error.message : 'unknown error'); }
+  }
+  return adds;
 }
