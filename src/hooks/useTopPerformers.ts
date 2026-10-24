@@ -21,6 +21,8 @@ export function useTopPerformers(weekly: boolean, selectedDate?: string) {
   const days = queries.flatMap(query => query.data ? [query.data] : []);
   const rosters = week ? scorerRosters(week, today) : null;
   const scoring = week?.scoringItems?.length ? week.scoringItems : LEAGUE_SCORING;
+  // Fantasy positions for rostered players; the page falls back to ESPN's box score letter.
+  const positions = new Map(week?.matchups.flatMap(matchup => [...matchup.home.players, ...matchup.away.players]).map(player => [String(player.id), player.position] as const) ?? []);
   const errors = days.flatMap(day => day.error ? [day.error] : []);
   if (queries.some(query => query.isError)) errors.push('Some dates could not be loaded. Totals may be incomplete. Try Refresh.');
   const data: DailyNbaScores | undefined = days.length ? {
@@ -28,7 +30,7 @@ export function useTopPerformers(weekly: boolean, selectedDate?: string) {
     boxScores: days.flatMap(day => day.boxScores), error: [...new Set(errors)].join(' ') || null,
   } : undefined;
   return {
-    today, date, dates, rosterQuery, rosters,
+    today, date, dates, rosterQuery, rosters, scoring, positions,
     gameDates: new Map(days.flatMap(day => day.games.map(game => [game.id, day.date] as const))),
     rows: topPerformers(days, scoring, rosters),
     teams: week?.matchups.flatMap(matchup => [matchup.home, matchup.away]) ?? [],

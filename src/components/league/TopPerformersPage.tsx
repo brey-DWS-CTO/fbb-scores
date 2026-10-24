@@ -9,10 +9,17 @@ import { leagueDataset } from '../../lib/league/data.js';
 import { playerPoolFromDataset } from '../../lib/league/playerPool.js';
 import { normalizeTeam } from '../../lib/league/houseParty.js';
 import { statLine } from '../../lib/league/partyScore.js';
+import { shortName } from '../../lib/league/format.js';
+import { PointsBreakdown } from './ScoreBreakdown.js';
 import TeamLogo from './TeamLogo.js';
 import { tipoffText } from './scoresUi.js';
 
 const FALLBACK_SEARCH_PLAYERS = playerPoolFromDataset(leagueDataset.players);
+
+/** The Game filter's word for an NBA game state. */
+function gameStateFilter(state: string | undefined): string {
+  return state === 'in' ? 'live' : state === 'post' ? 'final' : 'other';
+}
 
 export default function TopPerformersPage() {
   const [params, setParams] = useSearchParams();
@@ -24,7 +31,7 @@ export default function TopPerformersPage() {
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate >= seasonStartDate() && requestedDate <= today
     && (!calendar.data || gameDays.includes(requestedDate));
   const selectedDate = validDate ? requestedDate : today;
-  const { query, rows, rosters, teams, rosterQuery, date, dates, gameDates } = useTopPerformers(weekly, selectedDate);
+  const { query, rows, rosters, teams, rosterQuery, date, dates, gameDates, scoring, positions } = useTopPerformers(weekly, selectedDate);
   const previousDay = gameDays.filter(day => day < date).at(-1);
   const nextDay = gameDays.find(day => day > date);
   const [expanded, setExpanded] = useState(false);
@@ -33,7 +40,9 @@ export default function TopPerformersPage() {
   const search = params.get('search') ?? '';
   const searching = search.trim().length > 0;
   const poolQuery = useQuery({ queryKey: ['performer-player-pool'], queryFn: () => fetchPlayerPool(), enabled: searching, staleTime: 5 * 60_000 });
-  const shown = filterScorers(rows, rosters ? status : 'all', rosters ? team : 'all').filter(row => matchesPlayerName(row.name, search));
+  const gameFilter = params.get('game') ?? 'all';
+  const shown = filterScorers(rows, rosters ? status : 'all', rosters ? team : 'all').filter(row => matchesPlayerName(row.name, search))
+    .filter(row => gameFilter === 'all' || gameStateFilter(query.data?.games.find(entry => entry.id === row.gameId)?.state) === gameFilter);
   const changeFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     next.set(key, value);
@@ -81,6 +90,9 @@ export default function TopPerformersPage() {
       <label>Fantasy team<select className="hub-input" value={team} disabled={!rosters} onChange={event => changeFilter('fantasyTeam', event.target.value)}>
         <option value="all">All fantasy teams</option>{teams.map(side => <option key={side.teamId} value={String(side.teamId)}>{side.name}</option>)}
       </select></label>
+      <label>Game<select className="hub-input" value={gameFilter} onChange={event => changeFilter('game', event.target.value)}>
+        <option value="all">All games</option><option value="live">In progress</option><option value="final">Final</option>
+      </select></label>
     </div>
     {!rosters && <p className="daily-scorers-note">{rosterQuery.isLoading ? 'Loading current fantasy rosters…' : 'Current fantasy rosters unavailable. Showing all NBA players.'}</p>}
     {query.isLoading && <p role="status">Loading performances…</p>}
@@ -90,11 +102,12 @@ export default function TopPerformersPage() {
       <div className="daily-scorer-columns"><span>{weekly ? 'Player / games' : 'Player / game'}</span><span>FPTS</span></div>
       <ol className="daily-scorer-list">{(expanded ? shown : shown.slice(0, 10)).map((row, index) => {
         const game = data.games.find(entry => entry.id === row.gameId);
-        return <li key={`${row.gameId}:${row.athleteId}`}><Link className="daily-scorer-row" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })}>
+        const position = positions.get(row.athleteId) ?? row.position;
+        return <li key={`${row.gameId}:${row.athleteId}`}><div className="daily-scorer-row performer-row">
           <span className="daily-scorer-rank">{index + 1}</span><TeamLogo code={row.team} size={22} />
-          <span className="daily-scorer-info"><strong>{row.name}</strong><small>{rosters ? row.roster?.name ?? 'Not rostered' : 'Roster unknown'}</small><small>{weekly && `${row.gamesPlayed} GP · Latest: `}{game ? `${game.away} @ ${game.home} · ${game.state === 'in' ? 'LIVE · ' : ''}${game.detail}` : row.team}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
-          <span className="daily-scorer-total"><strong>{row.fpts.toFixed(1)}</strong><small>{row.stats['0'] ?? 0} PTS</small></span>
-        </Link></li>;
+          <span className="daily-scorer-info"><strong><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} title={row.name}>{shortName(row.name)}</Link>{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}>{weekly && `${row.gamesPlayed} GP · `}{game ? (game.state === 'in' ? `LIVE · ${game.detail}` : game.state === 'post' ? 'Final' : game.detail) : row.team}</small><small>{rosters ? row.roster?.name ?? 'Not rostered' : 'Roster unknown'}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
+          <span className="daily-scorer-total"><strong><PointsBreakdown name={row.name} label={weekly ? 'Week' : row.date} days={[{ rawStats: row.stats, stats: null }]} scoring={scoring} total={row.fpts} /></strong></span>
+        </div></li>;
       })}</ol>
       {shown.length > 10 && <button type="button" className="tap-btn mock-mini-btn daily-scorers-more" onClick={() => setExpanded(!expanded)}>{expanded ? 'Show top 10' : `Show all ${shown.length} players`}</button>}
     </>}

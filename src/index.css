@@ -6512,3 +6512,36 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .guest-access-admin button { min-height: 44px; }
 .guest-access-admin ul { list-style: none; padding: 0; }
 .guest-access-admin li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--panel-border); }
+
+/* Player cards: the card opens his NBA game, his name opens his news, his points open the breakdown. */
+.score-player .score-detail-trigger::after { content: none; }
+.score-player-game-link { display: block; }
+.score-player-game-link::after { content: ''; position: absolute; inset: 0; border-radius: 8px; cursor: pointer; }
+.score-player-game-link:hover { text-decoration: none; }
+.score-player .score-player-game-link:focus-visible { outline: none; }
+.score-player:has(.score-player-game-link:focus-visible) { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.score-player .score-detail-trigger, .player-news-trigger { position: relative; z-index: 1; }
+.player-news-trigger { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.player-news-trigger:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.player-news h2 { display: flex; align-items: center; gap: 8px; }
+.player-news-list { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 14px; }
+.player-news-list li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--cell-border); font-size: .85rem; line-height: 1.5; }
+.player-news-list time { font-size: .7rem; color: var(--text-soft); }
+.player-news-list strong { color: var(--text-max); }
+.player-news-list span { color: var(--text-mid); }
+.player-news-source { color: var(--text-soft); }
+.player-news-source a { color: var(--neon-teal); }
+/* Top Performers: the row opens the game, the points open the breakdown. */
+.performer-row { position: relative; }
+.performer-row:hover { background: var(--cell-bg); }
+.performer-game-link { color: inherit; text-decoration: none; }
+.performer-game-link::after { content: ''; position: absolute; inset: 0; }
+.performer-game-link:focus-visible { outline: none; }
+.performer-row:has(.performer-game-link:focus-visible) { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.performer-position { font-weight: 400; color: var(--text-soft); }
+.performer-live { color: var(--neon-teal); }
+.performer-row .score-detail-trigger { position: relative; z-index: 1; padding: 6px 0 6px 10px; min-height: 32px; }
+/* The game page's latest play sits above the score. Cast replaces it while open. */
+.nba-last-play { display: flex; flex-direction: column; gap: 4px; margin: 14px 0 0; padding: 10px 14px; font-size: .8rem; line-height: 1.5; color: var(--text-body); border-left: 3px solid var(--neon-teal); }
+.nba-last-play-label { font-size: .65rem; font-weight: 700; letter-spacing: .05em; color: var(--neon-teal); }
+.cast-open .nba-last-play { display: none; }

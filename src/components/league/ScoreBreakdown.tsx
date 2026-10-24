@@ -1,14 +1,23 @@
 import { Fragment, useRef, useState } from 'react';
-import type { ScorePlayer, ScoresWeek } from '../../lib/league/scores.js';
+import type { PlayerDay, ScorePlayer, ScoresWeek } from '../../lib/league/scores.js';
 const names: Record<number,string> = {0:'Points',1:'Blocks',2:'Steals',3:'Assists',6:'Rebounds',11:'Turnovers',13:'FGM',14:'Field goals attempted',15:'Free throws made',16:'Free throws attempted',17:'Three pointers made',18:'Three pointers attempted',23:'FGMI',24:'Free throws missed',37:'Double doubles',38:'Triple doubles',39:'Quadruple doubles'};
 // Keep made/missed shooting pairs and double-double bonuses together.
 const statOrder = [0, 13, 23, 14, 17, 18, 15, 24, 16, 6, 3, 2, 1, 11, 37, 38, 39];
 const breakdownValue = (value: number, decimals?: number) => value === 0 ? '\u2014' : decimals === undefined ? String(value) : value.toFixed(decimals);
 const statRank = new Map(statOrder.map((id, index) => [id, index]));
 export default function ScoreBreakdown({player,week,period,total}: {player:ScorePlayer;week:ScoresWeek;period?:number;total:number}) {
+  const days=Object.entries(player.days).filter(([key])=>period === undefined || Number(key) === period).map(([,day])=>day);
+  const label=period === undefined ? 'Week' : week.days.find(d=>d.scoringPeriodId === period)?.date ?? '';
+  return <PointsBreakdown name={player.name} label={label} days={days} scoring={week.scoringItems ?? []} total={total} />;
+}
+
+type BreakdownDay = Pick<PlayerDay, 'rawStats'> & { stats: PlayerDay['stats'] };
+
+/** A points total as a button. It opens each scoring category behind the total. */
+export function PointsBreakdown({name,label,days,scoring,total}: {name:string;label:string;days:BreakdownDay[];scoring:ReadonlyArray<{statId:number;points:number}>;total:number}) {
   const dialog=useRef<HTMLDialogElement>(null);
   const [fieldGoalsOpen, setFieldGoalsOpen] = useState(false);
-  const days=Object.entries(player.days).filter(([key])=>period === undefined || Number(key) === period).map(([,day])=>day);
+  const week={scoringItems:scoring};
   const raw: Record<string,number>={};
   for(const day of days) for(const [key,value] of Object.entries(day.rawStats ?? {})) raw[key]=(raw[key] ?? 0)+value;
   const rows=(week.scoringItems ?? []).filter(item=>item.points !== 0 && item.statId !== 9).map(item=>({...item,value:raw[String(item.statId)] ?? 0})).filter(item=>item.value * item.points !== 0).sort((a,b)=>(statRank.get(a.statId) ?? statOrder.length)-(statRank.get(b.statId) ?? statOrder.length));
@@ -30,10 +39,10 @@ export default function ScoreBreakdown({player,week,period,total}: {player:Score
   const sum=rows.reduce((s,r)=>s+r.value*r.points,0)+fouls*foulPoints;
   const available=days.some(d=>d.rawStats !== undefined) && (rows.length>0 || hasMinutes);
   if (total === 0) return <span>0.0</span>;
-  return <><button type="button" className="score-detail-trigger" aria-label={`${player.name}: actual points breakdown`} onClick={()=>{setFieldGoalsOpen(false);dialog.current?.showModal();}}>{total.toFixed(1)}</button>
-  <dialog ref={dialog} aria-label={`${player.name} points breakdown`} className="score-detail" onClick={e=>{if(e.target === e.currentTarget) dialog.current?.close();}}>
+  return <><button type="button" className="score-detail-trigger" aria-label={`${name}: actual points breakdown`} onClick={()=>{setFieldGoalsOpen(false);dialog.current?.showModal();}}>{total.toFixed(1)}</button>
+  <dialog ref={dialog} aria-label={`${name} points breakdown`} className="score-detail" onClick={e=>{if(e.target === e.currentTarget) dialog.current?.close();}}>
     <button type="button" className="tap-btn score-detail-close" aria-label="Close breakdown" onClick={()=>dialog.current?.close()}>×</button>
-    <h2>{player.name}</h2><p>Actual · {period === undefined ? 'Week' : week.days.find(d=>d.scoringPeriodId === period)?.date}</p>
+    <h2>{name}</h2><p>Actual · {label}</p>
     {available ? <table><thead><tr><th>Scoring category</th><th>Pts per</th><th>#</th><th>Score</th></tr></thead><tbody>{hasMinutes && <tr><th>Minutes played</th><td>&mdash;</td><td>{breakdownValue(Number(minutes.toFixed(1)))}</td><td>&mdash;</td></tr>}{displayRows.map(r=>r.statId === -1 ? <Fragment key="field-goals"><tr><th>FG% <small>{fieldGoalPercent}</small></th><td>&mdash;</td><td>{fieldGoals[0].value}/{fieldGoalAttempts}</td><td><button type="button" className={`score-field-goal-net${fieldGoalNet < 0 ? ' is-negative' : ''}`} aria-label="Field goal net points; expand made and missed totals" aria-expanded={fieldGoalsOpen} onClick={() => setFieldGoalsOpen(!fieldGoalsOpen)}>{breakdownValue(fieldGoalNet, 1)} <span aria-hidden="true">{fieldGoalsOpen ? '▴' : '▾'}</span></button></td></tr>{fieldGoalsOpen && fieldGoals.map(row => <tr key={row.statId} className="score-field-goal-part"><th>{names[row.statId]}</th><td className={row.points < 0 ? 'is-negative' : undefined}>{breakdownValue(row.points)}</td><td>{breakdownValue(row.value)}</td><td className={row.value * row.points < 0 ? 'is-negative' : undefined}>{breakdownValue(row.value * row.points, 1)}</td></tr>)}</Fragment> : <tr key={r.statId}><th>{names[r.statId] ?? `Stat ${r.statId}`}</th><td className={r.points < 0 ? 'is-negative' : undefined}>{breakdownValue(r.points)}</td><td>{breakdownValue(r.value)}</td><td className={r.value*r.points < 0 ? 'is-negative' : undefined}>{breakdownValue(r.value*r.points, 1)}</td></tr>)}{hasFouls && <tr><th>Fouls</th><td className={foulPoints < 0 ? 'is-negative' : undefined}>{breakdownValue(foulPoints)}</td><td>{breakdownValue(fouls)}</td><td className={fouls*foulPoints < 0 ? 'is-negative' : undefined}>{breakdownValue(fouls*foulPoints, 1)}</td></tr>}{Math.abs(sum-total)>0.05 && <tr><th>Other scoring / adjustments</th><td></td><td></td><td className={total-sum < 0 ? 'is-negative' : undefined}>{breakdownValue(total-sum, 1)}</td></tr>}</tbody><tfoot><tr><th>Total</th><td></td><td></td><td className={total < 0 ? 'is-negative' : undefined}>{total.toFixed(1)}</td></tr></tfoot></table> : <p>ESPN has not provided category stats for this score. Total: {total.toFixed(1)}.</p>}
   </dialog></>;
 }
