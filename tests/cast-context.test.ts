@@ -21,10 +21,13 @@ test('one NBA game box score shows only plays from that game', () => {
 });
 
 test('the last play is the latest in that game only', () => {
-  const play = (gameId: string, order: number, period = 3, clock = '5:32') => ({ id: `${gameId}:${order}`, gameId, order, period, clock, text: `play ${order}` }) as CastPlay;
+  const play = (gameId: string, order: number, period = 3, clock = '5:32', timestamp: string | null = null) => ({ id: `${gameId}:${order}`, gameId, order, period, clock, timestamp, text: `play ${order}` }) as CastPlay;
   const plays = [play('1', 4), play('1', 9), play('2', 20), play('1', 7)];
   assert.equal(lastGamePlay(plays, '1')?.order, 9);
   assert.equal(lastGamePlay(plays, '3'), null);
+  // ESPN appends late sub fixes after End of Game, and Cast adds a corrections row.
+  const final = [play('1', 745, 4, '0.0', '2026-10-24T04:31:56Z'), play('1', 755, 4, '4:51', '2026-10-24T04:15:22Z'), { ...play('1', 756, 4, '4:51', '2026-10-24T04:15:22Z'), id: '1:corrections' }];
+  assert.equal(lastGamePlay(final, '1')?.order, 745);
   assert.equal(castClockText(play('1', 1)), 'Q3 5:32');
   assert.equal(castClockText(play('1', 1, 5, '0:41')), 'OT1 0:41');
 });

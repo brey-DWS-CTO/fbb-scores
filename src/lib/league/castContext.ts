@@ -1,5 +1,5 @@
 import { normalizeTeam } from './houseParty.js';
-import type { CastPlay } from './fantasyCast.js';
+import { sortCastPlays, type CastPlay } from './fantasyCast.js';
 
 /** The mini feed follows the scoreboard the viewer is actually reading. */
 export function castPageScope(pathname: string, params: URLSearchParams): string {
@@ -12,9 +12,13 @@ export function castPageScope(pathname: string, params: URLSearchParams): string
   return team ? `nba:${team}` : 'all';
 }
 
-/** The latest play in one NBA game, by ESPN's play order. Null before the first play. */
+/**
+ * The latest play in one NBA game, by wall clock. ESPN appends late sub
+ * fixes to the end of its feed, so its play order alone can point back
+ * into the 4th quarter. The box score corrections row is not a play.
+ */
 export function lastGamePlay(plays: readonly CastPlay[], gameId: string): CastPlay | null {
-  return plays.reduce<CastPlay | null>((last, play) => play.gameId === gameId && (!last || play.order > last.order) ? play : last, null);
+  return sortCastPlays(plays.filter(play => play.gameId === gameId && !play.id.endsWith(':corrections')), true)[0] ?? null;
 }
 
 /** "Q3 5:32", "OT1 0:41". */
