@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cardGame, playerNewsUrl, readPlayerNews } from '../src/lib/league/playerCard.js';
+import { cardGame, playerNewsUrl, readPlayerNews, rotowireUrl } from '../src/lib/league/playerCard.js';
 import { demoWeek } from '../src/lib/league/scoresDemo.js';
 import type { GameLine, GameStatus, ScorePlayer } from '../src/lib/league/scores.js';
 
@@ -50,4 +50,11 @@ test('player news keeps RotoWire notes, newest first, five at most', () => {
   assert.deepEqual(readPlayerNews(null), []);
   assert.deepEqual(readPlayerNews({ feed: 'nope' }), []);
   assert.match(playerNewsUrl(3112335), /playerId=3112335/);
+});
+
+test('the RotoWire link searches his plain name, without accents or suffix', () => {
+  assert.equal(rotowireUrl('Ausar Thompson'), 'https://www.rotowire.com/search.php?term=Ausar+Thompson');
+  assert.equal(rotowireUrl('Nikola Jokić'), 'https://www.rotowire.com/search.php?term=Nikola+Jokic');
+  assert.equal(rotowireUrl('Jaren Jackson Jr.'), 'https://www.rotowire.com/search.php?term=Jaren+Jackson');
+  assert.equal(rotowireUrl("De'Aaron Fox"), "https://www.rotowire.com/search.php?term=De'Aaron+Fox");
 });

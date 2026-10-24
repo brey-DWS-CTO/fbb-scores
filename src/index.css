@@ -6547,3 +6547,14 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .nba-last-play { display: flex; flex-direction: column; gap: 4px; margin: 14px 0 0; padding: 10px 14px; font-size: .8rem; line-height: 1.5; color: var(--text-body); border-left: 3px solid var(--neon-teal); }
 .nba-last-play-label { font-size: .65rem; font-weight: 700; letter-spacing: .05em; color: var(--neon-teal); }
 .cast-open .nba-last-play { display: none; }
+/* The news card sits inside the bold, no-wrap name label. Reset what it inherits so notes wrap on phones. */
+.player-news { white-space: normal; overflow-wrap: anywhere; font-size: 1rem; font-weight: 400; text-align: left; letter-spacing: normal; text-transform: none; width: min(30rem, calc(100vw - 32px)); box-sizing: border-box; }
+.player-news h2 { font-size: 1.1rem; font-weight: 800; }
+.player-news > p { font-weight: 600; }
+.player-news-list strong { font-size: .85rem; font-weight: 700; line-height: 1.45; }
+.player-news-list span { font-size: .8rem; line-height: 1.5; }
+.player-news-list .player-news-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: .7rem; }
+.player-news-list .player-news-meta a, .player-news-source a { color: var(--neon-teal); font-weight: 700; }
+.player-news-source { font-size: .75rem; }
+/* Three quick links share one row; a long label may wrap to two lines. */
+.score-quick-links > a { white-space: normal; line-height: 1.2; }

@@ -37,6 +37,17 @@ export interface NewsItem {
   published: string;
 }
 
+/**
+ * His RotoWire page, where these notes come from. ESPN's feed carries no
+ * RotoWire link, but RotoWire's search opens the player page on an exact
+ * name. It wants plain letters and no suffix; a shared name lands on its
+ * search list instead.
+ */
+export function rotowireUrl(name: string): string {
+  const plain = name.normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '').trim();
+  return `https://www.rotowire.com/search.php?term=${encodeURIComponent(plain).replace(/%20/g, '+')}`;
+}
+
 /** ESPN's fantasy news feed for one player. It allows calls from the browser. */
 export function playerNewsUrl(playerId: number, limit = 25): string {
   return `https://site.api.espn.com/apis/fantasy/v2/games/fba/news/players?limit=${limit}&playerId=${playerId}`;

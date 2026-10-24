@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { playerNewsUrl, readPlayerNews } from '../../lib/league/playerCard.js';
+import { playerNewsUrl, readPlayerNews, rotowireUrl } from '../../lib/league/playerCard.js';
 import { injuryBadge, shortName, type ScorePlayer } from '../../lib/league/scores.js';
 import TeamLogo from './TeamLogo.js';
 
@@ -35,11 +35,11 @@ export default function PlayerNews({ player }: { player: ScorePlayer }) {
       {news.isError && <p role="alert">Could not load news. <button type="button" className="tap-btn mock-mini-btn" onClick={() => void news.refetch()}>Try again</button></p>}
       {news.data?.length === 0 && <p>No recent news.</p>}
       {news.data && news.data.length > 0 && <ol className="player-news-list">{news.data.map(item => <li key={item.id}>
-        <time dateTime={item.published}>{newsDate(item.published)}</time>
+        <span className="player-news-meta"><time dateTime={item.published}>{newsDate(item.published)}</time><a href={rotowireUrl(player.name)} target="_blank" rel="noreferrer">RotoWire</a></span>
         <strong>{item.headline}</strong>
         {item.story && <span>{item.story}</span>}
       </li>)}</ol>}
-      <p className="player-news-source">Notes from RotoWire via ESPN. <a href={`https://www.espn.com/nba/player/_/id/${player.id}`} target="_blank" rel="noreferrer">Full page on ESPN</a></p>
+      <p className="player-news-source">Notes from RotoWire via ESPN. <a href={rotowireUrl(player.name)} target="_blank" rel="noreferrer">All notes on RotoWire</a> · <a href={`https://www.espn.com/nba/player/_/id/${player.id}`} target="_blank" rel="noreferrer">ESPN page</a></p>
     </dialog>
   </>;
 }
