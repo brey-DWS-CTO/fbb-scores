@@ -89,12 +89,13 @@ export function foulTitle(read: FoulRead): string {
 }
 
 /**
- * The foul tag on a player card: FO once he has six, live or final; FL while
- * he is in trouble in a live game. Null otherwise.
+ * The foul tag on a player card, only while his game is live: FO once he
+ * has six, FL while he is in trouble. Null otherwise, and after the game.
  */
 export function foulBadge(fouls: number | undefined, read: FoulRead | null | undefined, live: boolean): { text: 'FO' | 'FL'; title: string } | null {
+  if (!live) return null;
   if ((fouls ?? 0) >= FOUL_OUT || read?.state === 'fouled-out') return { text: 'FO', title: 'Fouled out' };
-  if (live && read?.state === 'trouble') return { text: 'FL', title: foulTitle(read) };
+  if (read?.state === 'trouble') return { text: 'FL', title: foulTitle(read) };
   return null;
 }
 
