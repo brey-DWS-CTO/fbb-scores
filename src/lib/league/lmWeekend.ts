@@ -183,19 +183,37 @@ export interface LmAddWindow {
   reason: string | null;
   /** Today's first tip, ISO, when there is one. The window closes then. */
   closesAt: string | null;
+  /** When today's window opens, after waivers run, ISO. */
+  opensAt: string | null;
+  /** True before waivers run on a day the window will open. */
+  waiting: boolean;
 }
 
-/** Saturdays and Sundays, Pacific, before the first tip. */
+/** Give ESPN a few minutes to finish waivers before any LM add. */
+export const LM_OPEN_AFTER_WAIVERS_MS = 5 * 60_000;
+
+/** When a day's LM window opens: five minutes after that day's waiver run. */
+export function lmOpensAt(date: string, waiverHourPT: number): string {
+  return new Date(Date.parse(waiverRunAt(date, waiverHourPT)) + LM_OPEN_AFTER_WAIVERS_MS).toISOString();
+}
+
+/** Saturdays and Sundays, Pacific, after waivers run and before the first tip. */
 export function lmAddWindow(now: string | Date, todaysGames: readonly DayGame[]): LmAddWindow {
   const at = pacific(now);
   const tip = firstTip(todaysGames);
   const closesAt = tip ? new Date(Date.parse(tip) - LM_ADD_BUFFER_MS).toISOString() : null;
-  if (!isWeekend(at)) return { open: false, reason: 'LM adds are for Saturdays and Sundays.', closesAt };
-  if (tip === null) return { open: false, reason: 'No NBA games today, so no LM adds.', closesAt: null };
+  const closed = (reason: string, opensAt: string | null = null) => ({ open: false, reason, closesAt, opensAt, waiting: false });
+  if (!isWeekend(at)) return closed('LM adds are for Saturdays and Sundays.');
+  if (tip === null) return { ...closed('No NBA games today, so no LM adds.'), closesAt: null };
+  const opensAt = lmOpensAt(at.date, waiverHourFor(todaysGames).hourPT);
   const nowIso = typeof now === 'string' ? new Date(now).toISOString() : now.toISOString();
-  if (nowIso >= tip) return { open: false, reason: 'The first game has tipped off. LM adds closed for today.', closesAt };
-  if (closesAt && nowIso >= closesAt) return { open: false, reason: 'LM adds close 10 minutes before the first tip.', closesAt };
-  return { open: true, reason: null, closesAt };
+  if (nowIso >= tip) return closed('The first game has tipped off. LM adds closed for today.', opensAt);
+  if (closesAt && nowIso >= closesAt) return closed('LM adds close 10 minutes before the first tip.', opensAt);
+  if (nowIso < opensAt) {
+    const time = new Date(opensAt).toLocaleTimeString('en-US', { timeZone: PACIFIC, hour: 'numeric', minute: '2-digit' });
+    return { ...closed(`LM adds open at ${time} PT, after waivers run.`, opensAt), waiting: true };
+  }
+  return { open: true, reason: null, closesAt, opensAt, waiting: false };
 }
 
 export type LmAddStatus = 'requested' | 'waiting-for-drop' | 'added' | 'failsafe' | 'denied' | 'queued' | 'processing' | 'cancelled';
@@ -205,6 +223,7 @@ export function lmAddButtonReason(window: LmAddWindow | null, date: string | nul
   if (!signedIn) return 'Sign in to request an LM add.';
   if (!window || !date) return "Checking today's LM add window.";
   if (window.open) return 'Open until 10 minutes before the first tip.';
+  if (window.waiting && window.reason) return window.reason;
   const day = new Date(`${date}T12:00:00Z`).getUTCDay();
   if ((day === 0 || day === 6) && window.closesAt !== null) {
     return day === 6
@@ -289,7 +308,7 @@ export function checkLmAdd(ctx: LmAddContext): LmAddCheck[] {
   return [
     {
       rule: 'transactions.waivers.lmadd.timing',
-      text: 'Saturday or Sunday, at least 10 minutes before the first tip',
+      text: 'Saturday or Sunday, after waivers run and at least 10 minutes before the first tip',
       ok: window.open,
       detail: window.reason,
     },

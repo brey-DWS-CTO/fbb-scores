@@ -9,7 +9,7 @@ import type { DatasetPlayer } from '../../lib/keeper/types.js';
 import PlayerCombobox from './PlayerCombobox.js';
 import LmAddPanel from './LmAddPanel.js';
 import NavIcon from './NavIcon.js';
-import WaiverCountdowns from './WaiverCountdowns.js';
+import LmWindowClock from './LmWindowClock.js';
 
 const dayLabel = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
@@ -65,7 +65,7 @@ export default function LmAddsPage() {
       <h1>LM Adds</h1><p>Pick your day. Pick your player. We’ll handle the add when eligible.</p>
       <span className="lm-private-note"><NavIcon name="lock" size={14} /> Pending claims are private to you and the commissioner.</span>
     </header>
-    <WaiverCountdowns />
+    <LmWindowClock />
     <section className="panel lm-advance-panel">
       <h2>Queue an LM Add</h2>
       {!identity && <p>Sign in to submit a claim.</p>}
@@ -73,7 +73,7 @@ export default function LmAddsPage() {
         <fieldset className="lm-date-choice"><legend>1 · Choose your day</legend><div className="lm-weekend-options">{weekend.map(option => <button key={option} type="button" aria-pressed={date === option} disabled={busy} onClick={() => setDate(option)}>{dayLabel(option)}</button>)}</div>
           {!weekend.includes(date) && <p className="daily-scorers-note">Selected from calendar: {dayLabel(date)}</p>}
         </fieldset>
-        <div className="lm-deadline" aria-live="polite">{dateProblem ? <strong>{dateProblem}</strong> : selectedDay?.lmClosesAt ? <><strong>Claims close {clock(selectedDay.lmClosesAt)} PT · {dayLabel(date)}</strong><span>Waivers must clear first · 10 minutes before the first tip</span></> : <span>{calendar.isLoading ? 'Checking the NBA schedule…' : 'Deadline: 10 minutes before the earliest tip. The server checks eligibility when you submit.'} <Link to={`/waivers?month=${date.slice(0, 7)}&day=${date}`}>Calendar</Link></span>}</div>
+        <div className="lm-deadline" aria-live="polite">{dateProblem ? <strong>{dateProblem}</strong> : selectedDay?.lmClosesAt ? <><strong>Claims close {clock(selectedDay.lmClosesAt)} PT · {dayLabel(date)}</strong><span>The add runs after waivers, the first minute the player is free.</span></> : <span>{calendar.isLoading ? 'Checking the NBA schedule…' : 'Deadline: 10 minutes before the earliest tip. The server checks eligibility when you submit.'} <Link to={`/waivers?month=${date.slice(0, 7)}&day=${date}`}>Calendar</Link></span>}</div>
         <div><div className="lm-step-label">2 · Choose your player</div><PlayerCombobox key={pickerKey} ariaLabel="Player to claim" disabled={busy} players={dataset.players.filter(entry => entry.espnId !== null)} placeholder="Search for a player to claim…" onSelect={setPlayer} /></div>
         {player && <div className="lm-selected-player"><NavIcon name="jersey" size={22} /><div><strong>{player.fullName ?? player.name}</strong><span>{player.proTeam} · {dayLabel(date)}</span></div><button type="button" onClick={() => { setPlayer(null); setPickerKey(key => key + 1); }} aria-label="Clear selected player">Change</button></div>}
         <p className="lm-roster-reminder"><strong>3 · Make room in ESPN.</strong> If your roster is full, drop a player before this runs. The app never drops players for you.</p>
