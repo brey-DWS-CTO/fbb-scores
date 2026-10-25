@@ -6629,3 +6629,13 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .player-log-list.is-collapsed { max-height: 168px; padding-right: 10px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-soft) 45%, transparent) transparent; }
 .player-log-more { display: block; width: 100%; min-height: 34px; margin-top: 6px; font-size: .68rem; }
 .player-log-top .score-detail-trigger { padding: 0; min-height: 0; font: inherit; font-weight: 800; color: inherit; text-decoration: none; }
+/* The card is two boxed sections, games then news, so the log does not run into the notes. */
+.player-card-section { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--cell-border); border-radius: 10px; background: var(--cell-bg); }
+.player-card-section .player-log-strip { margin-top: 0; background: var(--panel-bg); }
+.player-card-section > .player-news-heading { margin-top: 0; }
+.player-card-section .player-news-list { margin-bottom: 0; }
+.player-card-section .player-news-list li:last-child { padding-bottom: 0; border-bottom: 0; }
+/* Today's game: a teal bar and the live clock mark it as the current one. */
+.player-log-game.is-today { margin: 0 -6px; padding: 7px 6px; border-top: 0; border-left: 3px solid var(--neon-teal); border-radius: 4px; background: color-mix(in srgb, var(--neon-teal) 8%, transparent); }
+.player-log-status { white-space: nowrap; color: var(--text-soft); }
+.player-log-game.is-live .player-log-status { color: var(--neon-teal); font-weight: 700; }

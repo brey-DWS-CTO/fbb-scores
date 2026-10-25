@@ -59,3 +59,10 @@ test('team and matchup filters count active scoring players, excluding bench and
   assert.equal(castMatchesTeams(play, [30], rosters, LEAGUE_SCORING), false);
   assert.equal(castMatchesTeams(play, [20], new Map(), LEAGUE_SCORING), false);
 });
+
+test('a single team counts its bench too', () => {
+  const [play] = parse(['Test Scorer makes two point shot (Test Helper assists)']);
+  const rosters = new Map([['1', { team: { teamId: 10 }, started: false }]]);
+  assert.equal(castMatchesTeams(play, [10], rosters, LEAGUE_SCORING, false), true);
+  assert.equal(castMatchesTeams(play, [30], rosters, LEAGUE_SCORING, false), false);
+});

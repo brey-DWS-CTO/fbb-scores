@@ -1,4 +1,3 @@
-import { isCastScorePage, openCastDock } from '../../lib/league/castControls.js';
 import type { NavSection } from '../../lib/league/navSections.js';
 import type { ReactNode } from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -19,10 +18,8 @@ function NavBadge({ count, label }: { count: number; label: string }) {
   );
 }
 
-/** Cast is an action while reading scores; other sections remain normal links. */
+/** Every section, Cast included, links to its own page. The floating Cast button opens the mini feed. */
 function SectionLink({ section, children, ...props }: { section: NavSection; children: ReactNode; className: string; title?: string; 'aria-label'?: string }) {
-  const { pathname } = useLocation();
-  if (section.id === 'cast' && isCastScorePage(pathname)) return <button type="button" {...props} onClick={openCastDock}>{children}</button>;
   return <NavLink to={sectionHome(section)} {...props}>{children}</NavLink>;
 }
 

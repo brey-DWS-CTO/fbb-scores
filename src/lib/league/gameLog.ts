@@ -7,6 +7,8 @@
  */
 import { round1 } from '../espn/calculations.js';
 import { completeLine, scoreLine, type ScoringItem } from './partyScore.js';
+import { liveClock, performerGameText, type DailyNbaScores } from './dailyScorers.js';
+import { normalizeTeam } from './houseParty.js';
 
 export interface LogGame {
   eventId: string;
@@ -94,7 +96,7 @@ export function readGameLog(body: unknown): GameLog {
           date: String(event.gameDate ?? ''),
           season,
           home,
-          opp: String(opp.abbreviation ?? ''),
+          opp: normalizeTeam(opp.abbreviation) ?? String(opp.abbreviation ?? ''),
           result: event.gameResult === 'W' || event.gameResult === 'L' ? event.gameResult : null,
           teamScore: home ? homeScore : awayScore,
           oppScore: home ? awayScore : homeScore,
@@ -121,6 +123,42 @@ export function logAverages(games: readonly LogGame[], scoring: readonly Scoring
 export function logLine(stats: Readonly<Record<string, number>>): string {
   const parts: Array<[string, string]> = [['6', 'reb'], ['3', 'ast'], ['2', 'stl'], ['1', 'blk'], ['17', '3pm'], ['11', 'to']];
   return [`${stats['40'] ?? 0} min`, `${stats['0'] ?? 0} pts`, ...parts.filter(([id]) => (stats[id] ?? 0) > 0).map(([id, label]) => `${stats[id]} ${label}`)].join(' · ');
+}
+
+export interface TodayGame {
+  gameId: string;
+  home: boolean;
+  opp: string;
+  state: 'pre' | 'in' | 'post';
+  /** "LIVE · Q2 10:15" or "F 120-110". Empty before tip-off; show the tip time. */
+  status: string;
+  /** Tip-off, ISO. */
+  tipoff: string;
+  /** His box score line so far. Null before he plays. */
+  stats: Record<string, number> | null;
+}
+
+/**
+ * His team's game today, from our daily scores, for the top of the log.
+ * ESPN's game log only lists a game once it ends, so a finished game the
+ * log already has is left out.
+ */
+export function todayGame(day: DailyNbaScores | undefined, proTeam: string, playerId: number, logged: readonly LogGame[]): TodayGame | null {
+  const team = normalizeTeam(proTeam);
+  const game = team ? day?.games.find((entry) => entry.home === team || entry.away === team) : undefined;
+  if (!team || !game || logged.some((entry) => entry.eventId === game.id)) return null;
+  const box = day?.boxScores.find((entry) => entry.gameId === game.id);
+  const line = box?.lines.find((entry) => entry.athleteId === String(playerId) && entry.played);
+  const live = { ...game, detail: box?.detail || game.detail, homeScore: box?.homeScore ?? game.homeScore, awayScore: box?.awayScore ?? game.awayScore };
+  return {
+    gameId: game.id,
+    home: game.home === team,
+    opp: game.home === team ? game.away : game.home,
+    state: game.state,
+    status: game.state === 'in' ? `LIVE · ${liveClock(live.detail)}` : game.state === 'post' ? performerGameText(live, team) : '',
+    tipoff: game.tipoff,
+    stats: line?.stats ?? null,
+  };
 }
 
 /** "W 115-93", his team's score first. */

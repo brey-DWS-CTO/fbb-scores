@@ -67,7 +67,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
   const runningTotals = useMemo(() => castRunningTotals(newest ? [...sorted].reverse() : sorted, scoring), [sorted, newest, scoring]);
   const plays = useMemo(() => {
     const teamIds = idsKey ? idsKey.split(',').map(Number) : [];
-    return sorted.filter(play => (gameScope ? castMatchesGame(play, scope) : scope === 'all' || castMatchesTeams(play, teamIds, rosters, scoring)) && (selectedGame === 'all' || play.gameId === selectedGame) && (!peek || play.changes.length > 0));
+    return sorted.filter(play => (gameScope ? castMatchesGame(play, scope) : scope === 'all' || castMatchesTeams(play, teamIds, rosters, scoring, !(scope === 'me' || scope.startsWith('team:')))) && (selectedGame === 'all' || play.gameId === selectedGame) && (!peek || play.changes.length > 0));
   }, [sorted, gameScope, scope, idsKey, rosters, scoring, selectedGame, peek]);
   const Container = embedded ? 'section' : 'main';
   return <Container className={`mock-page scores-page fantasy-cast-page${embedded ? ' cast-embedded' : ''}${peek ? ' cast-peek' : ''}`} aria-label={embedded ? 'Fantasy Cast feed' : undefined}>
