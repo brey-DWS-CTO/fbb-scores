@@ -1,0 +1,227 @@
+{
+  "capturedAt": "2026-10-21T05:19:46.746Z",
+  "inputFetchedAt": "2026-10-21T05:19:46.451Z",
+  "scope": "Opening-week source audit only; no finalized outcomes, no accuracy claim. Historical-only priors; does not represent personalized signed-in snapshots.",
+  "matchups": 5,
+  "futurePlayerGames": 241,
+  "missingSourcePlayerGames": 15,
+  "missingPlayers": [
+    {
+      "id": 6442,
+      "name": "Kyrie Irving"
+    },
+    {
+      "id": 2991230,
+      "name": "Fred VanVleet"
+    },
+    {
+      "id": 4396993,
+      "name": "Tyrese Haliburton"
+    },
+    {
+      "id": 5041935,
+      "name": "Cameron Boozer"
+    },
+    {
+      "id": 5095151,
+      "name": "Caleb Wilson"
+    }
+  ],
+  "cases": [
+    {
+      "season": 2027,
+      "week": 1,
+      "matchupId": 1,
+      "asOf": "2026-10-21T05:19:46.746Z",
+      "stage": "opening",
+      "coverage": {
+        "home": {
+          "remainingGames": 20,
+          "missingGames": 0,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 20,
+          "missingPlayerIds": []
+        },
+        "away": {
+          "remainingGames": 24,
+          "missingGames": 0,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 24,
+          "missingPlayerIds": []
+        }
+      },
+      "predictions": [
+        {
+          "model": "current-blend-v1",
+          "homeTotal": 888.8,
+          "awayTotal": 972.3,
+          "homeWinProbability": 0.29
+        },
+        {
+          "model": "historical-only-v1",
+          "homeTotal": 896,
+          "awayTotal": 965.2,
+          "homeWinProbability": 0.32
+        }
+      ]
+    },
+    {
+      "season": 2027,
+      "week": 1,
+      "matchupId": 2,
+      "asOf": "2026-10-21T05:19:46.746Z",
+      "stage": "opening",
+      "coverage": {
+        "home": {
+          "remainingGames": 26,
+          "missingGames": 3,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 23,
+          "missingPlayerIds": [
+            6442
+          ]
+        },
+        "away": {
+          "remainingGames": 25,
+          "missingGames": 0,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 25,
+          "missingPlayerIds": []
+        }
+      },
+      "predictions": [
+        {
+          "model": "current-blend-v1",
+          "homeTotal": 716.9,
+          "awayTotal": 872.2,
+          "homeWinProbability": 0.13
+        },
+        {
+          "model": "historical-only-v1",
+          "homeTotal": 732.5,
+          "awayTotal": 885.6,
+          "homeWinProbability": 0.14
+        }
+      ]
+    },
+    {
+      "season": 2027,
+      "week": 1,
+      "matchupId": 3,
+      "asOf": "2026-10-21T05:19:46.746Z",
+      "stage": "opening",
+      "coverage": {
+        "home": {
+          "remainingGames": 21,
+          "missingGames": 0,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 21,
+          "missingPlayerIds": []
+        },
+        "away": {
+          "remainingGames": 23,
+          "missingGames": 3,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 20,
+          "missingPlayerIds": [
+            2991230
+          ]
+        }
+      },
+      "predictions": [
+        {
+          "model": "current-blend-v1",
+          "homeTotal": 828,
+          "awayTotal": 712.6,
+          "homeWinProbability": 0.81
+        },
+        {
+          "model": "historical-only-v1",
+          "homeTotal": 833.8,
+          "awayTotal": 719.3,
+          "homeWinProbability": 0.81
+        }
+      ]
+    },
+    {
+      "season": 2027,
+      "week": 1,
+      "matchupId": 4,
+      "asOf": "2026-10-21T05:19:46.746Z",
+      "stage": "opening",
+      "coverage": {
+        "home": {
+          "remainingGames": 27,
+          "missingGames": 3,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 24,
+          "missingPlayerIds": [
+            5095151
+          ]
+        },
+        "away": {
+          "remainingGames": 25,
+          "missingGames": 3,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 22,
+          "missingPlayerIds": [
+            5041935
+          ]
+        }
+      },
+      "predictions": [
+        {
+          "model": "current-blend-v1",
+          "homeTotal": 816.9,
+          "awayTotal": 890.8,
+          "homeWinProbability": 0.31
+        },
+        {
+          "model": "historical-only-v1",
+          "homeTotal": 820.3,
+          "awayTotal": 893.9,
+          "homeWinProbability": 0.31
+        }
+      ]
+    },
+    {
+      "season": 2027,
+      "week": 1,
+      "matchupId": 5,
+      "asOf": "2026-10-21T05:19:46.746Z",
+      "stage": "opening",
+      "coverage": {
+        "home": {
+          "remainingGames": 22,
+          "missingGames": 0,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 22,
+          "missingPlayerIds": []
+        },
+        "away": {
+          "remainingGames": 28,
+          "missingGames": 3,
+          "dailyProjectionGames": 0,
+          "historicalPriorGames": 25,
+          "missingPlayerIds": [
+            4396993
+          ]
+        }
+      },
+      "predictions": [
+        {
+          "model": "current-blend-v1",
+          "homeTotal": 887.4,
+          "awayTotal": 795.8,
+          "homeWinProbability": 0.73
+        },
+        {
+          "model": "historical-only-v1",
+          "homeTotal": 892.7,
+          "awayTotal": 795.8,
+          "homeWinProbability": 0.74
+        }
+      ]
+    }
+  ]
+}
