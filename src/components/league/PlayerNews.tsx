@@ -1,7 +1,7 @@
-import { Fragment, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { playerNewsUrl, readPlayerNews, rotowireUrl } from '../../lib/league/playerCard.js';
-import { gameFantasyPoints, gameLogUrl, logAverages, logLine, readGameLog, recentGames, resultText } from '../../lib/league/gameLog.js';
+import { gameFantasyPoints, gameLogUrl, logAverages, logLine, readGameLog, resultText } from '../../lib/league/gameLog.js';
 import { LEAGUE_SCORING, type ScoringItem } from '../../lib/league/partyScore.js';
 import { injuryBadge, shortName, type ScorePlayer } from '../../lib/league/scores.js';
 import TeamLogo from './TeamLogo.js';
@@ -23,23 +23,14 @@ async function fetchGameLog(url: string) {
 }
 
 /**
- * Season average and his last 3, 7 or 15 games in league points. Early in
- * the season the window fills from last season, under its own label.
+ * Season average and his last 3, 7 or 15 games in league points, this
+ * season only. A window he has not played enough games for stays off.
  */
 function PlayerGameLog({ playerId, scoring }: { playerId: number; scoring: readonly ScoringItem[] }) {
   const [count, setCount] = useState<(typeof WINDOWS)[number]>(3);
   const current = useQuery({ queryKey: ['game-log', playerId, 'current'], queryFn: () => fetchGameLog(gameLogUrl(playerId)), staleTime: 10 * 60_000, retry: 1 });
-  const lastSeason = current.data?.seasonId ? current.data.seasonId - 1 : null;
-  const short = current.data !== undefined && current.data.games.length < count && lastSeason !== null;
-  const previous = useQuery({
-    queryKey: ['game-log', playerId, lastSeason],
-    queryFn: () => fetchGameLog(gameLogUrl(playerId, lastSeason ?? undefined)),
-    enabled: short,
-    staleTime: Infinity,
-    retry: 1,
-  });
   const thisSeason = current.data?.games ?? [];
-  const games = recentGames(thisSeason, previous.data?.games ?? [], count);
+  const games = thisSeason.slice(0, count);
   const season = logAverages(thisSeason, scoring);
   const recent = logAverages(games, scoring);
   if (current.isLoading) return <p role="status">Loading games…</p>;
@@ -54,22 +45,18 @@ function PlayerGameLog({ playerId, scoring }: { playerId: number; scoring: reado
     <div className="player-log-head">
       <h3>Game log</h3>
       <div className="performer-segment" role="group" aria-label="Games shown">
-        {WINDOWS.map(n => <button key={n} type="button" aria-pressed={count === n} onClick={() => setCount(n)}>Last {n}</button>)}
+        {WINDOWS.map(n => <button key={n} type="button" aria-pressed={count === n} disabled={n > 3 && thisSeason.length < n} title={n > 3 && thisSeason.length < n ? `After ${n} games` : undefined} onClick={() => setCount(n)}>Last {n}</button>)}
       </div>
     </div>
-    {short && previous.isLoading && <p role="status">Loading last season…</p>}
-    {games.length === 0 ? <p>No games yet.</p> : <ol className="player-log-list">
-      {games.map((game, index) => <Fragment key={game.eventId}>
-        {game.season !== games[index - 1]?.season && (index > 0 || thisSeason.length === 0) && <li className="player-log-season">{game.season} season</li>}
-        <li className="player-log-game">
-          <span className="player-log-top">
-            <span>{gameDate(game.date)} {game.home ? 'vs' : '@'} {game.opp}</span>
-            <span className={game.result === 'W' ? 'is-win' : game.result === 'L' ? 'is-loss' : undefined}>{resultText(game)}</span>
-            <strong>{gameFantasyPoints(game, scoring).toFixed(1)}</strong>
-          </span>
-          <small>{logLine(game.stats)}</small>
-        </li>
-      </Fragment>)}
+    {games.length === 0 ? <p>No games this season yet.</p> : <ol className="player-log-list">
+      {games.map(game => <li key={game.eventId} className="player-log-game">
+        <span className="player-log-top">
+          <span>{gameDate(game.date)} {game.home ? 'vs' : '@'} {game.opp}</span>
+          <span className={game.result === 'W' ? 'is-win' : game.result === 'L' ? 'is-loss' : undefined}>{resultText(game)}</span>
+          <strong>{gameFantasyPoints(game, scoring).toFixed(1)}</strong>
+        </span>
+        <small>{logLine(game.stats)}</small>
+      </li>)}
     </ol>}
   </>;
 }

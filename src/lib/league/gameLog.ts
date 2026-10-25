@@ -110,11 +110,6 @@ export function gameFantasyPoints(game: Pick<LogGame, 'stats'>, scoring: readonl
   return scoreLine(game, scoring);
 }
 
-/** The newest `count` games: this season first, then last season when this one is short. */
-export function recentGames(current: readonly LogGame[], previous: readonly LogGame[], count: number): LogGame[] {
-  return [...current, ...previous].slice(0, count);
-}
-
 /** Average fantasy points and minutes. Null for no games. */
 export function logAverages(games: readonly LogGame[], scoring: readonly ScoringItem[]): { fpts: number; min: number } | null {
   if (games.length === 0) return null;
