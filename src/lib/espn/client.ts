@@ -440,7 +440,7 @@ export class EspnClient {
     const { data } = await this.http.get<EspnKonaResponse>('', {
       params: { view: 'kona_player_info', _: Date.now() },
       headers: {
-        'x-fantasy-filter': JSON.stringify({ players: { filterIds: { value: wanted }, limit: wanted.length } }),
+        'x-fantasy-filter': JSON.stringify({ players: { filterIds: { value: wanted }, limit: wanted.length, sortPercOwned: { sortPriority: 1, sortAsc: false } } }),
       },
     });
     for (const entry of data.players ?? []) {
