@@ -3,10 +3,10 @@ import axios from 'axios';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useDailyScorers } from '../../hooks/useDailyScorers.js';
 import { teamFullName, normalizeTeam } from '../../lib/league/houseParty.js';
-import { shortName } from '../../lib/league/format.js';
 import { localDateIso, ownerByEspnTeamId } from '../../lib/league/scores.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import { PointsBreakdown } from './ScoreBreakdown.js';
+import PlayerNews from './PlayerNews.js';
 import { castClockText, lastGamePlay } from '../../lib/league/castContext.js';
 import { CAST_LIVE_MS } from '../../lib/league/castPolling.js';
 import type { FantasyCast } from '../../lib/league/fantasyCast.js';
@@ -71,7 +71,7 @@ export default function NbaGameScoresPage() {
         <div className="daily-scorer-columns"><span>Player</span><span>FPTS</span></div>
         <ol className="daily-scorer-list">{gameRows.filter(row => row.team === code).map(row => <li key={row.athleteId} className={`nba-game-player${row.athleteId === selected ? ' is-selected' : ''}`}>
           <span className="nba-game-player-info">
-            <strong title={row.name}>{shortName(row.name)}</strong>
+            <strong><PlayerNews player={{ id: Number(row.athleteId), name: row.name, proTeam: row.team, position: row.position ?? '' }} scoring={scoring} /></strong>
             <small>{!rosters ? '' : row.roster ? <span className="nba-game-owner">{OWNERS.get(row.roster.teamId) ?? row.roster.name}</span> : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}<span>{shortLine(row.stats)}</span></small>
           </span>
           <span className="daily-scorer-total"><strong><PointsBreakdown name={row.name} label={date} days={[{ rawStats: row.stats, stats: null }]} scoring={scoring} total={row.fpts} /></strong></span>
