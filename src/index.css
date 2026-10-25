@@ -6658,3 +6658,17 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .player-log-columns > span { color: var(--text-soft); font-size: .52rem; font-weight: 600; letter-spacing: .02em; }
 .player-log-game.is-today { margin: 0 -6px; padding: 5px 6px; grid-template-columns: 50px repeat(8, minmax(0, 1fr)) 40px; }
 .player-log-columns > span { text-transform: uppercase; }
+.score-badge.is-fouled-out { background: var(--neon-red); color: #fff; }
+/* Final games: the winner's score is bold with an arrow, the loser dims. */
+.nba-scoreboard-team.is-loser, .nba-game-scoreboard > .is-loser, .matchup-strip-side.is-loser, .nba-game-sticky .is-loser { opacity: .5; }
+.nba-scoreboard-team.is-winner strong, .nba-game-scoreboard > .is-winner strong, .matchup-strip-side.is-winner b { font-weight: 900; color: var(--text-max); }
+.nba-scoreboard-team.is-winner strong::after, .nba-game-scoreboard > .is-winner strong::after, .matchup-strip-side.is-winner b::after { content: ' ◀'; font-size: .55em; vertical-align: middle; color: var(--neon-teal); }
+/* NBA game page: the day's games in a strip, and a sticky score bar. */
+.nba-game-strip { margin: 10px 0; }
+.nba-game-strip .matchup-strip-card { flex-basis: 104px; }
+.nba-game-strip .matchup-strip-card.is-live { border-color: color-mix(in srgb, var(--neon-teal) 50%, var(--panel-border)); }
+.nba-strip-status { display: block; margin-top: 2px; overflow: hidden; color: var(--text-soft); font-size: .56rem; text-overflow: ellipsis; white-space: nowrap; }
+.matchup-strip-card.is-live .nba-strip-status { color: var(--neon-teal); font-weight: 700; }
+.nba-game-sticky { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
+.nba-game-sticky .score-sticky-side.is-winner strong { font-weight: 900; }
+.nba-sticky-status { order: 1; color: var(--text-soft); font-size: .62rem; white-space: nowrap; }

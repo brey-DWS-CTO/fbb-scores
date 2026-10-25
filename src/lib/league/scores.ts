@@ -1195,12 +1195,12 @@ export function matchupChance(
 
 // ─── Words for the screen ───────────────────────────────────────────────────
 
-/** "32 PTS, 11 REB, 6 AST, 2 STL, 1 BLK, 3 3PM, 2 TO". Zeros stay out, except points. */
+/** "36 MIN, 32 PT, 11 R, 6 A, 2 S, 1 B, 3 3P, 2 TO, 0 FL". Short labels keep it to one line. Zeros stay out, except points. */
 export function statLineText(stats: StatLine | null): string {
   if (!stats) return '';
-  const parts = [`${round1(stats.min)} MIN`, `${stats.pts} PTS`];
+  const parts = [`${round1(stats.min)} MIN`, `${stats.pts} PT`];
   const extras: Array<[number, string]> = [
-    [stats.reb, 'REB'], [stats.ast, 'AST'], [stats.stl, 'STL'], [stats.blk, 'BLK'], [stats.threes, '3PM'], [stats.to, 'TO'],
+    [stats.reb, 'R'], [stats.ast, 'A'], [stats.stl, 'S'], [stats.blk, 'B'], [stats.threes, '3P'], [stats.to, 'TO'],
   ];
   for (const [value, label] of extras) if (value > 0) parts.push(`${value} ${label}`);
   parts.push(`${stats.fouls ?? 0} FL`);

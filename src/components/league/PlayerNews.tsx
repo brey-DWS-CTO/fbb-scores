@@ -13,7 +13,7 @@ const newsDate = (iso: string) => new Date(iso).toLocaleString(undefined, { mont
 const gameDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
 const WINDOWS = [3, 7, 15] as const;
 // The game log's stat columns, by ESPN fantasy stat id.
-const LOG_COLUMNS: Array<[string, string]> = [['40', 'MIN'], ['0', 'PTS'], ['6', 'REB'], ['3', 'AST'], ['2', 'STL'], ['1', 'BLK'], ['17', '3PM'], ['11', 'TO']];
+const LOG_COLUMNS: Array<[string, string]> = [['40', 'MIN'], ['0', 'PT'], ['6', 'R'], ['3', 'A'], ['2', 'S'], ['1', 'B'], ['17', '3P'], ['11', 'TO']];
 const statCells = (stats: Readonly<Record<string, number>> | null) => LOG_COLUMNS.map(([id, label]) => <span key={label} className="player-log-num">{stats ? stats[id] ?? 0 : ''}</span>);
 
 async function fetchPlayerNews(playerId: number) {
