@@ -140,10 +140,28 @@ export class LineupService {
     const expectedSlots = op.before.slots.map(slot => {
       const incoming = expected.find(move => move.toSlotId === slot.id);
       const outgoing = expected.some(move => move.fromSlotId === slot.id);
-      return { id: slot.id, playerId: incoming?.playerId ?? (outgoing ? null : slot.playerId) };
+      return { ...slot, playerId: incoming?.playerId ?? (outgoing ? null : slot.playerId) };
     });
-    const confirmed = after.scoringPeriodId === op.before.scoringPeriodId && after.slots.length === expectedSlots.length
-      && expectedSlots.every(slot => after.slots.some(actual => actual.id === slot.id && actual.playerId === slot.playerId));
+    const playerIds = (snapshot: LineupSnapshot) => snapshot.players.map(player => player.id).sort((a, b) => a - b).join(',');
+    let slotsMatch = after.slots.length === expectedSlots.length
+      && expectedSlots.every(slot => after.slots.some(actual => actual.id === slot.id && actual.eligibilityId === slot.eligibilityId && actual.playerId === slot.playerId));
+    if (op.before.slotRules) {
+      // ESPN assigns lineupSlotId (position type), not identities for each
+      // UTIL/bench instance. Reordering players within one type is equivalent.
+      const ruleContent = (snapshot: LineupSnapshot) => JSON.stringify(Object.entries(snapshot.slotRules ?? {}).sort(([a], [b]) => a.localeCompare(b)));
+      slotsMatch = ruleContent(op.before) === ruleContent(after)
+        && after.slots.every(slot => op.before!.slotRules![String(slot.eligibilityId)] !== undefined)
+        && Object.entries(op.before.slotRules).every(([type, rule]) => {
+          const expectedGroup = expectedSlots.filter(slot => String(slot.eligibilityId) === type);
+          const actualGroup = after.slots.filter(slot => String(slot.eligibilityId) === type);
+          const ids = (slots: typeof expectedGroup) => slots.flatMap(slot => slot.playerId === null ? [] : [slot.playerId]).sort((a, b) => a - b).join(',');
+          const countMatches = rule.unlimited && type === '12'
+            ? actualGroup.length >= rule.count && actualGroup.length <= Math.max(rule.count, actualGroup.filter(slot => slot.playerId !== null).length)
+            : actualGroup.length === rule.count && expectedGroup.length === rule.count;
+          return countMatches && ids(expectedGroup) === ids(actualGroup);
+        });
+    }
+    const confirmed = after.scoringPeriodId === op.before.scoringPeriodId && playerIds(after) === playerIds(op.before) && slotsMatch;
     await this.repo.mutate(state => {
       const current = state.operations[id];
       // A completed result cannot be downgraded by a concurrent reconciliation.

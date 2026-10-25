@@ -1,7 +1,8 @@
 import type { Router, RequestHandler } from 'express';
 import { CONFIG_TEAMS, OWNERS, getState, mutateState, isKnownOwner } from '../lib/leagueStore.js';
-import { DisabledEspnLineupProvider } from '../lib/lineup/provider.js';
+import { EspnReadOnlyLineupProvider, lineupReadsEnabled } from '../lib/lineup/espnReadOnly.js';
 import { emptyLineupState, LineupService, type LineupRepository } from '../lib/lineup/service.js';
+import { myTeamReadView, LineupReadRevokedError } from '../lib/lineup/readView.js';
 import type { MoveRequest } from '../../src/lib/league/lineup.js';
 
 const repo: LineupRepository = {
@@ -9,7 +10,7 @@ const repo: LineupRepository = {
   async mutate(fn) { await mutateState(state => { state.lineupManagement ??= emptyLineupState(); fn(state.lineupManagement); }); },
 };
 // Deliberately no environment variable can turn on an unverified write adapter.
-const provider = new DisabledEspnLineupProvider();
+const provider = new EspnReadOnlyLineupProvider();
 function cutoff(): number {
   const minutes = Number(process.env.LINEUP_SAFETY_CUTOFF_MINUTES ?? 10);
   return Number.isFinite(minutes) && minutes >= 10 ? minutes : 10;
@@ -29,13 +30,17 @@ const directIdentity: RequestHandler = (_req, res, next) => {
 
 export function registerLineupRoutes(router: Router, auth: RequestHandler, commissioner: RequestHandler): void {
   router.get('/my-team', auth, directIdentity, safe(async (_req, res) => {
-    const state = await repo.read();
     const owner = res.locals.owner as string;
-    const grant = state.grants[owner];
-    const operation = Object.values(state.operations).filter(op => op.owner === owner)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
-    res.json({ enabled: grant?.enabled === true, executionEnabled: provider.executionEnabled,
-      reason: provider.reason, snapshot: operation?.after ?? null, operation, safetyCutoffMinutes: cutoff(), destinations: {} });
+    const configured = CONFIG_TEAMS.find(team => team.owner === owner);
+    const leagueId = process.env.ESPN_LEAGUE_ID;
+    const binding = configured && leagueId ? { leagueId, teamId: configured.espnTeamId } : null;
+    try {
+      const view = await myTeamReadView(repo, provider, owner, binding, lineupReadsEnabled());
+      res.json({ ...view, safetyCutoffMinutes: cutoff() });
+    } catch (error) {
+      if (error instanceof LineupReadRevokedError) { res.status(403).json({ error: error.message }); return; }
+      throw error;
+    }
   }));
   router.post('/my-team/moves', auth, directIdentity, safe(async (req, res) => {
     const body = req.body as Record<string, unknown> | null;
@@ -43,11 +48,20 @@ export function registerLineupRoutes(router: Router, auth: RequestHandler, commi
       || typeof body.id !== 'string' || !Number.isSafeInteger(body.playerId) || Number(body.playerId) <= 0
       || typeof body.destinationSlotId !== 'string' || body.destinationSlotId.length > 100
       || typeof body.revision !== 'string' || body.revision.length > 200) {
-      res.status(400).json({ error: 'Invalid lineup request. Team and league come from your server-side grant.' }); return;
+      res.status(400).json({ error: 'Invalid lineup request. Team and league come from your server-side grant.', notSubmitted: true }); return;
     }
     const request: MoveRequest = { playerId: body.playerId as number, destinationSlotId: body.destinationSlotId, revision: body.revision };
-    const operation = await service().submit(res.locals.owner as string, body.id, request);
-    res.json({ operation, snapshot: operation.after ?? operation.before ?? null });
+    try {
+      const operation = await service().submit(res.locals.owner as string, body.id, request);
+      res.json({ operation, snapshot: operation.after ?? operation.before ?? null });
+    } catch {
+      if (provider.executionEnabled) {
+        res.status(503).json({ error: 'Could not determine the move outcome. Check its operation status before trying another move.' }); return;
+      }
+      // The deployed provider cannot execute. This is a definite no-submit,
+      // unlike a lost response from any future enabled execution adapter.
+      res.status(409).json({ error: 'Live ESPN lineup execution is disabled. No move was submitted.', notSubmitted: true });
+    }
   }));
   router.get('/my-team/moves/:id', auth, directIdentity, safe(async (req, res) => {
     const operation = await service().verify(res.locals.owner as string, String(req.params.id));

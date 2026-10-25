@@ -15,14 +15,15 @@ export interface LineupProvider {
 export class DisabledEspnLineupProvider implements LineupProvider {
   readonly executionEnabled = false;
   readonly reason = 'ESPN lineup execution is not verified. Live moves are disabled.';
-  async read(): Promise<LineupSnapshot> { throw new Error(this.reason); }
+  async read(team: TeamBinding): Promise<LineupSnapshot> { void team; throw new Error(this.reason); }
   async canExecute(): Promise<boolean> { return false; }
   async execute(): Promise<void> { throw new Error(this.reason); }
 }
 
 /**
  * Boundary for a future authenticated browser worker. Implementations must use
- * a private server-side session, ordinary manager lock rules, and a fresh ESPN
+ * a private server-side session, LM Tools → Edit Roster → Perform as Team
+ * Manager (isActingAsTeamOwner=true), ordinary manager locks, and a fresh ESPN
  * reload for read(). A locally applied or cached roster is not read-back proof.
  * Login/MFA/CAPTCHA requires human interaction, never a bypass.
  */

@@ -1,5 +1,6 @@
 /** ESPN-neutral lineup validation. All times and eligibility come from the provider. */
 export interface LineupSlot {
+  kind?: 'starter' | 'bench' | 'reserve';
   /** Unique instance, including when several slots have the same position. */
   id: string;
   label: string;
@@ -16,6 +17,8 @@ export interface LineupPlayer {
 }
 
 export interface LineupSnapshot {
+  /** Configured ESPN capacities; instance IDs within a repeated type are UI identities. */
+  slotRules?: Record<string, { count: number; unlimited: boolean }>;
   leagueId: string;
   teamId: number;
   scoringPeriodId: number;

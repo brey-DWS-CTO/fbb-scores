@@ -11,6 +11,8 @@ export interface LineupOperation {
 export interface MyTeamResponse {
   enabled: boolean;
   executionEnabled: boolean;
+  readEnabled?: boolean;
+  readError?: string;
   reason: string;
   snapshot: LineupSnapshot | null;
   operation: LineupOperation | null;
@@ -19,6 +21,10 @@ export interface MyTeamResponse {
   destinations?: Record<string, string[]>;
 }
 export interface MoveResponse { operation: LineupOperation; snapshot?: LineupSnapshot | null }
+/** Only this explicit server response proves that no job was accepted. */
+export function lineupMoveWasNotSubmitted(error: unknown): boolean {
+  return axios.isAxiosError<{ notSubmitted?: boolean }>(error) && error.response?.data?.notSubmitted === true;
+}
 export interface LineupGrant { owner: string; enabled: boolean; leagueId: string; teamId: number }
 export interface LineupAccessResponse { grants: LineupGrant[]; owners: string[] }
 const headers = (credentials: Credentials) => credentials.session

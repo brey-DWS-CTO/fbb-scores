@@ -299,3 +299,44 @@ test('wrong team ESPN reads fail before execution and stay unknown after executi
     assert.equal(repo.state.rosterLocks['league:5'], wrongOnRead <= 2 ? undefined : id);
   }
 });
+
+test('ESPN repeated slot instances compare exact players by position type, not invented instance identities', async () => {
+  const { service, provider } = setup();
+  const before = snapshot();
+  before.slotRules = { '0': { count: 1, unlimited: false }, '12': { count: 2, unlimited: false } };
+  const after = saved();
+  after.slotRules = before.slotRules;
+  after.slots[1].id = 'bench-canonical-1';
+  after.slots[2].id = 'bench-canonical-0';
+  provider.onRead = count => count <= 2 ? structuredClone(before) : structuredClone(after);
+  assert.equal((await service.submit('Owner', id, request)).status, 'SUCCEEDED');
+});
+
+test('unlimited ESPN bench may lose an excess empty display row after promotion', async () => {
+  const { service, provider } = setup();
+  const before = snapshot();
+  before.slots.push({ id: 'sg', label: 'SG', eligibilityId: 1, playerId: null });
+  before.players[2].eligibleSlotIds.push(1);
+  before.slotRules = { '0': { count: 1, unlimited: false }, '1': { count: 1, unlimited: false }, '12': { count: 1, unlimited: true } };
+  const after = structuredClone(before);
+  after.revision = 'r2';
+  after.slots = after.slots.filter(slot => slot.id !== 'other');
+  after.slots.find(slot => slot.id === 'sg')!.playerId = 3;
+  provider.onRead = count => count <= 2 ? structuredClone(before) : structuredClone(after);
+  const move = { ...request, playerId: 3, destinationSlotId: 'sg' };
+  assert.equal((await service.submit('Owner', id, move)).status, 'SUCCEEDED');
+});
+
+test('position-group verification still rejects changed capacity rules or moved unchanged players', async () => {
+  for (const change of ['capacity', 'assignment']) {
+    const { service, provider } = setup();
+    const before = snapshot();
+    before.slotRules = { '0': { count: 1, unlimited: false }, '12': { count: 2, unlimited: false } };
+    const after = saved();
+    after.slotRules = structuredClone(before.slotRules);
+    if (change === 'capacity') after.slotRules['12'].count = 3;
+    else after.slots[2].eligibilityId = 0;
+    provider.onRead = count => count <= 2 ? structuredClone(before) : structuredClone(after);
+    assert.equal((await service.submit('Owner', id, request)).status, 'UNKNOWN');
+  }
+});

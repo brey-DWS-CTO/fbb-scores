@@ -25,6 +25,7 @@ before(async () => {
   process.env.DATABASE_URL = '';
   process.env.DOTENV_CONFIG_QUIET = 'true';
   process.env.ESPN_LEAGUE_ID = '123456';
+  process.env.ESPN_LINEUP_READS_ENABLED = '0';
   store = await import(pathToFileURL(path.join(tempRoot, 'server/lib/leagueStore.ts')).href);
   await store.setPin('Brey', 'fixture-only');
   await store.setPin('Ryan', 'fixture-only');
@@ -44,6 +45,7 @@ test('lineup routes require authentication and default to disabled without discl
   assert.equal(response.status, 200);
   assert.equal(response.body.enabled, false);
   assert.equal(response.body.executionEnabled, false);
+  assert.equal(response.body.readEnabled, false);
   assert.equal(response.body.snapshot, null);
   assert.deepEqual(response.body.destinations, {});
   assert.equal((await call('lineup-access', 'GET', undefined, 'Ryan')).status, 403);
@@ -62,7 +64,9 @@ test('client cannot select target team, and even granted access cannot enable wr
   await call('lineup-access/Brey', 'PUT', { enabled: true, leagueId: '123456', teamId: 7 });
   const request = { id: 'fixture-operation-123', playerId: 1, destinationSlotId: 'bench', revision: 'fixture' };
   assert.equal((await call('my-team/moves', 'POST', { ...request, teamId: 1 })).status, 400);
-  assert.equal((await call('my-team/moves', 'POST', request)).status, 409);
+  const disabled = await call('my-team/moves', 'POST', request);
+  assert.equal(disabled.status, 409);
+  assert.equal(disabled.body.notSubmitted, true);
   assert.deepEqual((await store.getState()).state.lineupManagement?.operations, {});
   assert.equal((await call('my-team/moves/nonexistent')).status, 409);
 });
