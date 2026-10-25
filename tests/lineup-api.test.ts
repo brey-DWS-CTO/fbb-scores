@@ -77,3 +77,40 @@ test('private lineup grants and ledger are redacted from public and member leagu
   const publicResponse = await fetch(`${base}/api/league/state`);
   assert.equal('lineupManagement' in (await publicResponse.json()).state, false);
 });
+
+test('missed-games report is commissioner-only and private ledger stays out of league state', async () => {
+  assert.equal((await fetch(`${base}/api/league/missed-games`)).status, 401);
+  assert.equal((await call('missed-games', 'GET', undefined, 'Ryan')).status, 403);
+  assert.equal((await call('missed-games/refresh', 'POST', { week: 1 }, 'Ryan')).status, 403);
+  const report = await call('missed-games');
+  assert.equal(report.status, 200);
+  assert.equal(report.body.teams.length, 10);
+  assert.equal(report.body.calendarKnown, false);
+  assert.ok(report.body.teams.every((t: { playInEligible: unknown }) => t.playInEligible === null));
+});
+
+test('missed-games refresh persists all teams, protects finalized rows on failure, and preserves approvals', async () => {
+  const { refreshMissedGames } = await import(pathToFileURL(path.join(tempRoot, 'server/lib/missedGamesService.ts')).href);
+  const ref = { matchupPeriodId: 1, scoringPeriodIds: [1], startDate: '2026-10-20', endDate: '2026-10-25', label: 'Week 1', phase: 'regular' };
+  const sides = store.CONFIG_TEAMS.map((team, i) => ({ teamId: team.espnTeamId, name: team.owner, players: [{ id: i + 1, days: { '1': { started: true, played: true, points: 10, stats: null } } }] }));
+  const fixture = { season: 2027, matchupPeriodId: 1, weeks: [ref], days: [{ scoringPeriodId: 1, date: '2026-10-25', games: {} }], matchups: Array.from({ length: 5 }, (_, i) => ({ id: i + 1, home: sides[i * 2], away: sides[i * 2 + 1] })), gamesCap: 30, fetchedAt: '2026-10-26T20:00:00Z' };
+  const now = new Date('2026-10-26T20:00:00Z');
+  const report = await refreshMissedGames(1, now, async () => fixture);
+  assert.equal(report.teams[0].missedWeeks, 1);
+  assert.equal(report.teams[0].totalGamesMissed, 29);
+  assert.equal((await call('missed-games/refresh', 'POST', { week: -1 })).status, 400);
+  assert.equal((await call('missed-games/exemption', 'POST', { week: 1, teamId: 7, reason: 'Cancellation' }, 'Ryan')).status, 403);
+  assert.equal((await call('missed-games/exemption', 'POST', { week: 1, teamId: 7, reason: 'Cancellation' })).status, 200);
+  await call('missed-games/exemption', 'POST', { week: 1, teamId: 7, reason: 'Cancellation' });
+  assert.deepEqual((await store.getState()).state.missedGames.exemptions[0].approvals, ['Brey']);
+  assert.equal((await call('missed-games')).body.teams.find((t: { teamId: number }) => t.teamId === 7).countedWeeks, 1);
+  const incomplete = structuredClone(fixture); incomplete.days[0].games = null; incomplete.fetchedAt = '2026-10-27T20:00:00Z';
+  await refreshMissedGames(1, now, async () => incomplete);
+  assert.equal((await store.getState()).state.missedGames.weeks['2027:1'].status, 'final');
+  await assert.rejects(refreshMissedGames(1, now, async () => { throw new Error('offline'); }));
+  assert.equal((await store.getState()).state.missedGames.weeks['2027:1'].teams.length, 10);
+  const member = await call('state', 'GET', undefined, 'Ryan');
+  assert.equal('missedGames' in member.body.state, false);
+  const publicResponse = await fetch(`${base}/api/league/state`);
+  assert.equal('missedGames' in (await publicResponse.json()).state, false);
+});

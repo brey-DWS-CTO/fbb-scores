@@ -85,6 +85,7 @@ export interface LeagueOverrides {
 }
 
 export interface LeagueDynamicState {
+  missedGames?: import('../../src/lib/league/missedGames.js').MissedGamesLedger;
   /** Server-private feature grants, operation ledger and roster mutexes. */
   lineupManagement?: import('./lineup/service.js').LineupState;
   seasonMode?: import('../../src/lib/league/seasonMode.js').SeasonMode;
