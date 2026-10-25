@@ -15,6 +15,8 @@ import TeamLogo from './TeamLogo.js';
 import { tipoffText } from './scoresUi.js';
 
 const FALLBACK_SEARCH_PLAYERS = playerPoolFromDataset(leagueDataset.players);
+// A full position, PG to C, for players on no roster. Rostered players use ESPN's primary position.
+const LIST_POSITIONS = new Map(FALLBACK_SEARCH_PLAYERS.flatMap(player => player.positions[0] ? [[String(player.espnId), player.positions[0]] as const] : []));
 // Rows and filters name the owner, not the fantasy team.
 const OWNERS = ownerByEspnTeamId(leagueDataset.teams);
 
@@ -105,7 +107,7 @@ export default function TopPerformersPage() {
       <div className="daily-scorer-columns"><span>{weekly ? 'Player / games' : 'Player / game'}</span><span>FPTS</span></div>
       <ol className="daily-scorer-list">{(expanded ? shown : shown.slice(0, 10)).map((row, index) => {
         const game = data.games.find(entry => entry.id === row.gameId);
-        const position = positions.get(row.athleteId) ?? row.position;
+        const position = positions.get(row.athleteId) ?? LIST_POSITIONS.get(row.athleteId) ?? row.position;
         return <li key={`${row.gameId}:${row.athleteId}`}><div className="daily-scorer-row performer-row">
           <span className="daily-scorer-rank">{index + 1}</span><TeamLogo code={row.team} size={22} />
           <span className="daily-scorer-info"><strong><PlayerNews player={{ id: Number(row.athleteId), name: row.name, proTeam: row.team, position: position ?? '' }} scoring={scoring} />{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} aria-label={`${row.name}: open his NBA game`}>{weekly && `${row.gamesPlayed} GP · `}{game ? performerGameText(game, row.team) : row.team}</Link></small><small>{!rosters ? 'Roster unknown' : row.roster ? OWNERS.get(row.roster.teamId) ?? row.roster.name : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
