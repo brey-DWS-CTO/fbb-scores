@@ -7,13 +7,17 @@ import { useScoresWeek } from '../../hooks/useScores.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import { castMatchesTeams, castPoints, sortCastPlays, type FantasyCast } from '../../lib/league/fantasyCast.js';
 import { LEAGUE_SCORING } from '../../lib/league/partyScore.js';
-import { defaultDay, localDateIso } from '../../lib/league/scores.js';
+import { defaultDay, localDateIso, ownerByEspnTeamId } from '../../lib/league/scores.js';
 import { castClockText, castGameScore, castMatchesGame } from '../../lib/league/castContext.js';
 import { numberParam } from './scoresUi.js';
 import './fantasyCast.css';
 import TeamLogo from './TeamLogo.js';
 import { castAction, castOwnership, castRunningTotals, castShortName } from '../../lib/league/castPresentation.js';
 import { castPollDelay } from '../../lib/league/castPolling.js';
+
+// Cast names each fantasy team by its owner.
+const OWNERS = ownerByEspnTeamId(leagueDataset.teams);
+const ownerOf = (team: { teamId: number; name: string }) => OWNERS.get(team.teamId) ?? team.name;
 
 export default function FantasyCastPage({ embedded = false, initialScope = 'all', peek = false }: { embedded?: boolean; initialScope?: string; peek?: boolean }) {
   const [today, setToday] = useState(() => localDateIso(new Date()));
@@ -80,8 +84,8 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
         {initialScope.startsWith('game:') && <option value={initialScope}>This NBA game · {query.data?.plays.find(play => play.gameId === initialScope.slice(5))?.game ?? initialScope.slice(5)}</option>}
         {initialScope.startsWith('nba:') && <option value={initialScope}>{initialScope.slice(4)} game · both teams</option>}
         {initialScope.startsWith('matchup:') && !matchups.some(matchup => `matchup:${matchup.id}` === initialScope) && <option value={initialScope}>Viewed matchup · scoring plays</option>}
-        {teams.map(team => <option key={team.teamId} value={`team:${team.teamId}`} disabled={!day}>{team.name}</option>)}
-        {matchups.map(matchup => <option key={matchup.id} value={`matchup:${matchup.id}`} disabled={!day}>{matchup.home.name} vs {matchup.away.name}</option>)}
+        {teams.map(team => <option key={team.teamId} value={`team:${team.teamId}`} disabled={!day}>{ownerOf(team)}</option>)}
+        {matchups.map(matchup => <option key={matchup.id} value={`matchup:${matchup.id}`} disabled={!day}>{ownerOf(matchup.home)} vs {ownerOf(matchup.away)}</option>)}
       </select></label>
       <label>NBA game<select className="hub-input" value={selectedGame} onChange={event => change('game', event.target.value)}><option value="all">All NBA games</option>{nbaGames.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <label>Order<select className="hub-input" value={newest ? 'newest' : 'oldest'} onChange={event => change('order', event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
@@ -105,7 +109,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
           const ownership = castOwnership(roster?.team.teamId, mine, opponentId);
           return <div key={`${change.athleteId}:${index}`} className={`cast-change cast-owner-${ownership}`}>
             <TeamLogo code={change.team} size={22} />
-            <div className="cast-player"><div className="cast-player-line"><strong title={change.name}>{castShortName(change.name)}</strong><span className="cast-inline-team" title={roster?.team.name}>{change.team} · {roster ? roster.team.name : day ? 'Free agent' : 'Roster unavailable'}{roster && !roster.started ? ' · BENCH' : ''}</span>{myPlayer && <span className="cast-you">YOU</span>}{ownership === 'opponent' && <span className="cast-you">OPP</span>}</div><div className="cast-action"><span>{castAction(play, change)}</span>{Object.keys(change.stats).some(id => ['37', '38', '39'].includes(id)) ? ' · Milestone bonus' : ''}</div></div>
+            <div className="cast-player"><div className="cast-player-line"><strong title={change.name}>{castShortName(change.name)}</strong><span className="cast-inline-team" title={roster?.team.name}>{change.team} · {roster ? ownerOf(roster.team) : day ? 'Free agent' : 'Roster unavailable'}{roster && !roster.started ? ' · BENCH' : ''}</span>{myPlayer && <span className="cast-you">YOU</span>}{ownership === 'opponent' && <span className="cast-you">OPP</span>}</div><div className="cast-action"><span>{castAction(play, change)}</span>{Object.keys(change.stats).some(id => ['37', '38', '39'].includes(id)) ? ' · Milestone bonus' : ''}</div></div>
             <div className="cast-impact"><strong key={points} className="cast-points" aria-label={`${points > 0 ? 'plus ' : ''}${points.toFixed(1)} fantasy points`}>{points > 0 ? '+' : ''}{points.toFixed(1)}</strong><span className="cast-game-total" title="Running fantasy points in this NBA game" aria-label={`${(runningTotals.get(change) ?? 0).toFixed(1)} game total`}>{(runningTotals.get(change) ?? 0).toFixed(1)} total</span></div>
           </div>;
         })}
