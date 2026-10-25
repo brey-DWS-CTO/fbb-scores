@@ -9,8 +9,8 @@ import { leagueDataset } from '../../lib/league/data.js';
 import { playerPoolFromDataset } from '../../lib/league/playerPool.js';
 import { normalizeTeam } from '../../lib/league/houseParty.js';
 import { statLine } from '../../lib/league/partyScore.js';
-import { shortName } from '../../lib/league/format.js';
 import { PointsBreakdown } from './ScoreBreakdown.js';
+import PlayerNews from './PlayerNews.js';
 import TeamLogo from './TeamLogo.js';
 import { tipoffText } from './scoresUi.js';
 
@@ -108,7 +108,7 @@ export default function TopPerformersPage() {
         const position = positions.get(row.athleteId) ?? row.position;
         return <li key={`${row.gameId}:${row.athleteId}`}><div className="daily-scorer-row performer-row">
           <span className="daily-scorer-rank">{index + 1}</span><TeamLogo code={row.team} size={22} />
-          <span className="daily-scorer-info"><strong><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} title={row.name}>{shortName(row.name)}</Link>{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}>{weekly && `${row.gamesPlayed} GP · `}{game ? performerGameText(game, row.team) : row.team}</small><small>{!rosters ? 'Roster unknown' : row.roster ? OWNERS.get(row.roster.teamId) ?? row.roster.name : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
+          <span className="daily-scorer-info"><strong><PlayerNews player={{ id: Number(row.athleteId), name: row.name, proTeam: row.team, position: position ?? '' }} scoring={scoring} />{position && <span className="performer-position"> · {position}</span>}</strong><small className={game?.state === 'in' ? 'performer-live' : undefined}><Link className="performer-game-link" state={{ returnTo: `/scores/performers?${params}` }} to={nbaGameHref(row.date, { gameId: row.gameId, player: row.athleteId })} aria-label={`${row.name}: open his NBA game`}>{weekly && `${row.gamesPlayed} GP · `}{game ? performerGameText(game, row.team) : row.team}</Link></small><small>{!rosters ? 'Roster unknown' : row.roster ? OWNERS.get(row.roster.teamId) ?? row.roster.name : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}</small>{searching && <small>{statLine(row.stats)}</small>}</span>
           <span className="daily-scorer-total"><strong><PointsBreakdown name={row.name} label={weekly ? 'Week' : row.date} days={[{ rawStats: row.stats, stats: null }]} scoring={scoring} total={row.fpts} /></strong></span>
         </div></li>;
       })}</ol>

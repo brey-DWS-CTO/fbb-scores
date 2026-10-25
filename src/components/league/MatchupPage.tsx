@@ -159,13 +159,13 @@ function CapEditor({ matchupPeriodId, cap, onClose }: CapEditorProps) {
   );
 }
 
-function PlayerTop({ player, slot, foulTrouble }: { player: ScorePlayer; slot: number; foulTrouble?: string }) {
+function PlayerTop({ player, slot, foulTrouble, scoring }: { player: ScorePlayer; slot: number; foulTrouble?: string; scoring?: ScoresWeek['scoringItems'] }) {
   const badge = injuryBadge(player.injuryStatus);
   return (
     <>
       <span className="score-slot">{slotLabel(slot)}</span>
       <span className="score-player-who">
-        <span className="score-player-name"><PlayerNews player={player} /><TeamLogo code={player.proTeam || null} size={14} /></span>
+        <span className="score-player-name"><PlayerNews player={player} scoring={scoring} /><TeamLogo code={player.proTeam || null} size={14} /></span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
         {foulTrouble && <span className="score-badge is-foul" title={foulTrouble} aria-label={foulTrouble}>FL</span>}
       </span>
@@ -237,7 +237,7 @@ function DayCell({ player, week, scoringPeriodId, expected, overage, court }: Da
   return (
     <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${onCourt ? ' is-live' : ''}`}>
       <div className="score-player-top">
-        <PlayerTop player={player} slot={slot} foulTrouble={foulTrouble} />
+        <PlayerTop player={player} slot={slot} foulTrouble={foulTrouble} scoring={week.scoringItems} />
         <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
       <GameLink player={player} week={week} scoringPeriodId={scoringPeriodId} className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>
@@ -272,7 +272,7 @@ function WeekCell({ player, week, expected, overages }: WeekCellProps) {
   return (
     <div className={cardClass(started, player)}>
       <div className="score-player-top">
-        <PlayerTop player={player} slot={latestSlot(player)} />
+        <PlayerTop player={player} slot={latestSlot(player)} scoring={week.scoringItems} />
         <PlayerPoints player={player} week={week} actual={summary.total.toFixed(1)} projected={proj} />
       </div>
       <GameLink player={player} week={week} className="score-player-game">

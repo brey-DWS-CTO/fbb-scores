@@ -33,3 +33,10 @@ test('running totals include negative plays and reset per NBA game', () => {
   assert.equal(totals.get(plays[1].changes[0]), 2.3);
   assert.equal(totals.get(next[0].changes[0]), 1);
 });
+
+test('each play keeps the score right after it', () => {
+  const [scored, bare] = parseCastPlays({ plays: [{ id: '1', text: 'Jump ball', awayScore: '98', homeScore: 101 }, { id: '2', text: 'Timeout' }] }, '1', 'MIA @ CHA', []);
+  assert.equal(scored.awayScore, 98);
+  assert.equal(scored.homeScore, 101);
+  assert.equal(bare.awayScore, undefined);
+});

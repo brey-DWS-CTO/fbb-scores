@@ -8,7 +8,7 @@ import { leagueDataset } from '../../lib/league/data.js';
 import { castMatchesTeams, castPoints, sortCastPlays, type FantasyCast } from '../../lib/league/fantasyCast.js';
 import { LEAGUE_SCORING } from '../../lib/league/partyScore.js';
 import { defaultDay, localDateIso } from '../../lib/league/scores.js';
-import { castMatchesGame } from '../../lib/league/castContext.js';
+import { castClockText, castGameScore, castMatchesGame } from '../../lib/league/castContext.js';
 import { numberParam } from './scoresUi.js';
 import './fantasyCast.css';
 import TeamLogo from './TeamLogo.js';
@@ -98,7 +98,7 @@ export default function FantasyCastPage({ embedded = false, initialScope = 'all'
     {query.data && !plays.length && <div className="panel cast-empty">{scope === 'all' ? 'No plays available for this date yet. The feed starts when games tip off.' : 'No scoring plays for this selection yet.'}</div>}
     <ol className="cast-feed">{plays.slice(0, visibleCount).map(play => {
       return <li key={play.id} className="panel cast-play">
-        <div className="cast-meta"><span>{play.timestamp ? new Date(play.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'Time unavailable'} · {play.game}</span><span>{play.period > 4 ? `OT${play.period - 4}` : `Q${play.period}`} · {play.clock}</span></div>
+        <div className="cast-meta"><span className="cast-meta-game">{castClockText(play)} · {castGameScore(play)}</span><span>{play.timestamp ? new Date(play.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'Time unavailable'}</span></div>
         <div className="cast-play-body">
         {!play.changes.length && <p className="cast-no-impact">{play.text}</p>}
         {play.changes.map((change, index) => { const roster = rosters.get(change.athleteId); const points = castPoints(change.stats, scoring); const myPlayer = mine !== undefined && roster?.team.teamId === mine;
