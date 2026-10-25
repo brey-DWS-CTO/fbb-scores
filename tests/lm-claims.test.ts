@@ -6,13 +6,14 @@ import { monthDates, waiverCalendarDay } from '../src/lib/league/waiverCalendar.
 import { runAdvanceLmClaims, type ClaimRuntime } from '../server/lib/lmWeekendService.js';
 
 const games = [{ home: 'DEN', away: 'LAL', tipoff: '2026-10-24T19:00:00.000Z' }];
-const now = new Date('2026-10-24T18:00:00.000Z');
+const now = new Date('2026-10-24T18:10:00.000Z');
 const config = { leagueId: 'test', seasonId: 2027, cookie: 'not-a-credential', dryRun: true };
 const claim = (id: string, extra: Partial<LmAddRequest> = {}): LmAddRequest => ({ id, season: 2027, owner: 'Kyle', teamId: 1, playerId: 100, playerName: 'Test Player', proTeam: 'DEN', requestedAt: '2026-10-23T17:00:00.000Z', forDate: '2026-10-24', status: 'queued', note: '', updatedAt: '2026-10-23T17:00:00.000Z', handledBy: null, ...extra });
 const readyInput = { request: claim('a'), now, games, onTeamId: 0, proTeam: 'DEN', lastDroppedAt: null, lastWaiverAt: '2026-10-24T18:00:00.000Z' };
 
 test('claims wait for current ownership and normal waivers, including pickup/drop cycles', () => {
   assert.equal(claimReady(readyInput).action, 'ready');
+  assert.equal(claimReady({ ...readyInput, now: new Date('2026-10-24T18:04:00.000Z') }).action, 'wait');
   assert.equal(claimReady({ ...readyInput, onTeamId: 2 }).action, 'wait');
   assert.equal(claimReady({ ...readyInput, onTeamId: null }).action, 'wait');
   assert.equal(claimReady({ ...readyInput, lastDroppedAt: '2026-10-24T18:01:00.000Z' }).action, 'wait');

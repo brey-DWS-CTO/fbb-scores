@@ -382,6 +382,8 @@ export async function runAdvanceLmClaims(config: EspnLmConfig, now = new Date(),
   const weekday = pacific(now).weekday;
   const games = weekday === 0 || weekday === 6 ? await deps.games(today) : [];
   const beforeTip = firstTip(games) !== null && now.toISOString() < firstTip(games)!;
+  // Before waivers run nothing can be awarded, so skip the ESPN reads.
+  if (beforeTip && lmAddWindow(now, games).waiting) return [];
   let drops: Map<number, string> | null = null;
   let lastRun: string | null = null;
   if (beforeTip) [drops, lastRun] = await Promise.all([deps.drops(), deps.lastRun(now)]);

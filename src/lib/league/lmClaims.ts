@@ -23,6 +23,7 @@ export function claimReady(input: {
   if (!tip || now.toISOString() >= tip) return { action: 'deny', note: 'No eligible pre-tip LM Add window remains.' };
   const window = lmAddWindow(now, games);
   if (!window.closesAt || request.requestedAt >= window.closesAt) return { action: 'deny', note: 'Claim was submitted after the 10-minute cutoff.' };
+  if (window.waiting) return { action: 'wait', note: "Waiting for today's waivers to run." };
   const closed = now.toISOString() >= window.closesAt;
   const notReady = (note: string) => ({ action: closed ? 'deny' as const : 'wait' as const, note });
   if (input.onTeamId === null) return { action: 'wait', note: 'ESPN ownership could not be verified. Nothing was added.' };

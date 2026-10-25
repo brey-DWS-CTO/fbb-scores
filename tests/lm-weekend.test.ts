@@ -69,7 +69,9 @@ test('early days come out in date order with their hour', () => {
 });
 
 test('the LM add window is Saturday or Sunday, before the first tip', () => {
-  assert.equal(lmAddWindow(`${SAT}T15:00:00.000Z`, [noon]).open, true); // 8 AM PT Saturday
+  assert.equal(lmAddWindow(`${SAT}T15:00:00.000Z`, [noon]).waiting, true); // 8 AM PT, before 11 AM waivers
+  assert.equal(lmAddWindow(`${SAT}T18:04:00.000Z`, [noon]).open, false);
+  assert.equal(lmAddWindow(`${SAT}T18:05:00.000Z`, [noon]).open, true); // 11:05 AM PT, after waivers
   assert.equal(lmAddWindow(`${SAT}T19:00:00.000Z`, [noon]).open, false); // tip-off
   assert.match(lmAddWindow(`${SAT}T19:00:00.000Z`, [noon]).reason ?? '', /tipped off/);
   assert.match(lmAddWindow('2026-10-23T15:00:00.000Z', [noon]).reason ?? '', /Saturdays and Sundays/);
@@ -85,7 +87,7 @@ test('the last waiver run before now is yesterday at 3 PM Pacific', () => {
 
 test('every lmadd condition is checked, with the rule it comes from', () => {
   const ok = checkLmAdd({
-    now: `${SAT}T15:00:00.000Z`,
+    now: `${SAT}T18:30:00.000Z`,
     todaysGames: [noon],
     proTeam: 'LAL',
     onTeamId: 0,
@@ -100,7 +102,7 @@ test('every lmadd condition is checked, with the rule it comes from', () => {
   assert.equal(lmAddAllowed(ok), true);
 
   const bad = checkLmAdd({
-    now: `${SAT}T15:00:00.000Z`,
+    now: `${SAT}T18:30:00.000Z`,
     todaysGames: [noon],
     proTeam: 'DEN',
     onTeamId: 4,
@@ -115,7 +117,7 @@ test('every lmadd condition is checked, with the rule it comes from', () => {
 });
 
 test('a player never dropped this season has cleared waivers', () => {
-  const checks = checkLmAdd({ now: `${SAT}T15:00:00.000Z`, todaysGames: [noon], proTeam: 'GSW', onTeamId: null, lastDroppedAt: null });
+  const checks = checkLmAdd({ now: `${SAT}T18:30:00.000Z`, todaysGames: [noon], proTeam: 'GSW', onTeamId: null, lastDroppedAt: null });
   assert.equal(lmAddAllowed(checks), true);
 });
 
@@ -181,7 +183,8 @@ test('the LM button explains weekdays, closed weekends, no games and signed-out 
   const { lmAddButtonReason } = await import('../src/lib/league/lmWeekend.ts');
   const games = [{ home: 'DEN', away: 'LAL', tipoff: '2026-10-24T20:00:00.000Z' }];
   assert.equal(lmAddButtonReason(lmAddWindow('2026-10-23T18:00:00Z', games), '2026-10-23', true), 'LM adds open Saturday and Sunday, until 10 minutes before the first tip.');
-  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T18:00:00Z', games), '2026-10-24', true), 'Open until 10 minutes before the first tip.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T18:00:00Z', games), '2026-10-24', true), 'LM adds open at 12:05 PM PT, after waivers run.');
+  assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T19:30:00Z', games), '2026-10-24', true), 'Open until 10 minutes before the first tip.');
   assert.equal(lmAddButtonReason(lmAddWindow('2026-10-24T20:00:00Z', games), '2026-10-24', true), 'Closed for today. Opens again tomorrow; closes 10 minutes before the first tip.');
   const sunday = [{ ...games[0], tipoff: '2026-10-25T20:00:00.000Z' }];
   assert.equal(lmAddButtonReason(lmAddWindow('2026-10-25T20:00:00Z', sunday), '2026-10-25', true), 'Closed for today. Opens again next Saturday; closes 10 minutes before the first tip.');
