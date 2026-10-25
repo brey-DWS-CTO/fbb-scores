@@ -5,6 +5,7 @@ import { apiErrorMessage, sandboxActive } from '../../lib/league/api.js';
 import { validateMove, type MoveRequest } from '../../lib/league/lineup.js';
 import { fetchMyTeam, fetchLineupOperation, submitLineupMove, lineupMoveWasNotSubmitted, type LineupOperation, type MoveResponse } from '../../lib/league/lineupApi.js';
 import './myTeam.css';
+import WeeklyLineupPlanner from './WeeklyLineupPlanner.js';
 
 const inProgress = (operation: LineupOperation | null | undefined) => operation != null &&
   ['REQUESTED', 'VALIDATING', 'EXECUTING', 'VERIFYING'].includes(operation.status);
@@ -88,6 +89,7 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
           {team.data?.readEnabled && <div className="my-team-read-toolbar"><span>ESPN roster · Read only</span><button type="button" className="tap-btn" disabled={team.isFetching} onClick={() => void team.refetch()}>{team.isFetching ? 'Refreshing…' : 'Refresh roster'}</button></div>}
           <p role="status" aria-live="polite" className="my-team-status">{status}</p>
           {snapshot && <>
+            {identity?.isCommissioner && <WeeklyLineupPlanner snapshot={snapshot} />}
             <div className="my-team-meta"><span>Scoring period {snapshot.scoringPeriodId}</span>{team.data?.executionEnabled && <span>{cutoff}-minute safety cutoff</span>}</div>
             <p id="lineup-help">{!team.data?.executionEnabled ? 'This roster comes from ESPN. Rows are disabled while live execution is unverified.' : selected?.revision === snapshot.revision ? 'Choose a highlighted destination. Tap the selected player to cancel.' : 'Choose a player to see eligible destinations.'}</p>
             {groupedSlots.map(group => <section className="my-team-group" key={group.kind} aria-labelledby={`lineup-${group.kind}`}><h2 id={`lineup-${group.kind}`}>{group.title}</h2><div className="my-team-roster" aria-describedby="lineup-help">

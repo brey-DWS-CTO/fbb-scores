@@ -35,3 +35,10 @@
   .lineup-access-admin form { grid-template-columns: 1fr; }
   .lineup-access-admin li { align-items: flex-start; }
 }
+.weekly-planner { padding: 20px; margin: 24px 0; border-radius: 12px; }
+.weekly-planner-scroll { overflow-x: auto; }
+.weekly-planner table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.weekly-planner caption { text-align: left; padding: 12px 0; font-weight: 700; }
+.weekly-planner th, .weekly-planner td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--panel-border); }
+.weekly-planner details { padding: 12px 0; }
+.weekly-planner summary { cursor: pointer; min-height: 32px; }
