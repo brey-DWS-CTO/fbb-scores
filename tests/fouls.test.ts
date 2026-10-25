@@ -112,9 +112,9 @@ test('a game not yet tipped reads as nothing', () => {
   assert.equal(courtReads([pre]).size, 0);
 });
 
-test('the card tag: FO at six fouls, live or final; FL only while in trouble live', () => {
-  assert.deepEqual(foulBadge(6, null, false), { text: 'FO', title: 'Fouled out' });
-  assert.equal(foulBadge(6, null, true)?.text, 'FO');
+test('the card tag shows only while live: FO at six fouls, FL while in trouble', () => {
+  assert.deepEqual(foulBadge(6, null, true), { text: 'FO', title: 'Fouled out' });
+  assert.equal(foulBadge(6, null, false), null);
   assert.equal(foulBadge(3, { state: 'trouble', fouls: 3, since: 2 }, true)?.text, 'FL');
   assert.equal(foulBadge(3, { state: 'trouble', fouls: 3, since: 2 }, false), null);
   assert.equal(foulBadge(2, null, true), null);

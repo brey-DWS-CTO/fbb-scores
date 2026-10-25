@@ -167,7 +167,7 @@ function PlayerTop({ player, slot, foul, scoring }: { player: ScorePlayer; slot:
       <span className="score-player-who">
         <span className="score-player-name"><PlayerNews player={player} scoring={scoring} /><TeamLogo code={player.proTeam || null} size={14} /></span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
-        {foul && <span className={`score-badge ${foul.text === 'FO' ? 'is-fouled-out' : 'is-foul'}`} title={foul.title} aria-label={foul.title}>{foul.text}</span>}
+        {foul && <span className="score-badge is-foul" title={foul.title} aria-label={foul.title}>{foul.text}</span>}
       </span>
     </>
   );
@@ -233,7 +233,7 @@ function DayCell({ player, week, scoringPeriodId, expected, overage, court }: Da
   const underway = day?.played === true || status === 'live' || status === 'final';
   const projected = status !== 'final' && proj !== null && proj > 0 && (!underway || status === 'live') ? proj : null;
   const onCourt = status === 'live' && court?.onCourt === true;
-  const foul = status === 'live' || status === 'final' ? foulBadge(day?.stats?.fouls, court?.foul, status === 'live') : null;
+  const foul = foulBadge(day?.stats?.fouls, court?.foul, status === 'live');
   return (
     <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${onCourt ? ' is-live' : ''}`}>
       <div className="score-player-top">
