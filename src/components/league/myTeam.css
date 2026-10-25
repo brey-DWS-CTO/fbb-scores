@@ -1,0 +1,31 @@
+.my-team-page { max-width: 820px; margin: 0 auto; padding: 24px 16px 100px; }
+.my-team-page h1 { margin: 6px 0 10px; font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 800; }
+.my-team-page p { color: var(--text-mid); line-height: 1.5; }
+.my-team-notice { padding: 20px; border-radius: 12px; margin: 20px 0; }
+.my-team-notice h2 { margin-top: 0; font-size: 1.1rem; }
+.my-team-status { min-height: 1.5em; font-weight: 700; color: var(--neon-yellow) !important; }
+.my-team-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: .8rem; color: var(--text-mid); }
+.my-team-roster { display: grid; gap: 8px; }
+.my-team-row { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; width: 100%; border: 1px solid var(--panel-border); border-radius: 10px; background: var(--panel-bg, #171717); color: var(--text-hi); font: inherit; text-align: left; cursor: pointer; }
+.my-team-row:disabled { cursor: default; opacity: .65; }
+.my-team-row.selected { outline: 2px solid var(--neon-yellow); outline-offset: 1px; }
+.my-team-row.eligible { border: 2px solid var(--neon-yellow); background: rgba(255, 230, 0, .08); }
+.my-team-row:focus-visible, .my-team-page button:focus-visible, .lineup-access-admin :is(button,input,select):focus-visible { outline: 3px solid var(--neon-yellow); outline-offset: 3px; }
+.my-team-slot { font-weight: 800; font-size: .8rem; color: var(--neon-yellow); }
+.my-team-player { font-weight: 700; overflow-wrap: anywhere; }
+.my-team-row-state { font-size: .75rem; }
+.my-team-footnote { font-size: .8rem; }
+.lineup-access-admin { padding: 20px; border-radius: 12px; margin: 20px 0; }
+.lineup-access-admin form { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); align-items: end; gap: 12px; }
+.lineup-access-admin label { display: grid; gap: 6px; font-size: .85rem; }
+.lineup-access-admin input,.lineup-access-admin select { width: 100%; min-height: 44px; }
+.lineup-access-admin button { min-height: 44px; }
+.lineup-access-admin ul { padding: 0; list-style: none; }
+.lineup-access-admin li { display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--panel-border); }
+@media (max-width: 540px) {
+  .my-team-page { padding: 18px 12px 100px; }
+  .my-team-row { grid-template-columns: 46px 1fr; gap: 8px; padding: 12px; }
+  .my-team-row-state { grid-column: 2; }
+  .lineup-access-admin form { grid-template-columns: 1fr; }
+  .lineup-access-admin li { align-items: flex-start; }
+}

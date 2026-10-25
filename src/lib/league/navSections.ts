@@ -54,7 +54,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { to: '/tiers', label: 'TIERS', mode: 'off-season' },
     ],
   },
-  { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
+  { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }, { to: '/my-team', label: 'MY TEAM', commishOnly: true }] },
   { id: 'cast', label: 'FANTASY CAST', shortLabel: 'CAST', icon: 'bolt', primary: true, tabs: [{ to: '/scores/cast', label: 'FANTASY CAST' }] },
   { id: 'watch', label: 'WATCH PARTIES', shortLabel: 'WATCH', icon: 'people', tabs: [{ to: '/watch', label: 'WATCH PARTIES', mode: 'in-season', pages: [{ to: '/party', label: 'PARTY' }] }] },
   { id: 'waivers', label: 'WAIVERS', icon: 'calendar', primary: true, tabs: [{ to: '/activity', label: 'ACTIVITY' }, { to: '/lm-adds', label: 'LM ADDS' }, { to: '/waivers', label: 'CALENDAR' }] },

@@ -85,6 +85,8 @@ export interface LeagueOverrides {
 }
 
 export interface LeagueDynamicState {
+  /** Server-private feature grants, operation ledger and roster mutexes. */
+  lineupManagement?: import('./lineup/service.js').LineupState;
   seasonMode?: import('../../src/lib/league/seasonMode.js').SeasonMode;
   season: number; // 2027
   keepers: Record<string, KeeperSelection[]>; // owner -> up to 2

@@ -53,6 +53,7 @@ import FavoritesPrompt from './components/league/FavoritesPrompt.js'
 import InviteToast from './components/league/InviteToast.js'
 import DraftRecapPage from './components/draft/DraftRecapPage.js'
 import FantasyCastPage from './components/league/FantasyCastPage.js'
+import MyTeamPage from './components/league/MyTeamPage.js';
 import FantasyCastBubble from './components/league/FantasyCastBubble.js'
 
 function App() {
@@ -145,6 +146,7 @@ function App() {
         <Route path="/watch" element={<WatchPage />} />
         <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
+        <Route path="/my-team" element={<MyTeamPage />} />
         <Route path="/scores/cast" element={<FantasyCastPage />} />
         <Route path="/league/offseason" element={<LeagueOffseasonPage />} />
         <Route path="/waivers" element={<WaiverCalendarPage />} />
