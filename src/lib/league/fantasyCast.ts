@@ -66,10 +66,15 @@ export function castPoints(stats: Record<string, number>, scoring: readonly Scor
   return round1(computeFpts(stats, [...scoring]));
 }
 
-export function castMatchesTeams(play: CastPlay, teamIds: readonly (number | undefined)[], rosters: ReadonlyMap<string, { team: { teamId: number }; started: boolean }>, scoring: readonly ScoringItem[]): boolean {
+/**
+ * A play counts for these teams when one of their players scores on it. A
+ * matchup counts starters only, since bench points do not count there; a
+ * single team counts its whole roster, bench included.
+ */
+export function castMatchesTeams(play: CastPlay, teamIds: readonly (number | undefined)[], rosters: ReadonlyMap<string, { team: { teamId: number }; started: boolean }>, scoring: readonly ScoringItem[], startersOnly = true): boolean {
   return play.changes.some(change => {
     const roster = rosters.get(change.athleteId);
-    return roster?.started === true && teamIds.includes(roster.team.teamId) && castPoints(change.stats, scoring) !== 0;
+    return roster !== undefined && (!startersOnly || roster.started) && teamIds.includes(roster.team.teamId) && castPoints(change.stats, scoring) !== 0;
   });
 }
 

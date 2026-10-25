@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import gamelog from './fixtures/espn-gamelog.json' with { type: 'json' };
-import { gameFantasyPoints, gameLogUrl, logAverages, logLine, readGameLog, resultText } from '../src/lib/league/gameLog.js';
+import { gameFantasyPoints, gameLogUrl, logAverages, logLine, readGameLog, resultText, todayGame } from '../src/lib/league/gameLog.js';
 import { LEAGUE_SCORING } from '../src/lib/league/partyScore.js';
 
 const log = readGameLog(gamelog);
@@ -14,6 +14,8 @@ test('reads the regular season, newest first, and leaves out preseason', () => {
   assert.equal(orl.home, false);
   assert.equal(resultText(orl), 'W 115-93');
   assert.equal(orl.season, '2026-27');
+  const utah = { ...gamelog, events: { ...gamelog.events, '401909845': { ...gamelog.events['401909845'], opponent: { id: '26', abbreviation: 'UTAH' } } } };
+  assert.equal(readGameLog(utah).games[0].opp, 'UTA');
 });
 
 test('leaves out playoff games', () => {
@@ -41,4 +43,20 @@ test('averages fantasy points and minutes, and nothing for no games', () => {
   assert.equal(logAverages([], LEAGUE_SCORING), null);
   assert.equal(readGameLog(null).games.length, 0);
   assert.match(gameLogUrl(1, 2026), /athletes\/1\/gamelog\?season=2026$/);
+});
+
+test('today\'s game sits on top: live with the clock, or final until the log has it', () => {
+  const game = { id: '9', tipoff: '2026-10-25T01:00:00Z', home: 'DEN', away: 'NOP', tv: null, state: 'in' as const, detail: '10:15 - 2nd', homeScore: 40, awayScore: 38 };
+  const line = { athleteId: '3936299', name: 'Jamal Murray', shortName: 'J. Murray', team: 'DEN', played: true, stats: { '0': 12, '40': 15 } };
+  const day = { date: '2026-10-24', fetchedAt: '', error: null, games: [game], boxScores: [{ gameId: '9', state: 'in' as const, detail: '10:15 - 2nd', home: 'DEN', away: 'NOP', homeScore: 40, awayScore: 38, lines: [line] }] };
+  const live = todayGame(day, 'DEN', 3936299, log.games)!;
+  assert.equal(live.status, 'LIVE · Q2 10:15');
+  assert.equal(live.opp, 'NOP');
+  assert.equal(live.home, true);
+  assert.equal(live.stats?.['0'], 12);
+  const final = todayGame({ ...day, games: [{ ...game, state: 'post', detail: 'Final' }], boxScores: [{ ...day.boxScores[0], state: 'post', detail: 'Final', homeScore: 120, awayScore: 110 }] }, 'DEN', 3936299, log.games)!;
+  assert.equal(final.status, 'F 120-110');
+  assert.equal(todayGame(day, 'DEN', 3936299, [{ ...log.games[0], eventId: '9' }]), null);
+  assert.equal(todayGame(day, 'BOS', 1, log.games), null);
+  assert.equal(todayGame({ ...day, games: [{ ...game, state: 'pre' }], boxScores: [] }, 'DEN', 3936299, log.games)?.stats, null);
 });

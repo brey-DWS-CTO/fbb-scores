@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { playerNewsUrl, readPlayerNews, rotowireUrl } from '../../lib/league/playerCard.js';
-import { gameFantasyPoints, gameLogUrl, logAverages, logLine, readGameLog, resultText } from '../../lib/league/gameLog.js';
+import { gameFantasyPoints, gameLogUrl, logAverages, logLine, readGameLog, resultText, todayGame } from '../../lib/league/gameLog.js';
+import { fetchDailyScorers } from '../../lib/league/api.js';
 import { LEAGUE_SCORING, type ScoringItem } from '../../lib/league/partyScore.js';
-import { injuryBadge, shortName, type ScorePlayer } from '../../lib/league/scores.js';
+import { injuryBadge, localDateIso, shortName, type ScorePlayer } from '../../lib/league/scores.js';
+import { tipoffText } from './scoresUi.js';
 import { PointsBreakdown } from './ScoreBreakdown.js';
 import TeamLogo from './TeamLogo.js';
 
@@ -28,11 +30,16 @@ async function fetchGameLog(url: string) {
  * season only. A window he has not played enough games for stays off.
  * Past three games the list scrolls inside itself until opened in full.
  */
-function PlayerGameLog({ playerId, name, scoring }: { playerId: number; name: string; scoring: readonly ScoringItem[] }) {
+function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number; name: string; proTeam: string; scoring: readonly ScoringItem[] }) {
   const [count, setCount] = useState<(typeof WINDOWS)[number]>(3);
   const [expanded, setExpanded] = useState(false);
   const current = useQuery({ queryKey: ['game-log', playerId, 'current'], queryFn: () => fetchGameLog(gameLogUrl(playerId)), staleTime: 10 * 60_000, retry: 1 });
+  // Today's game comes from our daily scores: ESPN's log lists a game only once it ends.
+  const date = localDateIso(new Date());
+  const day = useQuery({ queryKey: ['daily-scorers', date], queryFn: () => fetchDailyScorers(date), staleTime: 30_000, refetchInterval: 60_000, retry: 1 });
   const thisSeason = current.data?.games ?? [];
+  const today = todayGame(day.data, proTeam, playerId, thisSeason);
+  const todayLabel = today ? `Today ${today.home ? 'vs' : '@'} ${today.opp}` : '';
   const games = thisSeason.slice(0, count);
   const season = logAverages(thisSeason, scoring);
   const recent = logAverages(games, scoring);
@@ -51,7 +58,15 @@ function PlayerGameLog({ playerId, name, scoring }: { playerId: number; name: st
         {WINDOWS.map(n => <button key={n} type="button" aria-pressed={count === n} disabled={n > 3 && thisSeason.length < n} title={n > 3 && thisSeason.length < n ? `After ${n} games` : undefined} onClick={() => { setCount(n); setExpanded(false); }}>Last {n}</button>)}
       </div>
     </div>
-    {games.length === 0 ? <p>No games this season yet.</p> : <ol className={`player-log-list${games.length > 3 && !expanded ? ' is-collapsed' : ''}`}>
+    {today && <div className={`player-log-game is-today${today.state === 'in' ? ' is-live' : ''}`}>
+      <span className="player-log-top">
+        <span>{todayLabel}</span>
+        <span className="player-log-status">{today.status || tipoffText(today.tipoff)}</span>
+        <strong>{today.stats ? <PointsBreakdown name={name} label={todayLabel} days={[{ rawStats: today.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints({ stats: today.stats }, scoring)} /> : '—'}</strong>
+      </span>
+      <small>{today.stats ? logLine(today.stats) : today.state === 'pre' ? 'Not started' : 'Has not played yet'}</small>
+    </div>}
+    {games.length === 0 ? (!today && <p>No games this season yet.</p>) : <ol className={`player-log-list${games.length > 3 && !expanded ? ' is-collapsed' : ''}`}>
       {games.map(game => <li key={game.eventId} className="player-log-game">
         <span className="player-log-top">
           <span>{gameDate(game.date)} {game.home ? 'vs' : '@'} {game.opp}</span>
@@ -87,7 +102,8 @@ export default function PlayerNews({ player, scoring = LEAGUE_SCORING }: { playe
       <button type="button" className="tap-btn score-detail-close" aria-label="Close player card" onClick={close}>×</button>
       <h2><TeamLogo code={player.proTeam || null} size={20} /> {player.name}</h2>
       <p>{[player.position, player.proTeam].filter(Boolean).join(' · ')}{badge ? <> · <span className={`score-badge is-${badge.tone}`}>{badge.text}</span></> : player.injuryStatus === undefined ? '' : ' · Healthy'}</p>
-      {open && <PlayerGameLog playerId={player.id} name={player.name} scoring={scoring.length ? scoring : LEAGUE_SCORING} />}
+      {open && <section className="player-card-section" aria-label="Games"><PlayerGameLog playerId={player.id} name={player.name} proTeam={player.proTeam} scoring={scoring.length ? scoring : LEAGUE_SCORING} /></section>}
+      <section className="player-card-section" aria-label="News">
       <h3 className="player-news-heading">Recent news</h3>
       {open && news.isLoading && <p role="status">Loading news…</p>}
       {news.isError && <p role="alert">Could not load news. <button type="button" className="tap-btn mock-mini-btn" onClick={() => void news.refetch()}>Try again</button></p>}
@@ -97,6 +113,7 @@ export default function PlayerNews({ player, scoring = LEAGUE_SCORING }: { playe
         <strong>{item.headline}</strong>
         {item.story && <span>{item.story}</span>}
       </li>)}</ol>}
+      </section>
       <p className="player-news-source">Notes from RotoWire via ESPN. <a href={rotowireUrl(player.name)} target="_blank" rel="noreferrer">All notes on RotoWire</a> · <a href={`https://www.espn.com/nba/player/_/id/${player.id}`} target="_blank" rel="noreferrer">ESPN page</a></p>
     </dialog>
   </>;

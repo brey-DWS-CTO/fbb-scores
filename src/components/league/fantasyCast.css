@@ -179,3 +179,12 @@ button.top-nav-link { background: transparent; cursor: pointer; font-family: inh
 button.bottom-nav-tab { background: transparent; cursor: pointer; font-family: inherit; }
 /* Game clock and score lead the play line; the wall clock sits at the right. */
 .cast-meta-game { color: var(--text-body, #ddd); font-weight: 600; }
+/* Phones: the docked Cast is a fifth shorter, so more of the page shows above it. */
+@media (max-width:839px) {
+  .is-docked .cast-bubble-panel { height:240px; max-height:36dvh; }
+  html.cast-docked .app-shell-nav { padding-bottom:calc(min(240px, 36dvh) + 80px + env(safe-area-inset-bottom, 0px)); }
+}
+/* Docked on a phone, plays start right under the toolbar: no top padding, no status notes. Errors still show. */
+.cast-peek.cast-embedded.mock-page { padding-top:4px; }
+.cast-peek > p[role=status] { display:none; }
+.cast-peek .cast-feed { margin-top:0; }
