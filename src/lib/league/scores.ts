@@ -1195,16 +1195,19 @@ export function matchupChance(
 
 // ─── Words for the screen ───────────────────────────────────────────────────
 
-/** "36 MIN, 32 PT, 11 R, 6 A, 2 S, 1 B, 3 3P, 2 TO, 0 FL". Short labels keep it to one line. Zeros stay out, except points. */
+/**
+ * "36min 32pt 11r 6a 2s 1b 2to 0fl", the same style as the NBA game page.
+ * Points, rebounds and assists always show; steals, blocks and turnovers
+ * only when he has some. Minutes lead and fouls close, for the FL and FO tags.
+ */
 export function statLineText(stats: StatLine | null): string {
   if (!stats) return '';
-  const parts = [`${round1(stats.min)} MIN`, `${stats.pts} PT`];
-  const extras: Array<[number, string]> = [
-    [stats.reb, 'R'], [stats.ast, 'A'], [stats.stl, 'S'], [stats.blk, 'B'], [stats.threes, '3P'], [stats.to, 'TO'],
-  ];
-  for (const [value, label] of extras) if (value > 0) parts.push(`${value} ${label}`);
-  parts.push(`${stats.fouls ?? 0} FL`);
-  return parts.join(', ');
+  const some: Array<[number, string]> = [[stats.stl, 's'], [stats.blk, 'b'], [stats.to, 'to']];
+  return [
+    `${round1(stats.min)}min`, `${stats.pts}pt`, `${stats.reb}r`, `${stats.ast}a`,
+    ...some.filter(([value]) => value > 0).map(([value, label]) => `${value}${label}`),
+    `${stats.fouls ?? 0}fl`,
+  ].join(' ');
 }
 
 /**
