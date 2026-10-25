@@ -12,7 +12,7 @@ export function guestPageAllowed(path: string): boolean {
 export function guestRequestAllowed(method: string, path: string): boolean {
   if (method === 'POST') return ['/auth/sign-out', '/auth/guest/consume'].includes(path);
   if (method !== 'GET') return false;
-  return ['/auth/me', '/league/state', '/league/player-pool', '/league/fantasy-cast', '/league/daily-scorers', '/league/performer-dates', '/league/history', '/league/history/versions', '/league/games-caps', '/espn/scoreboard', '/espn/league-info', '/espn/week'].includes(path)
+  return ['/auth/me', '/league/state', '/league/player-pool', '/league/fantasy-cast', '/league/daily-scorers', '/league/performer-dates', '/league/history', '/league/history/versions', '/league/games-caps', '/league/missed-games', '/espn/scoreboard', '/espn/league-info', '/espn/week'].includes(path)
     || /^\/espn\/(?:daily|matchup)\/\d+$/.test(path)
     || /^\/espn\/trends\/(?:player|team)\/\d+$/.test(path);
 }

@@ -2,7 +2,7 @@ import type { Router, RequestHandler } from 'express';
 import { readMissedGamesReport, refreshMissedGames } from '../lib/missedGamesService.js';
 import { CONFIG_TEAMS, mutateState, appendAudit } from '../lib/leagueStore.js';
 export function registerMissedGamesRoutes(router: Router, auth: RequestHandler, commissioner: RequestHandler) {
-  router.get('/missed-games', auth, commissioner, async (_req, res, next) => {
+  router.get('/missed-games', async (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     try { res.json(await readMissedGamesReport()); } catch (error) { next(error); }
   });

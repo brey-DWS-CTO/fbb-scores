@@ -78,9 +78,9 @@ test('private lineup grants and ledger are redacted from public and member leagu
   assert.equal('lineupManagement' in (await publicResponse.json()).state, false);
 });
 
-test('missed-games report is commissioner-only and private ledger stays out of league state', async () => {
-  assert.equal((await fetch(`${base}/api/league/missed-games`)).status, 401);
-  assert.equal((await call('missed-games', 'GET', undefined, 'Ryan')).status, 403);
+test('missed-games report is public while refresh remains commissioner-only', async () => {
+  assert.equal((await fetch(`${base}/api/league/missed-games`)).status, 200);
+  assert.equal((await call('missed-games', 'GET', undefined, 'Ryan')).status, 200);
   assert.equal((await call('missed-games/refresh', 'POST', { week: 1 }, 'Ryan')).status, 403);
   const report = await call('missed-games');
   assert.equal(report.status, 200);

@@ -1,6 +1,6 @@
 # Missed-games report
 
-Commissioner-only under Scores > Missed Games (`/scores/missed-games`). The page reads the persistent report, then refreshes the current ESPN week and backfills any missing closed regular-season matchups. Manual refresh repeats this process. Recheck a saved week to pick up later ESPN stat corrections. Ordinary members and guests cannot read or mutate this report; the private ledger is removed from general league-state responses.
+Publicly visible under Scores > Missed Games (`/scores/missed-games`). The page reads the persistent report. For commissioners, it then refreshes the current ESPN week and backfills any missing closed regular-season matchups. Manual refresh repeats this process. Recheck a saved week to pick up later ESPN stat corrections. Everyone can read the report without signing in. Only commissioners can refresh data or approve exemptions; the private ledger is removed from general league-state responses.
 
 ## Counting
 
@@ -22,4 +22,4 @@ The current config marks only Brey as commissioner. Therefore a second approval 
 
 ## Verification
 
-Pure tests cover threshold boundaries, per-week caps, provisional/incomplete coverage, DNPs, bench games, time zones and exemptions. API integration tests cover commissioner access, private-state redaction, durable all-team refresh, idempotent approvals, and retention of final records after failed or incomplete reads. Fixtures contain no ESPN credentials. Production ESPN validation and browser QA remain separate.
+Pure tests cover threshold boundaries, per-week caps, provisional/incomplete coverage, DNPs, bench games, time zones and exemptions. API integration tests cover public read access, commissioner-only writes, private-state redaction, durable all-team refresh, idempotent approvals, and retention of final records after failed or incomplete reads. Fixtures contain no ESPN credentials. Production ESPN validation and browser QA remain separate.
