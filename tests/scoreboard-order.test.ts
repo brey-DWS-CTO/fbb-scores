@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { scoreboardTimeLeft, sortScoreboardGames } from '../src/lib/league/scoreboardOrder.js';
+import { gameWinner, scoreboardTimeLeft, sortScoreboardGames, teamScore } from '../src/lib/league/scoreboardOrder.js';
 import type { NbaGame } from '../src/lib/league/houseParty.js';
 
 test('scoreboard puts live nearest the finish first, then upcoming by ascending tipoff, then finals', () => {
@@ -12,4 +12,14 @@ test('scoreboard puts live nearest the finish first, then upcoming by ascending 
   assert.equal(scoreboardTimeLeft('End of 3rd'), 720);
   assert.equal(scoreboardTimeLeft('4th 1:15'), 75);
   assert.equal(scoreboardTimeLeft('Delayed'), Infinity);
+});
+
+test('the winner is marked only once a game is final', () => {
+  const game = { home: 'PHI', away: 'MIL', state: 'post' as const, homeScore: 127, awayScore: 116 };
+  assert.equal(gameWinner(game), 'PHI');
+  assert.equal(gameWinner({ ...game, homeScore: 100 }), 'MIL');
+  assert.equal(gameWinner({ ...game, state: 'in' }), null);
+  assert.equal(gameWinner({ ...game, homeScore: null }), null);
+  assert.equal(gameWinner(game, { homeScore: 110, awayScore: 112 }), 'MIL');
+  assert.equal(teamScore(game, undefined, 'MIL'), 116);
 });

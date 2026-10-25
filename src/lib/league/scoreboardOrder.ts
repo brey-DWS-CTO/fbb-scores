@@ -24,3 +24,16 @@ export function sortScoreboardGames(games: readonly NbaGame[]): NbaGame[] {
     return a.tipoff.localeCompare(b.tipoff) || a.id.localeCompare(b.id);
   });
 }
+
+/** The score to show for one team: the box score's when it has one, else the scoreboard's. */
+export function teamScore(game: Pick<NbaGame, 'home' | 'homeScore' | 'awayScore'>, box: { homeScore: number | null; awayScore: number | null } | undefined, code: string): number | null {
+  return code === game.home ? box?.homeScore ?? game.homeScore : box?.awayScore ?? game.awayScore;
+}
+
+/** The winning team's code once a game is final. Null while it runs, before it starts, or on a tie. */
+export function gameWinner(game: Pick<NbaGame, 'home' | 'away' | 'state' | 'homeScore' | 'awayScore'>, box?: { homeScore: number | null; awayScore: number | null }): string | null {
+  if (game.state !== 'post') return null;
+  const home = teamScore(game, box, game.home), away = teamScore(game, box, game.away);
+  if (home === null || away === null || home === away) return null;
+  return home > away ? game.home : game.away;
+}

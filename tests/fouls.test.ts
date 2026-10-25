@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { courtReads, foulRead, foulsByPeriod, foulTitle, troubleAt } from '../src/lib/league/fouls.js';
+import { courtReads, foulBadge, foulRead, foulsByPeriod, foulTitle, troubleAt } from '../src/lib/league/fouls.js';
 import { parseBoxScore, type BoxScore } from '../src/lib/league/partyScore.js';
 
 const play = (kind: string, period: number, athleteId = '1') => ({
@@ -110,4 +110,12 @@ test('a game not yet tipped reads as nothing', () => {
     { athleteId: '1', name: 'X', shortName: 'X', team: 'A', played: false, stats: {}, onCourt: true },
   ] };
   assert.equal(courtReads([pre]).size, 0);
+});
+
+test('the card tag: FO at six fouls, live or final; FL only while in trouble live', () => {
+  assert.deepEqual(foulBadge(6, null, false), { text: 'FO', title: 'Fouled out' });
+  assert.equal(foulBadge(6, null, true)?.text, 'FO');
+  assert.equal(foulBadge(3, { state: 'trouble', fouls: 3, since: 2 }, true)?.text, 'FL');
+  assert.equal(foulBadge(3, { state: 'trouble', fouls: 3, since: 2 }, false), null);
+  assert.equal(foulBadge(2, null, true), null);
 });

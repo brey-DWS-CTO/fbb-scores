@@ -10,7 +10,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query';
 import { useIdentity } from '../../hooks/useLeague.js';
 import { GAMES_CAPS_KEY, useCourt, useExpectedPoints, useGamesCaps, useScoresWeek } from '../../hooks/useScores.js';
-import { foulTitle, type CourtRead } from '../../lib/league/fouls.js';
+import { foulBadge, type CourtRead } from '../../lib/league/fouls.js';
 import { apiErrorMessage, saveGamesCap } from '../../lib/league/api.js';
 import { playerDayProjection, playerWeekProjection, projText, sideProjection } from '../../lib/league/dailyProjection.js';
 import { leagueDataset } from '../../lib/league/data.js';
@@ -159,7 +159,7 @@ function CapEditor({ matchupPeriodId, cap, onClose }: CapEditorProps) {
   );
 }
 
-function PlayerTop({ player, slot, foulTrouble, scoring }: { player: ScorePlayer; slot: number; foulTrouble?: string; scoring?: ScoresWeek['scoringItems'] }) {
+function PlayerTop({ player, slot, foul, scoring }: { player: ScorePlayer; slot: number; foul?: ReturnType<typeof foulBadge>; scoring?: ScoresWeek['scoringItems'] }) {
   const badge = injuryBadge(player.injuryStatus);
   return (
     <>
@@ -167,7 +167,7 @@ function PlayerTop({ player, slot, foulTrouble, scoring }: { player: ScorePlayer
       <span className="score-player-who">
         <span className="score-player-name"><PlayerNews player={player} scoring={scoring} /><TeamLogo code={player.proTeam || null} size={14} /></span>
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
-        {foulTrouble && <span className="score-badge is-foul" title={foulTrouble} aria-label={foulTrouble}>FL</span>}
+        {foul && <span className={`score-badge ${foul.text === 'FO' ? 'is-fouled-out' : 'is-foul'}`} title={foul.title} aria-label={foul.title}>{foul.text}</span>}
       </span>
     </>
   );
@@ -233,11 +233,11 @@ function DayCell({ player, week, scoringPeriodId, expected, overage, court }: Da
   const underway = day?.played === true || status === 'live' || status === 'final';
   const projected = status !== 'final' && proj !== null && proj > 0 && (!underway || status === 'live') ? proj : null;
   const onCourt = status === 'live' && court?.onCourt === true;
-  const foulTrouble = status === 'live' && court?.foul?.state === 'trouble' ? foulTitle(court.foul) : undefined;
+  const foul = status === 'live' || status === 'final' ? foulBadge(day?.stats?.fouls, court?.foul, status === 'live') : null;
   return (
     <div className={`${cardClass(day?.started === true, player)}${overage ? ' is-overage' : ''}${onCourt ? ' is-live' : ''}`}>
       <div className="score-player-top">
-        <PlayerTop player={player} slot={slot} foulTrouble={foulTrouble} scoring={week.scoringItems} />
+        <PlayerTop player={player} slot={slot} foul={foul} scoring={week.scoringItems} />
         <PlayerPoints player={player} week={week} period={scoringPeriodId} actual={day ? day.points.toFixed(1) : '0.0'} projected={projected} />
       </div>
       <GameLink player={player} week={week} scoringPeriodId={scoringPeriodId} className={`score-player-game${status === 'live' ? ' is-live' : ''}`}>

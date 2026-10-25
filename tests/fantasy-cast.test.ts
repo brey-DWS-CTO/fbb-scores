@@ -66,3 +66,15 @@ test('a single team counts its bench too', () => {
   assert.equal(castMatchesTeams(play, [10], rosters, LEAGUE_SCORING, false), true);
   assert.equal(castMatchesTeams(play, [30], rosters, LEAGUE_SCORING, false), false);
 });
+
+test('a missed end-of-quarter heave costs the shooter nothing', () => {
+  const heave = (text: string, period: number, clock: string) => parseCastPlays({ plays: [{ id: '1', text, period: { number: period }, clock: { displayValue: clock } }] }, 'g1', 'BOS @ NY', players)[0];
+  assert.equal(heave('Test Scorer misses 61-foot three point shot', 2, '0.8').changes.length, 0);
+  assert.equal(heave('Test Scorer misses 40-foot three point jumper', 3, '0:02').changes.length, 0);
+  // Still a real miss: the 4th quarter, too short, or too early.
+  assert.equal(heave('Test Scorer misses 61-foot three point shot', 4, '0.8').changes.length, 1);
+  assert.equal(heave('Test Scorer misses 28-foot three point jumper', 2, '0.8').changes.length, 1);
+  assert.equal(heave('Test Scorer misses 61-foot three point shot', 2, '5.2').changes.length, 1);
+  // A made heave still counts.
+  assert.equal(castPoints(heave('Test Scorer makes 61-foot three point shot', 2, '0.8').changes[0].stats, LEAGUE_SCORING), 4.5);
+});

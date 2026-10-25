@@ -88,6 +88,16 @@ export function foulTitle(read: FoulRead): string {
   return `Foul trouble: ${read.fouls} fouls, since ${read.since > 4 ? '' : 'the '}${periodName(read.since)}`;
 }
 
+/**
+ * The foul tag on a player card: FO once he has six, live or final; FL while
+ * he is in trouble in a live game. Null otherwise.
+ */
+export function foulBadge(fouls: number | undefined, read: FoulRead | null | undefined, live: boolean): { text: 'FO' | 'FL'; title: string } | null {
+  if ((fouls ?? 0) >= FOUL_OUT || read?.state === 'fouled-out') return { text: 'FO', title: 'Fouled out' };
+  if (live && read?.state === 'trouble') return { text: 'FL', title: foulTitle(read) };
+  return null;
+}
+
 export interface CourtRead {
   onCourt: boolean;
   foul: FoulRead | null;
