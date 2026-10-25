@@ -52,7 +52,8 @@ export default function FantasyCastBubble() {
     setPosition({ left: Math.max(8, Math.min(left, window.innerWidth - rect.width - 8)), top: Math.max(8, Math.min(top, window.innerHeight - rect.height - navSpace)) });
   };
   const visible = !dismissed && isCastScorePage(pathname);
-  const minimize = () => { restoreFocus.current = true; setOpen(false); };
+  // Closing the panel sends the Cast button home to the bottom right, wherever the panel was dragged.
+  const minimize = () => { restoreFocus.current = true; drag.current = null; setPosition(null); setOpen(false); };
   const changeMode = (next: CastMode) => {
     drag.current = null;
     setMode(next);
@@ -83,7 +84,7 @@ export default function FantasyCastBubble() {
     if (!open || !visible) return;
     close.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { restoreFocus.current = true; setOpen(false); }
+      if (event.key === 'Escape') minimize();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

@@ -12,6 +12,19 @@ export interface CastPlay {
 export interface FantasyCast { plays: CastPlay[]; error: string | null; fetchedAt: string; schedule?: CastSchedule }
 type RawPlay = { id?: string; text?: string; awayScore?: number | string; homeScore?: number | string; scoreValue?: number; pointsAttempted?: number; wallclock?: string; sequenceNumber?: string; period?: { number?: number }; clock?: { displayValue?: string } };
 
+/**
+ * An end-of-quarter heave: a shot from 36 feet or more in the last 3 seconds
+ * of the 1st, 2nd or 3rd quarter. Under the NBA's 2025-26 rule a missed
+ * heave is a team attempt, so it costs the shooter nothing.
+ */
+export function isHeave(text: string, period: number, clock: string): boolean {
+  const feet = Number(/(\d+)-foot/.exec(text)?.[1] ?? 0);
+  if (feet < 36 || period < 1 || period > 3) return false;
+  const [minutes, seconds] = clock.includes(':') ? clock.split(':').map(Number) : [0, Number(clock)];
+  const left = minutes * 60 + seconds;
+  return Number.isFinite(left) && left <= 3;
+}
+
 /** Keep every play, including substitutions and team events with no fantasy impact. */
 export function parseCastPlays(raw: unknown, gameId: string, game: string, players: readonly BoxLine[]): CastPlay[] {
   const plays = (raw as { plays?: RawPlay[] } | null)?.plays;
@@ -20,6 +33,7 @@ export function parseCastPlays(raw: unknown, gameId: string, game: string, playe
   const uniquePlayers = [...new Map(players.map(player => [player.athleteId, player])).values()];
   return [...plays].sort((a, b) => Number(a.sequenceNumber ?? a.id ?? 0) - Number(b.sequenceNumber ?? b.id ?? 0)).map((play, index) => {
     const text = play.text ?? '';
+    const heave = isHeave(text, play.period?.number ?? 0, play.clock?.displayValue ?? '');
     const changes: CastPlay['changes'] = [];
     const add = (player: BoxLine, stat: string, stats: Record<string, number>) => {
       const previous = totals.get(player.athleteId) ?? {};
@@ -39,7 +53,7 @@ export function parseCastPlays(raw: unknown, gameId: string, game: string, playe
           add(player, free ? 'Free throw made' : three ? '3-pointer made' : 'Field goal made', free ? { '0': 1, '15': 1, '16': 1 } : { '0': three ? 3 : 2, '13': 1, '14': 1, ...(three ? { '17': 1, '18': 1 } : {}) });
         } else if (action.startsWith('misses ')) {
           const free = action.includes('free throw');
-          add(player, free ? 'Free throw missed' : 'Field goal missed', free ? { '24': 1, '16': 1 } : { '23': 1, '14': 1 });
+          if (free || !heave) add(player, free ? 'Free throw missed' : 'Field goal missed', free ? { '24': 1, '16': 1 } : { '23': 1, '14': 1 });
         } else if (/^(offensive|defensive) rebound/.test(action)) add(player, 'Rebound', { '6': 1 });
         else if (action.includes('turnover')) add(player, 'Turnover', { '11': 1 });
         else if (action.startsWith('blocks ')) add(player, 'Block', { '1': 1 });

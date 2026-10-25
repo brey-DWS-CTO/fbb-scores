@@ -6639,3 +6639,22 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .player-log-game.is-today { margin: 0 -6px; padding: 7px 6px; border-top: 0; border-left: 3px solid var(--neon-teal); border-radius: 4px; background: color-mix(in srgb, var(--neon-teal) 8%, transparent); }
 .player-log-status { white-space: nowrap; color: var(--text-soft); }
 .player-log-game.is-live .player-log-status { color: var(--neon-teal); font-weight: 700; }
+/* One line per game: date and opponent, the stat line, then FPTS. A long stat line wraps under itself. */
+.player-log-game { flex-direction: row; align-items: baseline; gap: 8px; padding: 6px 0; }
+.player-log-when { flex: 0 0 auto; color: var(--text-body); font-size: .74rem; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.player-log-game > small { flex: 1; min-width: 0; line-height: 1.35; }
+.player-log-game > strong { flex: 0 0 auto; min-width: 2.8em; text-align: right; color: var(--text-max); font-size: .92rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.player-log-game > strong .score-detail-trigger { padding: 0; min-height: 0; font: inherit; font-weight: 800; color: inherit; text-decoration: none; }
+.player-log-game.is-live .player-log-when { color: var(--neon-teal); font-weight: 700; }
+.player-log-list.is-collapsed { max-height: 120px; }
+/* The game log is a compact table: game, eight stat columns, FPTS. One short row per game, no sideways scroll. */
+.player-log-game { display: grid; grid-template-columns: 50px repeat(8, minmax(0, 1fr)) 40px; align-items: center; gap: 2px; padding: 5px 0; }
+.player-log-when { display: flex; flex-direction: column; line-height: 1.2; font-size: .66rem; }
+.player-log-when > small { color: var(--text-soft); font-size: .6rem; font-weight: 400; }
+.player-log-num { text-align: center; color: var(--text-body); font-size: .68rem; font-variant-numeric: tabular-nums; }
+.player-log-fpts { text-align: right; }
+.player-log-game > strong.player-log-fpts { min-width: 0; font-size: .84rem; }
+.player-log-columns { padding: 2px 0 4px; border-top: 0; }
+.player-log-columns > span { color: var(--text-soft); font-size: .52rem; font-weight: 600; letter-spacing: .02em; }
+.player-log-game.is-today { margin: 0 -6px; padding: 5px 6px; grid-template-columns: 50px repeat(8, minmax(0, 1fr)) 40px; }
+.player-log-columns > span { text-transform: uppercase; }

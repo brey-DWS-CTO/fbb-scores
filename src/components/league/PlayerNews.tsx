@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { playerNewsUrl, readPlayerNews, rotowireUrl } from '../../lib/league/playerCard.js';
-import { gameFantasyPoints, gameLogUrl, logAverages, logLine, readGameLog, resultText, todayGame } from '../../lib/league/gameLog.js';
+import { gameFantasyPoints, gameLogUrl, logAverages, readGameLog, todayGame } from '../../lib/league/gameLog.js';
 import { fetchDailyScorers } from '../../lib/league/api.js';
 import { LEAGUE_SCORING, type ScoringItem } from '../../lib/league/partyScore.js';
 import { injuryBadge, localDateIso, shortName, type ScorePlayer } from '../../lib/league/scores.js';
@@ -12,6 +12,9 @@ import TeamLogo from './TeamLogo.js';
 const newsDate = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const gameDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
 const WINDOWS = [3, 7, 15] as const;
+// The game log's stat columns, by ESPN fantasy stat id.
+const LOG_COLUMNS: Array<[string, string]> = [['40', 'MIN'], ['0', 'PTS'], ['6', 'REB'], ['3', 'AST'], ['2', 'STL'], ['1', 'BLK'], ['17', '3PM'], ['11', 'TO']];
+const statCells = (stats: Readonly<Record<string, number>> | null) => LOG_COLUMNS.map(([id, label]) => <span key={label} className="player-log-num">{stats ? stats[id] ?? 0 : ''}</span>);
 
 async function fetchPlayerNews(playerId: number) {
   const response = await fetch(playerNewsUrl(playerId));
@@ -58,22 +61,17 @@ function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number;
         {WINDOWS.map(n => <button key={n} type="button" aria-pressed={count === n} disabled={n > 3 && thisSeason.length < n} title={n > 3 && thisSeason.length < n ? `After ${n} games` : undefined} onClick={() => { setCount(n); setExpanded(false); }}>Last {n}</button>)}
       </div>
     </div>
-    {today && <div className={`player-log-game is-today${today.state === 'in' ? ' is-live' : ''}`}>
-      <span className="player-log-top">
-        <span>{todayLabel}</span>
-        <span className="player-log-status">{today.status || tipoffText(today.tipoff)}</span>
-        <strong>{today.stats ? <PointsBreakdown name={name} label={todayLabel} days={[{ rawStats: today.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints({ stats: today.stats }, scoring)} /> : '—'}</strong>
-      </span>
-      <small>{today.stats ? logLine(today.stats) : today.state === 'pre' ? 'Not started' : 'Has not played yet'}</small>
+    <div className="player-log-game player-log-columns" aria-hidden="true"><span className="player-log-when">Game</span>{LOG_COLUMNS.map(([, label]) => <span key={label} className="player-log-num">{label}</span>)}<span className="player-log-fpts">FPTS</span></div>
+    {today && <div className={`player-log-game is-today${today.state === 'in' ? ' is-live' : ''}`} title={today.stats ? undefined : today.state === 'pre' ? 'Not started' : 'Has not played yet'}>
+      <span className="player-log-when"><span>{today.state === 'in' ? today.status.replace('LIVE · ', '') : today.state === 'pre' ? tipoffText(today.tipoff) : 'Today'}</span><small>{today.home ? 'vs ' : '@'}{today.opp}</small></span>
+      {statCells(today.stats)}
+      <strong className="player-log-fpts">{today.stats ? <PointsBreakdown name={name} label={todayLabel} days={[{ rawStats: today.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints({ stats: today.stats }, scoring)} /> : '—'}</strong>
     </div>}
     {games.length === 0 ? (!today && <p>No games this season yet.</p>) : <ol className={`player-log-list${games.length > 3 && !expanded ? ' is-collapsed' : ''}`}>
       {games.map(game => <li key={game.eventId} className="player-log-game">
-        <span className="player-log-top">
-          <span>{gameDate(game.date)} {game.home ? 'vs' : '@'} {game.opp}</span>
-          <span className={game.result === 'W' ? 'is-win' : game.result === 'L' ? 'is-loss' : undefined}>{resultText(game)}</span>
-          <strong><PointsBreakdown name={name} label={`${gameDate(game.date)} ${game.home ? 'vs' : '@'} ${game.opp}`} days={[{ rawStats: game.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints(game, scoring)} /></strong>
-        </span>
-        <small>{logLine(game.stats)}</small>
+        <span className="player-log-when"><span>{gameDate(game.date)}</span><small>{game.home ? 'vs ' : '@'}{game.opp}</small></span>
+        {statCells(game.stats)}
+        <strong className="player-log-fpts"><PointsBreakdown name={name} label={`${gameDate(game.date)} ${game.home ? 'vs' : '@'} ${game.opp}`} days={[{ rawStats: game.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints(game, scoring)} /></strong>
       </li>)}
     </ol>}
     {games.length > 3 && <button type="button" className="tap-btn mock-mini-btn player-log-more" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Collapse' : `Show all ${games.length}`}</button>}
