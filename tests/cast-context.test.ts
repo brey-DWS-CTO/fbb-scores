@@ -1,7 +1,7 @@
 import { isCastScorePage } from '../src/lib/league/castControls.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { castClockText, castMatchesGame, castPageScope, lastGamePlay } from '../src/lib/league/castContext.js';
+import { castClockText, castGameScore, castMatchesGame, castPageScope, lastGamePlay } from '../src/lib/league/castContext.js';
 import type { CastPlay } from '../src/lib/league/fantasyCast.js';
 
 test('follows the viewed matchup rather than the signed-in owner', () => {
@@ -30,6 +30,11 @@ test('the last play is the latest in that game only', () => {
   assert.equal(lastGamePlay(final, '1')?.order, 745);
   assert.equal(castClockText(play('1', 1)), 'Q3 5:32');
   assert.equal(castClockText(play('1', 1, 5, '0:41')), 'OT1 0:41');
+});
+
+test('the play line shows the score right after the play', () => {
+  assert.equal(castGameScore({ game: 'MIA @ CHA', awayScore: 98, homeScore: 101 }), 'MIA 98 @ CHA 101');
+  assert.equal(castGameScore({ game: 'MIA @ CHA' }), 'MIA @ CHA');
 });
 
 test('NBA game filter includes both teams and excludes unrelated games', () => {

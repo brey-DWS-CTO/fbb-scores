@@ -177,3 +177,5 @@ html.theme-light .fantasy-cast-page .cast-legend-opponent { color: #a51d2d; bord
 /* Cast actions in the navigation share the surrounding link appearance. */
 button.top-nav-link { background: transparent; cursor: pointer; font-family: inherit; text-align: left; }
 button.bottom-nav-tab { background: transparent; cursor: pointer; font-family: inherit; }
+/* Game clock and score lead the play line; the wall clock sits at the right. */
+.cast-meta-game { color: var(--text-body, #ddd); font-weight: 600; }

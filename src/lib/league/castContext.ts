@@ -26,6 +26,13 @@ export function castClockText(play: Pick<CastPlay, 'period' | 'clock'>): string 
   return `${play.period > 4 ? `OT${play.period - 4}` : `Q${play.period}`}${play.clock ? ` ${play.clock}` : ''}`;
 }
 
+/** "MIA 98 @ CHA 101": the game with the score right after the play. Just the teams when no score was kept. */
+export function castGameScore(play: Pick<CastPlay, 'game' | 'awayScore' | 'homeScore'>): string {
+  const [away, home] = play.game.split(' @ ');
+  if (!home || play.awayScore === undefined || play.homeScore === undefined) return play.game;
+  return `${away} ${play.awayScore} @ ${home} ${play.homeScore}`;
+}
+
 export function castMatchesGame(play: CastPlay, scope: string): boolean {
   if (scope.startsWith('game:')) return play.gameId === scope.slice(5);
   if (scope.startsWith('nba:')) return play.game.split(' @ ').some(code => normalizeTeam(code) === normalizeTeam(scope.slice(4)));

@@ -6598,3 +6598,24 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .lineup-games-over { padding: 0 6px; border: 0; border-radius: 4px; background: color-mix(in srgb, var(--neon-red) 12%, transparent); color: var(--neon-red); font: inherit; font-weight: 700; line-height: inherit; white-space: nowrap; cursor: pointer; }
 .lineup-games-over::after { content: ' ›'; }
 .lineup-games-over:focus-visible { outline: 2px solid var(--neon-red); outline-offset: 2px; }
+
+/* Player card: a stat strip, then his recent games as two short lines each, then news. */
+.player-log-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 12px 0; border: 1px solid var(--cell-border); border-radius: 8px; }
+.player-log-strip > div { display: flex; flex-direction: column-reverse; align-items: center; gap: 2px; padding: 8px 2px; }
+.player-log-strip > div + div { border-left: 1px solid var(--cell-border); }
+.player-log-strip dt { color: var(--text-soft); font-size: .58rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.player-log-strip dd { margin: 0; color: var(--text-max); font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.player-log-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0 6px; }
+.player-log-head h3, .player-news-heading { margin: 0; color: var(--text-max); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
+.player-news-heading { margin-top: 16px; }
+.player-log-head .performer-segment { height: 30px; }
+.player-log-head .performer-segment button { padding: 0 8px; font-size: .62rem; }
+.player-log-list { list-style: none; margin: 0; padding: 0; }
+.player-log-game { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; border-top: 1px solid var(--cell-border); }
+.player-log-top { display: flex; align-items: baseline; gap: 8px; font-size: .78rem; color: var(--text-body); font-variant-numeric: tabular-nums; }
+.player-log-top > span:first-child { flex: 1; min-width: 0; font-weight: 600; }
+.player-log-top .is-win { color: var(--neon-teal); }
+.player-log-top .is-loss { color: var(--neon-red); }
+.player-log-top strong { min-width: 3.2em; text-align: right; color: var(--text-max); font-size: .95rem; font-weight: 800; }
+.player-log-game small { color: var(--text-soft); font-size: .68rem; }
+.player-log-season { padding: 8px 0 4px; border-top: 1px solid var(--cell-border); color: var(--text-soft); font-size: .62rem; letter-spacing: .04em; text-transform: uppercase; }

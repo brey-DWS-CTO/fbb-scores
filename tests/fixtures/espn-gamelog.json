@@ -1,0 +1,172 @@
+{
+ "filters": [
+  {
+   "name": "season",
+   "value": "2027"
+  }
+ ],
+ "names": [
+  "minutes",
+  "fieldGoalsMade-fieldGoalsAttempted",
+  "fieldGoalPct",
+  "threePointFieldGoalsMade-threePointFieldGoalsAttempted",
+  "threePointPct",
+  "freeThrowsMade-freeThrowsAttempted",
+  "freeThrowPct",
+  "totalRebounds",
+  "assists",
+  "blocks",
+  "steals",
+  "fouls",
+  "turnovers",
+  "points"
+ ],
+ "seasonTypes": [
+  {
+   "displayName": "2026-27 Regular Season",
+   "categories": [
+    {
+     "displayName": "october",
+     "events": [
+      {
+       "eventId": "401909845",
+       "stats": [
+        "23",
+        "4-13",
+        "30.8",
+        "2-8",
+        "25.0",
+        "2-2",
+        "100.0",
+        "5",
+        "5",
+        "0",
+        "2",
+        "4",
+        "3",
+        "12"
+       ]
+      },
+      {
+       "eventId": "401909091",
+       "stats": [
+        "29",
+        "7-17",
+        "41.2",
+        "5-13",
+        "38.5",
+        "2-3",
+        "66.7",
+        "2",
+        "6",
+        "0",
+        "2",
+        "4",
+        "1",
+        "21"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "displayName": "2026-27 Preseason",
+   "categories": [
+    {
+     "displayName": "Preseason",
+     "events": [
+      {
+       "eventId": "401914125",
+       "stats": [
+        "18",
+        "1-5",
+        "20.0",
+        "1-4",
+        "25.0",
+        "0-0",
+        "0.0",
+        "2",
+        "6",
+        "0",
+        "0",
+        "4",
+        "3",
+        "3"
+       ]
+      },
+      {
+       "eventId": "401914124",
+       "stats": [
+        "22",
+        "3-7",
+        "42.9",
+        "1-3",
+        "33.3",
+        "3-3",
+        "100.0",
+        "3",
+        "7",
+        "1",
+        "0",
+        "2",
+        "5",
+        "10"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "events": {
+  "401909091": {
+   "gameDate": "2026-10-21T23:30:00.000+00:00",
+   "homeTeamId": "14",
+   "awayTeamId": "16",
+   "homeTeamScore": "106",
+   "awayTeamScore": "131",
+   "gameResult": "W",
+   "opponent": {
+    "id": "14",
+    "abbreviation": "MIA"
+   }
+  },
+  "401909845": {
+   "gameDate": "2026-10-23T23:00:00.000+00:00",
+   "homeTeamId": "19",
+   "awayTeamId": "16",
+   "homeTeamScore": "93",
+   "awayTeamScore": "115",
+   "gameResult": "W",
+   "opponent": {
+    "id": "19",
+    "abbreviation": "ORL"
+   }
+  },
+  "401914124": {
+   "gameDate": "2026-10-12T23:30:00.000+00:00",
+   "homeTeamId": "18",
+   "awayTeamId": "16",
+   "homeTeamScore": "104",
+   "awayTeamScore": "122",
+   "gameResult": "W",
+   "opponent": {
+    "id": "18",
+    "abbreviation": "NY"
+   }
+  },
+  "401914125": {
+   "gameDate": "2026-10-15T00:00:00.000+00:00",
+   "homeTeamId": "16",
+   "awayTeamId": "8",
+   "homeTeamScore": "106",
+   "awayTeamScore": "128",
+   "gameResult": "L",
+   "opponent": {
+    "id": "8",
+    "abbreviation": "DET"
+   }
+  }
+ }
+}

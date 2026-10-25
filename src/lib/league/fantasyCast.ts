@@ -5,10 +5,12 @@ import type { CastSchedule } from './castPolling.js';
 export interface CastPlay {
   id: string; gameId: string; text: string; clock: string; period: number;
   timestamp: string | null; order: number; game: string;
+  /** The score right after this play. Missing on plays saved before scores were kept. */
+  awayScore?: number; homeScore?: number;
   changes: { athleteId: string; name: string; team: string; stat: string; stats: Record<string, number> }[];
 }
 export interface FantasyCast { plays: CastPlay[]; error: string | null; fetchedAt: string; schedule?: CastSchedule }
-type RawPlay = { id?: string; text?: string; scoreValue?: number; pointsAttempted?: number; wallclock?: string; sequenceNumber?: string; period?: { number?: number }; clock?: { displayValue?: string } };
+type RawPlay = { id?: string; text?: string; awayScore?: number | string; homeScore?: number | string; scoreValue?: number; pointsAttempted?: number; wallclock?: string; sequenceNumber?: string; period?: { number?: number }; clock?: { displayValue?: string } };
 
 /** Keep every play, including substitutions and team events with no fantasy impact. */
 export function parseCastPlays(raw: unknown, gameId: string, game: string, players: readonly BoxLine[]): CastPlay[] {
@@ -54,7 +56,9 @@ export function parseCastPlays(raw: unknown, gameId: string, game: string, playe
     }
     return { id: `${gameId}:${play.id ?? index}`, gameId, text, game, clock: play.clock?.displayValue ?? '', period: play.period?.number ?? 0,
       timestamp: play.wallclock && Number.isFinite(Date.parse(play.wallclock)) ? play.wallclock : null,
-      order: Number(play.sequenceNumber ?? index), changes };
+      order: Number(play.sequenceNumber ?? index), changes,
+      ...(Number.isFinite(Number(play.awayScore)) && Number.isFinite(Number(play.homeScore)) && play.awayScore !== undefined && play.homeScore !== undefined
+        ? { awayScore: Number(play.awayScore), homeScore: Number(play.homeScore) } : {}) };
   });
 }
 
