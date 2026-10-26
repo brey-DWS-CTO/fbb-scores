@@ -45,6 +45,8 @@ import type { MockFinish } from '../../src/lib/league/mockStats.js';
 import { parseMockTrade, type MockTrade } from '../../src/lib/league/mockTrades.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
 import type { GamesCapRow } from '../../src/lib/league/gamesCap.js';
+import type { GameLine } from '../../src/lib/league/scores.js';
+import type { CachedDay, TrendPoint, TrendRow } from '../../src/lib/league/winTrend.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
 import type { AchievementLedger } from '../../src/lib/league/achievements.js';
@@ -553,6 +555,14 @@ interface StoreBackend {
   draftListOwners(season: number): Promise<string[]>;
   setDraftQueue(room: string, owner: string, keys: string[]): Promise<void>;
   getDraftQueues(room: string): Promise<Record<string, string[]>>;
+  /** Kept copies of a week's days, for the win % clock. */
+  getTrendDays(season: number, scoringPeriodIds: number[]): Promise<CachedDay[]>;
+  saveTrendDay(season: number, day: CachedDay): Promise<void>;
+  /** Every saved win % point for a week, oldest first. */
+  listTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]>;
+  /** The newest saved point for each matchup in a week. */
+  latestTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]>;
+  saveTrendRows(rows: TrendRow[]): Promise<void>;
   getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario>;
   setKeeperScenarioTarget(
     season: number,
@@ -772,6 +782,37 @@ function toHistoryVersionRow(raw: RawHistoryVersionRow): LeagueHistoryVersionRow
     publishedAt: new Date(raw.published_at).toISOString(),
     publishedBy: raw.published_by,
   };
+}
+
+interface TrendPointSqlRow {
+  matchup_id: number;
+  taken_at: string | Date;
+  home_pct: number;
+  home_points: number;
+  away_points: number;
+  home_proj: number;
+  away_proj: number;
+}
+
+function trendPointFromSql(row: TrendPointSqlRow): TrendPoint {
+  return {
+    matchupId: row.matchup_id,
+    takenAt: new Date(row.taken_at).toISOString(),
+    homePct: row.home_pct,
+    homePoints: Number(row.home_points),
+    awayPoints: Number(row.away_points),
+    homeProj: Number(row.home_proj),
+    awayProj: Number(row.away_proj),
+  };
+}
+
+function trendPointOf(row: TrendRow): TrendPoint {
+  const { matchupId, takenAt, homePct, homePoints, awayPoints, homeProj, awayProj } = row;
+  return { matchupId, takenAt, homePct, homePoints, awayPoints, homeProj, awayProj };
+}
+
+function trendRowKey(row: TrendRow): string {
+  return `${row.season}:${row.matchupPeriodId}:${row.matchupId}:${row.takenAt}`;
 }
 
 // ─── Neon Postgres backend ───────────────────────────────────────────────────
@@ -1068,6 +1109,29 @@ class NeonBackend implements StoreBackend {
       seen_at timestamptz not null,
       primary key (room, owner)
     )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS win_trend_points (
+      season int not null,
+      matchup_period int not null,
+      matchup_id int not null,
+      taken_at timestamptz not null,
+      home_team int not null,
+      away_team int not null,
+      home_pct int not null,
+      home_points real not null,
+      away_points real not null,
+      home_proj real not null,
+      away_proj real not null,
+      primary key (season, matchup_period, matchup_id, taken_at)
+    )`;
+    await this.sql`CREATE TABLE IF NOT EXISTS win_trend_days (
+      season int not null,
+      scoring_period int not null,
+      date text not null,
+      read_on text not null,
+      payload jsonb not null,
+      games jsonb,
+      primary key (season, scoring_period)
+    )`;
     await this.sql`CREATE TABLE IF NOT EXISTS draft_lists (
       season int not null,
       owner text not null,
@@ -1245,6 +1309,60 @@ class NeonBackend implements StoreBackend {
     await this.ensureInit();
     const rows = (await this.sql`SELECT owner, keys FROM draft_queues WHERE room = ${room}`) as Array<{ owner: string; keys: string[] }>;
     return Object.fromEntries(rows.map((row) => [row.owner, Array.isArray(row.keys) ? row.keys : []]));
+  }
+
+  async getTrendDays(season: number, scoringPeriodIds: number[]): Promise<CachedDay[]> {
+    await this.ensureInit();
+    if (scoringPeriodIds.length === 0) return [];
+    const rows = (await this.sql`SELECT scoring_period, date, read_on, payload, games FROM win_trend_days
+      WHERE season = ${season} AND scoring_period = ANY(${`{${scoringPeriodIds.map(Number).join(',')}}`}::int[])`) as Array<{
+      scoring_period: number;
+      date: string;
+      read_on: string;
+      payload: unknown;
+      games: Record<string, GameLine> | null;
+    }>;
+    return rows.map((row) => ({ scoringPeriodId: row.scoring_period, date: row.date, readOn: row.read_on, payload: row.payload, games: row.games }));
+  }
+
+  async saveTrendDay(season: number, day: CachedDay): Promise<void> {
+    await this.ensureInit();
+    await this.sql`INSERT INTO win_trend_days (season, scoring_period, date, read_on, payload, games)
+      VALUES (${season}, ${day.scoringPeriodId}, ${day.date}, ${day.readOn}, ${JSON.stringify(day.payload)}::jsonb, ${day.games === null ? null : JSON.stringify(day.games)}::jsonb)
+      ON CONFLICT (season, scoring_period) DO UPDATE SET date = EXCLUDED.date, read_on = EXCLUDED.read_on,
+        payload = EXCLUDED.payload, games = EXCLUDED.games`;
+  }
+
+  async listTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT matchup_id, taken_at, home_pct, home_points, away_points, home_proj, away_proj
+      FROM win_trend_points WHERE season = ${season} AND matchup_period = ${matchupPeriodId}
+      ORDER BY taken_at`) as TrendPointSqlRow[];
+    return rows.map(trendPointFromSql);
+  }
+
+  async latestTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]> {
+    await this.ensureInit();
+    const rows = (await this.sql`SELECT DISTINCT ON (matchup_id) matchup_id, taken_at, home_pct, home_points, away_points, home_proj, away_proj
+      FROM win_trend_points WHERE season = ${season} AND matchup_period = ${matchupPeriodId}
+      ORDER BY matchup_id, taken_at DESC`) as TrendPointSqlRow[];
+    return rows.map(trendPointFromSql);
+  }
+
+  async saveTrendRows(rows: TrendRow[]): Promise<void> {
+    await this.ensureInit();
+    if (rows.length === 0) return;
+    const body = JSON.stringify(rows.map((row) => ({
+      season: row.season, matchup_period: row.matchupPeriodId, matchup_id: row.matchupId, taken_at: row.takenAt,
+      home_team: row.homeTeamId, away_team: row.awayTeamId, home_pct: row.homePct, home_points: row.homePoints,
+      away_points: row.awayPoints, home_proj: row.homeProj, away_proj: row.awayProj,
+    })));
+    await this.sql`INSERT INTO win_trend_points (season, matchup_period, matchup_id, taken_at, home_team, away_team,
+        home_pct, home_points, away_points, home_proj, away_proj)
+      SELECT * FROM jsonb_to_recordset(${body}::jsonb) AS x(season int, matchup_period int, matchup_id int,
+        taken_at timestamptz, home_team int, away_team int, home_pct int, home_points real, away_points real,
+        home_proj real, away_proj real)
+      ON CONFLICT DO NOTHING`;
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -2538,6 +2656,9 @@ interface FileDoc {
   draftLists?: Array<{ season: number; owner: string; list: DraftList }>;
   /** Each owner's draft queue, by room. */
   draftQueues?: Array<{ room: string; owner: string; keys: string[] }>;
+  /** Kept days and saved points for the win % trend. */
+  trendDays?: Array<CachedDay & { season: number }>;
+  trendRows?: TrendRow[];
 }
 
 /** Every list a fresh document starts with. */
@@ -2646,6 +2767,8 @@ class FileBackend implements StoreBackend {
         draftPresence: Array.isArray(doc.draftPresence) ? doc.draftPresence : [],
         draftLists: Array.isArray(doc.draftLists) ? doc.draftLists : [],
         draftQueues: Array.isArray(doc.draftQueues) ? doc.draftQueues : [],
+        trendDays: Array.isArray(doc.trendDays) ? doc.trendDays : [],
+        trendRows: Array.isArray(doc.trendRows) ? doc.trendRows : [],
       };
     } catch {
       // A missing or unreadable file starts empty. Every list must be present,
@@ -2770,6 +2893,48 @@ class FileBackend implements StoreBackend {
   async getDraftQueues(room: string): Promise<Record<string, string[]>> {
     await this.ensureInit();
     return Object.fromEntries((this.readDoc().draftQueues ?? []).filter((row) => row.room === room).map((row) => [row.owner, row.keys]));
+  }
+
+  async getTrendDays(season: number, scoringPeriodIds: number[]): Promise<CachedDay[]> {
+    await this.ensureInit();
+    const wanted = new Set(scoringPeriodIds);
+    return (this.readDoc().trendDays ?? [])
+      .filter((day) => day.season === season && wanted.has(day.scoringPeriodId))
+      .map((day) => ({ scoringPeriodId: day.scoringPeriodId, date: day.date, readOn: day.readOn, payload: day.payload, games: day.games }));
+  }
+
+  async saveTrendDay(season: number, day: CachedDay): Promise<void> {
+    await this.ensureInit();
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      doc.trendDays = [...(doc.trendDays ?? []).filter((row) => !(row.season === season && row.scoringPeriodId === day.scoringPeriodId)), { ...structuredClone(day), season }];
+      this.writeDoc(doc);
+    });
+  }
+
+  async listTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]> {
+    await this.ensureInit();
+    return (this.readDoc().trendRows ?? [])
+      .filter((row) => row.season === season && row.matchupPeriodId === matchupPeriodId)
+      .sort((a, b) => a.takenAt.localeCompare(b.takenAt))
+      .map(trendPointOf);
+  }
+
+  async latestTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]> {
+    const latest = new Map<number, TrendPoint>();
+    for (const point of await this.listTrendPoints(season, matchupPeriodId)) latest.set(point.matchupId, point);
+    return [...latest.values()];
+  }
+
+  async saveTrendRows(rows: TrendRow[]): Promise<void> {
+    await this.ensureInit();
+    if (rows.length === 0) return;
+    await this.enqueueWrite(() => {
+      const doc = this.readDoc();
+      const seen = new Set((doc.trendRows ?? []).map(trendRowKey));
+      doc.trendRows = [...(doc.trendRows ?? []), ...rows.filter((row) => !seen.has(trendRowKey(row))).map((row) => structuredClone(row))];
+      this.writeDoc(doc);
+    });
   }
 
   async getKeeperScenario(season: number, viewer: string): Promise<KeeperScenario> {
@@ -3775,6 +3940,29 @@ export async function setDraftQueue(room: string, owner: string, keys: string[])
 /** Every owner's draft queue in this room. */
 export async function getDraftQueues(room: string): Promise<Record<string, string[]>> {
   return getBackend().getDraftQueues(room);
+}
+
+/** Kept copies of a week's days, for the win % clock. */
+export async function getTrendDays(season: number, scoringPeriodIds: number[]): Promise<CachedDay[]> {
+  return getBackend().getTrendDays(season, scoringPeriodIds);
+}
+
+export async function saveTrendDay(season: number, day: CachedDay): Promise<void> {
+  return getBackend().saveTrendDay(season, day);
+}
+
+/** Every saved win % point for a week, oldest first. */
+export async function listTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]> {
+  return getBackend().listTrendPoints(season, matchupPeriodId);
+}
+
+/** The newest saved point for each matchup in a week. */
+export async function latestTrendPoints(season: number, matchupPeriodId: number): Promise<TrendPoint[]> {
+  return getBackend().latestTrendPoints(season, matchupPeriodId);
+}
+
+export async function saveTrendRows(rows: TrendRow[]): Promise<void> {
+  return getBackend().saveTrendRows(rows);
 }
 
 /** Owners who checked in to this room since `since`. */

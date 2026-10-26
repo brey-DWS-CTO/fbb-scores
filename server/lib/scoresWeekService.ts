@@ -70,7 +70,7 @@ async function fetchNbaScoreboardRaw(date: string): Promise<unknown | null> {
   }
 }
 
-async function fetchNbaGamesForDate(date: string): Promise<Record<string, GameLine> | null> {
+export async function fetchNbaGamesForDate(date: string): Promise<Record<string, GameLine> | null> {
   const raw = await fetchNbaScoreboardRaw(date);
   return raw === null ? null : readNbaScoreboard(raw);
 }
@@ -78,11 +78,15 @@ async function fetchNbaGamesForDate(date: string): Promise<Record<string, GameLi
 /** A fresh read for scheduled warnings, using the same loader as the score page. */
 export async function loadCurrentScoresWeek(): Promise<ScoresWeek> { return loadScoresWeek(null); }
 export async function loadScoresWeek(period: number | null): Promise<ScoresWeek> {
+  return loadWeek(espnClientFromEnv(), period);
+}
+
+/** The league's ESPN client from the server's own credentials. */
+export function espnClientFromEnv(): EspnClient {
   const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
   if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) throw new Error('Missing ESPN credentials');
-  const client = new EspnClient({
+  return new EspnClient({
     leagueId: ESPN_LEAGUE_ID, seasonId: Number(ESPN_SEASON_ID ?? 2026),
     espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: ESPN_COOKIE_STRING,
   });
-  return loadWeek(client, period);
 }

@@ -65,6 +65,7 @@ import type { ScoresWeek } from './scores.js';
 import type { DailyNbaScores } from './dailyScorers.js';
 import type { WaiverCalendar } from './waiverCalendar.js';
 import type { GamesCapRow } from './gamesCap.js';
+import type { TrendPoint } from './winTrend.js';
 import type { FillLine } from './expertProjections.js';
 import type { LeagueTransaction } from './transactions.js';
 import type { EarlyDay, LmAddCheck, LmAddRequest, LmAddWindow, WaiverHour } from './lmWeekend.js';
@@ -981,6 +982,12 @@ export async function fetchScoresWeek(matchupPeriod: number | null): Promise<Sco
     params: matchupPeriod === null ? undefined : { matchupPeriod },
   });
   return data;
+}
+
+/** Every saved win % point for one week, oldest first. */
+export async function fetchWinTrend(season: number, matchupPeriod: number): Promise<TrendPoint[]> {
+  const { data } = await axios.get<{ points: TrendPoint[] }>('/api/espn/win-trend', { params: { season, matchupPeriod } });
+  return data.points;
 }
 
 export async function fetchDailyScorers(date: string): Promise<DailyNbaScores> {
