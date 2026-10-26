@@ -118,7 +118,7 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
                     if (activeSelection && eligible) { void move({ playerId: activeSelection.playerId, destinationSlotId: slot.id, revision: activeSelection.revision }); return; }
                     if (player) setSelected({ playerId: player.id, revision: snapshot.revision });
                   }}>
-                  <span className="my-team-slot">{slot.label}</span><span className="my-team-player-line"><span className="my-team-player" title={player?.name}>{player ? shortName(player.name) : 'Empty slot'}</span>{player && <small className="my-team-positions" aria-label="Eligible positions">{positions || 'Unknown'}</small>}</span><TeamLogo code={player?.proTeamId !== undefined ? NBA_TEAM_ABBREV[player.proTeamId] ?? null : null} size={16} />
+                  <span className="my-team-slot">{slot.label}</span><span className="my-team-player-line"><span className="my-team-player" title={player?.name}>{player ? shortName(player.name) : 'Empty slot'}</span>{player && <TeamLogo code={player.proTeamId !== undefined ? NBA_TEAM_ABBREV[player.proTeamId] ?? null : null} size={16} />}{player && <small className="my-team-positions" aria-label="Eligible positions">{positions || 'Unknown'}</small>}</span>
                   <span className="my-team-row-state">{player?.locked ? <NavIcon name="lock" size={12} label="Locked" /> : isSelected ? 'Selected' : eligible ? 'Eligible destination' : ''}{player && <span className="my-team-lock-detail">{player.lockAt ? `Lock: ${new Date(player.lockAt).toLocaleString()}` : team.data?.executionEnabled ? 'Lock details unavailable' : ''}</span>}</span>
                 </button>;
               })}
