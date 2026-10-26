@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sideProjection } from '../src/lib/league/dailyProjection.js';
-import { gamesCapProjection, sideOdds, type GameLine, type ScorePlayer, type ScoreSide, type ScoresWeek } from '../src/lib/league/scores.js';
+import { gamesCapProjection, gamesPlayed, sideOdds, type GameLine, type ScorePlayer, type ScoreSide, type ScoresWeek } from '../src/lib/league/scores.js';
+import { lineupGames } from '../src/lib/league/lineupGames.js';
 import { sideMean } from '../src/lib/league/winOdds.js';
 
 const game = (status: GameLine['status']): GameLine => ({ status, opponent: 'NY', home: true, teamScore: null, oppScore: null, clock: null, tipoff: null, minutesLeft: status === 'live' ? 24 : null });
@@ -126,4 +127,51 @@ test('a cancelled game reduces the excess count instead of becoming an overage',
   const projection = sideProjection(side, week, expected);
   assert.equal(projection.week, 905);
   assert.deepEqual(projection.overages.map((entry) => entry.playerId), [30]);
+});
+
+test('today’s final DNPs do not cause false overages at or under the cap', () => {
+  const { side, week } = example();
+  for (const player of side.players.slice(29)) {
+    Object.assign(player.days['2'], { points: 0, played: false, game: game('final') });
+  }
+  week.days[1].games = { DEN: game('final'), GSW: game('final'), LAL: game('final') };
+  for (const cap of [29, 30]) {
+    const cappedWeek = { ...week, gamesCap: cap } as ScoresWeek;
+    assert.equal(gamesPlayed(side, cappedWeek), 29);
+    assert.equal(lineupGames(side, cappedWeek).projected, 29);
+    assert.deepEqual(gamesCapProjection(side, cappedWeek, expected).overages, []);
+    assert.equal(sideProjection(side, cappedWeek, expected).deduction, 0);
+  }
+});
+
+test('an OUT player’s live NBA game counts only if he actually played', () => {
+  const { side, week } = example();
+  const player = side.players[29];
+  player.injuryStatus = 'OUT';
+  player.days['2'].game = game('live');
+  week.days[1].games!.DEN = game('live');
+  const cappedWeek = { ...week, gamesCap: 31 } as ScoresWeek;
+  assert.equal(gamesPlayed(side, cappedWeek), 29);
+  assert.deepEqual(gamesCapProjection(side, cappedWeek, expected).overages, []);
+  player.days['2'].played = true;
+  assert.equal(gamesPlayed(side, cappedWeek), 30);
+  assert.equal(gamesCapProjection(side, cappedWeek, expected).overages.length, 1);
+});
+
+test('26 played games plus two final DNPs stay at the 26-game cap without deductions', () => {
+  const { side, week } = example();
+  side.players = side.players.slice(0, 28);
+  for (const player of side.players.slice(26)) {
+    player.days = { '2': { lineupSlotId: 4, started: true, points: 0, played: false, stats: null, game: game('final') } };
+  }
+  week.days[1].games = { DEN: game('final') };
+  const cappedWeek = { ...week, gamesCap: 26 } as ScoresWeek;
+  const games = lineupGames(side, cappedWeek);
+  assert.equal(games.played, 26);
+  assert.equal(games.projected, 26);
+  assert.equal(games.difference, 0);
+  const forecast = sideProjection(side, cappedWeek, expected);
+  assert.deepEqual(forecast.overages, []);
+  assert.equal(forecast.deduction, 0);
+  assert.equal(forecast.week, side.total);
 });

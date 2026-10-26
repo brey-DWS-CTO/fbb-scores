@@ -848,7 +848,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
           const points = num(pool.appliedStatTotal)
             ?? (row ? (num(row.appliedTotal) ?? (items.length > 0 ? computeFpts(numbers(row.stats), items) : 0)) : 0);
           const game = day.games && proTeam ? (day.games[proTeam] ?? null) : null;
-          const played = (stats?.gp ?? 0) >= 1 || points !== 0 || (stats !== null && game?.status === 'final');
+          const played = (stats?.gp ?? 0) >= 1 || (stats?.min ?? 0) > 0 || points !== 0;
           known.days[String(day.scoringPeriodId)] = { lineupSlotId, started, points, stats, rawStats: row ? numbers(row.stats) : undefined, played, game };
           if (started) dayPoints += points;
         }
@@ -1050,7 +1050,7 @@ export function gamesPlayed(side: ScoreSide, week: Pick<ScoresWeek, 'days' | 'cu
       if (day.scoringPeriodId < week.currentScoringPeriodId) {
         if (playerDay.played) used += 1;
       } else if (day.scoringPeriodId === week.currentScoringPeriodId) {
-        if (playerDay.game?.status === 'final' || playerDay.game?.status === 'live' || playerDay.played) used += 1;
+        if (playerDay.played || (playerDay.game?.status === 'live' && !isOut(player))) used += 1;
       }
     }
   }
@@ -1120,7 +1120,7 @@ export function gamesCapProjection(
       const played = actual?.started === true && (day.scoringPeriodId < week.currentScoringPeriodId
         ? actual.played
         : day.scoringPeriodId === week.currentScoringPeriodId
-          && (actual.played || actual.game?.status === 'live' || actual.game?.status === 'final'));
+          && (actual.played || (actual.game?.status === 'live' && !isOut(player))));
       const game = left.get(`${player.id}:${day.scoringPeriodId}`);
       if (!played && !game) continue;
       const baseline = game ? expected(player, day.scoringPeriodId) : 0;
