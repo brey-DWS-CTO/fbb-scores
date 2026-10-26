@@ -76,12 +76,13 @@ async function fetchNbaGamesForDate(date: string): Promise<Record<string, GameLi
 }
 
 /** A fresh read for scheduled warnings, using the same loader as the score page. */
-export async function loadCurrentScoresWeek(): Promise<ScoresWeek> {
+export async function loadCurrentScoresWeek(): Promise<ScoresWeek> { return loadScoresWeek(null); }
+export async function loadScoresWeek(period: number | null): Promise<ScoresWeek> {
   const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
   if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) throw new Error('Missing ESPN credentials');
   const client = new EspnClient({
     leagueId: ESPN_LEAGUE_ID, seasonId: Number(ESPN_SEASON_ID ?? 2026),
     espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: ESPN_COOKIE_STRING,
   });
-  return loadWeek(client, null);
+  return loadWeek(client, period);
 }

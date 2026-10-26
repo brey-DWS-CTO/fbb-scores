@@ -1,4 +1,6 @@
+import { registerMissedGamesRoutes } from './missedGames.js';
 import { getPerformerDates } from '../lib/performerDatesService.js';
+import { registerLineupRoutes } from './lineup.js';
 /**
  * League draft-hub API — keepers, live draft picks, locks, PINs, audit log.
  * Mounted at /api/league.
@@ -680,6 +682,8 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
   // Whose keepers each owner has revealed is theirs alone. Prop bets have
   // their own route, so they stay out of the poll payload.
   delete state.achievements;
+  delete state.lineupManagement;
+  delete state.missedGames;
   delete state.propBets;
   // Roasts lean on the numbers, and members draft blind until it closes.
   if (!viewer.isCommissioner && !result.state.draft.closedAt) delete state.draftRecap;
@@ -5522,6 +5526,9 @@ router.post('/guests', requireAuth, requireCommissioner, async (req, res, next) 
 router.delete('/guests/:id', requireAuth, requireCommissioner, async (req, res, next) => {
   try { const id = String(req.params.id); await revokeGuestAccess(id); await appendAudit(actor(res), 'guest.revoked', { id }); res.status(204).end(); } catch (error) { next(error); }
 });
+
+registerLineupRoutes(router, requireAuth, requireCommissioner);
+registerMissedGamesRoutes(router, requireAuth, requireCommissioner);
 
 router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;
