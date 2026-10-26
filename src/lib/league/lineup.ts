@@ -9,6 +9,8 @@ export interface LineupSlot {
 }
 
 export interface LineupPlayer {
+  /** Display-only NBA affiliation from the roster read. */
+  proTeamId?: number;
   id: number;
   name: string;
   eligibleSlotIds: number[];

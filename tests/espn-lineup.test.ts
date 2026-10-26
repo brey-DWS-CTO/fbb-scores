@@ -168,3 +168,12 @@ test('invalid bindings and dates fail before parsing', () => {
   }
   assert.throws(() => parseEspnLineup(settings(), roster(), binding, new Date(NaN)));
 });
+
+test('roster read carries optional NBA affiliation for display without inventing unknown teams', () => {
+  const data = roster();
+  Object.assign(data.teams[0].roster.entries[0].playerPoolEntry.player, { proTeamId: 7 });
+  Object.assign(data.teams[0].roster.entries[1].playerPoolEntry.player, { proTeamId: 'unknown' });
+  const result = parseEspnLineup(settings(), data, binding, now);
+  assert.equal(result.players.find(p => p.id === 1)?.proTeamId, 7);
+  assert.equal(result.players.find(p => p.id === 2)?.proTeamId, undefined);
+});
