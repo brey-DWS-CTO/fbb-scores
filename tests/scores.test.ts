@@ -449,6 +449,22 @@ test('the week carries both sides, their records, totals and day scores', () => 
   assert.equal(week.days[4].games, null, 'a day never fetched has no games');
 });
 
+test('finished NBA games with zero stat rows do not turn DNPs into games played', () => {
+  const plan = planWeek(SETTINGS, 3, TODAY_ANCHOR);
+  const week = readEspnWeek({
+    plan, settings: SETTINGS, fetchedAt: '2026-11-05T20:00:00Z',
+    days: [{ scoringPeriodId: 17, date: '2026-11-04', games: DAY_17_GAMES,
+      payload: dayPayload(17, [
+        { ...JOKIC, stats: { '40': 0, '42': 0 }, points: 0 },
+        { ...JOKIC, id: 999, stats: { '40': 2 }, points: 0 },
+      ], []) }],
+  });
+  const side = week.matchups[0].home;
+  assert.equal(side.players[0].days['17'].played, false);
+  assert.equal(side.players[1].days['17'].played, true, 'minutes count even with zero fantasy points and no GP stat');
+  assert.equal(gamesPlayed(side, week), 1);
+});
+
 test('a player\'s day is his own stat row, his slot and his game', () => {
   const week = buildWeek();
   const jokic = week.matchups[0].home.players.find((player) => player.name === 'Nikola Jokic') as ScorePlayer;

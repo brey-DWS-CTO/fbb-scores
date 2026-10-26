@@ -20,6 +20,8 @@ test('counts a live game once even when OUT, and honors later lineup changes', (
   player.days['19'].started = false;
   assert.equal(lineupGames(week.matchups[0].away, week).projected, 3);
   player.injuryStatus = 'OUT';
+  assert.equal(lineupGames(week.matchups[0].away, week).projected, 1, 'OUT without participation does not use a live game');
+  player.days['18'].played = true;
   assert.equal(lineupGames(week.matchups[0].away, week).projected, 2);
 });
 
