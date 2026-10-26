@@ -1,3 +1,4 @@
+import { runMissedGamesClock } from '../lib/missedGamesService.js';
 /**
  * The clocks. Mounted at /api/notify.
  *
@@ -57,12 +58,13 @@ router.get('/tick', async (req: Request, res: Response) => {
     });
     // The moves feed fills on the hour too, so the table is whole even when
     // nobody opens the page. A failed pull is logged, never fatal here.
+    const missedGames = await runMissedGamesClock(new Date()).catch(() => ({ error: 'Missed-games refresh failed; saved records retained' }));
     const moves = await pullTransactionsIfStale();
     if (moves && moves.added > 0) console.log(`[transactions] tick: ${moves.added} new`);
     const run = await runDueReminders(new Date(), appOrigin(req));
     // Counts only. Who was mailed is not something a log needs to carry.
     console.log(`[notify] tick: ${run.sent} of ${run.due} due reminders sent`);
-    res.json({ ...run, games });
+    res.json({ ...run, games, missedGames });
   } catch (err) {
     console.error('[notify] tick failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'The reminder run failed' });

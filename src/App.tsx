@@ -1,3 +1,4 @@
+import MissedGamesPage from './components/league/MissedGamesPage.js';
 import GuestJoinPage from './components/league/GuestJoinPage.js';
 import { guestPageAllowed } from './lib/league/guestAccess.js';
 import { Routes, Route, useLocation, Link, Navigate } from 'react-router-dom'
@@ -147,6 +148,7 @@ function App() {
         <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
         <Route path="/my-team" element={<MyTeamPage />} />
+        <Route path="/scores/missed-games" element={<MissedGamesPage />} />
         <Route path="/scores/cast" element={<FantasyCastPage />} />
         <Route path="/league/offseason" element={<LeagueOffseasonPage />} />
         <Route path="/waivers" element={<WaiverCalendarPage />} />
