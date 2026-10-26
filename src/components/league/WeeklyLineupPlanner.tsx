@@ -39,7 +39,7 @@ export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnap
           <thead><tr><th scope="col" className="weekly-player-cell">Player</th>{Array.from({ length: gameColumns }, (_, i) => <th scope="col" key={i}>Game {i + 1}</th>)}</tr></thead>
           <tbody>{rows.map(({ player, scoring, games }) => {
             return <tr key={player.id}>
-              <th scope="row" className="weekly-player-cell" title={player.name}><span className="weekly-player-label"><TeamLogo code={scoring?.proTeam ?? null} size={18} /><span className="weekly-player-name">{shortName(player.name)}</span></span></th>
+              <th scope="row" className="weekly-player-cell" title={player.name}><span className="weekly-player-label"><TeamLogo code={scoring?.proTeam ?? null} size={14} /><span className="weekly-player-name">{shortName(player.name)}</span></span></th>
               {games.map(game => {
                 const date = `${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${game.date}T12:00:00Z`))} ${Number(game.date.slice(8))}`;
                 const opponent = `${game.home ? 'vs' : '@'} ${game.opponent || 'TBD'}`;

@@ -140,7 +140,7 @@
 .my-team-group { margin-top: 8px; }
 .my-team-group h2 { margin: 0; padding: 5px 6px; font-size: .7rem; color: var(--text-mid); text-transform: uppercase; letter-spacing: .04em; }
 .my-team-roster { gap: 0; border-top: 1px solid var(--panel-border); }
-.my-team-row { grid-template-columns: 32px 22px minmax(0,1fr) auto; min-height: 34px; gap: 8px; padding: 4px 6px; border: 0; border-bottom: 1px solid var(--panel-border); border-radius: 0; background: transparent; font-size: .8rem; }
+.my-team-row { grid-template-columns: 32px minmax(0,1fr) 16px auto; min-height: 34px; gap: 8px; padding: 4px 6px; border: 0; border-bottom: 1px solid var(--panel-border); border-radius: 0; background: transparent; font-size: .8rem; }
 .my-team-row:nth-child(even) { background: color-mix(in srgb, var(--text-mid) 4%, transparent); }
 .my-team-row .team-logo { object-fit: contain; }
 .my-team-slot { font-size: .65rem; }
@@ -150,7 +150,7 @@
 .my-team-updated { margin: 5px 0; font-size: .65rem; }
 @media (max-width: 540px) {
   .my-team-header h1 { font-size: 1.1rem; }
-  .my-team-row { grid-template-columns: 28px 22px minmax(0,1fr) auto; min-height: 34px; padding: 4px 5px; gap: 6px; }
+  .my-team-row { grid-template-columns: 28px minmax(0,1fr) 16px auto; min-height: 34px; padding: 4px 5px; gap: 6px; }
   .my-team-group { margin-top: 6px; }
 }
 
@@ -159,3 +159,8 @@
 .weekly-player-label { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .weekly-player-label .team-logo { flex-shrink: 0; object-fit: contain; }
 .weekly-player-label .weekly-player-name { min-width: 0; }
+
+.my-team-player-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.my-team-player-line .my-team-player { min-width: 0; }
+.my-team-positions { flex-shrink: 0; color: var(--text-mid); font-size: .63rem; font-weight: 400; white-space: nowrap; }
+.weekly-player-label .team-logo { order: 2; margin-left: auto; }

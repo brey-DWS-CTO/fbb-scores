@@ -102,6 +102,7 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
             {groupedSlots.map(group => <section className="my-team-group" key={group.kind} aria-labelledby={`lineup-${group.kind}`}><h2 id={`lineup-${group.kind}`}>{group.title}</h2><div className="my-team-roster" aria-describedby="lineup-help">
               {group.slots.map(slot => {
                 const player = snapshot.players.find(candidate => candidate.id === slot.playerId);
+                const positions = player ? ['PG', 'SG', 'SF', 'PF', 'C'].filter((_position, id) => player.eligibleSlotIds.includes(id)).join('/') : '';
                 const activeSelection = selected?.revision === snapshot.revision ? selected : null;
                 const isSelected = activeSelection != null && player != null && activeSelection.playerId === player.id;
                 let eligible = false;
@@ -110,14 +111,14 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
                   catch { /* Both players and the applicable locks must pass. */ }
                 }
                 const disabled = !enabled || (activeSelection != null ? !eligible && !isSelected : !player || player.locked);
-                return <button type="button" key={slot.id} disabled={disabled} aria-pressed={isSelected} aria-label={player ? `${slot.label}: ${player.name}` : `${slot.label}: Empty slot`}
+                return <button type="button" key={slot.id} disabled={disabled} aria-pressed={isSelected} aria-label={player ? `${slot.label}: ${player.name}, eligible positions ${positions || 'unavailable'}` : `${slot.label}: Empty slot`}
                   className={`my-team-row${eligible ? ' eligible' : ''}${isSelected ? ' selected' : ''}`}
                   onClick={() => {
                     if (isSelected) { setSelected(null); return; }
                     if (activeSelection && eligible) { void move({ playerId: activeSelection.playerId, destinationSlotId: slot.id, revision: activeSelection.revision }); return; }
                     if (player) setSelected({ playerId: player.id, revision: snapshot.revision });
                   }}>
-                  <span className="my-team-slot">{slot.label}</span><TeamLogo code={player?.proTeamId !== undefined ? NBA_TEAM_ABBREV[player.proTeamId] ?? null : null} size={22} /><span className="my-team-player" title={player?.name}>{player ? shortName(player.name) : 'Empty slot'}</span>
+                  <span className="my-team-slot">{slot.label}</span><span className="my-team-player-line"><span className="my-team-player" title={player?.name}>{player ? shortName(player.name) : 'Empty slot'}</span>{player && <small className="my-team-positions" aria-label="Eligible positions">{positions || 'Unknown'}</small>}</span><TeamLogo code={player?.proTeamId !== undefined ? NBA_TEAM_ABBREV[player.proTeamId] ?? null : null} size={16} />
                   <span className="my-team-row-state">{player?.locked ? <NavIcon name="lock" size={12} label="Locked" /> : isSelected ? 'Selected' : eligible ? 'Eligible destination' : ''}{player && <span className="my-team-lock-detail">{player.lockAt ? `Lock: ${new Date(player.lockAt).toLocaleString()}` : team.data?.executionEnabled ? 'Lock details unavailable' : ''}</span>}</span>
                 </button>;
               })}
