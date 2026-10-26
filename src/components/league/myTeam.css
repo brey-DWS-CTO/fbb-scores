@@ -112,3 +112,21 @@
   .weekly-game-card { min-width: 66px; min-height: 65px; padding: 3px; }
   .weekly-swipe-hint { max-width: 98px; text-align: right; }
 }
+
+/* Compact schedule: opponent and projected points only. */
+.weekly-compact-total { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0 !important; font-size: .75rem; }
+.weekly-compact-total span { font-variant-numeric: tabular-nums; }
+.weekly-compact-key { margin: 4px 0 !important; font-size: .62rem; color: var(--text-mid); }
+.weekly-planner .weekly-game-table tbody th, .weekly-planner .weekly-game-table tbody td { padding: 3px 4px; }
+.weekly-game-card { min-height: 0; min-width: 62px; padding: 1px; gap: 0; border: 0; border-radius: 0; }
+.weekly-game-card.is-recommended { border: 0; background: transparent; }
+.weekly-game-opponent { font-size: .69rem; font-weight: 400; line-height: 1.15; }
+.weekly-game-points { font-size: .8rem; line-height: 1.2; font-weight: 400; }
+.is-recommended .weekly-game-opponent, .is-recommended .weekly-game-points { font-weight: 850; }
+.weekly-planner .weekly-game-table .weekly-player-cell { min-width: 118px; width: 118px; max-width: 118px; padding: 3px 5px; }
+.weekly-player-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
+@media (max-width: 540px) {
+  .weekly-game-card { min-height: 0; min-width: 54px; padding: 1px; }
+  .weekly-planner .weekly-game-table tbody th, .weekly-planner .weekly-game-table tbody td { padding: 3px; }
+  .weekly-planner .weekly-game-table .weekly-player-cell { min-width: 108px; width: 108px; max-width: 108px; }
+}
