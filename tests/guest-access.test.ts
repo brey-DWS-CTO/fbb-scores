@@ -7,9 +7,9 @@ test('guest navigation excludes owner actions in both modes', () => {
   for (const mode of ['in-season', 'off-season'] as const) {
     const sections = visibleSections(false, false, mode, true);
     assert.deepEqual(sections.map(s => s.id), ['scores', 'cast', 'league']);
-    assert.deepEqual(sections.find(s => s.id === 'league')?.tabs.map(t => t.to), ['/teams', '/history']);
+    assert.deepEqual(sections.find(s => s.id === 'league')?.tabs.map(t => t.to), ['/teams', '/league/missed-games', '/history']);
   }
-  for (const path of ['/scores', '/scores/42', '/scores/cast', '/teams', '/history']) assert.ok(guestPageAllowed(path));
+  for (const path of ['/scores', '/scores/42', '/scores/cast', '/teams', '/history', '/league/missed-games']) assert.ok(guestPageAllowed(path));
   for (const path of ['/admin', '/keepers', '/trades', '/dues', '/lm-adds', '/draft']) assert.ok(!guestPageAllowed(path));
 });
 test('guest requests default to denied, including unknown future endpoints', () => {

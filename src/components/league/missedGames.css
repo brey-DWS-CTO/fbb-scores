@@ -8,3 +8,16 @@
 .missed-games-page form, .missed-games-page label { display: grid; gap: 12px; }
 .missed-games-page :is(input,select) { max-width: 100%; min-height: 44px; padding: 10px; color: var(--text-hi); background: var(--panel-bg); border: 1px solid var(--panel-border); }
 .missed-games-page :is(button,input,select,summary):focus-visible { outline: 3px solid var(--neon-yellow); outline-offset: 3px; }
+.missed-games-detail-count { color: var(--text-mid); font-weight: 400; font-size: .75rem; margin-left: 8px; }
+.missed-games-page .missed-games-status { font-size: .75rem; margin: 6px 0; }
+@media (max-width: 540px) {
+  .missed-games-page.mock-page { padding: 10px 10px 84px; }
+  .missed-games-page h1 { margin: 0 0 6px; font-size: 1.25rem; }
+  .missed-games-page > p, .missed-games-season { margin: 6px 0; font-size: .75rem; line-height: 1.35; }
+  .missed-games-page table { font-size: .74rem; }
+  .missed-games-page th, .missed-games-page td { padding: 9px 5px; }
+  .missed-games-page .missed-games-counted { display: none; }
+  .missed-games-page details { padding: 2px 0; border-bottom: 1px solid var(--panel-border); }
+  .missed-games-page summary { min-height: 44px; align-content: center; font-size: .82rem; }
+  .missed-games-page .tap-btn { min-height: 36px; padding: 6px 10px; font-size: .75rem; }
+}

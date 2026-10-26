@@ -9,7 +9,7 @@ for (const mode of ['off-season', 'in-season'] as const) {
         const sections = visibleSections(commissioner, revealed, mode);
         assert.equal(sections.some(s => s.id === 'commish'), commissioner);
         assert.ok(sections.every(s => s.tabs.length > 0));
-        assert.ok(sections.filter(s => s.primary).length <= 4, 'leave room for MORE on phones');
+        assert.ok(sections.filter(s => s.primary).length <= (commissioner && mode === 'in-season' ? 5 : 4), 'leave room for MORE on phones');
         for (const section of sections) {
           for (const tab of section.tabs) {
             assert.equal(sectionFor(tab.to, sections)?.id, section.id);
@@ -73,4 +73,14 @@ test('Waivers opens Activity and keeps its own mobile button and subpages', () =
   for (const path of ['/waivers', '/lm-adds']) assert.equal(sectionFor(path, sections)?.id, 'waivers');
   assert.deepEqual(sections.filter(section => section.primary).map(section => section.id), ['scores', 'cast', 'waivers', 'league']);
   assert.equal(sections.find(section => section.id === 'trades')?.primary, false);
+});
+test('Missed Games belongs to League for everyone and My Team has its own commissioner button', () => {
+  for (const commissioner of [false, true]) {
+    const sections = visibleSections(commissioner, true, 'in-season');
+    assert.equal(sectionFor('/league/missed-games', sections)?.id, 'league');
+    assert.equal(sectionFor('/scores/missed-games', sections)?.id, 'league');
+    assert.equal(sectionFor('/my-team', sections)?.id, commissioner ? 'my-team' : undefined);
+    assert.equal(sections.find(s => s.id === 'my-team')?.primary, commissioner ? true : undefined);
+    assert.deepEqual(sections.find(s => s.id === 'scores')?.tabs.map(t => t.to), ['/scores']);
+  }
 });

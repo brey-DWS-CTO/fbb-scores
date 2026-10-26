@@ -6,7 +6,7 @@ export function isGuestOwner(owner: string): boolean { return owner.startsWith(G
 export function guestName(owner: string): string { return owner.split(':').slice(2).join(':') || 'Guest'; }
 export interface GuestAccess { id: string; name: string; issuedAt: string; expiresAt: string | null; }
 export function guestPageAllowed(path: string): boolean {
-  return path === '/' || path.startsWith('/guest/') || path === '/teams' || path === '/history' || path === '/scores' || path.startsWith('/scores/');
+  return path === '/' || path.startsWith('/guest/') || path === '/league/missed-games' || path === '/teams' || path === '/history' || path === '/scores' || path.startsWith('/scores/');
 }
 /** Defense in depth: guest sessions can only read the spectator endpoints. */
 export function guestRequestAllowed(method: string, path: string): boolean {
