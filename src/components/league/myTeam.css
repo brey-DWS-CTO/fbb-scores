@@ -80,3 +80,35 @@
   .my-team-row-state { grid-column: auto; font-size: .65rem; }
   .my-team-lock-detail:empty { display: none; }
 }
+/* Packed per-player schedule: off days do not occupy columns. */
+.weekly-game-legend { display: flex; align-items: center; gap: 6px; margin: 8px 0; font-size: .7rem; color: var(--text-mid); }
+.weekly-swipe-hint { margin-left: auto; font-size: .65rem; }
+.weekly-start-badge { display: inline-block; padding: 2px 5px; border-radius: 4px; background: var(--neon-teal); color: #09211c; font-size: .55rem; font-weight: 900; line-height: 1.2; letter-spacing: .04em; }
+.weekly-game-scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--panel-border); border-radius: 8px; scrollbar-width: thin; }
+.weekly-game-scroll:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.weekly-planner .weekly-game-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: auto; }
+.weekly-planner .weekly-game-table th, .weekly-planner .weekly-game-table td { padding: 5px; vertical-align: middle; border-bottom: 1px solid var(--panel-border); text-align: center; }
+.weekly-planner .weekly-game-table thead th { font-size: .65rem; font-weight: 600; color: var(--text-mid); white-space: nowrap; }
+.weekly-planner .weekly-game-table .weekly-player-cell { position: sticky; left: 0; z-index: 1; min-width: 142px; width: 142px; max-width: 142px; text-align: left; background: var(--panel-bg, #171717); border-right: 1px solid var(--panel-border); }
+.weekly-game-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--text-mid) 5%, transparent); }
+.weekly-game-table tbody tr:nth-child(even) .weekly-player-cell { background: var(--nav-bg, #202020); }
+.weekly-player-name { display: block; font-size: .8rem; font-weight: 750; line-height: 1.25; }
+.weekly-player-meta, .weekly-player-total { display: block; color: var(--text-mid); font-size: .62rem; font-weight: 400; margin-top: 3px; line-height: 1.2; }
+.weekly-injury { color: var(--neon-yellow); }
+.weekly-game-card { display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 76px; min-height: 70px; padding: 4px; border: 1px solid transparent; border-radius: 6px; }
+.weekly-game-card.is-recommended { border-color: var(--neon-teal); background: color-mix(in srgb, var(--neon-teal) 9%, transparent); }
+.weekly-game-date { font-size: .58rem; color: var(--text-mid); white-space: nowrap; }
+.weekly-game-opponent { font-size: .73rem; font-weight: 600; white-space: nowrap; }
+.weekly-game-points { font-size: .95rem; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.weekly-game-points small { font-size: .52rem; font-weight: 400; color: var(--text-mid); }
+.is-recommended .weekly-game-points { font-weight: 900; color: var(--neon-teal); }
+.weekly-game-state { min-height: 13px; font-size: .57rem; color: var(--text-mid); white-space: nowrap; }
+.weekly-planner .weekly-game-table .weekly-no-games { text-align: left; font-size: .68rem; color: var(--text-mid); }
+@media (max-width: 540px) {
+  .weekly-planner .weekly-game-table .weekly-player-cell { min-width: 118px; width: 118px; max-width: 118px; padding: 6px; }
+  .weekly-planner .weekly-game-table td { padding: 3px; }
+  .weekly-player-name { font-size: .73rem; }
+  .weekly-player-meta, .weekly-player-total { font-size: .57rem; }
+  .weekly-game-card { min-width: 66px; min-height: 65px; padding: 3px; }
+  .weekly-swipe-hint { max-width: 98px; text-align: right; }
+}
