@@ -42,3 +42,41 @@
 .weekly-planner th, .weekly-planner td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--panel-border); }
 .weekly-planner details { padding: 12px 0; }
 .weekly-planner summary { cursor: pointer; min-height: 32px; }
+.my-team-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.my-team-header p { margin: 0; font-size: .78rem; }
+.my-team-views { display: flex; gap: 4px; margin: 6px 0 10px; border-bottom: 1px solid var(--panel-border); }
+.my-team-views button { flex: 1; min-height: 44px; border: 0; border-bottom: 2px solid transparent; color: var(--text-mid); background: transparent; font: inherit; font-weight: 700; }
+.my-team-views button[aria-pressed="true"] { color: var(--neon-teal); border-bottom-color: var(--neon-teal); }
+.my-team-page { padding-top: 12px; }
+.my-team-header h1 { margin: 0; }
+.my-team-status { min-height: 0; }
+.weekly-planner { padding: 12px; margin: 0; }
+.weekly-planner h2 { margin: 0 0 8px; font-size: 1rem; }
+.weekly-planner-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
+.weekly-planner-totals > div { display: grid; gap: 2px; }
+.weekly-planner-totals strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.weekly-planner-totals small { font-size: .9rem; color: var(--text-mid); }
+.weekly-planner-totals span { color: var(--text-mid); font-size: .72rem; }
+.weekly-planner .weekly-planner-help { padding: 0; margin: 0 0 4px; font-size: .78rem; }
+.weekly-planner .weekly-planner-help summary { min-height: 32px; display: list-item; }
+.weekly-planner th:not(:first-child), .weekly-planner td { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 540px) {
+  .my-team-page { padding: 8px 10px 84px; }
+  .my-team-header h1 { font-size: 1.25rem; }
+  .my-team-read-toolbar { font-size: .72rem; gap: 8px; }
+  .my-team-read-toolbar button { min-height: 36px; padding: 4px 8px; }
+  .weekly-planner { padding: 8px; border-radius: 8px; }
+  .weekly-planner .score-week { margin-bottom: 6px; }
+  .weekly-planner table { font-size: .72rem; }
+  .weekly-planner th, .weekly-planner td { padding: 8px 4px; }
+  .weekly-planner tbody th { max-width: 130px; }
+  .weekly-planner details { padding: 4px 0; }
+  .weekly-planner summary { min-height: 40px; display: flex; align-items: center; font-size: .78rem; }
+  .my-team-page .my-team-footnote { font-size: .68rem; margin: 6px 0; }
+  .my-team-group { margin-top: 12px; }
+  .my-team-group h2 { margin-bottom: 6px; font-size: .85rem; }
+  .my-team-roster { gap: 4px; }
+  .my-team-row { grid-template-columns: 36px 1fr auto; gap: 8px; min-height: 44px; padding: 8px; font-size: .8rem; }
+  .my-team-row-state { grid-column: auto; font-size: .65rem; }
+  .my-team-lock-detail:empty { display: none; }
+}

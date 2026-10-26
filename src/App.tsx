@@ -148,7 +148,8 @@ function App() {
         <Route path="/party/:id" element={<PartyPage />} />
         <Route path="/scores" element={<ScoresPage />} />
         <Route path="/my-team" element={<MyTeamPage />} />
-        <Route path="/scores/missed-games" element={<MissedGamesPage />} />
+        <Route path="/league/missed-games" element={<MissedGamesPage />} />
+        <Route path="/scores/missed-games" element={<Navigate to="/league/missed-games" replace />} />
         <Route path="/scores/cast" element={<FantasyCastPage />} />
         <Route path="/league/offseason" element={<LeagueOffseasonPage />} />
         <Route path="/waivers" element={<WaiverCalendarPage />} />

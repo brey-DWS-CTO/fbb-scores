@@ -8,8 +8,7 @@
  */
 import { leagueSchedule2027 } from './scheduleData.js';
 import type { SeasonMode } from './seasonMode.js';
-
-export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy' | 'bolt' | 'calendar' | 'people';
+export type SectionIcon = 'lock' | 'target' | 'arrows' | 'home' | 'book' | 'shield' | 'tv' | 'trophy' | 'bolt' | 'calendar' | 'people' | 'jersey';
 
 export interface SectionTab {
   to: string;
@@ -21,7 +20,7 @@ export interface SectionTab {
 }
 
 export interface NavSection {
-  id: 'scores' | 'cast' | 'watch' | 'waivers' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
+  id: 'my-team' | 'scores' | 'cast' | 'watch' | 'waivers' | 'keepers' | 'draft' | 'trades' | 'league' | 'vault' | 'rules' | 'commish';
   label: string;
   shortLabel?: string;
   icon: SectionIcon;
@@ -54,7 +53,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { to: '/tiers', label: 'TIERS', mode: 'off-season' },
     ],
   },
-  { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }, { to: '/my-team', label: 'MY TEAM', commishOnly: true }, { to: '/scores/missed-games', label: 'MISSED GAMES' }] },
+  { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
+  { id: 'my-team', label: 'MY TEAM', icon: 'jersey', commishOnly: true, tabs: [{ to: '/my-team', label: 'MY TEAM' }] },
   { id: 'cast', label: 'FANTASY CAST', shortLabel: 'CAST', icon: 'bolt', primary: true, tabs: [{ to: '/scores/cast', label: 'FANTASY CAST' }] },
   { id: 'watch', label: 'WATCH PARTIES', shortLabel: 'WATCH', icon: 'people', tabs: [{ to: '/watch', label: 'WATCH PARTIES', mode: 'in-season', pages: [{ to: '/party', label: 'PARTY' }] }] },
   { id: 'waivers', label: 'WAIVERS', icon: 'calendar', primary: true, tabs: [{ to: '/activity', label: 'ACTIVITY' }, { to: '/lm-adds', label: 'LM ADDS' }, { to: '/waivers', label: 'CALENDAR' }] },
@@ -67,6 +67,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     tabs: [
       { to: '/league', label: 'LEAGUE HQ' },
       { to: '/teams', label: 'TEAMS' },
+      { to: '/league/missed-games', label: 'MISSED GAMES', pages: [{ to: '/scores/missed-games', label: 'MISSED GAMES' }] },
       { to: '/dues', label: 'DUES' },
       { to: '/history', label: 'HISTORY' },
     ],
@@ -132,10 +133,10 @@ export function activeTab(pathname: string, tabs: readonly SectionTab[]): string
 /** Keep menus focused on the current mode; saved page addresses remain valid. */
 export function visibleSections(isCommissioner: boolean, keepersPublic: boolean, mode: SeasonMode, isGuest = false): NavSection[] {
   if (isGuest) return NAV_SECTIONS.filter(section => ['scores', 'cast', 'league'].includes(section.id)).map(section => section.id === 'league'
-    ? { ...section, primary: true, home: '/teams', tabs: section.tabs.filter(tab => ['/teams', '/history'].includes(tab.to)) }
+    ? { ...section, primary: true, home: '/teams', tabs: section.tabs.filter(tab => ['/teams', '/history', '/league/missed-games'].includes(tab.to)) }
     : { ...section, primary: true });
   const order = mode === 'in-season'
-    ? ['scores', 'cast', 'watch', 'waivers', 'league', 'trades', 'rules', 'commish', 'draft']
+    ? ['scores', 'my-team', 'cast', 'watch', 'waivers', 'league', 'trades', 'rules', 'commish', 'draft']
     : ['keepers', 'draft', 'cast', 'trades', 'league', 'vault', 'rules', 'commish'];
   return order.flatMap((id) => {
     const section = NAV_SECTIONS.find((entry) => entry.id === id);
@@ -146,7 +147,7 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
       label: archive ? 'DRAFT RESULTS' : section.label,
       home: archive ? '/draft' : section.home,
       primary: mode === 'in-season'
-        ? ['scores', 'cast', 'waivers', 'league'].includes(id)
+        ? ['scores', 'my-team', 'cast', 'waivers', 'league'].includes(id)
         : ['keepers', 'draft', 'cast', 'league'].includes(id),
       tabs: section.tabs.filter((tab) =>
         (!tab.commishOnly || isCommissioner)

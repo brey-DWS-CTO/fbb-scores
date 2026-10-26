@@ -7,7 +7,7 @@ import './missedGames.css';
 export default function MissedGamesPage() {
   const { identity } = useIdentity();
   return <main className="mock-page missed-games-page"><h1>Missed games report</h1>
-    <p>Four matchups with missed games removes play-in eligibility. Top-four playoff qualification remains available.</p>
+    <p>Four missed weeks means no play-in eligibility. Top-four qualification stays available.</p>
     <Report key={[identity?.owner, identity?.session].join(':')} identity={identity} />
   </main>;
 }
@@ -61,18 +61,18 @@ function Report({ identity }: { identity: Identity | null }) {
   const report = query.data;
   return <>
     {canManage && <button className="tap-btn" disabled={busy} onClick={() => void refresh()}>{busy ? 'Refreshing…' : 'Refresh / backfill from ESPN'}</button>}
-    <p role="status" aria-live="polite">{message}</p>
+    {message && <p className="missed-games-status" role="status" aria-live="polite">{message}</p>}
     {query.isPending && <p>Loading saved report…</p>}
     {query.isError && <p role="alert">{apiErrorMessage(query.error)} <button className="tap-btn" onClick={() => void query.refetch()}>Retry</button></p>}
     {report && <>
-      <p>Season {report.season} · Completed matchups only. Weekly limits match Scores. Open weeks show games still needed and never count as missed weeks.</p>
+      <p className="missed-games-season">{report.season} season - Completed weeks only. Open weeks are provisional.</p>
       {(!report.calendarKnown || report.pendingWeeks.length > 0) && <p role="status">Coverage incomplete. Awaiting verification of {report.pendingWeeks.length ? `Week ${report.pendingWeeks.join(', ')}` : 'the season calendar'}. Eligibility is pending until closed weeks are verified.</p>}
-      <div className="missed-games-scroll"><table><caption>Season missed-games totals</caption><thead><tr><th>Owner</th><th>Weeks missed</th><th>Games missed</th><th>Weeks counted</th><th>Play-in eligibility</th></tr></thead><tbody>
-        {report.teams.map(team => <tr key={team.teamId}><th scope="row">{team.owner}</th><td>{team.missedWeeks}</td><td>{team.totalGamesMissed}</td><td>{team.countedWeeks} / {report.maxMissedWeeks}</td><td>{team.playInEligible === false ? 'Ineligible · Top 4 required' : team.playInEligible === null ? 'Pending verification' : team.countedWeeks === 3 ? 'Eligible · At limit' : 'Eligible so far'}</td></tr>)}
+      <div className="missed-games-scroll"><table><caption className="sr-only">Season missed-games totals</caption><thead><tr><th>Owner</th><th title="Weeks with missed games">Weeks</th><th title="Total games missed">Games</th><th className="missed-games-counted">Counted</th><th>Play-in</th></tr></thead><tbody>
+        {report.teams.map(team => <tr key={team.teamId}><th scope="row">{team.owner}</th><td>{team.missedWeeks}</td><td>{team.totalGamesMissed}</td><td className="missed-games-counted">{team.countedWeeks} / {report.maxMissedWeeks}</td><td>{team.playInEligible === false ? 'Ineligible - Top 4' : team.playInEligible === null ? 'Pending' : team.countedWeeks === 3 ? 'At limit' : 'Eligible'}</td></tr>)}
       </tbody></table></div>
-      {report.teams.map(team => <details key={team.teamId}><summary>{team.owner} · Weekly detail</summary><div className="missed-games-scroll"><table><caption>{team.owner}: matchup audit</caption><thead><tr><th>Week</th><th>Status</th><th>Played / Limit</th><th>Missed / Needed</th><th>Exemption</th></tr></thead><tbody>
+      <details><summary>Weekly detail by team</summary>{report.teams.map(team => <details key={team.teamId}><summary>{team.owner} <span className="missed-games-detail-count">{team.countedWeeks} counted - {team.totalGamesMissed} games missed</span></summary><div className="missed-games-scroll"><table><caption>{team.owner}: matchup audit</caption><thead><tr><th>Week</th><th>Status</th><th>Played / Limit</th><th>Missed / Needed</th><th>Exemption</th></tr></thead><tbody>
         {team.history.map(w => <tr key={w.week}><th scope="row">{w.label}</th><td>{w.status}</td><td>{w.played ?? '—'} / {w.cap}</td><td>{w.status === 'incomplete' ? 'Unverified' : `${w.missed ?? '—'}${w.status === 'provisional' ? ' still needed' : ' missed'}`}</td><td>{w.exemption ? `${w.exempt ? 'Approved' : 'Pending'}: ${w.exemption.reason} (${w.exemption.approvals.join(', ')})` : 'None'}</td></tr>)}
-      </tbody></table></div></details>)}
+      </tbody></table></div></details>)}</details>
       {canManage && <details><summary>Commissioner exemptions</summary><p>Rule 6.7.1: both commissioners must approve the same reason. Actual missed-game totals stay visible; an approved week is removed from the eligibility count.</p>
         <form onSubmit={event => { event.preventDefault(); void approve(); }}>
           <label>Team and week<select required value={selected} onChange={event => { setSelected(event.target.value); const [id, week] = event.target.value.split(':').map(Number); setReason(report.teams.find(t => t.teamId === id)?.history.find(w => w.week === week)?.exemption?.reason ?? ''); }}><option value="">Choose…</option>{report.teams.flatMap(t => t.history.filter(w => w.status === 'final' && (w.missed ?? 0) > 0).map(w => <option key={`${t.teamId}:${w.week}`} value={`${t.teamId}:${w.week}`}>{t.owner} · {w.label}</option>))}</select></label>
@@ -80,8 +80,8 @@ function Report({ identity }: { identity: Identity | null }) {
           <button className="tap-btn" disabled={busy || !selected || !reason.trim()}>Record my approval</button>
         </form>
       </details>}
-      {canManage && <form onSubmit={event => { event.preventDefault(); void recheck(); }}><label>Recheck a saved week<select required value={recheckWeek} onChange={event => setRecheckWeek(event.target.value)}><option value="">Choose…</option>{report.weeks.map(w => <option key={w.matchupPeriodId} value={w.matchupPeriodId}>{w.label}</option>)}</select></label><button className="tap-btn" disabled={busy || !recheckWeek}>Recheck week</button></form>}
-      <p>Saved checks: {report.weeks.map(w => `${w.label}: ${new Date(w.fetchedAt).toLocaleString()}`).join(' · ') || 'None yet.'} Automatic catch-up runs daily at 8 AM Pacific.</p>
+      <details className="missed-games-updates"><summary>Data checks & updates</summary>{canManage && <form onSubmit={event => { event.preventDefault(); void recheck(); }}><label>Recheck a saved week<select required value={recheckWeek} onChange={event => setRecheckWeek(event.target.value)}><option value="">Choose…</option>{report.weeks.map(w => <option key={w.matchupPeriodId} value={w.matchupPeriodId}>{w.label}</option>)}</select></label><button className="tap-btn" disabled={busy || !recheckWeek}>Recheck week</button></form>}
+      <p>Saved checks: {report.weeks.map(w => `${w.label}: ${new Date(w.fetchedAt).toLocaleString()}`).join(' · ') || 'None yet.'} Automatic catch-up runs daily at 8 AM Pacific.</p></details>
     </>}
   </>;
 }
