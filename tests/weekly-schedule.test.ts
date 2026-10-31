@@ -32,3 +32,14 @@ test('final actuals remain separate from projected points and absent stats are n
   assert.equal(result[0].actual, 51); assert.equal(result[0].projected, 35);
   assert.equal(weeklyPlayerGames(player, week, () => 35, [])[0].played, null);
 });
+
+
+test('passed tipoff locks a stale upcoming game and removes its recommendation', () => {
+  const starts = [{ playerId: 7, period: 2, slot: 'PG', points: 20 }];
+  const before = weeklyPlayerGames(player, fixture(), () => 20, starts, Date.parse('2027-01-02T19:00:00Z'))[0];
+  const after = weeklyPlayerGames(player, fixture(), () => 20, starts, Date.parse(game.tipoff!))[0];
+  assert.equal(before.locked, false);
+  assert.equal(before.recommended, true);
+  assert.equal(after.locked, true);
+  assert.equal(after.recommended, false);
+});

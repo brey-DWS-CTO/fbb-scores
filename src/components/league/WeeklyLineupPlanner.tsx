@@ -8,6 +8,7 @@ import { planWeeklyLineup } from '../../lib/league/weeklyLineup.js';
 import { weeklyPlayerGames } from '../../lib/league/weeklySchedule.js';
 import { shortName } from '../../lib/league/scores.js';
 import TeamLogo from './TeamLogo.js';
+import NavIcon from './NavIcon.js';
 import { WeekPicker } from './ScoresBits.js';
 
 export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnapshot }) {
@@ -31,9 +32,9 @@ export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnap
     {(query.isError || caps.isError) && <p role="alert">{apiErrorMessage(query.error ?? caps.error)} <button className="tap-btn" onClick={() => { void query.refetch(); void caps.refetch(); }}>Retry</button></p>}
     {week && !side && <p>No matchup found for your team this week.</p>}
     {plan && week && <>
-      <p className="weekly-compact-total"><span><strong>{plan.used + plan.starts.length} / {cap}</strong> games</span><span>{plan.projectedTotal.toFixed(1)} projected points</span></p>
+      <p className="weekly-compact-total"><span><strong>{plan.used + plan.starts.length} / {cap}</strong> planned</span><span>{plan.projectedTotal.toFixed(1)} projected points</span></p>
       {plan.warnings.map(w => <p role="status" key={w}>{w}</p>)}
-      <p className="weekly-compact-key"><strong>Bold = recommended start</strong></p>
+      <p className="weekly-compact-key"><strong className="weekly-start-key">Teal + bold = start</strong><span>Muted = bench</span><span><NavIcon name="lock" size={10} /> Locked / completed</span></p>
       <div className="weekly-game-scroll" tabIndex={0} role="region" aria-label="Player game schedule; scroll horizontally for more games">
         <table className="weekly-game-table"><caption className="sr-only">Each player's scheduled games, projected fantasy points, and recommended starts. Games are packed chronologically without off-day gaps.</caption>
           <thead><tr><th scope="col" className="weekly-player-cell">Player</th>{Array.from({ length: gameColumns }, (_, i) => <th scope="col" key={i}>Game {i + 1}</th>)}</tr></thead>
@@ -43,9 +44,9 @@ export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnap
               {games.map(game => {
                 const date = `${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${game.date}T12:00:00Z`))} ${Number(game.date.slice(8))}`;
                 const opponent = `${game.home ? 'vs' : '@'} ${game.opponent || 'TBD'}`;
-                const state = game.status === 'final' ? game.actual !== null ? `${game.actual.toFixed(1)} actual` : game.played === false ? 'DNP' : 'Final' : game.status === 'live' ? 'Live' : game.recommended ? 'Recommended start' : 'Not selected';
-                return <td key={game.period}><div className={`weekly-game-card${game.recommended ? ' is-recommended' : ''}${game.status !== 'upcoming' ? ' is-started' : ''}`} title={`${date}, ${opponent}, ${state}`} aria-label={`${player.name}, ${game.date}, ${opponent}, ${game.projected?.toFixed(1) ?? 'unavailable'} projected points, ${state}${game.recommended && game.slot ? ` at ${game.slot}` : ''}`}>
-                  <span className="weekly-game-opponent">{opponent}</span>
+                const state = game.status === 'final' ? game.actual !== null ? `${game.actual.toFixed(1)} actual` : game.played === false ? 'DNP' : 'Final' : game.status === 'live' ? 'Live' : game.locked ? 'Locked' : game.recommended ? 'Recommended start' : 'Bench';
+                return <td key={game.period}><div className={`weekly-game-card${game.recommended ? ' is-recommended' : ''}${game.locked ? ' is-locked' : game.recommended ? '' : ' is-benched'}`} title={`${date}, ${opponent}, ${state}`} aria-label={`${player.name}, ${game.date}, ${opponent}, ${game.projected?.toFixed(1) ?? 'unavailable'} projected points, ${state}${game.recommended && game.slot ? ` at ${game.slot}` : ''}`}>
+                  <span className="weekly-game-opponent">{game.locked && <NavIcon name="lock" size={9} />}{opponent}</span>
                   <strong className="weekly-game-points">{game.projected?.toFixed(1) ?? '\u2014'}</strong>
                 </div></td>;
               })}

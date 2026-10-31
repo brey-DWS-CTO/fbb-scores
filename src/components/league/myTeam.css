@@ -165,3 +165,12 @@
 .my-team-positions { flex-shrink: 0; color: var(--text-mid); font-size: .63rem; font-weight: 400; white-space: nowrap; }
 .weekly-player-label .team-logo { order: 2; }
 .my-team-player-line .team-logo { flex-shrink: 0; }
+
+/* Recommendation states use theme colors; weight and lock glyphs also convey meaning. */
+.weekly-compact-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.weekly-compact-key > span { display: inline-flex; align-items: center; gap: 3px; }
+.weekly-start-key, .is-recommended .weekly-game-opponent { color: var(--neon-teal); }
+.weekly-game-card.is-benched { color: var(--text-mid); }
+.weekly-game-card.is-locked { color: var(--text-body); }
+.weekly-game-opponent { display: inline-flex; align-items: center; gap: 2px; }
+.weekly-game-opponent svg { flex-shrink: 0; }

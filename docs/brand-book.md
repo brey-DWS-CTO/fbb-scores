@@ -17,7 +17,8 @@ Use this guide when adding or changing UI. Reuse existing components and theme t
 - Interactive lineup rows retain at least 44px height. Do not sacrifice touch targets for density.
 - Keep player identity on one line; truncate long display names and preserve full accessible names. Eligibility and logos stay visible.
 - Projection games contain only opponent and projected points, on two compact lines. Pack actual games chronologically without off-day columns.
-- Recommended starts use bold text and the theme teal accent. Explain the meaning once in a compact legend; avoid repeated badges.
+- Recommended starts use bold text and the theme teal accent on both opponent and points. Bench options use `--text-mid`; locked/completed games use `--text-body` and a small inline lock glyph. Explain these states once in a compact legend; avoid repeated badges.
+- Use the actual weekly cap and include already-used games in the planned count. Passed tip-off locks a game even if its feed still says upcoming.
 - Keep the player column sticky when the schedule scrolls horizontally. The page itself must fit the mobile viewport.
 
 ## Theme and typography
