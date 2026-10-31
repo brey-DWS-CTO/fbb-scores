@@ -1,3 +1,4 @@
+import MatchupTables from './MatchupTables.js';
 import { useMatchupProjection } from '../../hooks/useMatchupProjection.js';
 import { projectionExplanation } from '../../lib/league/matchupProjection.js';
 import { useMemo, useState } from 'react';
@@ -62,5 +63,6 @@ export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnap
       </div>
       <p className="my-team-footnote">{matchup.loading ? 'Loading matchup estimates...' : adjusted > 0 ? `Pace + position estimates: ${adjusted}/${upcoming.length} upcoming games.` : 'ESPN daily / baseline estimates; no matchup adjustments.'} Opponent / projected points. Swipe for more games.</p>
     </>}
+    {week && <MatchupTables season={week.season} scoring={week.scoringItems} />}
   </section>;
 }

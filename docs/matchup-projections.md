@@ -41,3 +41,11 @@ Focused tests cover source formats, season conventions, alias joins, hidden dupl
 A live source smoke read covers all 30 teams. Local UI QA uses synthetic schedules with real captured matchup environments, clearly labeled as sample data. These checks prove functioning inputs and arithmetic; they do not prove improved predictive accuracy.
 
 Before expanding beyond the planner, archive baseline and adjusted predictions before tip-off with source capture timestamps, then join finalized outcomes. Compare paired player-game MAE, RMSE and bias, with sample counts and coverage, and evaluate weekly selected-lineup outcomes separately. Use the forecast evaluation work in PR #133 as the starting point. Do not backtest using today's full-season DvP table against earlier games: that leaks their outcomes into the prediction.
+
+## Reference tables
+
+Both My Team > Projections and the season Projections editor contain a collapsed Matchup data section. Pace ranks all 30 teams by possessions per 48 minutes; Vs position selects PG/SG/SF/PF/C and ranks raw shared-stat points allowed per game with sample GP. Rank 1 means fastest / most allowed, respectively. Both tables can reverse the metric sort; ties share a rank. Zero-sample allowances are unknown and unranked.
+
+The tables reuse the same cached matchup environment as the planner and its shared-category scoring function. No source request is made solely for a closed section. The position table explicitly excludes FG/FT misses and DD/TD bonuses; its raw allowances are not the planner's shrunk, pace-normalized adjustment. Captured time and source links accompany the table. The shared component keeps both themes, adjacent 16px logos and compact rows consistent.
+
+Keep these as local views for now; no additional primary navigation tab was added. A dedicated projections section can follow when player forecasts and league-wide matchup research become an independent in-season workflow.

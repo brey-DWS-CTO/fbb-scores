@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { fetchMatchupEnvironment } from '../lib/league/api.js';
+import { useMatchupEnvironment } from './useMatchupEnvironment.js';
 import { matchupGameProjection } from '../lib/league/matchupProjection.js';
 import { LEAGUE_SCORING } from '../lib/league/partyScore.js';
 import type { ScorePlayer, ScoresWeek } from '../lib/league/scores.js';
@@ -11,8 +10,7 @@ import { useProjectionData } from './useProjectionData.js';
 export function useMatchupProjection(week: ScoresWeek | undefined) {
   const baseline = useExpectedPoints();
   const { snapshot } = useProjectionData();
-  const query = useQuery({ queryKey: ['matchup-environment', week?.season],
-    queryFn: () => fetchMatchupEnvironment(week!.season), enabled: !!week, staleTime: 60 * 60 * 1000, retry: false });
+  const query = useMatchupEnvironment(week?.season);
   const scoring = week?.scoringItems ?? snapshot?.scoringItems ?? LEAGUE_SCORING;
   const environment = query.data?.environment;
   const project = useMemo(() => (player: ScorePlayer, period: number) =>

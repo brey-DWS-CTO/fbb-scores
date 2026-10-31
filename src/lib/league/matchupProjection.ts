@@ -24,7 +24,7 @@ export const MATCHUP_PRIOR_GAMES = 15;
 export const MATCHUP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SHARED_STATS = new Set([0, 6, 3, 17, 2, 1, 11]);
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
-function defensePoints(row: PositionDefense, scoring: readonly ScoringItem[]): number {
+export function sharedDefensePoints(row: PositionDefense, scoring: readonly ScoringItem[]): number {
   return scoring.reduce((sum, item) => sum + (SHARED_STATS.has(item.statId) ? (row.stats[String(item.statId)] ?? 0) * item.points : 0), 0);
 }
 function positions(value: string): MatchupPosition[] {
@@ -61,11 +61,11 @@ export function matchupGameProjection(player: ScorePlayer, period: number, basel
     for (const team of teams) {
       const defense = team.defense[position];
       if (!defense || defense.games <= 0 || !(team.pace > 0)) return null;
-      total += defensePoints(defense, scoring) / team.pace * defense.games;
+      total += sharedDefensePoints(defense, scoring) / team.pace * defense.games;
       games += defense.games;
     }
     const average = total / games;
-    const allowed = defensePoints(row, scoring) / opponent.pace;
+    const allowed = sharedDefensePoints(row, scoring) / opponent.pace;
     if (!(average > 0) || !(allowed > 0)) return null;
     return { ratio: allowed / average, reliability: row.games / (row.games + MATCHUP_PRIOR_GAMES) };
   });
