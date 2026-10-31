@@ -111,7 +111,8 @@ export function parseEspnLineup(
     requireValue(new Set(eligibleSlotIds).size === eligibleSlotIds.length, 'Duplicate ESPN eligibility.');
     // ESPN includes IR eligibility for healthy players too. This raw list is
     // not a claim that a reserve move is legal; the provider must prove that.
-    players.push({ id, name: player.fullName, eligibleSlotIds, locked: pool.lineupLocked, lockAt: null });
+    players.push({ id, name: player.fullName, eligibleSlotIds, locked: pool.lineupLocked, lockAt: null,
+      ...(Number.isSafeInteger(player.proTeamId) && Number(player.proTeamId) >= 0 ? { proTeamId: Number(player.proTeamId) } : {}) });
     occupants.set(slotType, [...(occupants.get(slotType) ?? []), id]);
   }
   players.sort((a, b) => a.id - b.id);

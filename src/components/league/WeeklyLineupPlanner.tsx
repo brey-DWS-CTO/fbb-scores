@@ -5,6 +5,10 @@ import { capForWeek } from '../../lib/league/gamesCap.js';
 import { useScoresWeek, useExpectedPoints } from '../../hooks/useScores.js';
 import type { LineupSnapshot } from '../../lib/league/lineup.js';
 import { planWeeklyLineup } from '../../lib/league/weeklyLineup.js';
+import { weeklyPlayerGames } from '../../lib/league/weeklySchedule.js';
+import { shortName } from '../../lib/league/scores.js';
+import TeamLogo from './TeamLogo.js';
+import NavIcon from './NavIcon.js';
 import { WeekPicker } from './ScoresBits.js';
 
 export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnapshot }) {
@@ -16,6 +20,11 @@ export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnap
   const side = week?.matchups.flatMap(m => [m.home, m.away]).find(s => s.teamId === snapshot.teamId);
   const cap = week && caps.data ? capForWeek(caps.data.caps.filter(row => row.season === week.season), week.matchupPeriodId, week.gamesCap) : null;
   const plan = useMemo(() => side && week && cap !== null ? planWeeklyLineup(snapshot, side, week, cap, expected) : null, [snapshot, side, week, cap, expected]);
+  const rows = useMemo(() => snapshot.players.map(player => {
+    const scoring = side?.players.find(p => p.id === player.id);
+    return { player, scoring, games: scoring && week && plan ? weeklyPlayerGames(scoring, week, expected, plan.starts) : [] };
+  }), [snapshot, side, week, expected, plan]);
+  const gameColumns = Math.max(1, ...rows.map(row => row.games.length));
   return <section className="weekly-planner panel" aria-labelledby="weekly-planner-title">
     <h2 id="weekly-planner-title">{side?.name ?? 'Weekly projections'}</h2>
     <WeekPicker weeks={week?.weeks ?? []} selected={week?.matchupPeriodId ?? requested} onChange={setRequested} />
@@ -23,20 +32,30 @@ export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnap
     {(query.isError || caps.isError) && <p role="alert">{apiErrorMessage(query.error ?? caps.error)} <button className="tap-btn" onClick={() => { void query.refetch(); void caps.refetch(); }}>Retry</button></p>}
     {week && !side && <p>No matchup found for your team this week.</p>}
     {plan && week && <>
-      <div className="weekly-planner-totals"><div><strong>{plan.used + plan.starts.length}<small> / {cap}</small></strong><span>Games - {plan.used} started</span></div><div><strong>{plan.projectedTotal.toFixed(1)}</strong><span>Projected points</span></div></div>
-      <details className="weekly-planner-help"><summary>How projections work</summary><p>Best remaining starts within daily slots and the weekly cap, using Scores estimates. Out and reserve players are excluded. Live games use the greater of current points and the pregame estimate. Full-week points include every scheduled game; suggested points cover remaining recommended starts. Recommendations do not change your roster.</p></details>
+      <p className="weekly-compact-total"><span><strong>{plan.used + plan.starts.length} / {cap}</strong> planned</span><span>{plan.projectedTotal.toFixed(1)} projected points</span></p>
       {plan.warnings.map(w => <p role="status" key={w}>{w}</p>)}
-      <div className="weekly-planner-scroll"><table><caption className="sr-only">Weekly player projections</caption><thead><tr><th>Player</th><th title="Scheduled games">GP</th><th title="Full-week projected points">Proj</th><th title="Suggested remaining starts">Starts</th><th title="Points from suggested starts">Pts</th></tr></thead><tbody>
-        {snapshot.players.map(p => {
-          const chosen = plan.starts.filter(s => s.playerId === p.id);
-          return <tr key={p.id}><th scope="row">{p.name}</th><td>{plan.scheduled.get(p.id) ?? '—'}</td><td>{plan.weeklyPoints.get(p.id)?.toFixed(1) ?? '—'}</td><td>{chosen.length}</td><td>{chosen.reduce((sum, s) => sum + s.points, 0).toFixed(1)}</td></tr>;
-        })}
-      </tbody></table></div>
-      {week.days.map(day => {
-        const starts = plan.starts.filter(s => s.period === day.scoringPeriodId);
-        return starts.length > 0 && <details key={day.scoringPeriodId}><summary>{day.date} · {starts.length} suggested starts</summary><ul>{starts.map(s => <li key={s.playerId}>{s.slot} · {snapshot.players.find(p => p.id === s.playerId)?.name} · {s.points.toFixed(1)} pts</li>)}</ul></details>;
-      })}
-      <p className="my-team-footnote">GP: scheduled games - Proj: full week - Starts/Pts: remaining suggestions</p>
+      <p className="weekly-compact-key"><strong className="weekly-start-key">Teal + bold = start</strong><span>Muted = bench</span><span><NavIcon name="lock" size={10} /> Locked / completed</span></p>
+      <div className="weekly-game-scroll" tabIndex={0} role="region" aria-label="Player game schedule; scroll horizontally for more games">
+        <table className="weekly-game-table"><caption className="sr-only">Each player's scheduled games, projected fantasy points, and recommended starts. Games are packed chronologically without off-day gaps.</caption>
+          <thead><tr><th scope="col" className="weekly-player-cell">Player</th>{Array.from({ length: gameColumns }, (_, i) => <th scope="col" key={i}>Game {i + 1}</th>)}</tr></thead>
+          <tbody>{rows.map(({ player, scoring, games }) => {
+            return <tr key={player.id}>
+              <th scope="row" className="weekly-player-cell" title={player.name}><span className="weekly-player-label"><TeamLogo code={scoring?.proTeam ?? null} size={14} /><span className="weekly-player-name">{shortName(player.name)}</span></span></th>
+              {games.map(game => {
+                const date = `${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${game.date}T12:00:00Z`))} ${Number(game.date.slice(8))}`;
+                const opponent = `${game.home ? 'vs' : '@'} ${game.opponent || 'TBD'}`;
+                const state = game.status === 'final' ? game.actual !== null ? `${game.actual.toFixed(1)} actual` : game.played === false ? 'DNP' : 'Final' : game.status === 'live' ? 'Live' : game.locked ? 'Locked' : game.recommended ? 'Recommended start' : 'Bench';
+                return <td key={game.period}><div className={`weekly-game-card${game.recommended ? ' is-recommended' : ''}${game.locked ? ' is-locked' : game.recommended ? '' : ' is-benched'}`} title={`${date}, ${opponent}, ${state}`} aria-label={`${player.name}, ${game.date}, ${opponent}, ${game.projected?.toFixed(1) ?? 'unavailable'} projected points, ${state}${game.recommended && game.slot ? ` at ${game.slot}` : ''}`}>
+                  <span className="weekly-game-opponent">{game.locked && <NavIcon name="lock" size={9} />}{opponent}</span>
+                  <strong className="weekly-game-points">{game.projected?.toFixed(1) ?? '\u2014'}</strong>
+                </div></td>;
+              })}
+              {games.length < gameColumns && <td colSpan={gameColumns - games.length} className="weekly-no-games">{games.length === 0 ? scoring ? week.days.some(day => day.games === null) ? 'Schedule unavailable' : 'No games scheduled' : 'Player data unavailable' : null}</td>}
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>
+      <p className="my-team-footnote">Opponent / projected points. Swipe for more games.</p>
     </>}
   </section>;
 }
