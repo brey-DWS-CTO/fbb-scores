@@ -1,5 +1,5 @@
 import { FppgLabel } from './LineupFppg.js';
-import { fppgGapLabel } from '../../lib/league/lineupFppg.js';
+import { leadPerExtraGameLabel } from '../../lib/league/lineupFppg.js';
 import { fppgText, lineupFppg } from '../../lib/league/lineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
 import PlayerNews from './PlayerNews.js';
@@ -26,7 +26,6 @@ import {
   matchupChance,
   ownerByEspnTeamId,
   playerWeek,
-  recordText,
   rosterOn,
   seasonStartDate,
   slotLabel,
@@ -72,8 +71,7 @@ interface SideHeadProps {
 function SideHead({ side, owner, proj, leading, right }: SideHeadProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}`}>
-      <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name}</div></div>
-      <div className="score-side-owner">{owner ?? 'Unknown owner'}</div>
+      <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name} <span className="score-side-owner-inline">· {owner ?? 'Unknown owner'}</span></div></div>
       <div className="score-side-scoreline"><div className="score-side-total">{side.total.toFixed(1)}</div>
       {proj !== null && <div className="score-side-proj">Proj <b>{projText(proj)}</b></div>}
       </div>
@@ -93,7 +91,7 @@ interface GamesLineProps {
 function GamesLine({ side, week, right, onEdit, overage }: GamesLineProps) {
   return (
     <div className={`score-games${right ? ' is-right' : ''}`}>
-      <LineupGamesSummary side={side} week={week} onOver={overage?.open} overDay={overage?.label} />
+      <LineupGamesSummary side={side} week={week} onOver={overage?.open} overDay={overage?.label} brief />
       {onEdit && <button type="button" className="tap-btn score-cap-btn" aria-label="Change this week's games cap" onClick={onEdit}><NavIcon name="pencil" size={12} /></button>}
     </div>
   );
@@ -404,7 +402,7 @@ export default function MatchupPage() {
   };
   const homeProj = settled ? null : homeForecast;
   const awayProj = settled ? null : awayForecast;
-  const fppgGap = matchup ? fppgGapLabel(matchup.home, matchup.away) : null;
+  const fppgGap = matchup ? leadPerExtraGameLabel(matchup.home, matchup.away) : null;
   // The box scores behind on-the-floor and foul trouble: today only, and only once a game has tipped.
   const courtDay = !demo && week && view?.kind === 'day' && view.scoringPeriodId === week.currentScoringPeriodId
     ? week.days.find((day) => day.scoringPeriodId === view.scoringPeriodId) ?? null
@@ -481,8 +479,6 @@ export default function MatchupPage() {
                 {[matchup.home, matchup.away].map((side, index) => {
                   const deduction = (index === 0 ? homeForecast : awayForecast)?.deduction ?? 0;
                   return <div key={side.teamId} className={index === 1 ? 'is-right' : undefined}>
-                    <strong>{side.abbrev || side.name}</strong>
-                    <div className="score-side-owner">Record {recordText(side.record)}</div>
                     <FppgLabel side={side} />
                     {deduction > 0 && <div className="score-overage-label">−{projText(deduction)} projected overage</div>}
                   </div>;

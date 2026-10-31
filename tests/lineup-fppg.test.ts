@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lineupFppg, fppgText, fppgGapLabel, sortLineupFppg } from '../src/lib/league/lineupFppg.ts';
+import { lineupFppg, fppgText, leadPerExtraGameLabel, sortLineupFppg } from '../src/lib/league/lineupFppg.ts';
 import { planWeek } from '../src/lib/league/scores.ts';
 import type { ScoreSide, ScorePlayer, PlayerDay } from '../src/lib/league/scores.ts';
 const day = (points:number, started=true, played=true):PlayerDay => ({points,started,played,lineupSlotId:0,stats:null,game:null});
@@ -32,13 +32,14 @@ test('weekly table sorts week, GP, dates, names and trend without mutating rows;
  assert.deepEqual(ids('trend'),[1,2,3]); assert.deepEqual(rows.map(row=>row.teamId),[1,2,3]);
 });
 
-test('matchup FPPG gap names the side scoring more per game; even and empty handled',()=>{
- const me={...side({'1':day(40)},{'1':day(40)},{'1':day(40)}),abbrev:'ME'};
- const them={...side({'1':day(42.5)},{'1':day(42.5)}),abbrev:'THEM'};
- assert.equal(fppgGapLabel(me,them),'THEM +2.5 FPPG');
- assert.equal(fppgGapLabel(them,me),'THEM +2.5 FPPG');
- assert.equal(fppgGapLabel(me,{...me,abbrev:'X'}),'Even FPPG');
- assert.equal(fppgGapLabel(me,side({'1':day(0,true,false)})),null);
- const a={...side({'1':day(33.14)}),abbrev:'A'}, b={...side({'1':day(31.55)}),abbrev:'B'};
- assert.equal(fppgGapLabel(a,b),'A +1.5 FPPG');
+test('lead per extra game: 166.1 up over 4 extra starter-games is 41.5 PPG; even and fewer games show the lead',()=>{
+ const g=(n:number)=>Object.fromEntries(Array.from({length:n},(_,i)=>[String(i+1),day(10)]));
+ const funk={...side(g(26)),total:859.6,abbrev:'FUNK'};
+ const st={...side(g(22)),total:693.5,abbrev:'ST'};
+ assert.equal(leadPerExtraGameLabel(funk,st),'FUNK +41.5 PPG · 4 extra GP');
+ assert.equal(leadPerExtraGameLabel(st,funk),'FUNK +41.5 PPG · 4 extra GP');
+ assert.equal(leadPerExtraGameLabel(funk,{...st,total:900}),'ST +40.4 · 4 fewer GP');
+ assert.equal(leadPerExtraGameLabel(funk,{...funk,abbrev:'X',total:800}),'FUNK +59.6 · even GP');
+ assert.equal(leadPerExtraGameLabel(funk,{...funk,abbrev:'X'}),'Even');
+ assert.equal(leadPerExtraGameLabel({...funk,players:[]},{...st,players:[]}),null);
 });

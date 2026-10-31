@@ -6132,8 +6132,10 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 /* FL beside the name while a player is in foul trouble. */
 .score-badge.is-foul { background: var(--neon-orange); }
 
-/* One line under the win bar: which side scores more per starter-game. */
+/* One line under the win bar: the lead per extra starter-game the leader has played. */
 .score-fppg-gap { margin-top: 4px; text-align: center; font-size: 0.7rem; font-weight: 700; color: var(--neon-teal); font-variant-numeric: tabular-nums; }
+.score-side-owner-inline { font-size: 0.68rem; font-weight: 400; color: var(--text-dim); }
+.score-matchup-details .score-extra-stats .lineup-fppg { margin: 0; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */

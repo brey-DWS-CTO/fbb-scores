@@ -41,16 +41,20 @@ export function sortLineupFppg(teams: readonly ScoreSide[], column: string, asce
 }
 
 /**
- * The per-game gap between two sides of a matchup, as one short line.
- * "GSW +2.5 FPPG" means GSW scores 2.5 more per starter-game than the other side.
- * Null until both sides have a played starter-game.
+ * The lead, spread over the extra starter-games the leader has played, as one short line.
+ * "FUNK +41.5 PPG · 4 extra GP": FUNK leads by 166.1 having played 4 more games, 41.5 a game.
+ * With even games, or the leader behind on games, the lead alone: "FUNK +166.1 · even GP".
+ * Null until either side has a played starter-game.
  */
-export function fppgGapLabel(home: ScoreSide, away: ScoreSide, period?: number): string | null {
-  const h = lineupFppg(home, period).average, a = lineupFppg(away, period).average;
-  if (h === null || a === null) return null;
-  // Subtract the shown one-decimal numbers, so the gap matches the two FPPG labels beside it.
-  const gap = Math.round((Math.abs(Number(fppgText(h)) - Number(fppgText(a))) + Number.EPSILON) * 10) / 10;
-  if (gap === 0) return 'Even FPPG';
-  const leader = h > a ? home : away;
-  return `${leader.abbrev || leader.name} +${gap.toFixed(1)} FPPG`;
+export function leadPerExtraGameLabel(home: ScoreSide, away: ScoreSide): string | null {
+  const homeGames = lineupFppg(home).games, awayGames = lineupFppg(away).games;
+  if (!homeGames && !awayGames) return null;
+  const lead = Math.round((Math.abs(home.total - away.total) + Number.EPSILON) * 10) / 10;
+  if (lead === 0) return 'Even';
+  const homeLeads = home.total > away.total;
+  const leader = homeLeads ? home : away;
+  const extra = homeLeads ? homeGames - awayGames : awayGames - homeGames;
+  const name = leader.abbrev || leader.name;
+  if (extra > 0) return `${name} +${fppgText(lead / extra)} PPG · ${extra} extra GP`;
+  return `${name} +${lead.toFixed(1)} · ${extra === 0 ? 'even GP' : `${-extra} fewer GP`}`;
 }
