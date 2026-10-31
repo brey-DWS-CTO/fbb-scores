@@ -6132,6 +6132,29 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 /* FL beside the name while a player is in foul trouble. */
 .score-badge.is-foul { background: var(--neon-orange); }
 
+/* Win % trend: a Trend button beside the bar, and the chart it opens. */
+.score-trend-row { display: flex; align-items: center; gap: 8px; }
+.score-trend-row > .score-bar-row { flex: 1; min-width: 0; }
+.score-trend-toggle { flex: 0 0 auto; padding: 2px 8px; border: 1px solid var(--panel-border); border-radius: 999px; background: transparent; color: var(--text-soft); font-size: .62rem; font-weight: 700; letter-spacing: .04em; cursor: pointer; }
+.score-trend-toggle.is-on { border-color: var(--neon-teal); color: var(--neon-teal); }
+.win-trend { margin-top: 6px; }
+.win-trend-note { padding: 6px 0; color: var(--text-soft); font-size: .72rem; text-align: center; }
+.win-trend-plot { position: relative; }
+.win-trend-plot svg { display: block; width: 100%; height: auto; overflow: visible; }
+.win-trend-side { position: absolute; left: 0; font-size: .58rem; font-weight: 800; letter-spacing: .04em; color: var(--text-soft); pointer-events: none; }
+.win-trend-side.is-top { top: 0; }
+.win-trend-side.is-bottom { bottom: 18px; }
+.win-trend-grid { stroke: var(--panel-border); stroke-width: 1; }
+.win-trend-mid { stroke: var(--text-dim); stroke-width: 1; stroke-dasharray: 3 3; }
+.win-trend-day { fill: var(--text-soft); font-size: 9px; }
+.win-trend-line { fill: none; stroke: var(--neon-teal); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.win-trend-plot svg { touch-action: pan-y; }
+.win-trend-hit { fill: transparent; cursor: crosshair; }
+.win-trend-cursor { stroke: var(--text-dim); stroke-width: 1; }
+.win-trend-dot { fill: var(--neon-teal); stroke: var(--panel-bg); stroke-width: 2; }
+.win-trend-readout { display: flex; justify-content: center; gap: 10px; color: var(--text-body); font-size: .7rem; font-variant-numeric: tabular-nums; }
+.win-trend-readout b { color: var(--text-max); }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

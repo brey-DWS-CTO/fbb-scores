@@ -20,6 +20,7 @@ import { runGamesWarnings } from '../lib/gamesWarningService.js';
 import { refreshTeamNamesNow } from '../lib/teamNameService.js';
 import { pullTransactionsIfStale } from '../lib/transactionService.js';
 import { runLmClock, runLmClaimClock } from '../lib/lmWeekendService.js';
+import { runWinTrendClock } from '../lib/winTrendService.js';
 import { appOrigin } from './auth.js';
 
 const router = Router();
@@ -121,6 +122,22 @@ router.get('/lm-claims', async (req: Request, res: Response) => {
   if (!allowed(req)) { res.status(401).json({ error: 'Not for you' }); return; }
   try { res.json({ adds: await runLmClaimClock(new Date()) }); }
   catch (error) { console.error('[lm-claims]', error instanceof Error ? error.message : error); res.status(500).json({ error: 'LM claim processing failed' }); }
+});
+
+/**
+ * GET /api/notify/win-trend, every fifteen minutes: save each matchup's win
+ * chance while games are on. A quiet run reads one scoreboard and stops.
+ */
+router.get('/win-trend', async (req: Request, res: Response) => {
+  if (!allowed(req)) { res.status(401).json({ error: 'Not for you' }); return; }
+  try {
+    const run = await runWinTrendClock(new Date());
+    if (run.run) console.log(`[win-trend] ${run.run}: ${run.saved} saved, ${run.espnReads} ESPN reads${run.skipped ? `, ${run.skipped}` : ''}`);
+    res.json(run);
+  } catch (err) {
+    console.error('[win-trend] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'The win trend clock failed' });
+  }
 });
 
 export default router;

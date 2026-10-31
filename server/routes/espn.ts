@@ -6,6 +6,7 @@ import type { EspnMatchupRaw, EspnRosterEntry, GameStatus, NbaGameInfo } from '.
 import { NBA_TEAM_ABBREV } from '../../src/lib/espn/calculations.js';
 import type { ScoresWeek } from '../../src/lib/league/scores.js';
 import { loadWeek } from '../lib/scoresWeekService.js';
+import { listTrendPoints } from '../lib/leagueStore.js';
 import { espnUploadUrl, isEspnUploadId } from '../../src/lib/league/teamLogo.js';
 
 const router = Router();
@@ -402,6 +403,29 @@ router.get('/espn/week', async (req, res) => {
     }
     console.error('[ESPN proxy] Error fetching week:', message);
     res.status(502).json({ error: message });
+  }
+});
+
+/**
+ * GET /api/espn/win-trend?season=2027&matchupPeriod=1: every saved win %
+ * point for the week. The clock adds points at most every 15 minutes, so
+ * the CDN may answer for two.
+ */
+router.get('/espn/win-trend', async (req, res) => {
+  const season = Number(req.query.season);
+  const matchupPeriod = Number(req.query.matchupPeriod);
+  if (!Number.isInteger(season) || !Number.isInteger(matchupPeriod)) {
+    res.status(400).json({ error: 'Invalid week' });
+    return;
+  }
+  try {
+    const points = await listTrendPoints(season, matchupPeriod);
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=120');
+    res.json({ points });
+  } catch (err) {
+    console.error('[win-trend] read failed:', err instanceof Error ? err.message : err);
+    res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+    res.status(502).json({ error: 'Could not read the trend' });
   }
 });
 

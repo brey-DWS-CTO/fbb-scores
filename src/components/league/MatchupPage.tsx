@@ -46,6 +46,7 @@ import LineupGamesSummary from './LineupGamesSummary.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
 import { ScoresNotice, WinBar } from './ScoresBits.js';
+import { WinTrend } from './WinTrend.js';
 import { numberParam, scoresQuery, tipoffText } from './scoresUi.js';
 
 type View = { kind: 'day'; scoringPeriodId: number } | { kind: 'week' };
@@ -351,6 +352,7 @@ export default function MatchupPage() {
   const dayNav = useRef<HTMLDivElement>(null);
   const scoreHeader = useRef<HTMLElement>(null);
   const [showStickyScore, setShowStickyScore] = useState(false);
+  const [showTrend, setShowTrend] = useState(false);
 
   const loaded = query.data;
   // The commissioner's cap for this week when he set one, else ESPN's.
@@ -470,7 +472,24 @@ export default function MatchupPage() {
               <SideHead side={matchup.home} owner={owners.get(matchup.home.teamId)} proj={homeProj?.week ?? null} leading={matchup.home.total > matchup.away.total} />
               <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} proj={awayProj?.week ?? null} leading={matchup.away.total > matchup.home.total} right />
             </div>
-            <WinBar left={chance.home} right={chance.away} />
+            <div className="score-trend-row">
+              <WinBar left={chance.home} right={chance.away} />
+              {!demo && (
+                <button type="button" className={`score-trend-toggle${showTrend ? ' is-on' : ''}`} aria-expanded={showTrend} onClick={() => setShowTrend((on) => !on)}>
+                  Trend
+                </button>
+              )}
+            </div>
+            {showTrend && !demo && (
+              <WinTrend
+                season={week.season}
+                matchupPeriodId={week.matchupPeriodId}
+                matchupId={matchup.id}
+                dates={week.days.map((day) => day.date)}
+                homeLabel={matchup.home.abbrev || matchup.home.name}
+                awayLabel={matchup.away.abbrev || matchup.away.name}
+              />
+            )}
             {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
             <details className="score-matchup-details">
               <summary>Matchup details</summary>
