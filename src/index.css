@@ -6139,6 +6139,8 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 .fppg-proj.is-at { color: var(--neon-teal); }
 .fppg-proj.is-under { color: var(--neon-yellow); font-weight: 700; }
 .fppg-proj.is-over { color: var(--neon-red); font-weight: 700; }
+/* A long team name plus the owner may need a third line; never clip the owner. */
+.score-team-heading .score-side-name { -webkit-line-clamp: 3; }
 .fppg-live { display: inline-block; width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: var(--neon-teal); vertical-align: middle; }
 .score-matchup-details .score-extra-stats .lineup-fppg { margin: 0; }
 
