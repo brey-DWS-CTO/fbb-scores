@@ -1,3 +1,4 @@
+import { lmAddRuleDisplay } from '../../lib/league/rulebookHotfix.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
@@ -368,8 +369,12 @@ export default function RulesPage() {
   const book = editing && draft ? draft : (pastVersion?.book ?? publishedBook);
   const historical = pastVersion !== null && pastVersion.id !== publishedMeta.versionId;
   const index = useMemo(
-    () => (book === rulebook2027 ? rulebookIndex2027 : buildRulebookIndex(book)),
-    [book],
+    () => {
+      const indexed = book === rulebook2027 ? rulebookIndex2027 : buildRulebookIndex(book);
+      // Clarify the live app without changing the signed publication or its revision.
+      return editing || historical ? indexed : lmAddRuleDisplay(indexed);
+    },
+    [book, editing, historical],
   );
   const sections = useMemo(() => groupByArticle(index), [index]);
   const results = useMemo(() => (term.trim() ? searchRulebook(index, term) : null), [term, index]);
