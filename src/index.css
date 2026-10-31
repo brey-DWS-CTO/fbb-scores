@@ -6135,6 +6135,11 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 /* One line under the win bar: the lead per extra starter-game the leader has played. */
 .score-fppg-gap { margin-top: 4px; text-align: center; font-size: 0.7rem; font-weight: 700; color: var(--neon-teal); font-variant-numeric: tabular-nums; }
 .score-side-owner-inline { font-size: 0.68rem; font-weight: 400; color: var(--text-dim); }
+/* Projected games beside games played: teal at cap, yellow under, red over. */
+.fppg-proj.is-at { color: var(--neon-teal); }
+.fppg-proj.is-under { color: var(--neon-yellow); font-weight: 700; }
+.fppg-proj.is-over { color: var(--neon-red); font-weight: 700; }
+.fppg-live { display: inline-block; width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: var(--neon-teal); vertical-align: middle; }
 .score-matchup-details .score-extra-stats .lineup-fppg { margin: 0; }
 
 /* ─── Offsets around the two nav bars ────────────────────────────────── */

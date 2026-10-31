@@ -42,11 +42,12 @@ export function sortLineupFppg(teams: readonly ScoreSide[], column: string, asce
 
 /**
  * The lead, spread over the extra starter-games the leader has played, as one short line.
- * "FUNK +41.5 PPG · 4 extra GP": FUNK leads by 166.1 having played 4 more games, 41.5 a game.
- * With even games, or the leader behind on games, the lead alone: "FUNK +166.1 · even GP".
+ * "Brey +41.5 PPG · up 4 games": Brey leads by 166.1 having played 4 more games, 41.5 a game.
+ * With even games, or the leader behind on games, the lead alone: "Brey +166.1 · down 2 games".
+ * Names are the owners' first names; a side without one falls back to its team abbreviation.
  * Null until either side has a played starter-game.
  */
-export function leadPerExtraGameLabel(home: ScoreSide, away: ScoreSide): string | null {
+export function leadPerExtraGameLabel(home: ScoreSide, away: ScoreSide, homeOwner?: string, awayOwner?: string): string | null {
   const homeGames = lineupFppg(home).games, awayGames = lineupFppg(away).games;
   if (!homeGames && !awayGames) return null;
   const lead = Math.round((Math.abs(home.total - away.total) + Number.EPSILON) * 10) / 10;
@@ -54,7 +55,8 @@ export function leadPerExtraGameLabel(home: ScoreSide, away: ScoreSide): string 
   const homeLeads = home.total > away.total;
   const leader = homeLeads ? home : away;
   const extra = homeLeads ? homeGames - awayGames : awayGames - homeGames;
-  const name = leader.abbrev || leader.name;
-  if (extra > 0) return `${name} +${fppgText(lead / extra)} PPG · ${extra} extra GP`;
-  return `${name} +${lead.toFixed(1)} · ${extra === 0 ? 'even GP' : `${-extra} fewer GP`}`;
+  const name = (homeLeads ? homeOwner : awayOwner) || leader.abbrev || leader.name;
+  const games = (n: number) => `${n} game${n === 1 ? '' : 's'}`;
+  if (extra > 0) return `${name} +${fppgText(lead / extra)} PPG · up ${games(extra)}`;
+  return `${name} +${lead.toFixed(1)} · ${extra === 0 ? 'even games' : `down ${games(-extra)}`}`;
 }

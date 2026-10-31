@@ -36,10 +36,12 @@ test('lead per extra game: 166.1 up over 4 extra starter-games is 41.5 PPG; even
  const g=(n:number)=>Object.fromEntries(Array.from({length:n},(_,i)=>[String(i+1),day(10)]));
  const funk={...side(g(26)),total:859.6,abbrev:'FUNK'};
  const st={...side(g(22)),total:693.5,abbrev:'ST'};
- assert.equal(leadPerExtraGameLabel(funk,st),'FUNK +41.5 PPG · 4 extra GP');
- assert.equal(leadPerExtraGameLabel(st,funk),'FUNK +41.5 PPG · 4 extra GP');
- assert.equal(leadPerExtraGameLabel(funk,{...st,total:900}),'ST +40.4 · 4 fewer GP');
- assert.equal(leadPerExtraGameLabel(funk,{...funk,abbrev:'X',total:800}),'FUNK +59.6 · even GP');
+ assert.equal(leadPerExtraGameLabel(funk,st,'Brey','Derek'),'Brey +41.5 PPG · up 4 games');
+ assert.equal(leadPerExtraGameLabel(st,funk,'Derek','Brey'),'Brey +41.5 PPG · up 4 games');
+ assert.equal(leadPerExtraGameLabel(funk,st),'FUNK +41.5 PPG · up 4 games');
+ assert.equal(leadPerExtraGameLabel(funk,{...st,total:900}),'ST +40.4 · down 4 games');
+ assert.equal(leadPerExtraGameLabel(funk,{...funk,abbrev:'X',total:800}),'FUNK +59.6 · even games');
+ assert.equal(leadPerExtraGameLabel({...side(g(23)),total:859.6,abbrev:'FUNK'},st),'FUNK +166.1 PPG · up 1 game');
  assert.equal(leadPerExtraGameLabel(funk,{...funk,abbrev:'X'}),'Even');
  assert.equal(leadPerExtraGameLabel({...funk,players:[]},{...st,players:[]}),null);
 });
