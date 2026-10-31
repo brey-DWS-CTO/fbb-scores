@@ -1,4 +1,5 @@
 import { FppgLabel } from './LineupFppg.js';
+import { fppgGapLabel } from '../../lib/league/lineupFppg.js';
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -147,6 +148,7 @@ export default function ScoresPage() {
             const homeLeads = matchup.home.total > matchup.away.total;
             const awayLeads = matchup.away.total > matchup.home.total;
             const mine = matchup.home.teamId === myTeamId || matchup.away.teamId === myTeamId;
+            const fppgGap = fppgGapLabel(matchup.home, matchup.away);
             return (
               <Link key={matchup.id} to={linkTo(matchup)} className={`panel score-card${mine ? ' is-mine' : ''}`}>
                 <div className="score-head-grid">
@@ -173,6 +175,7 @@ export default function ScoresPage() {
                   />
                 </div>
                 <WinBar left={chance.home} right={chance.away} />
+                {fppgGap && <div className="score-fppg-gap">{fppgGap}</div>}
                 {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
               </Link>
             );
