@@ -1,3 +1,4 @@
+import type { MatchupFeed } from './matchupProjection.js';
 import { resolveSeasonMode } from './seasonMode.js';
 import type { ExpertProjections } from './expertProjections.js';
 import type { ProjectionEdit } from './projectionEdits.js';
@@ -2165,3 +2166,8 @@ axios.interceptors.request.use(config => {
   } catch { /* No saved identity. */ }
   return config;
 });
+
+export async function fetchMatchupEnvironment(season: number): Promise<MatchupFeed> {
+  const { data } = await axios.get<MatchupFeed>('/api/league/matchup-environment', { params: { season } });
+  return data;
+}
