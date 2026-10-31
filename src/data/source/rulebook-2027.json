@@ -908,7 +908,7 @@
                     {
                       "id": "transactions.waivers.lmadd.public",
                       "legacyNumber": "5.3.3.2.3",
-                      "text": "The LM add must be announced publicly in the league group chat. No exceptions for phone calls, personal conversations, or similar."
+                      "text": "The LM add must be requested through the app or announced publicly in the league group chat. No exceptions for phone calls, personal conversations, or similar."
                     },
                     {
                       "id": "transactions.waivers.lmadd.space",
