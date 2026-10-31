@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import { fppgText, lineupFppg, sortLineupFppg } from '../../lib/league/lineupFppg.js';
 import { shortDate, type ScoreSide, type ScoresWeek } from '../../lib/league/scores.js';
+import { gamesCapStatus, lineupGames } from '../../lib/league/lineupGames.js';
 
-export function FppgLabel({ side, period }: { side: ScoreSide; period?: number }) {
+/** With `week`, GP reads played/projected, the projection coloured by where it lands against the cap. */
+export function FppgLabel({ side, period, week }: { side: ScoreSide; period?: number; week?: ScoresWeek }) {
   const value = lineupFppg(side, period);
-  return <div className="lineup-fppg"><strong>{fppgText(value.average)} FPPG</strong> · {value.games} GP
-    {period !== undefined && <> · {value.points.toFixed(1)} pts</>}{value.live ? ' · live' : ''}</div>;
+  const games = week ? lineupGames(side, week) : null;
+  const tone = !games || games.difference === null ? '' : games.difference > 0 ? ' is-over' : games.difference < 0 ? ' is-under' : ' is-at';
+  return <div className="lineup-fppg"><strong>{fppgText(value.average)} FPPG</strong> · {value.games}
+    {games && <>/<span className={`fppg-proj${tone}`} title={`${games.estimated ? 'Estimated' : 'Projected'} ${games.projected} of ${games.cap ?? '?'} games. ${gamesCapStatus(games)}.`}>{games.estimated ? '~' : ''}{games.projected}</span></>} GP
+    {period !== undefined && <> · {value.points.toFixed(1)} pts</>}{value.live ? <span className="fppg-live" role="img" aria-label="live" /> : null}</div>;
 }
 
 function DailySparkline({ daily, dates }: { daily: Array<number | null>; dates: string[] }) {

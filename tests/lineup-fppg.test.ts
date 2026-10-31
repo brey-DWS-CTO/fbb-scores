@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lineupFppg, fppgText, sortLineupFppg } from '../src/lib/league/lineupFppg.ts';
+import { lineupFppg, fppgText, leadPerExtraGameLabel, sortLineupFppg } from '../src/lib/league/lineupFppg.ts';
 import { planWeek } from '../src/lib/league/scores.ts';
 import type { ScoreSide, ScorePlayer, PlayerDay } from '../src/lib/league/scores.ts';
 const day = (points:number, started=true, played=true):PlayerDay => ({points,started,played,lineupSlotId:0,stats:null,game:null});
@@ -30,4 +30,18 @@ test('weekly table sorts week, GP, dates, names and trend without mutating rows;
  assert.deepEqual(ids('1'),[2,1,3]); assert.deepEqual(ids('2',true),[1,2,3]);
  assert.deepEqual(ids('team',true),[1,2,3]); assert.deepEqual(ids('team'),[3,2,1]);
  assert.deepEqual(ids('trend'),[1,2,3]); assert.deepEqual(rows.map(row=>row.teamId),[1,2,3]);
+});
+
+test('lead per extra game: 166.1 up over 4 extra starter-games is 41.5 PPG; even and fewer games show the lead',()=>{
+ const g=(n:number)=>Object.fromEntries(Array.from({length:n},(_,i)=>[String(i+1),day(10)]));
+ const funk={...side(g(26)),total:859.6,abbrev:'FUNK'};
+ const st={...side(g(22)),total:693.5,abbrev:'ST'};
+ assert.equal(leadPerExtraGameLabel(funk,st,'Brey','Derek'),'Brey +41.5 PPG · up 4 games');
+ assert.equal(leadPerExtraGameLabel(st,funk,'Derek','Brey'),'Brey +41.5 PPG · up 4 games');
+ assert.equal(leadPerExtraGameLabel(funk,st),'FUNK +41.5 PPG · up 4 games');
+ assert.equal(leadPerExtraGameLabel(funk,{...st,total:900}),'ST +40.4 · down 4 games');
+ assert.equal(leadPerExtraGameLabel(funk,{...funk,abbrev:'X',total:800}),'FUNK +59.6 · even games');
+ assert.equal(leadPerExtraGameLabel({...side(g(23)),total:859.6,abbrev:'FUNK'},st),'FUNK +166.1 PPG · up 1 game');
+ assert.equal(leadPerExtraGameLabel(funk,{...funk,abbrev:'X'}),'Even');
+ assert.equal(leadPerExtraGameLabel({...funk,players:[]},{...st,players:[]}),null);
 });

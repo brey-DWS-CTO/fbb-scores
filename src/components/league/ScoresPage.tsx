@@ -1,4 +1,5 @@
 import { FppgLabel } from './LineupFppg.js';
+import { leadPerExtraGameLabel } from '../../lib/league/lineupFppg.js';
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useIdentity } from '../../hooks/useLeague.js';
@@ -12,13 +13,11 @@ import {
   matchupChance,
   orderForViewer,
   ownerByEspnTeamId,
-  recordText,
   seasonStartDate,
   type ScoreMatchup,
   type ScoreSide,
   type ScoresWeek,
 } from '../../lib/league/scores.js';
-import LineupGamesSummary from './LineupGamesSummary.js';
 import FantasyTeamLogo from './FantasyTeamLogo.js';
 import IdentityChip from './IdentityChip.js';
 import NavIcon from './NavIcon.js';
@@ -43,15 +42,13 @@ interface SideProps {
 function CardSide({ side, week, owner, leading, mine, proj, deduction, projAhead, right }: SideProps) {
   return (
     <div className={`score-side-head${right ? ' is-right' : ''}${leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}`}>
-      <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name}</div></div>
-      <div className="score-side-owner">{owner ?? 'Unknown owner'} · {recordText(side.record)}</div>
-      <FppgLabel side={side} />
+      <div className="score-team-heading"><FantasyTeamLogo side={side} /><div className="score-side-name">{side.name} <span className="score-side-owner-inline">· {owner ?? 'Unknown owner'}</span></div></div>
+      <FppgLabel side={side} week={week} />
       <div className="score-side-scoreline"><div className="score-side-total">{side.total.toFixed(1)}</div>
       {proj !== null && (
         <div className={`score-side-proj${projAhead ? ' is-up' : ''}`} title={deduction > 0 ? `${projText(deduction)} overage points deducted` : undefined}>Proj <b>{projText(proj)}</b></div>
       )}
       </div>
-      <LineupGamesSummary side={side} week={week} />
     </div>
   );
 }
@@ -147,6 +144,7 @@ export default function ScoresPage() {
             const homeLeads = matchup.home.total > matchup.away.total;
             const awayLeads = matchup.away.total > matchup.home.total;
             const mine = matchup.home.teamId === myTeamId || matchup.away.teamId === myTeamId;
+            const fppgGap = leadPerExtraGameLabel(matchup.home, matchup.away, owners.get(matchup.home.teamId), owners.get(matchup.away.teamId));
             return (
               <Link key={matchup.id} to={linkTo(matchup)} className={`panel score-card${mine ? ' is-mine' : ''}`}>
                 <div className="score-head-grid">
@@ -173,6 +171,7 @@ export default function ScoresPage() {
                   />
                 </div>
                 <WinBar left={chance.home} right={chance.away} />
+                {fppgGap && <div className="score-fppg-gap">{fppgGap}</div>}
                 {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
               </Link>
             );
