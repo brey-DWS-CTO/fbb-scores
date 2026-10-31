@@ -39,4 +39,6 @@ test('matchup FPPG gap names the side scoring more per game; even and empty hand
  assert.equal(fppgGapLabel(them,me),'THEM +2.5 FPPG');
  assert.equal(fppgGapLabel(me,{...me,abbrev:'X'}),'Even FPPG');
  assert.equal(fppgGapLabel(me,side({'1':day(0,true,false)})),null);
+ const a={...side({'1':day(33.14)}),abbrev:'A'}, b={...side({'1':day(31.55)}),abbrev:'B'};
+ assert.equal(fppgGapLabel(a,b),'A +1.5 FPPG');
 });

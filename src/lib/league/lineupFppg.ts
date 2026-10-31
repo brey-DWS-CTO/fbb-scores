@@ -48,7 +48,8 @@ export function sortLineupFppg(teams: readonly ScoreSide[], column: string, asce
 export function fppgGapLabel(home: ScoreSide, away: ScoreSide, period?: number): string | null {
   const h = lineupFppg(home, period).average, a = lineupFppg(away, period).average;
   if (h === null || a === null) return null;
-  const gap = Math.round((Math.abs(h - a) + Number.EPSILON) * 10) / 10;
+  // Subtract the shown one-decimal numbers, so the gap matches the two FPPG labels beside it.
+  const gap = Math.round((Math.abs(Number(fppgText(h)) - Number(fppgText(a))) + Number.EPSILON) * 10) / 10;
   if (gap === 0) return 'Even FPPG';
   const leader = h > a ? home : away;
   return `${leader.abbrev || leader.name} +${gap.toFixed(1)} FPPG`;
