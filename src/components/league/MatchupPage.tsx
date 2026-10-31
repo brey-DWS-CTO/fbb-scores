@@ -1,4 +1,5 @@
 import { FppgLabel } from './LineupFppg.js';
+import { fppgGapLabel } from '../../lib/league/lineupFppg.js';
 import { fppgText, lineupFppg } from '../../lib/league/lineupFppg.js';
 import ScoreBreakdown from './ScoreBreakdown.js';
 import PlayerNews from './PlayerNews.js';
@@ -403,6 +404,7 @@ export default function MatchupPage() {
   };
   const homeProj = settled ? null : homeForecast;
   const awayProj = settled ? null : awayForecast;
+  const fppgGap = matchup ? fppgGapLabel(matchup.home, matchup.away) : null;
   // The box scores behind on-the-floor and foul trouble: today only, and only once a game has tipped.
   const courtDay = !demo && week && view?.kind === 'day' && view.scoringPeriodId === week.currentScoringPeriodId
     ? week.days.find((day) => day.scoringPeriodId === view.scoringPeriodId) ?? null
@@ -471,6 +473,7 @@ export default function MatchupPage() {
               <SideHead side={matchup.away} owner={owners.get(matchup.away.teamId)} proj={awayProj?.week ?? null} leading={matchup.away.total > matchup.home.total} right />
             </div>
             <WinBar left={chance.home} right={chance.away} />
+            {fppgGap && <div className="score-fppg-gap">{fppgGap}</div>}
             {matchup.winner !== 'UNDECIDED' && <div className="score-final">FINAL</div>}
             <details className="score-matchup-details">
               <summary>Matchup details</summary>

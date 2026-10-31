@@ -6132,6 +6132,9 @@ html:not(.theme-light) .score-points-projected { font-size: .75rem; font-weight:
 /* FL beside the name while a player is in foul trouble. */
 .score-badge.is-foul { background: var(--neon-orange); }
 
+/* One line under the win bar: which side scores more per starter-game. */
+.score-fppg-gap { margin-top: 4px; text-align: center; font-size: 0.7rem; font-weight: 700; color: var(--neon-teal); font-variant-numeric: tabular-nums; }
+
 /* ─── Offsets around the two nav bars ────────────────────────────────── */
 /* Last in the file on purpose: these must beat the base top:0 rules above. */
 .keeper-browse-banner { position: static; }

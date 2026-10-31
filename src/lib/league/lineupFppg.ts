@@ -39,3 +39,17 @@ export function sortLineupFppg(teams: readonly ScoreSide[], column: string, asce
     return (av - bv) * (ascending ? 1 : -1) || a.name.localeCompare(b.name);
   });
 }
+
+/**
+ * The per-game gap between two sides of a matchup, as one short line.
+ * "GSW +2.5 FPPG" means GSW scores 2.5 more per starter-game than the other side.
+ * Null until both sides have a played starter-game.
+ */
+export function fppgGapLabel(home: ScoreSide, away: ScoreSide, period?: number): string | null {
+  const h = lineupFppg(home, period).average, a = lineupFppg(away, period).average;
+  if (h === null || a === null) return null;
+  const gap = Math.round((Math.abs(h - a) + Number.EPSILON) * 10) / 10;
+  if (gap === 0) return 'Even FPPG';
+  const leader = h > a ? home : away;
+  return `${leader.abbrev || leader.name} +${gap.toFixed(1)} FPPG`;
+}

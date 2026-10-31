@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lineupFppg, fppgText, sortLineupFppg } from '../src/lib/league/lineupFppg.ts';
+import { lineupFppg, fppgText, fppgGapLabel, sortLineupFppg } from '../src/lib/league/lineupFppg.ts';
 import { planWeek } from '../src/lib/league/scores.ts';
 import type { ScoreSide, ScorePlayer, PlayerDay } from '../src/lib/league/scores.ts';
 const day = (points:number, started=true, played=true):PlayerDay => ({points,started,played,lineupSlotId:0,stats:null,game:null});
@@ -30,4 +30,13 @@ test('weekly table sorts week, GP, dates, names and trend without mutating rows;
  assert.deepEqual(ids('1'),[2,1,3]); assert.deepEqual(ids('2',true),[1,2,3]);
  assert.deepEqual(ids('team',true),[1,2,3]); assert.deepEqual(ids('team'),[3,2,1]);
  assert.deepEqual(ids('trend'),[1,2,3]); assert.deepEqual(rows.map(row=>row.teamId),[1,2,3]);
+});
+
+test('matchup FPPG gap names the side scoring more per game; even and empty handled',()=>{
+ const me={...side({'1':day(40)},{'1':day(40)},{'1':day(40)}),abbrev:'ME'};
+ const them={...side({'1':day(42.5)},{'1':day(42.5)}),abbrev:'THEM'};
+ assert.equal(fppgGapLabel(me,them),'THEM +2.5 FPPG');
+ assert.equal(fppgGapLabel(them,me),'THEM +2.5 FPPG');
+ assert.equal(fppgGapLabel(me,{...me,abbrev:'X'}),'Even FPPG');
+ assert.equal(fppgGapLabel(me,side({'1':day(0,true,false)})),null);
 });
