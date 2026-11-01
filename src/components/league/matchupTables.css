@@ -1,0 +1,20 @@
+.matchup-tables { margin: 8px 0; padding: 0; color: var(--text-hi); }
+.matchup-tables > summary { min-height: 44px; padding: 10px; cursor: pointer; font-size: .78rem; font-weight: 650; }
+.matchup-tables > summary > span { margin-left: 6px; font-size: .67rem; font-weight: 400; color: var(--text-mid); }
+.matchup-tables-body { padding: 0 10px 8px; }
+.matchup-table-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; }
+.matchup-table-views { display: flex; gap: 4px; }
+.matchup-table-views button, .matchup-table-controls select { min-height: 44px; padding: 5px 9px; border: 1px solid var(--panel-border); border-radius: 5px; background: var(--panel-bg); color: var(--text-hi); font: inherit; font-size: .75rem; }
+.matchup-table-views button[aria-pressed="true"] { color: var(--neon-teal); border-color: var(--neon-teal); }
+.matchup-table-controls label { display: flex; align-items: center; gap: 6px; font-size: .7rem; }
+.matchup-table-scroll { max-height: 330px; overflow: auto; border: 1px solid var(--panel-border); border-radius: 5px; }
+.matchup-table-scroll:focus-visible, .matchup-tables summary:focus-visible, .matchup-tables button:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: 2px; }
+.matchup-table-scroll table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .74rem; font-variant-numeric: tabular-nums; }
+.matchup-table-scroll th, .matchup-table-scroll td { padding: 5px 8px; border-bottom: 1px solid var(--panel-border); text-align: right; }
+.matchup-table-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel-bg); color: var(--text-mid); }
+.matchup-table-scroll th:nth-child(2) { text-align: left; }
+.matchup-table-scroll th button { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.matchup-table-scroll tbody tr:nth-child(even) { background: color-mix(in srgb, var(--text-mid) 5%, transparent); }
+.matchup-team-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 650; }
+.matchup-team-label .team-logo { flex-shrink: 0; object-fit: contain; }
+.matchup-table-note { margin: 5px 0 !important; font-size: .65rem; line-height: 1.4; color: var(--text-mid); }

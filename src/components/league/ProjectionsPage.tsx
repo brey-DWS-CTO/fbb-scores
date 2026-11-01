@@ -1,3 +1,4 @@
+import MatchupTables from './MatchupTables.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { projectedPerGame } from '../../lib/league/draftRankings.js';
@@ -368,6 +369,8 @@ export default function ProjectionsPage() {
             : 'The commish will update them soon.'}
         </div>
       )}
+
+      <MatchupTables season={snapshot?.season ?? state.season} scoring={snapshot?.scoringItems} />
 
       <CurrentLineupGames />
 

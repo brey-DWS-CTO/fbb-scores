@@ -1,3 +1,4 @@
+import { runProjectionEvaluationClock } from '../lib/projectionEvaluationService.js';
 import { runMissedGamesClock } from '../lib/missedGamesService.js';
 /**
  * The clocks. Mounted at /api/notify.
@@ -51,6 +52,7 @@ router.get('/tick', async (req: Request, res: Response) => {
     return;
   }
   try {
+    const evaluationPromise = runProjectionEvaluationClock(new Date()).catch(() => ({ error: 'Forecast evaluation failed; saved captures retained' }));
     // A failed ESPN read must not prevent the other league reminders.
     const games = await runGamesWarnings(new Date(), appOrigin(req)).catch((err: unknown) => {
       console.error('[notify] lineup warnings failed:', err instanceof Error ? err.message : err);
@@ -64,7 +66,9 @@ router.get('/tick', async (req: Request, res: Response) => {
     const run = await runDueReminders(new Date(), appOrigin(req));
     // Counts only. Who was mailed is not something a log needs to carry.
     console.log(`[notify] tick: ${run.sent} of ${run.due} due reminders sent`);
-    res.json({ ...run, games, missedGames });
+    const evaluation = await evaluationPromise;
+    console.log('[forecast evaluation]', JSON.stringify(evaluation));
+    res.json({ ...run, games, missedGames, evaluation });
   } catch (err) {
     console.error('[notify] tick failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'The reminder run failed' });

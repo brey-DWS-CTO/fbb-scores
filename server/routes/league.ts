@@ -1,3 +1,5 @@
+import { registerProjectionEvaluationRoutes } from './projectionEvaluation.js';
+import { getMatchupEnvironment } from '../lib/matchupEnvironment.js';
 import { registerMissedGamesRoutes } from './missedGames.js';
 import { getPerformerDates } from '../lib/performerDatesService.js';
 import { registerLineupRoutes } from './lineup.js';
@@ -379,6 +381,13 @@ import { getFantasyCast } from '../lib/fantasyCastService.js';
 import { castCacheSeconds } from '../../src/lib/league/castPolling.js';
 
 const router = Router();
+router.get('/matchup-environment', async (req, res) => {
+  const season = Number(req.query.season);
+  if (!Number.isInteger(season) || season < 2020 || season > 2035) { res.status(400).json({ error: 'Invalid NBA season' }); return; }
+  const feed = await getMatchupEnvironment(season);
+  res.setHeader('Cache-Control', feed.error ? 'no-store' : 'public, max-age=300');
+  res.json(feed);
+});
 router.get('/fantasy-cast', async (req, res, next) => {
   const date = typeof req.query.date === 'string' ? req.query.date : '';
   if (!validScoreDate(date)) { res.status(400).json({ error: 'Use a date in YYYY-MM-DD format' }); return; }
@@ -5527,6 +5536,7 @@ router.delete('/guests/:id', requireAuth, requireCommissioner, async (req, res, 
   try { const id = String(req.params.id); await revokeGuestAccess(id); await appendAudit(actor(res), 'guest.revoked', { id }); res.status(204).end(); } catch (error) { next(error); }
 });
 
+registerProjectionEvaluationRoutes(router, requireAuth, requireCommissioner);
 registerLineupRoutes(router, requireAuth, requireCommissioner);
 registerMissedGamesRoutes(router, requireAuth, requireCommissioner);
 
