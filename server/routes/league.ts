@@ -1,3 +1,4 @@
+import { registerProjectionEvaluationRoutes } from './projectionEvaluation.js';
 import { getMatchupEnvironment } from '../lib/matchupEnvironment.js';
 import { registerMissedGamesRoutes } from './missedGames.js';
 import { getPerformerDates } from '../lib/performerDatesService.js';
@@ -5535,6 +5536,7 @@ router.delete('/guests/:id', requireAuth, requireCommissioner, async (req, res, 
   try { const id = String(req.params.id); await revokeGuestAccess(id); await appendAudit(actor(res), 'guest.revoked', { id }); res.status(204).end(); } catch (error) { next(error); }
 });
 
+registerProjectionEvaluationRoutes(router, requireAuth, requireCommissioner);
 registerLineupRoutes(router, requireAuth, requireCommissioner);
 registerMissedGamesRoutes(router, requireAuth, requireCommissioner);
 

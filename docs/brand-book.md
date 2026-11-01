@@ -18,6 +18,7 @@ Use this guide when adding or changing UI. Reuse existing components and theme t
 - Keep player identity on one line; truncate long display names and preserve full accessible names. Eligibility and logos stay visible.
 - Projection games contain only opponent and projected points, on two compact lines. Pack actual games chronologically without off-day columns.
 - Recommended starts use bold text and the theme teal accent on both opponent and points. Bench options use `--text-mid`; locked/completed games use `--text-body` and a small inline lock glyph. Explain these states once in a compact legend; avoid repeated badges.
+- Roster average columns stay together as Season / L3 / L7 / L15. These mean completed games, with a sample marker for short windows; never relabel day-based windows as games.
 - Use the actual weekly cap and include already-used games in the planned count. Passed tip-off locks a game even if its feed still says upcoming.
 - Keep matchup reference tables collapsed by default. Use the shared MatchupTables component for Pace / Vs position, a bounded scrolling table, adjacent 16px team logos, and explicit scoring/sample-size labels.
 - Keep the player column sticky when the schedule scrolls horizontally. The page itself must fit the mobile viewport.

@@ -1,6 +1,6 @@
 # Planner matchup projections, version 1
 
-The My Team weekly planner applies a conservative pace and position-defense signal to its existing league-scored player baseline. Other scores pages and win probabilities retain their current model during this pilot.
+The My Team weekly planner offers an opt-in experimental model with a conservative pace and position-defense signal to its existing league-scored player baseline. Other scores pages and win probabilities retain their current model during this pilot.
 
 ## Sources and scoring
 
@@ -49,3 +49,5 @@ Both My Team > Projections and the season Projections editor contain a collapsed
 The tables reuse the same cached matchup environment as the planner and its shared-category scoring function. No source request is made solely for a closed section. The position table explicitly excludes FG/FT misses and DD/TD bonuses; its raw allowances are not the planner's shrunk, pace-normalized adjustment. Captured time and source links accompany the table. The shared component keeps both themes, adjacent 16px logos and compact rows consistent.
 
 Keep these as local views for now; no additional primary navigation tab was added. A dedicated projections section can follow when player forecasts and league-wide matchup research become an independent in-season workflow.
+
+Prospective tracking, baseline defaults and the commissioner comparison report are documented in [projection-evaluation.md](projection-evaluation.md).

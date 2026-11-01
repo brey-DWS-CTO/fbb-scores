@@ -174,3 +174,20 @@
 .weekly-game-card.is-locked { color: var(--text-body); }
 .weekly-game-opponent { display: inline-flex; align-items: center; gap: 2px; }
 .weekly-game-opponent svg { flex-shrink: 0; }
+
+/* All four game-based averages remain visible beside every roster player. */
+.my-team-row, .my-team-average-head { grid-template-columns: 32px minmax(0,1fr) repeat(4, 48px) 12px; }
+.my-team-average-head { display: grid; gap: 8px; padding: 4px 6px; color: var(--text-mid); font-size: .6rem; }
+.my-team-average-head > span:nth-child(n+3), .my-team-average { text-align: right; font-variant-numeric: tabular-nums; }
+.my-team-average { font-size: .72rem; white-space: nowrap; }
+.my-team-average-note { margin: 4px 0; font-size: .62rem; }
+@media (max-width: 540px) {
+  .my-team-row, .my-team-average-head { grid-template-columns: 24px minmax(0,1fr) repeat(4, 34px) 12px; gap: 4px; }
+  .my-team-average-head { padding: 4px 5px; }
+  .my-team-average { font-size: .64rem; }
+  .my-team-positions { font-size: .56rem; }
+}
+
+.my-team-model-choice { display: flex; align-items: center; gap: 6px; min-height: 44px; font-size: .7rem; color: var(--text-mid); }
+
+.my-team-page:not(.my-team-readonly) .my-team-row-state { grid-column: 2 / -1; justify-content: flex-end; }
