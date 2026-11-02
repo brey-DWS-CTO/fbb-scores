@@ -5,5 +5,5 @@ import { fetchMatchupEnvironment } from '../lib/league/api.js';
 export function useMatchupEnvironment(season: number | undefined, enabled = true) {
   return useQuery({ queryKey: ['matchup-environment', season],
     queryFn: () => fetchMatchupEnvironment(season!), enabled: enabled && season !== undefined,
-    staleTime: 60 * 60 * 1000, retry: false });
+    staleTime: 60 * 60 * 1000, refetchOnWindowFocus: false, retry: false });
 }

@@ -1,5 +1,5 @@
+import { READONLY_TEAM_REFRESH_MS } from '../../lib/league/projectionComputePolicy.js';
 import ProjectionEvaluation from './ProjectionEvaluation.js';
-import { useExpectedPoints } from '../../hooks/useScores.js';
 import MatchupTables from './MatchupTables.js';
 import { useMatchupProjection } from '../../hooks/useMatchupProjection.js';
 import { projectionExplanation } from '../../lib/league/matchupProjection.js';
@@ -18,12 +18,12 @@ import { WeekPicker } from './ScoresBits.js';
 
 export default function WeeklyLineupPlanner({ snapshot }: { snapshot: LineupSnapshot }) {
   const [requested, setRequested] = useState<number | null>(null);
-  const query = useScoresWeek(requested, false);
+  const query = useScoresWeek(requested, false, true, undefined, READONLY_TEAM_REFRESH_MS);
   const caps = useQuery({ queryKey: ['games-caps'], queryFn: fetchGamesCaps, staleTime: 60_000 });
   const week = query.data;
-  const matchup = useMatchupProjection(week);
-  const baseline = useExpectedPoints();
   const [experimental, setExperimental] = useState(false);
+  const matchup = useMatchupProjection(week, experimental);
+  const baseline = matchup.baseline;
   const expected = experimental ? matchup.expected : baseline;
   const { project } = matchup;
   const side = week?.matchups.flatMap(m => [m.home, m.away]).find(s => s.teamId === snapshot.teamId);

@@ -1,3 +1,4 @@
+import { EVALUATION_MAX_FORECASTS, evaluationDate } from './projectionComputePolicy.js';
 import { expectedPointsForGame } from './dailyProjection.js';
 import { matchupGameProjection, type MatchupEnvironment } from './matchupProjection.js';
 import { planWeeklyLineup, type PlannedStart } from './weeklyLineup.js';
@@ -31,14 +32,16 @@ export function evaluationGame(week: ScoresWeek, player: ScorePlayer, period: nu
   return { key: evaluationKey(week.season, day.date, player.id, player.proTeam, game.opponent), date: day.date, playerId: player.id,
     team: normalizeNbaTeamCode(player.proTeam), opponent: normalizeNbaTeamCode(game.opponent), tipoff: game.tipoff };
 }
-/** First immutable capture in the two hours before tip-off; no historical reconstruction. */
+/** First immutable morning capture of today's games; no historical reconstruction. */
 export function buildEvaluationForecasts(week: ScoresWeek, priors: Record<string, number>, environment: MatchupEnvironment | null,
   availableAt: string, scoring: readonly ScoringItem[], now: number): ForecastRecord[] {
   assertInputs(week, availableAt, now);
   const result = new Map<string, ForecastRecord>();
-  for (const side of week.matchups.flatMap(m => [m.home, m.away])) for (const player of side.players) for (const day of week.days) {
+  const captureDate = evaluationDate(now);
+  capture: for (const side of week.matchups.flatMap(m => [m.home, m.away])) for (const player of side.players) for (const day of week.days) {
     const game = evaluationGame(week, player, day.scoringPeriodId);
-    if (!game || Date.parse(game.tipoff) <= now || Date.parse(game.tipoff) - now > 2 * 3600000) continue;
+    if (!game || game.date !== captureDate || Date.parse(game.tipoff) <= now) continue;
+    if (result.has(game.key)) continue;
     const baseline = expectedPointsForGame(player, { scoringPeriodId: day.scoringPeriodId, preseason: priors[String(player.id)] ?? null });
     const adjusted = matchupGameProjection(player, day.scoringPeriodId, baseline, week, environment, scoring, now);
     const inputPlayer = { ...player, days: {}, projByDay: { [String(day.scoringPeriodId)]: player.projByDay[String(day.scoringPeriodId)] } };
@@ -46,12 +49,14 @@ export function buildEvaluationForecasts(week: ScoresWeek, priors: Record<string
       capturedAt: new Date(now).toISOString(), model: EVALUATION_MODEL, baseline, adjusted: adjusted.points, source: adjusted.source,
       input: { player: inputPlayer, period: day.scoringPeriodId, preseason: priors[String(player.id)] ?? null,
         environmentId: adjusted.source === 'matchup' && environment ? environmentKey(environment) : null, scoring, availableAt } });
+    if (result.size >= EVALUATION_MAX_FORECASTS) break capture;
   }
-  return [...result.values()];
+  return [...result.values()].sort((a, b) => a.key.localeCompare(b.key)).slice(0, EVALUATION_MAX_FORECASTS);
 }
 export function buildEvaluationPlan(week: ScoresWeek, side: ScoreSide, lineup: LineupSnapshot, cap: number, priors: Record<string, number>,
   environment: MatchupEnvironment | null, availableAt: string, scoring: readonly ScoringItem[], now: number): PlanRecord | null {
   assertInputs(week, availableAt, now);
+  if (week.days.length > 14 || lineup.players.length > 30 || lineup.slots.length > 30 || cap > 60) return null;
   if (!Number.isFinite(Date.parse(lineup.fetchedAt)) || Date.parse(lineup.fetchedAt) > now || now - Date.parse(lineup.fetchedAt) > 30000) return null;
   const baseline = (p: ScorePlayer, period: number) => expectedPointsForGame(p, { scoringPeriodId: period, preseason: priors[String(p.id)] ?? null });
   const adjusted = (p: ScorePlayer, period: number) => matchupGameProjection(p, period, baseline(p, period), week, environment, scoring, now).points;
@@ -66,7 +71,7 @@ export function buildEvaluationPlan(week: ScoresWeek, side: ScoreSide, lineup: L
   return { kind: 'plan', id: `plan:${EVALUATION_MODEL}:${week.season}:${week.matchupPeriodId}:${side.teamId}`, model: EVALUATION_MODEL,
     season: week.season, capturedAt: new Date(now).toISOString(), week: week.matchupPeriodId, teamId: side.teamId, cap, used: basePlan.used,
     baseline: baselineGames, adjusted: adjustedGames,
-    input: { lineup, side, week, priors, scoring, environmentId: environment ? environmentKey(environment) : null, availableAt } };
+    input: { lineup, side: { ...side, players: side.players.map(player => ({ ...player, days: Object.fromEntries(Object.entries(player.days).map(([period, day]) => [period, { ...day, stats: null, rawStats: undefined, game: null }])) })) }, week: { ...week, matchups: [] }, priors: Object.fromEntries(side.players.map(player => [String(player.id), priors[String(player.id)]]).filter(([, value]) => value !== undefined)), scoring, environmentId: environment ? environmentKey(environment) : null, availableAt } };
 }
 interface Pair { baseline: number; adjusted: number; actual: number; date: string; played: boolean }
 function metrics(pairs: readonly Pair[], key: 'baseline' | 'adjusted') {
@@ -121,7 +126,7 @@ export function projectionEvaluationReport(records: readonly EvaluationRecord[],
     if ([...base, ...adjusted].some(value => value === null)) continue;
     gains.push(adjusted.reduce((sum, value) => sum + value!.points, 0) - base.reduce((sum, value) => sum + value!.points, 0));
   }
-  return { model: EVALUATION_MODEL, captured, adjustedCaptures, pending, invalid, dnp, missingBaselines,
+  return { generatedAt: new Date(now).toISOString(), model: EVALUATION_MODEL, captured, adjustedCaptures, pending, invalid, dnp, missingBaselines,
     lastCaptureAt: rows.filter(row => row.kind === 'forecast').map(row => row.capturedAt).sort().at(-1) ?? null,
     lastResultAt: rows.filter(row => row.kind === 'result').map(row => row.capturedAt).sort().at(-1) ?? null,
     all: comparison(pairs), matchupOnly: comparison(matchupPairs), activeOnly: comparison(matchupPairs.filter(pair => pair.played)),

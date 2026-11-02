@@ -386,6 +386,7 @@ router.get('/matchup-environment', async (req, res) => {
   if (!Number.isInteger(season) || season < 2020 || season > 2035) { res.status(400).json({ error: 'Invalid NBA season' }); return; }
   const feed = await getMatchupEnvironment(season);
   res.setHeader('Cache-Control', feed.error ? 'no-store' : 'public, max-age=300');
+  res.setHeader('Vercel-CDN-Cache-Control', feed.error ? 'no-store' : 'public, s-maxage=21600');
   res.json(feed);
 });
 router.get('/fantasy-cast', async (req, res, next) => {

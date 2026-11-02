@@ -30,7 +30,7 @@ These limits and the 15-game prior are initial conservative choices, not fitted 
 
 ESPN daily projections take precedence and are never multiplied by our matchup model. Zero baselines, started games, absent opponents, unknown positions, zero samples, wrong seasons, future capture timestamps and captures older than 24 hours retain the baseline. No current matchup environment is applied to already-started historical games.
 
-Sources are fetched together with 10-second timeouts, shared in flight, and cached for six hours in process (at most two seasons). Failures cache an explicit baseline response for five minutes. There is no last-good stale carryover. The browser shares an hourly query; the public success response has five-minute browser caching. No API keys or league credentials are sent to these sources.
+Sources are fetched together with 10-second timeouts, shared in flight, and cached for six hours in process (at most two seasons). Failures cache an explicit baseline response for five minutes. There is no last-good stale carryover. The browser shares an hourly query; the public success response has five-minute browser caching and a six-hour Vercel CDN TTL. Baseline-only planners do not request this source. No API keys or league credentials are sent to these sources.
 
 The planner's visible footer reports how many upcoming games are adjusted. Each game title and accessible description contains its source or baseline/pace/defense breakdown. Recommended games and weekly totals use the same adjusted function.
 

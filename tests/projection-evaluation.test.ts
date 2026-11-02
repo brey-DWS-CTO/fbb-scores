@@ -31,12 +31,14 @@ function result(forecast: ForecastRecord, points = 30): ResultRecord {
     tipoff: forecast.tipoff, gameId: '100', played: true, model: EVALUATION_MODEL,
     stats: completeLine({ '0': points, '6': 0, '3': 0, '2': 0, '1': 0, '13': 0, '14': 0, '15': 0, '16': 0, '17': 0, '11': 0, '40': 30 }) };
 }
-test('captures only future games within two hours and rejects future input availability', () => {
+test("captures only today's future games and rejects future input availability", () => {
   const { week, environment, forecast } = fixtures();
   assert.equal(forecast.date, '2026-11-02'); assert.equal(forecast.baseline, 40); assert.equal(forecast.source, 'matchup');
   assert.equal(buildEvaluationForecasts(week, {}, environment, week.fetchedAt, LEAGUE_SCORING, now).length, 1);
   assert.throws(() => buildEvaluationForecasts({ ...week, fetchedAt: new Date(now + 1).toISOString() }, {}, environment, week.fetchedAt, LEAGUE_SCORING, now));
   assert.throws(() => buildEvaluationForecasts(week, {}, environment, new Date(now + 1).toISOString(), LEAGUE_SCORING, now));
+  week.days[0].games!.DEN.tipoff = '2026-11-03T03:00:00Z';
+  assert.equal(buildEvaluationForecasts(week, {}, environment, week.fetchedAt, LEAGUE_SCORING, now).length, 1, 'morning protocol includes games more than two hours out');
   week.days[0].games!.DEN.tipoff = new Date(now).toISOString();
   assert.equal(buildEvaluationForecasts(week, {}, environment, week.fetchedAt, LEAGUE_SCORING, now).length, 0);
 });
@@ -119,4 +121,10 @@ test('frozen legal lineup choices compare only after every selected game has a f
   assert.equal(projectionEvaluationReport([plan, env, first], now + 7 * 86400000).lineups.completed, 0);
   const report = projectionEvaluationReport([plan, env, first, second], now + 7 * 86400000);
   assert.equal(report.lineups.completed, 1); assert.equal(report.lineups.meanGain, 20);
+});
+
+test('daily forecast persistence is capped at 300 games', () => {
+  const { week, environment } = fixtures();
+  week.matchups[0].home = { ...week.matchups[0].home, players: Array.from({ length: 350 }, (_, index) => ({ ...player, id: index + 1 })) };
+  assert.equal(buildEvaluationForecasts(week, {}, environment, week.fetchedAt, LEAGUE_SCORING, now).length, 300);
 });

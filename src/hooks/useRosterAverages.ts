@@ -9,7 +9,7 @@ export function useRosterAverages(players: readonly LineupPlayer[], season: numb
       const response = await fetch(gameLogUrl(player.id, season));
       if (!response.ok) throw new Error('Game log unavailable');
       return readGameLog(await response.json());
-    }, staleTime: 10 * 60_000, retry: 1 })) });
+    }, staleTime: 10 * 60_000, gcTime: 30 * 60_000, refetchOnWindowFocus: false, retry: 1 })) });
   return new Map(players.map((player, index) => [player.id, { loading: queries[index].isLoading,
     error: queries[index].isError, retry: queries[index].refetch, averages: queries[index].data ? playerGameAverages(queries[index].data, season, scoring) : null }]));
 }

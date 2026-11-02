@@ -1,3 +1,4 @@
+import { READONLY_TEAM_REFRESH_MS } from '../../lib/league/projectionComputePolicy.js';
 import { useProjectionData } from '../../hooks/useProjectionData.js';
 import { useRosterAverages } from '../../hooks/useRosterAverages.js';
 import { LEAGUE_SCORING } from '../../lib/league/partyScore.js';
@@ -35,7 +36,8 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
   const submitting = useRef(false);
   const key = ['my-team', identity?.owner, identity?.session];
   const team = useQuery({ queryKey: key, queryFn: () => fetchMyTeam(identity!),
-    enabled: identity != null && !identity.isGuest && !sandbox, refetchInterval: 15_000 });
+    enabled: identity != null && !identity.isGuest && !sandbox, refetchInterval: query => query.state.data?.executionEnabled ? 15_000 : READONLY_TEAM_REFRESH_MS,
+    refetchOnWindowFocus: query => query.state.data?.executionEnabled === true });
   const operationQuery = useQuery({ queryKey: ['lineup-operation', identity?.owner, pendingId],
     queryFn: () => fetchLineupOperation(identity!, pendingId!),
     enabled: pendingId != null && identity != null && !sandbox,
@@ -48,7 +50,7 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
   const confirmed = result?.snapshot;
   const latest = team.data?.snapshot;
   const snapshot = confirmed && (!latest || Date.parse(confirmed.fetchedAt) > Date.parse(latest.fetchedAt)) ? confirmed : latest;
-  const { state: leagueState } = useLeagueState();
+  const { state: leagueState } = useLeagueState(false, 'league', false);
   const { snapshot: projections } = useProjectionData(view === 'roster' && !!snapshot);
   const scoring = projections?.season === leagueState.season ? projections.scoringItems : LEAGUE_SCORING;
   const averages = useRosterAverages(snapshot?.players ?? [], leagueState.season, scoring, view === 'roster' && !!snapshot);
@@ -99,7 +101,7 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
           {team.isError && <p role="alert">{apiErrorMessage(team.error)} <button type="button" className="tap-btn" onClick={() => void team.refetch()}>Retry</button></p>}
           {team.data && !team.data.executionEnabled && !snapshot && <p className="my-team-notice">{team.data.readEnabled ? team.data.reason : 'Roster access has not been enabled for your account.'}</p>}
           {team.data?.readError && <p role="alert">{team.data.readError}</p>}
-          {team.data?.readEnabled && <div className="my-team-read-toolbar"><span>{snapshot?.players.length ?? 0} players · ESPN</span><button type="button" className="tap-btn" disabled={team.isFetching} onClick={() => void team.refetch()}>{team.isFetching ? 'Refreshing…' : 'Refresh roster'}</button></div>}
+          {team.data?.readEnabled && <div className="my-team-read-toolbar"><span>{snapshot?.players.length ?? 0} players · ESPN</span><button type="button" className="tap-btn" disabled={team.isFetching} onClick={() => { void team.refetch(); void client.invalidateQueries({ queryKey: ['game-log'], predicate: query => snapshot?.players.some(player => player.id === query.queryKey[1]) === true }); }}>{team.isFetching ? 'Refreshing…' : 'Refresh roster'}</button></div>}
           {status && <p role="status" aria-live="polite" className="my-team-status">{status}</p>}
           {snapshot && <>
             <nav className="my-team-views" aria-label="My Team views"><button type="button" aria-pressed={view === 'roster'} onClick={() => setView('roster')}>Roster</button><button type="button" aria-pressed={view === 'projections'} onClick={() => setView('projections')}>Projections</button></nav>
