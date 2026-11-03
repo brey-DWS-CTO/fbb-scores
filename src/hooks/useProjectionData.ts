@@ -35,7 +35,8 @@ export function useProjectionData(enabled = true): {
   loading: boolean;
 } {
   const { identity } = useIdentity();
-  const { meta } = useLeagueState();
+  // Projection consumers subscribe to the shared state; AppNav owns its polling clock.
+  const { meta } = useLeagueState(false, 'league', false);
   // Every signed-in owner reads the numbers. The edits are each owner's own,
   // so the cache keeps one copy per owner.
   const signedIn = enabled && identity !== null && !identity.isGuest;

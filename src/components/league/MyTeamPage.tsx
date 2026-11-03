@@ -1,6 +1,13 @@
+import { leagueSchedule2027, scheduleSnapshot2027 } from '../../lib/league/scheduleData.js';
+import { todayIso } from '../../lib/league/navSections.js';
+import { READONLY_TEAM_REFRESH_MS } from '../../lib/league/projectionComputePolicy.js';
+import { useProjectionData } from '../../hooks/useProjectionData.js';
+import { useRosterAverages } from '../../hooks/useRosterAverages.js';
+import { LEAGUE_SCORING } from '../../lib/league/partyScore.js';
+import type { AverageWindow } from '../../lib/league/playerGameAverages.js';
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useIdentity, type Identity } from '../../hooks/useLeague.js';
+import { useIdentity, useLeagueState, type Identity } from '../../hooks/useLeague.js';
 import { apiErrorMessage, sandboxActive } from '../../lib/league/api.js';
 import { validateMove, type MoveRequest } from '../../lib/league/lineup.js';
 import { fetchMyTeam, fetchLineupOperation, submitLineupMove, lineupMoveWasNotSubmitted, type LineupOperation, type MoveResponse } from '../../lib/league/lineupApi.js';
@@ -31,7 +38,8 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
   const submitting = useRef(false);
   const key = ['my-team', identity?.owner, identity?.session];
   const team = useQuery({ queryKey: key, queryFn: () => fetchMyTeam(identity!),
-    enabled: identity != null && !identity.isGuest && !sandbox, refetchInterval: 15_000 });
+    enabled: identity != null && !identity.isGuest && !sandbox, refetchInterval: query => query.state.data?.executionEnabled ? 15_000 : READONLY_TEAM_REFRESH_MS,
+    refetchOnWindowFocus: query => query.state.data?.executionEnabled === true });
   const operationQuery = useQuery({ queryKey: ['lineup-operation', identity?.owner, pendingId],
     queryFn: () => fetchLineupOperation(identity!, pendingId!),
     enabled: pendingId != null && identity != null && !sandbox,
@@ -44,6 +52,14 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
   const confirmed = result?.snapshot;
   const latest = team.data?.snapshot;
   const snapshot = confirmed && (!latest || Date.parse(confirmed.fetchedAt) > Date.parse(latest.fetchedAt)) ? confirmed : latest;
+  const { state: leagueState } = useLeagueState(false, 'league', false);
+  const { snapshot: projections } = useProjectionData(view === 'roster' && !!snapshot);
+  const today = todayIso();
+  const scheduleWeek = leagueState.season === scheduleSnapshot2027.season
+    ? leagueSchedule2027.find(week => week.startDate <= today && today <= week.endDate)
+    : undefined;
+  const scoring = projections?.season === leagueState.season ? projections.scoringItems : LEAGUE_SCORING;
+  const averages = useRosterAverages(snapshot?.players ?? [], leagueState.season, scoring, view === 'roster' && !!snapshot);
   const uncertain = pendingId != null && (!result || operationQuery.isError) || operation?.status === 'UNKNOWN';
   const waiting = busy || inProgress(operation);
   const enabled = team.data?.enabled === true && team.data.executionEnabled === true && !waiting && !uncertain;
@@ -91,18 +107,23 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
           {team.isError && <p role="alert">{apiErrorMessage(team.error)} <button type="button" className="tap-btn" onClick={() => void team.refetch()}>Retry</button></p>}
           {team.data && !team.data.executionEnabled && !snapshot && <p className="my-team-notice">{team.data.readEnabled ? team.data.reason : 'Roster access has not been enabled for your account.'}</p>}
           {team.data?.readError && <p role="alert">{team.data.readError}</p>}
-          {team.data?.readEnabled && <div className="my-team-read-toolbar"><span>{snapshot?.players.length ?? 0} players · ESPN</span><button type="button" className="tap-btn" disabled={team.isFetching} onClick={() => void team.refetch()}>{team.isFetching ? 'Refreshing…' : 'Refresh roster'}</button></div>}
+          {team.data?.readEnabled && <div className="my-team-read-toolbar"><span>{snapshot?.players.length ?? 0} players · ESPN</span><button type="button" className="tap-btn" disabled={team.isFetching} onClick={() => { void team.refetch(); void client.invalidateQueries({ queryKey: ['game-log'], predicate: query => snapshot?.players.some(player => player.id === query.queryKey[1]) === true }); }}>{team.isFetching ? 'Refreshing…' : 'Refresh roster'}</button></div>}
           {status && <p role="status" aria-live="polite" className="my-team-status">{status}</p>}
           {snapshot && <>
             <nav className="my-team-views" aria-label="My Team views"><button type="button" aria-pressed={view === 'roster'} onClick={() => setView('roster')}>Roster</button><button type="button" aria-pressed={view === 'projections'} onClick={() => setView('projections')}>Projections</button></nav>
             <div hidden={view !== 'projections'}>{view === 'projections' && identity?.isCommissioner && <WeeklyLineupPlanner snapshot={snapshot} />}</div>
             <div hidden={view !== 'roster'}>
+            <p className="my-team-average-note">Fantasy points per game - Season / last 3, 7, 15 games. * Fewer games available. GW = full week scheduled games{scheduleWeek ? ` (${scheduleWeek.startDate} to ${scheduleWeek.endDate}, provisional)` : " (unavailable)"}.</p>
+            {[...averages.values()].some(value => value.error) && <p className="my-team-average-note" role="status">Some game logs are unavailable. <button type="button" className="tap-btn" onClick={() => { for (const value of averages.values()) if (value.error) void value.retry(); }}>Retry averages</button></p>}
             {team.data?.executionEnabled && <div className="my-team-meta"><span>{cutoff}-minute safety cutoff</span></div>}
             <p id="lineup-help" className={team.data?.executionEnabled ? undefined : 'sr-only'}>{!team.data?.executionEnabled ? 'ESPN roster · Lineup changes are off.' : selected?.revision === snapshot.revision ? 'Choose a highlighted destination. Tap the selected player to cancel.' : 'Choose a player to see eligible destinations.'}</p>
-            {groupedSlots.map(group => <section className="my-team-group" key={group.kind} aria-labelledby={`lineup-${group.kind}`}><h2 id={`lineup-${group.kind}`}>{group.title}</h2><div className="my-team-roster" aria-describedby="lineup-help">
+            {groupedSlots.map(group => <section className="my-team-group" key={group.kind} aria-labelledby={`lineup-${group.kind}`}><h2 id={`lineup-${group.kind}`}>{group.title}</h2><div className="my-team-roster" aria-describedby="lineup-help"><div className="my-team-average-head" aria-hidden="true"><span></span><span>Player</span><span title="Games this week">GW</span><span>Season</span><span>L3</span><span>L7</span><span>L15</span><span></span></div>
               {group.slots.map(slot => {
                 const player = snapshot.players.find(candidate => candidate.id === slot.playerId);
+                const gamesThisWeek = player?.proTeamId !== undefined ? scheduleWeek?.gamesByTeamId[player.proTeamId] : undefined;
+                const gamesLabel = `Games this week: ${gamesThisWeek ?? 'unavailable'}`;
                 const positions = player ? ['PG', 'SG', 'SF', 'PF', 'C'].filter((_position, id) => player.eligibleSlotIds.includes(id)).join('/') : '';
+                const averageLabel = player ? (['season', 'last3', 'last7', 'last15'] as const).map(key => { const value = averages.get(player.id)?.averages?.[key]; return `${key}: ${value ? `${value.average.toFixed(1)} across ${value.count} games` : 'unavailable'}`; }).join(', ') : '';
                 const activeSelection = selected?.revision === snapshot.revision ? selected : null;
                 const isSelected = activeSelection != null && player != null && activeSelection.playerId === player.id;
                 let eligible = false;
@@ -111,7 +132,7 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
                   catch { /* Both players and the applicable locks must pass. */ }
                 }
                 const disabled = !enabled || (activeSelection != null ? !eligible && !isSelected : !player || player.locked);
-                return <button type="button" key={slot.id} disabled={disabled} aria-pressed={isSelected} aria-label={player ? `${slot.label}: ${player.name}, eligible positions ${positions || 'unavailable'}` : `${slot.label}: Empty slot`}
+                return <button type="button" key={slot.id} disabled={disabled} aria-pressed={isSelected} aria-label={player ? `${slot.label}: ${player.name}, eligible positions ${positions || 'unavailable'}, ${gamesLabel}, ${averageLabel}` : `${slot.label}: Empty slot`}
                   className={`my-team-row${eligible ? ' eligible' : ''}${isSelected ? ' selected' : ''}`}
                   onClick={() => {
                     if (isSelected) { setSelected(null); return; }
@@ -119,6 +140,8 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
                     if (player) setSelected({ playerId: player.id, revision: snapshot.revision });
                   }}>
                   <span className="my-team-slot">{slot.label}</span><span className="my-team-player-line"><span className="my-team-player" title={player?.name}>{player ? shortName(player.name) : 'Empty slot'}</span>{player && <TeamLogo code={player.proTeamId !== undefined ? NBA_TEAM_ABBREV[player.proTeamId] ?? null : null} size={16} />}{player && <small className="my-team-positions" aria-label="Eligible positions">{positions || 'Unknown'}</small>}</span>
+                  <span className="my-team-average my-team-games" title={`${gamesLabel}. Full week scheduled games, including games already played; provisional schedule.`} aria-label={gamesLabel}>{player ? gamesThisWeek ?? '\u2014' : ''}</span>
+                  {(['season', 'last3', 'last7', 'last15'] as const).map(window => <RosterAverage key={window} value={player ? averages.get(player.id)?.averages?.[window] ?? null : null} label={window === 'season' ? 'Season' : `Last ${window.slice(4)} games`} loading={!!player && averages.get(player.id)?.loading === true} empty={!player} />)}
                   <span className="my-team-row-state">{player?.locked ? <NavIcon name="lock" size={12} label="Locked" /> : isSelected ? 'Selected' : eligible ? 'Eligible destination' : ''}{player && <span className="my-team-lock-detail">{player.lockAt ? `Lock: ${new Date(player.lockAt).toLocaleString()}` : team.data?.executionEnabled ? 'Lock details unavailable' : ''}</span>}</span>
                 </button>;
               })}
@@ -129,4 +152,10 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
           {operation?.status === 'SUCCEEDED' && operation.undo && enabled && <button type="button" className="tap-btn" onClick={() => void move(operation.undo!)}>Undo, if still eligible</button>}
         </>}
   </main>;
+}
+
+function RosterAverage({ value, label, loading, empty }: { value: AverageWindow | null; label: string; loading: boolean; empty: boolean }) {
+  const partial = value?.target !== null && value !== null && value.count < value.target;
+  const description = empty ? 'Empty slot' : loading ? `${label}: loading` : value ? `${label}: ${value.average.toFixed(1)} fantasy points across ${value.count} games` : `${label}: unavailable`;
+  return <span className="my-team-average" title={description} aria-label={description}>{empty ? '' : loading ? '...' : value ? `${value.average.toFixed(1)}${partial ? '*' : ''}` : '\u2014'}</span>;
 }

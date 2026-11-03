@@ -32,7 +32,7 @@ async function openingNightAnchor(): Promise<DateAnchor> {
     : { scoringPeriodId: 1, date: start, source: 'season-start' };
 }
 
-export async function loadWeek(client: EspnClient, requested: number | null): Promise<ScoresWeek> {
+export async function loadWeek(client: EspnClient, requested: number | null, maxDays?: number): Promise<ScoresWeek> {
   const settings = await client.fetchWeekSettings();
   // Calendar dates stay pinned to the NBA schedule across midnight and time zones.
   const league = settings as { settings?: { proTeams?: unknown } } | null;
@@ -42,6 +42,7 @@ export async function loadWeek(client: EspnClient, requested: number | null): Pr
     ? { scoringPeriodId: first[0], date: first[1], source: 'pro-schedule' }
     : await openingNightAnchor();
   const plan = planWeek(settings, requested, anchor);
+  if (maxDays !== undefined && plan.days.length > maxDays) throw new Error('Week exceeds evaluation read budget');
 
   const days: EspnDayInput[] = [];
   const BATCH_SIZE = 4;
@@ -77,12 +78,12 @@ async function fetchNbaGamesForDate(date: string): Promise<Record<string, GameLi
 
 /** A fresh read for scheduled warnings, using the same loader as the score page. */
 export async function loadCurrentScoresWeek(): Promise<ScoresWeek> { return loadScoresWeek(null); }
-export async function loadScoresWeek(period: number | null): Promise<ScoresWeek> {
+export async function loadScoresWeek(period: number | null, budget?: { timeoutMs: number; maxDays: number }): Promise<ScoresWeek> {
   const { ESPN_LEAGUE_ID, ESPN_SEASON_ID, ESPN_S2, ESPN_SWID, ESPN_COOKIE_STRING } = process.env;
   if (!ESPN_LEAGUE_ID || (!ESPN_COOKIE_STRING && (!ESPN_S2 || !ESPN_SWID))) throw new Error('Missing ESPN credentials');
   const client = new EspnClient({
     leagueId: ESPN_LEAGUE_ID, seasonId: Number(ESPN_SEASON_ID ?? 2026),
-    espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: ESPN_COOKIE_STRING,
+    espnS2: ESPN_S2, swid: ESPN_SWID, cookieOverride: ESPN_COOKIE_STRING, timeoutMs: budget?.timeoutMs, maxResponseBytes: budget ? 8 * 1024 * 1024 : undefined,
   });
-  return loadWeek(client, period);
+  return loadWeek(client, period, budget?.maxDays);
 }

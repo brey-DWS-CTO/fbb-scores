@@ -49,18 +49,18 @@ const EMPTY_STATE: LeagueDynamicState = {
  * `side` 'test' reads the shared test draft. Only the draft and TV screens
  * ask for it; the league and the test keep separate caches.
  */
-export function useLeagueState(fast = false, side: StateSide = 'league') {
+export function useLeagueState(fast = false, side: StateSide = 'league', poll = true) {
   const { identity } = useIdentity();
   const queryClient = useQueryClient();
   useEffect(() => wakeOnActivity(queryClient), [queryClient]);
   const query = useQuery<StateResponse>({
     queryKey: ['league-state', identity?.owner ?? 'anon', side],
     queryFn: () => fetchLeagueState(identity, side === 'test'),
-    refetchInterval: (current) => pollInterval({
+    refetchInterval: poll ? (current) => pollInterval({
       fast,
       draftLive: draftIsLive(current.state.data?.state),
       idleForMs: idleForMs(),
-    }),
+    }) : false,
     refetchOnWindowFocus: true,
     staleTime: 1000,
   });

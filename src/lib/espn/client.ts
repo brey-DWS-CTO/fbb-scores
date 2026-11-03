@@ -22,6 +22,8 @@ interface EspnClientConfig {
   swid?: string;
   /** Optional: full cookie string override (e.g. copied from browser DevTools Network tab) */
   cookieOverride?: string;
+  timeoutMs?: number;
+  maxResponseBytes?: number;
 }
 
 /** One stat row on a kona player. `id` is `{source}{split}{season}`, e.g. `102027`. */
@@ -151,6 +153,8 @@ export class EspnClient {
 
     this.historyHttp = axios.create({
       baseURL: `${ESPN_BASE}/leagueHistory`,
+      timeout: config.timeoutMs ?? 0,
+      maxContentLength: config.maxResponseBytes ?? -1,
       maxRedirects: 0,
       validateStatus: (status) => status < 400,
       headers,
@@ -158,6 +162,8 @@ export class EspnClient {
 
     this.http = axios.create({
       baseURL: `${ESPN_BASE}/seasons/${config.seasonId}/segments/0/leagues/${config.leagueId}`,
+      timeout: config.timeoutMs ?? 0,
+      maxContentLength: config.maxResponseBytes ?? -1,
       maxRedirects: 0, // Don't follow 302 — ESPN redirects to www.espn.com on bad auth
       validateStatus: (status) => status < 400, // treat 302 as a valid response so interceptor can handle it
       headers: {

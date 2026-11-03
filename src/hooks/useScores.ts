@@ -33,7 +33,7 @@ export function useGamesCaps(): { rows: GamesCapRow[]; capFor: (matchupPeriodId:
  * is open; a past week is read once. `demo` swaps ESPN for the seeded fake
  * week, loaded only when asked for so it never weighs on the real page.
  */
-export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabled = true, shouldPoll: () => boolean = () => true) {
+export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabled = true, shouldPoll: () => boolean = () => true, pollMs = SCORES_POLL_MS) {
   return useQuery<ScoresWeek>({
     queryKey: ['scores-week', demo ? 'demo' : (matchupPeriod ?? 'current')],
     queryFn: demo
@@ -50,7 +50,7 @@ export function useScoresWeek(matchupPeriod: number | null, demo: boolean, enabl
     refetchInterval: (query) => {
       if (demo || !shouldPoll()) return false;
       const week = query.state.data;
-      return week && week.matchupPeriodId === week.currentMatchupPeriodId ? SCORES_POLL_MS : false;
+      return week && week.matchupPeriodId === week.currentMatchupPeriodId ? pollMs : false;
     },
   });
 }

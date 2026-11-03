@@ -99,6 +99,8 @@ export interface BoxLine {
   position?: string;
   /** False for a player listed but on the bench all night. */
   played: boolean;
+  /** Explicit provider DNP, distinct from missing/zero-minute stats. */
+  didNotPlay?: boolean;
   /** ESPN fantasy stat ids to values, misses and double-doubles filled in. */
   stats: Record<string, number>;
   /** On the floor now, by ESPN's box score. Only means something while the game runs. */
@@ -219,6 +221,7 @@ export function parseBoxScore(raw: unknown, gameId: string): BoxScore | null {
         const byPeriod = fouls.get(athleteId);
         lines.push({
           athleteId, name, shortName: text(athlete?.shortName), team, played, stats,
+          ...(athleteRow?.didNotPlay === true ? { didNotPlay: true } : {}),
           ...(text(record(athlete?.position)?.abbreviation) ? { position: text(record(athlete?.position)?.abbreviation) } : {}),
           onCourt: athleteRow?.active === true,
           ...(byPeriod ? { foulsByPeriod: byPeriod } : {}),
