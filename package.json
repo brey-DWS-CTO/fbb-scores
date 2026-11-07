@@ -13,6 +13,7 @@
     "start": "node --import tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview",
+    "forecast:eval": "node --import tsx scripts/forecast-evaluate.ts",
     "smoke:prod": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
