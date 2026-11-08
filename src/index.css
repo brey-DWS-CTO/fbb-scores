@@ -6690,5 +6690,9 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .league-standings table { width: 100%; border-collapse: collapse; font-size: .75rem; }
 .league-standings td, .league-standings th { padding: 9px 7px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--panel-border); }
 .league-standings th:nth-child(2), .league-standings tbody th { text-align: left; }
+.league-standings thead th { padding: 0; }
+.league-standings thead button { width: 100%; min-height: 44px; padding: 0 7px; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; }
+.league-standings thead button:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: -2px; }
+.league-standings-owner { font-weight: 400; color: var(--text-mid); }
 .league-standings > small { display: block; margin-top: 10px; color: var(--text-mid); font-size: .65rem; }
 .player-acquisition { display: flex; flex-direction: column; gap: 2px; color: var(--text-mid); font-size: .58rem; line-height: 1.4; font-weight: 400; }
