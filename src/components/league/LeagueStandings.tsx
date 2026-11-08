@@ -27,7 +27,10 @@ function sortValue(team: Standing, key: Exclude<SortKey, 'name'>): number | null
 export default function LeagueStandings({ owners }: { owners: readonly TeamInfo[] }) {
   const { data, isPending, isError } = useLeagueOverview();
   const [sort, setSort] = useState<{ key: SortKey; ascending: boolean }>({ key: 'rank', ascending: true });
-  const names = new Map(owners.map(team => [team.espnTeamId, team.fullName || team.owner]));
+  const names = new Map(owners.map(team => [
+    team.espnTeamId,
+    (team.fullName.trim() || team.owner.trim()).split(/\s+/)[0],
+  ]));
   const direction = sort.ascending ? 1 : -1;
   const teams = (data?.teams ?? []).toSorted((a, b) => {
     if (sort.key === 'name') return direction * a.name.localeCompare(b.name);
