@@ -1,3 +1,4 @@
+import { reconcileFinalScores } from '../lib/finalScoresService.js';
 import { runProjectionEvaluationClock } from '../lib/projectionEvaluationService.js';
 import { runMissedGamesClock } from '../lib/missedGamesService.js';
 /**
@@ -44,6 +45,12 @@ function allowed(req: Request): boolean {
   if (secret) return req.header('authorization') === `Bearer ${secret}`;
   return fromLocalhost(req);
 }
+
+router.get('/final-scores', async (req: Request, res: Response) => {
+  if (!allowed(req)) { res.status(401).json({ error: 'Not for you' }); return; }
+  try { res.json(await reconcileFinalScores()); }
+  catch (error) { console.error('[final-scores]', error); res.status(502).json({ error: error instanceof Error ? error.message : 'Final score reconciliation failed' }); }
+});
 
 /** GET /api/notify/tick: send whatever the clock says is due. */
 router.get('/tick', async (req: Request, res: Response) => {

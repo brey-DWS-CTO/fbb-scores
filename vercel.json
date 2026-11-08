@@ -9,6 +9,7 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [
+    { "path": "/api/notify/final-scores", "schedule": "0 5-9 * * 1" },
     { "path": "/api/notify/tick", "schedule": "0 * * * *" },
     { "path": "/api/notify/team-names", "schedule": "0 14 * * 1" },
     { "path": "/api/notify/lm-clock", "schedule": "*/15 * * * *" },

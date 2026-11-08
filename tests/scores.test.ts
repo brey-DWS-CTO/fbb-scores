@@ -439,8 +439,8 @@ test('the week carries both sides, their records, totals and day scores', () => 
   assert.equal(matchup.id, 301);
   assert.equal(matchup.home.name, 'Mamu, There Goes That Amen');
   assert.equal(recordText(matchup.home.record), '2-0');
-  assert.equal(matchup.home.total, 456.8, 'the live total beats the settled one');
-  assert.equal(matchup.away.total, 380, 'no live total, so the settled one');
+  assert.equal(matchup.home.total, 56.8, 'total is rebuilt from uncapped starter stats');
+  assert.equal(matchup.away.total, 75, 'sum of started players across days');
   assert.equal(matchup.home.pointsByDay['17'], 56.8, 'ESPN\'s own day score when it sends one');
   assert.equal(matchup.away.pointsByDay['17'], 33, 'the started players\' points when it does not');
   assert.equal(matchup.away.pointsByDay['18'], 42);
@@ -640,6 +640,8 @@ test('a day with no game for the team, and a day already final, add nothing', ()
 test('the odds use expected points per game after last-day overage deductions', () => {
   const week = buildWeek();
   const [matchup] = week.matchups;
+  matchup.home.total = 456.8;
+  matchup.away.total = 380;
   const expected = (player: ScorePlayer) => (player.name === 'Nikola Jokic' ? 60 : 30);
   const home = sideOdds(matchup.home, week, expected);
   assert.equal(home.points, 456.8);
@@ -691,6 +693,8 @@ test('expected points are asked for by day, and the projections read the same ga
 test('more expected points for one side move its chance up', () => {
   const week = buildWeek();
   const [matchup] = week.matchups;
+  matchup.home.total = 456.8;
+  matchup.away.total = 380;
   const even = matchupChance(matchup, week, () => 30);
   const strongHome = matchupChance(matchup, week, (player) => (player.name === 'Nikola Jokic' ? 80 : 30));
   const strongAway = matchupChance(matchup, week, (player) => (player.proTeam === 'GSW' ? 80 : 30));
@@ -817,4 +821,28 @@ test('the full week cap does not shrink as the current scoring day advances', ()
     rosterSettings: { lineupSlotStatLimits: { '15': { statId: 42, limitValue: 28 } } },
   } };
   assert.equal(planWeek(settings, 1, OPENING_NIGHT).gamesCap, 28, 'ESPN can change the opening week cap');
+});
+
+test('uncapped NBA lines restore zeros after ESPN stops scoring, including negative games', () => {
+  const plan = planWeek(SETTINGS, 3, TODAY_ANCHOR);
+  const payload = dayPayload(18, [{ ...JOKIC, points: 0 }, { ...BENCH, points: 0 }], [{ ...CURRY, points: 0 }], { totalPointsLive: 0, pointsByScoringPeriod: { '18': 0 } });
+  const week = readEspnWeek({ plan, settings: SETTINGS, fetchedAt: '', days: [{
+    scoringPeriodId: 18, date: '2026-11-05', payload, games: DAY_18_GAMES,
+    playerStats: { '1': JOKIC_DAY, '3': { '0': 100, '42': 1 }, '4': { '11': 2, '42': 1, '40': 5 } },
+  }] });
+  const matchup = week.matchups[0];
+  assert.equal(matchup.home.players[0].days['18'].points, 56.8);
+  assert.equal(matchup.home.total, 56.8, 'bench score is excluded');
+  assert.equal(matchup.home.pointsByDay['18'], 56.8);
+  assert.equal(matchup.away.total, -3.6, 'negative uncapped scores remain negative');
+ });
+
+test('later ESPN payloads cannot overwrite restored earlier-day totals with capped zeros', () => {
+  const plan = planWeek(SETTINGS, 3, TODAY_ANCHOR);
+  const week = readEspnWeek({ plan, settings: SETTINGS, fetchedAt: '', days: [17, 18].map(period => ({
+    scoringPeriodId: period, date: '2026-11-05', games: DAY_17_GAMES,
+    payload: dayPayload(period, [{ ...JOKIC, stats: JOKIC_DAY, points: 0 }], [], { pointsByScoringPeriod: { '17': 0, '18': 0 } }),
+  })) });
+  assert.equal(week.matchups[0].home.total, 113.6);
+  assert.equal(week.matchups[0].home.pointsByDay['17'], 56.8);
 });

@@ -139,3 +139,10 @@ export function describeWrite(result: EspnWriteResult): string {
   if (result.authFailed) return `ESPN refused the sign-in (${result.status})`;
   return `ESPN said ${result.status ?? 'nothing'}: ${result.body || 'no detail'}`;
 }
+
+/** Absolute (replacement) adjustments, matching ESPN's scoreboard model update.
+ * Verified against ESPN kona 1.523 scoreboard and main bundles.
+ */
+export async function setMatchupAdjustments(config: EspnLmConfig, matchups: unknown[]): Promise<EspnWriteResult> {
+  return post(config, '/schedule', matchups, 'lm.scores');
+}
