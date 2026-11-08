@@ -533,6 +533,8 @@ export function readNbaScoreboard(payload: unknown): Record<string, GameLine> {
 // ─── Reading ESPN's days into the week ──────────────────────────────────────
 
 export interface EspnDayInput {
+  /** Uncapped NBA box-score stats, keyed by ESPN athlete ID. */
+  playerStats?: Record<string, Record<string, number>>;
   scoringPeriodId: number;
   date: string;
   /** ESPN's league payload for that scoring period, with rosters. */
@@ -753,9 +755,10 @@ function sideDraft(teamId: number): SideDraft {
 /**
  * Turn ESPN's answers for every day of a week into one `ScoresWeek`.
  *
- * Totals come from the matchup entry itself (`totalPointsLive`, then
- * `totalPoints`), day scores from `pointsByScoringPeriod` when ESPN sends it
- * and from the day's started players when it does not. A player's day line
+ * Totals and day scores are rebuilt from started players using league scoring
+ * rules, independently of ESPN's applied game cap. NBA box scores override
+ * league stat rows when supplied. ESPN totals are a fallback only when the
+ * scoring rules are unavailable. A player's day line
  * comes only from the stat row filed for that exact scoring period; a season
  * row is never mistaken for a day.
  */
@@ -814,7 +817,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
         const total = num(sideRaw.totalPointsLive) ?? num(sideRaw.totalPoints);
         if (total !== null) side.total = total;
         const byDay = numbers(sideRaw.pointsByScoringPeriod);
-        for (const [periodKey, points] of Object.entries(byDay)) side.pointsByDay[periodKey] = points;
+        if (items.length === 0) for (const [periodKey, points] of Object.entries(byDay)) side.pointsByDay[periodKey] = points;
 
         let dayPoints = 0;
         for (const rawEntry of list(dict(sideRaw.rosterForCurrentScoringPeriod).entries)) {
@@ -844,15 +847,18 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
           const lineupSlotId = num(entry.lineupSlotId) ?? 12;
           const started = isActiveSlot(lineupSlotId);
           const row = dayStatRow(pool, player, day.scoringPeriodId);
-          const stats = row ? toStatLine(numbers(row.stats)) : null;
-          const points = num(pool.appliedStatTotal)
-            ?? (row ? (num(row.appliedTotal) ?? (items.length > 0 ? computeFpts(numbers(row.stats), items) : 0)) : 0);
           const game = day.games && proTeam ? (day.games[proTeam] ?? null) : null;
+          const rawStats = day.playerStats?.[String(playerId)] ?? (row ? numbers(row.stats)
+            : day.playerStats && game?.status === 'final' ? { '40': 0, '42': 0 } : undefined);
+          const stats = rawStats ? toStatLine(rawStats) : null;
+          const points = rawStats && items.length > 0
+            ? computeFpts(rawStats, items)
+            : num(pool.appliedStatTotal) ?? (row ? num(row.appliedTotal) ?? 0 : 0);
           const played = (stats?.gp ?? 0) >= 1 || (stats?.min ?? 0) > 0 || points !== 0;
-          known.days[String(day.scoringPeriodId)] = { lineupSlotId, started, points, stats, rawStats: row ? numbers(row.stats) : undefined, played, game };
+          known.days[String(day.scoringPeriodId)] = { lineupSlotId, started, points, stats, rawStats, played, game };
           if (started) dayPoints += points;
         }
-        if (!(String(day.scoringPeriodId) in side.pointsByDay)) {
+        if (items.length > 0 || !(String(day.scoringPeriodId) in side.pointsByDay)) {
           side.pointsByDay[String(day.scoringPeriodId)] = round1(dayPoints);
         }
       }
@@ -867,7 +873,7 @@ export function readEspnWeek(input: EspnWeekInput): ScoresWeek {
       name: meta?.name ?? `Team ${draft.teamId}`,
       abbrev: meta?.abbrev ?? '',
       record: meta?.record ?? { wins: 0, losses: 0, ties: 0 },
-      total: draft.total ?? summed,
+      total: items.length > 0 ? summed : draft.total ?? summed,
       pointsByDay: draft.pointsByDay,
       players: [...draft.players.values()],
       logoUrl: meta?.logoUrl ?? null,
