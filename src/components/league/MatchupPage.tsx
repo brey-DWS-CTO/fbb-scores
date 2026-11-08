@@ -1,3 +1,4 @@
+import PlayerAcquisition from './PlayerAcquisition.js';
 import { FppgLabel } from './LineupFppg.js';
 import { leadPerExtraGameLabel } from '../../lib/league/lineupFppg.js';
 import { fppgText, lineupFppg } from '../../lib/league/lineupFppg.js';
@@ -165,6 +166,7 @@ function PlayerTop({ player, slot, foul, scoring }: { player: ScorePlayer; slot:
       <span className="score-slot">{slotLabel(slot)}</span>
       <span className="score-player-who">
         <span className="score-player-name"><PlayerNews player={player} scoring={scoring} /><TeamLogo code={player.proTeam || null} size={14} /></span>
+        <PlayerAcquisition playerId={player.id} />
         {badge && <span className={`score-badge is-${badge.tone}`}>{badge.text}</span>}
         {foul && <span className="score-badge is-foul" title={foul.title} aria-label={foul.title}>{foul.text}</span>}
       </span>

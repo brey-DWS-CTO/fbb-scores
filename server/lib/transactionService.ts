@@ -1,3 +1,4 @@
+import { readLeagueOverview, type LeagueOverview } from '../../src/lib/league/leagueOverview.js';
 /**
  * The moves feed: pull this season's adds, drops, claims and trades from
  * ESPN and keep every row the store has not seen.
@@ -124,4 +125,14 @@ export async function transactionsFeed(): Promise<TransactionsFeed> {
     pulledAt: lastPullAt > 0 ? new Date(lastPullAt).toISOString() : null,
     pullError: lastPullError,
   };
+}
+
+let overviewCache: { expires: number; read: Promise<LeagueOverview> } | null = null;
+export function leagueOverview(): Promise<LeagueOverview> {
+  if (overviewCache && overviewCache.expires > Date.now()) return overviewCache.read;
+  const client = espnClient();
+  if (!client) return Promise.reject(new Error('ESPN credentials are not configured'));
+  const read = client.fetchLeagueOverview().then(readLeagueOverview).catch(error => { overviewCache = null; throw error; });
+  overviewCache = { expires: Date.now() + PULL_TTL_MS, read };
+  return read;
 }

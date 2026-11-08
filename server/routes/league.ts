@@ -1,3 +1,4 @@
+import { leagueOverview } from '../lib/transactionService.js';
 import { registerProjectionEvaluationRoutes } from './projectionEvaluation.js';
 import { getMatchupEnvironment } from '../lib/matchupEnvironment.js';
 import { registerMissedGamesRoutes } from './missedGames.js';
@@ -402,6 +403,10 @@ router.get('/fantasy-cast', async (req, res, next) => {
   catch { next(new HttpError(502, 'Play feed is unavailable. Please try again.')); }
 });
 const leagueDataset = rawDataset as unknown as LeagueDataset;
+
+router.get('/overview', async (_req, res, next) => {
+  try { res.json(await leagueOverview()); } catch (error) { next(error); }
+});
 
 router.get('/waiver-calendar', async (req, res, next) => {
   const month = typeof req.query.month === 'string' ? req.query.month : '';

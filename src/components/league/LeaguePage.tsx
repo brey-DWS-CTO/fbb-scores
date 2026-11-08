@@ -1,3 +1,4 @@
+import LeagueStandings from './LeagueStandings.js';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -59,6 +60,7 @@ export default function LeaguePage() {
       </div>
 
       {/* ── Activity: pick trades and ESPN moves, newest first ── */}
+      <LeagueStandings />
       <Section title="ACTIVITY" color="var(--neon-yellow)">
         {activity.length === 0 ? (
           <div style={{ color: 'var(--text-faint)' }}>No trades or moves yet. When one goes through, it shows here.</div>
