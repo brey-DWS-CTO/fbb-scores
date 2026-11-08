@@ -6683,3 +6683,12 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .nba-game-sticky { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
 .nba-game-sticky .score-sticky-side.is-winner strong { font-weight: 900; }
 .nba-sticky-status { order: 1; color: var(--text-soft); font-size: .62rem; white-space: nowrap; }
+
+.league-standings { padding: 14px; margin-bottom: 14px; border-radius: 10px; }
+.league-standings h2 { font-size: .7rem; color: var(--neon-teal); }
+.league-standings-scroll { overflow-x: auto; }
+.league-standings table { width: 100%; border-collapse: collapse; font-size: .75rem; }
+.league-standings td, .league-standings th { padding: 9px 7px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--panel-border); }
+.league-standings th:nth-child(2), .league-standings tbody th { text-align: left; }
+.league-standings > small { display: block; margin-top: 10px; color: var(--text-mid); font-size: .65rem; }
+.player-acquisition { display: flex; flex-direction: column; gap: 2px; color: var(--text-mid); font-size: .58rem; line-height: 1.4; font-weight: 400; }

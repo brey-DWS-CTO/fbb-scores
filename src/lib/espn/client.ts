@@ -285,6 +285,14 @@ export class EspnClient {
    * box score's filter leaves out. Returned raw; the pure reader in
    * `src/lib/league/scores.ts` takes it from here.
    */
+  async fetchLeagueOverview(): Promise<unknown> {
+    const { data } = await this.http.get<unknown>('', {
+      params: { view: ['mTeam', 'mSettings', 'mDraftDetail'], _: Date.now() },
+      paramsSerializer: { indexes: null },
+    });
+    return data;
+  }
+
   async fetchWeekSettings(): Promise<unknown> {
     const { data } = await this.http.get<unknown>('', {
       params: {
