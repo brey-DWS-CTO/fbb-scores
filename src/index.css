@@ -6695,5 +6695,5 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .league-standings thead button:focus-visible { outline: 2px solid var(--neon-teal); outline-offset: -2px; }
 .league-standings-owner { font-weight: 400; color: var(--text-mid); }
 .league-standings > small { display: block; margin-top: 10px; color: var(--text-mid); font-size: .65rem; }
-.player-acquisition { display: flex; flex-direction: column; gap: 2px; color: var(--text-mid); font-size: .58rem; line-height: 1.4; font-weight: 400; }
-.player-news .player-acquisition { font-size: .8rem; }
+.player-acquisition { display: flex; flex-direction: column; gap: 2px; color: var(--text-mid); font-size: .8rem; line-height: 1.4; font-weight: 400; }
+.player-draft-link { align-self: flex-start; color: var(--neon-teal); text-decoration: underline; }

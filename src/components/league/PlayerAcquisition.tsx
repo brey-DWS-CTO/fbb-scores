@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useLeagueOverview } from '../../hooks/useLeagueOverview.js';
 import { fetchTransactions } from '../../lib/league/api.js';
 export default function PlayerAcquisition({ playerId }: { playerId: number }) {
@@ -10,6 +11,8 @@ export default function PlayerAcquisition({ playerId }: { playerId: number }) {
   const latest = moves[0];
   const moveText = latest ? `${latest.kind === 'drop' ? 'Dropped' : latest.kind === 'trade' ? 'Traded' : 'Added'}${latest.bid !== null ? ` · $${latest.bid} FAAB` : ''} · ${new Date(latest.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null;
   return <small className="player-acquisition" title={[draft, ...moves.map(row => `${row.kind} · ${row.owner}${row.bid !== null ? ` · $${row.bid} FAAB` : ''} · ${new Date(row.at).toLocaleDateString('en-US')}`)].filter(Boolean).join('\n')}>
-    {draft && <span>{draft}</span>}{moveText && <span>{moveText}</span>}{!draft && !moveText && <span>{overview.isPending || feed.isPending ? 'Loading history…' : 'Acquisition history unavailable'}</span>}
+    {draft && <Link className="player-draft-link" to={`/draft/recap?player=${playerId}`}>{draft} · View draft board</Link>}
+    {moveText && <span>{moveText}</span>}
+    {!draft && !moveText && <span>{overview.isPending || feed.isPending ? 'Loading history…' : 'Acquisition history unavailable'}</span>}
   </small>;
 }
