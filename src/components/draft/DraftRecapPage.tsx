@@ -1,7 +1,7 @@
 import { shortName } from '../../lib/league/format.js';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { buildDraftBoard } from '../../lib/keeper/engine.js';
 import {
   RECAP_COLUMNS,
@@ -72,6 +72,8 @@ function scoreClass(score: number | null): string {
  * commissioner closes the draft; until then the stats gate holds it.
  */
 export default function DraftRecapPage() {
+  const [params] = useSearchParams();
+  const playerId = Number(params.get('player'));
   const { identity } = useIdentity();
   const { state, dataset } = useDraftData();
   // ESPN's numbers with the commish's injury edits, the same for every member.
@@ -110,6 +112,10 @@ export default function DraftRecapPage() {
     });
   }, [snapshot, dataset, state]);
 
+  const linkedPlayerKey = playerId > 0
+    ? dataset.players.find(player => player.espnId === playerId)?.key ?? `p${playerId}`
+    : null;
+
   if (!identity) {
     return <div className="mock-page"><SignInPanel reason="Sign in to see the draft recap." /></div>;
   }
@@ -144,7 +150,7 @@ export default function DraftRecapPage() {
           <Totals recap={recap} />
           <Makeup recap={recap} />
           <StealsAndReaches recap={recap} />
-          <HeatBoard recap={recap} teams={dataset.teams.map((team) => ({ owner: team.owner, draftPosition: team.draftPosition }))} />
+          <HeatBoard key={linkedPlayerKey} recap={recap} linkedPlayerKey={linkedPlayerKey} teams={dataset.teams.map((team) => ({ owner: team.owner, draftPosition: team.draftPosition }))} />
           <PickTable recap={recap} />
           <p className="recap-foot">
             Grades weigh projected points from the best ten starters (45%), a good-luck ceiling (15%), a bad-luck
@@ -522,10 +528,20 @@ function heat(pick: RecapPick, mode: 'value' | 'age'): string {
   return `color-mix(in srgb, ${hue} ${Math.round(Math.abs(t) * 45)}%, var(--cell-bg))`;
 }
 
-function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string; draftPosition: number }[] }) {
+function HeatBoard({ recap, teams, linkedPlayerKey }: {
+  recap: DraftRecap;
+  teams: { owner: string; draftPosition: number }[];
+  linkedPlayerKey: string | null;
+}) {
   const [mode, setMode] = useState<'value' | 'age'>('value');
   const [focus, setFocus] = useState<string | null>(null);
-  const [picked, setPicked] = useState<RecapPick | null>(null);
+  const [selectedOverall, setSelectedOverall] = useState<number | null>(null);
+  const linkedPick = linkedPlayerKey ? recap.picks.find(pick => pick.key === linkedPlayerKey) : undefined;
+  const picked = selectedOverall === null ? linkedPick : recap.picks.find(pick => pick.overall === selectedOverall);
+  const linkedTarget = linkedPick ? `recap-pick-${linkedPick.overall}` : linkedPlayerKey ? 'recap-board' : null;
+  useEffect(() => {
+    if (linkedTarget) document.getElementById(linkedTarget)?.scrollIntoView({ block: 'center', inline: 'center' });
+  }, [linkedTarget]);
   const columns = [...teams].sort((a, b) => a.draftPosition - b.draftPosition);
   const rounds = Math.max(...recap.picks.map((pick) => pick.round));
   const at = new Map(recap.picks.map((pick) => [`${pick.round}:${pick.column}`, pick]));
@@ -561,10 +577,11 @@ function HeatBoard({ recap, teams }: { recap: DraftRecap; teams: { owner: string
               return (
                 <button
                   key={`${round}-${team.owner}`}
+                  id={`recap-pick-${pick.overall}`}
                   type="button"
                   className={`recap-board-cell${focus === pick.owner ? ' is-on' : ''}${picked?.overall === pick.overall ? ' is-picked' : ''}`}
                   style={{ background: heat(pick, mode) }}
-                  onClick={() => setPicked(pick)}
+                  onClick={() => setSelectedOverall(pick.overall)}
                   aria-label={`${shortName(pick.name)}, ${pick.owner}, ${pickPlace(pick)}`}
                 >
                   {(pick.keeper || pick.auto) && <span className="recap-board-tag">{pick.keeper ? 'K' : 'A'}</span>}

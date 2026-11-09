@@ -101,11 +101,11 @@ export default function PlayerNews({ player, scoring = LEAGUE_SCORING }: { playe
       <button type="button" className="tap-btn score-detail-close" aria-label="Close player card" onClick={close}>×</button>
       <h2><TeamLogo code={player.proTeam || null} size={20} /> {player.name}</h2>
       <p>{[player.position, player.proTeam].filter(Boolean).join(' · ')}{badge ? <> · <span className={`score-badge is-${badge.tone}`}>{badge.text}</span></> : player.injuryStatus === undefined ? '' : ' · Healthy'}</p>
+      {open && <section className="player-card-section" aria-label="Games"><PlayerGameLog playerId={player.id} name={player.name} proTeam={player.proTeam} scoring={scoring.length ? scoring : LEAGUE_SCORING} /></section>}
       {open && <section className="player-card-section" aria-label="Fantasy league history">
         <h3 className="player-news-heading">Fantasy league history</h3>
         <PlayerAcquisition playerId={player.id} />
       </section>}
-      {open && <section className="player-card-section" aria-label="Games"><PlayerGameLog playerId={player.id} name={player.name} proTeam={player.proTeam} scoring={scoring.length ? scoring : LEAGUE_SCORING} /></section>}
       <section className="player-card-section" aria-label="News">
       <h3 className="player-news-heading">Recent news</h3>
       {open && news.isLoading && <p role="status">Loading news…</p>}
