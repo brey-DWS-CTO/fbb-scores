@@ -11,6 +11,7 @@ import {
   beforeSeason,
   longDate,
   matchupChance,
+  matchupForViewer,
   orderForViewer,
   ownerByEspnTeamId,
   seasonStartDate,
@@ -133,7 +134,8 @@ export default function ScoresPage() {
 
       {week && matchups.length > 0 && (
         <div className="score-list">
-          {matchups.map((matchup) => {
+          {matchups.map((entry) => {
+            const matchup = matchupForViewer(entry, myTeamId);
             const chance = matchupChance(matchup, week, expected);
             const homeForecast = sideProjection(matchup.home, week, expected);
             const awayForecast = sideProjection(matchup.away, week, expected);

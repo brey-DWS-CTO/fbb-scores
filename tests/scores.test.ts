@@ -17,6 +17,7 @@ import {
   latestSlot,
   lineupOrder,
   matchupChance,
+  matchupForViewer,
   orderForViewer,
   ownerByEspnTeamId,
   planWeek,
@@ -729,6 +730,18 @@ test('your own matchup sits on top', () => {
   const owners = ownerByEspnTeamId([{ owner: 'Brey', espnTeamId: 7 }, { owner: 'Amy', espnTeamId: 2 }]);
   assert.equal(owners.get(7), 'Brey');
   assert.equal(owners.get(3), undefined);
+});
+
+test('an away viewer sees their team on the left with the correct winner', () => {
+  const matchup = { ...matchupOf(1, 10, 1), winner: 'AWAY' } as const;
+  const displayed = matchupForViewer(matchup, 1);
+  assert.equal(displayed.home, matchup.away);
+  assert.equal(displayed.away, matchup.home);
+  assert.equal(displayed.winner, 'HOME');
+  assert.equal(matchup.winner, 'AWAY');
+  assert.equal(matchupForViewer(matchup, 10), matchup);
+  assert.equal(matchupForViewer(matchup, null), matchup);
+  assert.equal(matchupForViewer({ ...matchup, winner: 'UNDECIDED' }, 1).winner, 'UNDECIDED');
 });
 
 const player = (name: string, days: Record<string, { lineupSlotId: number; started: boolean; points: number }>): ScorePlayer => ({

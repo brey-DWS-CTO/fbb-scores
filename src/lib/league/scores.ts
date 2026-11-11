@@ -1254,6 +1254,13 @@ export function defaultDay(week: Pick<ScoresWeek, 'days' | 'currentScoringPeriod
   return week.days[week.days.length - 1].scoringPeriodId;
 }
 
+/** Orient a matchup for display, keeping the winner aligned with its side. */
+export function matchupForViewer(matchup: ScoreMatchup, espnTeamId: number | null): ScoreMatchup {
+  if (matchup.away.teamId !== espnTeamId) return matchup;
+  const winner = matchup.winner === 'HOME' ? 'AWAY' : matchup.winner === 'AWAY' ? 'HOME' : matchup.winner;
+  return { ...matchup, home: matchup.away, away: matchup.home, winner };
+}
+
 /** The viewer's own matchup first, the rest in ESPN's order. */
 export function orderForViewer(matchups: readonly ScoreMatchup[], espnTeamId: number | null): ScoreMatchup[] {
   if (espnTeamId === null) return [...matchups];

@@ -6613,11 +6613,12 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 
 /* Player card: a stat strip, then his recent games as two short lines each, then news. */
 .player-log-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 12px 0; border: 1px solid var(--cell-border); border-radius: 8px; }
+.player-log-strip.is-full-season { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .player-log-strip > div { display: flex; flex-direction: column-reverse; align-items: center; gap: 2px; padding: 8px 2px; }
 .player-log-strip > div + div { border-left: 1px solid var(--cell-border); }
 .player-log-strip dt { color: var(--text-soft); font-size: .58rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .player-log-strip dd { margin: 0; color: var(--text-max); font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.player-log-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0 6px; }
+.player-log-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0 6px; }
 .player-log-head h3, .player-news-heading { margin: 0; color: var(--text-max); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
 .player-news-heading { margin-top: 16px; }
 .player-log-head .performer-segment { height: 30px; }
