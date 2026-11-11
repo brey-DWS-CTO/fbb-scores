@@ -131,7 +131,7 @@ export function playerDayProjection(
   const left = gamesLeft(player, week, anySlot).find((game) => game.scoringPeriodId === scoringPeriodId);
   if (!left) return null;
   const sofar = player.days[String(scoringPeriodId)]?.points ?? 0;
-  return Math.round((sofar + remainingGamePoints(left, expected(player, scoringPeriodId))) * 10) / 10;
+  return Math.round((sofar + remainingGamePoints(player, left, expected(player, scoringPeriodId))) * 10) / 10;
 }
 
 /**
@@ -146,7 +146,7 @@ export function playerWeekProjection(
 ): number {
   let total = 0;
   for (const day of Object.values(player.days)) if (day.started) total += day.points;
-  for (const game of gamesLeft(player, week, anySlot)) total += remainingGamePoints(game, expected(player, game.scoringPeriodId));
+  for (const game of gamesLeft(player, week, anySlot)) total += remainingGamePoints(player, game, expected(player, game.scoringPeriodId));
   return Math.round(total * 10) / 10;
 }
 
