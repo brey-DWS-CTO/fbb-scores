@@ -21,13 +21,14 @@ test('one opening-night outlier cannot dominate the preseason forecast', () => {
   assert.equal(expectedPointsForGame(player, { scoringPeriodId: 18, preseason: 30 }), 36, 'ESPN daily forecasts still take priority');
 });
 
-test('remaining projections scale with time left', () => {
-  assert.equal(remainingGamePoints({ scoringPeriodId: 18, share: 0.25, live: true }, 40), 10);
-  assert.equal(remainingGamePoints({ scoringPeriodId: 18, share: 1, live: false }, 40), 40);
-  assert.equal(remainingGamePoints({ scoringPeriodId: 18, share: 0, live: true }, 40), 0);
+test('remaining projections use the game clock when player minutes are unavailable', () => {
+  const player = warningWeek().matchups[0].away.players[0];
+  assert.equal(remainingGamePoints(player, { scoringPeriodId: 18, share: 0.25, live: true }, 40), 10);
+  assert.equal(remainingGamePoints(player, { scoringPeriodId: 18, share: 1, live: false }, 40), 40);
+  assert.equal(remainingGamePoints(player, { scoringPeriodId: 18, share: 0, live: true }, 40), 0);
 });
 
-test('a cold first half leaves the normal second-half projection in the player, team and odds forecasts', () => {
+test('player, team and odds forecasts use the observed rotation and pregame scoring rate', () => {
   const week = warningWeek();
   week.gamesCap = 30;
   const side = week.matchups[0].away;
@@ -43,9 +44,13 @@ test('a cold first half leaves the normal second-half projection in the player, 
   side.pointsByDay['18'] = 2;
   side.total = 32;
   const playerFinish = playerDayProjection(player, week, () => 40, 18)!;
-  assert.equal(playerFinish, 22);
+  assert.equal(playerFinish, 24.5);
   assert.equal(sideProjection(side, week, () => 40).byDay['18'], playerFinish);
   assert.equal(sideProjection(side, week, () => 40).week, Math.round(sideMean(sideOdds(side, week, () => 40)) * 10) / 10);
+  player.days['18'].stats!.min = 12;
+  assert.equal(playerDayProjection(player, week, () => 40, 18), 17);
+  player.days['18'].points = 12;
+  assert.equal(playerDayProjection(player, week, () => 40, 18), 27);
 });
 
 test('early-week odds include shared forecast uncertainty and resist small score swings', () => {

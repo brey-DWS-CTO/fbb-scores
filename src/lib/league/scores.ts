@@ -37,6 +37,8 @@ export interface GameLine {
   tipoff: string | null;
   /** Minutes still to play. Live games only. */
   minutesLeft: number | null;
+  /** Actual time elapsed in overtime, when 48 minus minutesLeft no longer applies. */
+  overtimeElapsedMinutes?: number;
 }
 
 export interface StatLine {
@@ -79,7 +81,7 @@ export interface ScorePlayer {
   last30: number | null;
   seasonGames?: number | null;
   last15Games?: number | null;
-  /** Expected playing time, blending season and preseason minutes when available. */
+  /** Actual minutes per game this season, when available. */
   expectedMinutes?: number | null;
   /** ESPN's own projection for a day, in league points, by scoring period id. Empty when ESPN sends none. */
   projByDay: Record<string, number>;
@@ -526,6 +528,7 @@ export function readNbaScoreboard(payload: unknown): Record<string, GameLine> {
         clock,
         tipoff,
         minutesLeft,
+        ...(gameStatus === 'live' && period > 4 ? { overtimeElapsedMinutes: 48 + (period - 4) * 5 - clockSeconds / 60 } : {}),
       };
     }
   }
@@ -660,7 +663,6 @@ function sampleFigures(player: Dict, season: number): Pick<PlayerFigures, 'seaso
   let seasonGames: number | null = null;
   let last15Games: number | null = null;
   let actualMinutes: number | null = null;
-  let projectedMinutes: number | null = null;
   for (const raw of list(player.stats)) {
     const row = dict(raw);
     if (num(row.seasonId) !== null && num(row.seasonId) !== season) continue;
@@ -670,15 +672,11 @@ function sampleFigures(player: Dict, season: number): Pick<PlayerFigures, 'seaso
     if (num(row.statSourceId) === 0 && num(row.statSplitTypeId) === 2) last15Games ??= gp;
     if (num(row.statSplitTypeId) !== 0) continue;
     const minutes = (stats['40'] ?? 0) / gp;
-    if (num(row.statSourceId) === 0) {
-      seasonGames ??= gp;
-      if (minutes > 0 && minutes <= 48) actualMinutes ??= minutes;
-    } else if (num(row.statSourceId) === 1 && minutes > 0 && minutes <= 48) projectedMinutes ??= minutes;
+    if (num(row.statSourceId) !== 0) continue;
+    seasonGames ??= gp;
+    if (minutes > 0 && minutes <= 48) actualMinutes ??= minutes;
   }
-  const expectedMinutes = actualMinutes !== null && projectedMinutes !== null
-    ? (actualMinutes * (seasonGames ?? 0) + projectedMinutes * 8) / ((seasonGames ?? 0) + 8)
-    : actualMinutes ?? projectedMinutes;
-  return { seasonGames, last15Games, expectedMinutes };
+  return { seasonGames, last15Games, expectedMinutes: actualMinutes };
 }
 
 /** Fill in what this payload knows that an earlier one did not. */
@@ -912,12 +910,25 @@ export interface GameLeft {
   /** 1 for a game not started, the part left for a live one, a fraction for a day nobody can read. */
   share: number;
   live: boolean;
+  overtimeElapsedMinutes?: number;
 }
 
-/** Keep the pregame scoring rate for the time left in the game. */
-export function remainingGamePoints(game: GameLeft, baseline: number): number {
+/** Apply the pregame scoring rate to the player's estimated remaining court time. */
+export function remainingGamePoints(player: ScorePlayer, game: GameLeft, baseline: number): number {
   const prior = Number.isFinite(baseline) ? Math.max(0, baseline) : 0;
-  return prior * game.share;
+  const clockEstimate = prior * game.share;
+  if (!game.live || game.share <= 0 || prior === 0) return clockEstimate;
+
+  const elapsed = game.overtimeElapsedMinutes ?? 48 * (1 - game.share);
+  const played = player.days[String(game.scoringPeriodId)]?.stats?.min;
+  const expectedMinutes = player.expectedMinutes;
+  // Give the rotation time to start and keep the clock estimate when minutes are unavailable.
+  if (elapsed < 6 || played == null || played <= 0 || played > elapsed + 1
+    || expectedMinutes == null || expectedMinutes <= 0 || expectedMinutes > 48) return clockEstimate;
+
+  const courtShare = Math.min(1, played / elapsed);
+  const remainingMinutes = 48 * game.share * courtShare;
+  return remainingMinutes * (prior / expectedMinutes);
 }
 
 /** Minutes left as a share of a 48-minute game. A live game with no clock is half done. */
@@ -990,7 +1001,10 @@ export function gamesLeft(
     const game = day.games[player.proTeam];
     if (!game || game.status === 'off' || game.status === 'final') continue;
     if (game.status === 'live') {
-      left.push({ scoringPeriodId: day.scoringPeriodId, share: liveShare(game), live: true });
+      left.push({
+        scoringPeriodId: day.scoringPeriodId, share: liveShare(game), live: true,
+        overtimeElapsedMinutes: game.overtimeElapsedMinutes,
+      });
     } else {
       left.push({ scoringPeriodId: day.scoringPeriodId, share: 1, live: false });
     }
@@ -1115,7 +1129,7 @@ export function gamesCapProjection(
       const game = left.get(`${player.id}:${day.scoringPeriodId}`);
       if (!played && !game) continue;
       const baseline = game ? expected(player, day.scoringPeriodId) : 0;
-      const points = game && game.share > 0 ? remainingGamePoints(game, baseline) / game.share : 0;
+      const points = game && game.share > 0 ? remainingGamePoints(player, game, baseline) / game.share : 0;
       candidates.push({
         playerId: player.id, scoringPeriodId: day.scoringPeriodId,
         expected: Number.isFinite(points) ? Math.max(0, points) : 0,
