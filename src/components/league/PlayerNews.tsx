@@ -30,12 +30,10 @@ async function fetchGameLog(url: string) {
 }
 
 /**
- * Season average and his last 3, 7 or 15 games in league points, this
- * season only. A window he has not played enough games for stays off.
- * Past three games the list scrolls inside itself until opened in full.
+ * Show recent games or the full current-season log, scored in league points.
  */
 function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number; name: string; proTeam: string; scoring: readonly ScoringItem[] }) {
-  const [count, setCount] = useState<(typeof WINDOWS)[number]>(3);
+  const [count, setCount] = useState<(typeof WINDOWS)[number] | 'all'>(3);
   const [expanded, setExpanded] = useState(false);
   const current = useQuery({ queryKey: ['game-log', playerId, 'current'], queryFn: () => fetchGameLog(gameLogUrl(playerId)), staleTime: 10 * 60_000, retry: 1 });
   // Today's game comes from our daily scores: ESPN's log lists a game only once it ends.
@@ -44,15 +42,16 @@ function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number;
   const thisSeason = current.data?.games ?? [];
   const today = todayGame(day.data, proTeam, playerId, thisSeason);
   const todayLabel = today ? `Today ${today.home ? 'vs' : '@'} ${today.opp}` : '';
-  const games = thisSeason.slice(0, count);
+  const games = count === 'all' ? thisSeason : thisSeason.slice(0, count);
+  const collapsed = count !== 'all' && games.length > 3 && !expanded;
   const season = logAverages(thisSeason, scoring);
   const recent = logAverages(games, scoring);
   if (current.isLoading) return <p role="status">Loading games…</p>;
   if (current.isError) return <p role="alert">Could not load his games. <button type="button" className="tap-btn mock-mini-btn" onClick={() => void current.refetch()}>Try again</button></p>;
   return <>
-    <dl className="player-log-strip">
+    <dl className={`player-log-strip${count === 'all' ? ' is-full-season' : ''}`}>
       <div><dt>Season avg</dt><dd>{season ? season.fpts.toFixed(1) : '—'}</dd></div>
-      <div><dt>Last {count} avg</dt><dd>{recent ? recent.fpts.toFixed(1) : '—'}</dd></div>
+      {count !== 'all' && <div><dt>Last {count} avg</dt><dd>{recent ? recent.fpts.toFixed(1) : '—'}</dd></div>}
       <div><dt>Min</dt><dd>{season ? season.min.toFixed(1) : '—'}</dd></div>
       <div><dt>GP</dt><dd>{thisSeason.length}</dd></div>
     </dl>
@@ -60,6 +59,7 @@ function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number;
       <h3>Game log</h3>
       <div className="performer-segment" role="group" aria-label="Games shown">
         {WINDOWS.map(n => <button key={n} type="button" aria-pressed={count === n} disabled={n > 3 && thisSeason.length < n} title={n > 3 && thisSeason.length < n ? `After ${n} games` : undefined} onClick={() => { setCount(n); setExpanded(false); }}>Last {n}</button>)}
+        <button type="button" aria-pressed={count === 'all'} onClick={() => { setCount('all'); setExpanded(false); }}>All</button>
       </div>
     </div>
     <div className="player-log-game player-log-columns" aria-hidden="true"><span className="player-log-when">Game</span>{LOG_COLUMNS.map(([, label]) => <span key={label} className="player-log-num">{label}</span>)}<span className="player-log-fpts">FPTS</span></div>
@@ -68,14 +68,14 @@ function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number;
       {statCells(today.stats)}
       <strong className="player-log-fpts">{today.stats ? <PointsBreakdown name={name} label={todayLabel} days={[{ rawStats: today.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints({ stats: today.stats }, scoring)} /> : '—'}</strong>
     </div>}
-    {games.length === 0 ? (!today && <p>No games this season yet.</p>) : <ol className={`player-log-list${games.length > 3 && !expanded ? ' is-collapsed' : ''}`}>
+    {games.length === 0 ? (!today && <p>No games this season yet.</p>) : <ol className={`player-log-list${collapsed ? ' is-collapsed' : ''}`}>
       {games.map(game => <li key={game.eventId} className="player-log-game">
         <span className="player-log-when"><span>{gameDate(game.date)}</span><small>{game.home ? 'vs ' : '@'}{game.opp}</small></span>
         {statCells(game.stats)}
         <strong className="player-log-fpts"><PointsBreakdown name={name} label={`${gameDate(game.date)} ${game.home ? 'vs' : '@'} ${game.opp}`} days={[{ rawStats: game.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints(game, scoring)} /></strong>
       </li>)}
     </ol>}
-    {games.length > 3 && <button type="button" className="tap-btn mock-mini-btn player-log-more" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Collapse' : `Show all ${games.length}`}</button>}
+    {count !== 'all' && games.length > 3 && <button type="button" className="tap-btn mock-mini-btn player-log-more" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Collapse' : `Show all ${games.length}`}</button>}
   </>;
 }
 

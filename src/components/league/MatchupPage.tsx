@@ -25,6 +25,7 @@ import {
   lineupOrder,
   longDate,
   matchupChance,
+  matchupForViewer,
   ownerByEspnTeamId,
   playerWeek,
   rosterOn,
@@ -360,7 +361,9 @@ export default function MatchupPage() {
     [loaded, capFor],
   );
   const wantedId = numberParam(matchupId ?? null);
-  const matchup: ScoreMatchup | undefined = week?.matchups.find((entry) => entry.id === wantedId);
+  const myTeamId = leagueDataset.teams.find((team) => team.owner === identity?.owner)?.espnTeamId ?? null;
+  const selectedMatchup: ScoreMatchup | undefined = week?.matchups.find((entry) => entry.id === wantedId);
+  const matchup = selectedMatchup && matchupForViewer(selectedMatchup, myTeamId);
 
   const view: View | null = useMemo(() => {
     if (!week) return null;
@@ -445,7 +448,7 @@ export default function MatchupPage() {
         <IdentityChip />
       </div>
 
-      {week && matchup && <MatchupStrip week={week} selected={matchup.id} demo={demo} day={dayParam} />}
+      {week && matchup && <MatchupStrip week={week} selected={matchup.id} myTeamId={myTeamId} demo={demo} day={dayParam} />}
 
       {demo && (
         <div className="score-demo" role="status">

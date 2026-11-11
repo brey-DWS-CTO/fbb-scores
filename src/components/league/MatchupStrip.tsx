@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ownerByEspnTeamId, type ScoresWeek } from '../../lib/league/scores.js';
+import { matchupForViewer, orderForViewer, ownerByEspnTeamId, type ScoresWeek } from '../../lib/league/scores.js';
 import { leagueDataset } from '../../lib/league/data.js';
 import FantasyTeamLogo from './FantasyTeamLogo.js';
 import { scoresQuery } from './scoresUi.js';
@@ -8,15 +8,15 @@ import { scoresQuery } from './scoresUi.js';
 // The slider names each side by its owner: short, and how the league knows its teams.
 const OWNERS = ownerByEspnTeamId(leagueDataset.teams);
 
-export default function MatchupStrip({ week, selected, demo, day }: { week: ScoresWeek; selected: number; demo: boolean; day: string | null }) {
+export default function MatchupStrip({ week, selected, myTeamId, demo, day }: { week: ScoresWeek; selected: number; myTeamId: number | null; demo: boolean; day: string | null }) {
   const strip = useRef<HTMLDivElement>(null);
   const active = useRef<HTMLAnchorElement>(null);
-  useEffect(() => { active.current?.scrollIntoView({ block: 'nearest', inline: 'center' }); }, [selected]);
+  useEffect(() => { active.current?.scrollIntoView({ block: 'nearest', inline: 'center' }); }, [selected, myTeamId]);
   return (
     <nav className="matchup-strip" aria-label="Other matchups">
       <button type="button" className="tap-btn matchup-strip-arrow" aria-label="Scroll matchups left" onClick={() => strip.current?.scrollBy({ left: -240, behavior: 'smooth' })}>‹</button>
       <div className="matchup-strip-track" ref={strip}>
-        {week.matchups.map((matchup) => (
+        {orderForViewer(week.matchups, myTeamId).map((entry) => matchupForViewer(entry, myTeamId)).map((matchup) => (
           <Link key={matchup.id} ref={matchup.id === selected ? active : undefined} className={`matchup-strip-card${matchup.id === selected ? ' is-selected' : ''}`} aria-current={matchup.id === selected ? 'page' : undefined} aria-label={`${matchup.home.name} versus ${matchup.away.name}`} to={`/scores/${matchup.id}${scoresQuery({ week: week.matchupPeriodId, demo, day })}`}>
             {[matchup.home, matchup.away].map((side) => (
               <span className="matchup-strip-side" key={side.teamId}><FantasyTeamLogo side={side} size={19} /><span title={side.name}>{OWNERS.get(side.teamId) ?? side.abbrev ?? side.name}</span><b>{side.total.toFixed(1)}</b></span>
