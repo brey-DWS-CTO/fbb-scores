@@ -81,7 +81,7 @@ export interface ScorePlayer {
   last30: number | null;
   seasonGames?: number | null;
   last15Games?: number | null;
-  /** Expected playing time, blending season and preseason minutes when available. */
+  /** Actual minutes per game this season, when available. */
   expectedMinutes?: number | null;
   /** ESPN's own projection for a day, in league points, by scoring period id. Empty when ESPN sends none. */
   projByDay: Record<string, number>;
@@ -663,7 +663,6 @@ function sampleFigures(player: Dict, season: number): Pick<PlayerFigures, 'seaso
   let seasonGames: number | null = null;
   let last15Games: number | null = null;
   let actualMinutes: number | null = null;
-  let projectedMinutes: number | null = null;
   for (const raw of list(player.stats)) {
     const row = dict(raw);
     if (num(row.seasonId) !== null && num(row.seasonId) !== season) continue;
@@ -673,15 +672,11 @@ function sampleFigures(player: Dict, season: number): Pick<PlayerFigures, 'seaso
     if (num(row.statSourceId) === 0 && num(row.statSplitTypeId) === 2) last15Games ??= gp;
     if (num(row.statSplitTypeId) !== 0) continue;
     const minutes = (stats['40'] ?? 0) / gp;
-    if (num(row.statSourceId) === 0) {
-      seasonGames ??= gp;
-      if (minutes > 0 && minutes <= 48) actualMinutes ??= minutes;
-    } else if (num(row.statSourceId) === 1 && minutes > 0 && minutes <= 48) projectedMinutes ??= minutes;
+    if (num(row.statSourceId) !== 0) continue;
+    seasonGames ??= gp;
+    if (minutes > 0 && minutes <= 48) actualMinutes ??= minutes;
   }
-  const expectedMinutes = actualMinutes !== null && projectedMinutes !== null
-    ? (actualMinutes * (seasonGames ?? 0) + projectedMinutes * 8) / ((seasonGames ?? 0) + 8)
-    : actualMinutes ?? projectedMinutes;
-  return { seasonGames, last15Games, expectedMinutes };
+  return { seasonGames, last15Games, expectedMinutes: actualMinutes };
 }
 
 /** Fill in what this payload knows that an earlier one did not. */

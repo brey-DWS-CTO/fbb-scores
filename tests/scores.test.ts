@@ -230,7 +230,7 @@ function buildWeek(): ScoresWeek {
 
 // ─── The plan ───────────────────────────────────────────────────────────────
 
-test('score payloads retain fantasy logos, sample counts and expected playing time', () => {
+test('score payloads retain fantasy logos, sample counts and actual season minutes per game', () => {
   const settings = { ...SETTINGS, teams: [
     { id: 7, name: 'Home', roster: { entries: [{ playerPoolEntry: { id: 1, player: { id: 1, stats: [
       { statSourceId: 0, statSplitTypeId: 0, seasonId: 2027, stats: { '0': 100, '40': 60, '42': 2 } },
@@ -250,7 +250,7 @@ test('score payloads retain fantasy logos, sample counts and expected playing ti
   const player = week.matchups[0].home.players[0];
   assert.equal(player.seasonGames, 2);
   assert.equal(player.last15Games, 1);
-  assert.ok(Math.abs(player.expectedMinutes! - 33.2) < 1e-9);
+  assert.equal(player.expectedMinutes, 30);
 });
 
 test('the plan lists the week\'s days, dated from the pro schedule and counted out from today', () => {
