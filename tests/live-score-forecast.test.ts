@@ -3,7 +3,7 @@ import { leagueDataset } from '../src/lib/league/data.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { blendExpected, expectedPointsForGame, playerDayProjection, sideProjection } from '../src/lib/league/dailyProjection.js';
-import { remainingGamePoints, sideOdds } from '../src/lib/league/scores.js';
+import { readNbaScoreboard, remainingGamePoints, sideOdds } from '../src/lib/league/scores.js';
 import { sideMean, winChance } from '../src/lib/league/winOdds.js';
 import { warningWeek } from './helpers/lineup-games-fixture.js';
 
@@ -21,42 +21,29 @@ test('one opening-night outlier cannot dominate the preseason forecast', () => {
   assert.equal(expectedPointsForGame(player, { scoringPeriodId: 18, preseason: 30 }), 36, 'ESPN daily forecasts still take priority');
 });
 
-test('minutes used late in a game reduce the remaining projection, with bounded efficiency updates', () => {
-  const player = warningWeek().matchups[0].away.players[0];
-  player.expectedMinutes = 32;
-  player.days['18'].stats = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, threes: 0, to: 0, min: 30, gp: 1 };
-  player.days['18'].points = 15;
-  const left = { scoringPeriodId: 18, live: true, share: 0.25 };
-  const cold = remainingGamePoints(player, left, 40);
-  assert.ok(cold > 0 && cold < 10, `remaining points should be below the clock-only 10, got ${cold}`);
-  player.days['18'].points = 100;
-  const hot = remainingGamePoints(player, left, 40);
-  assert.ok(hot > cold && hot <= 13.5, 'a hot game is updated with regression, not extrapolated without limits');
-  player.days['18'].stats.min = 4;
-  assert.equal(remainingGamePoints(player, { ...left, share: 0.9 }, 40), 36, 'the opening minutes do not rewrite the baseline');
+test('remaining projections scale with time left', () => {
+  assert.equal(remainingGamePoints({ scoringPeriodId: 18, share: 0.25, live: true }, 40), 10);
+  assert.equal(remainingGamePoints({ scoringPeriodId: 18, share: 1, live: false }, 40), 40);
+  assert.equal(remainingGamePoints({ scoringPeriodId: 18, share: 0, live: true }, 40), 0);
 });
 
-test('without reliable minutes the live forecast falls back to the game clock', () => {
-  const player = warningWeek().matchups[0].away.players[0];
-  assert.equal(remainingGamePoints(player, { scoringPeriodId: 18, share: 0.5, live: true }, 40), 20);
-  assert.equal(remainingGamePoints(player, { scoringPeriodId: 18, share: 1, live: false }, 40), 40);
-  assert.equal(remainingGamePoints(player, { scoringPeriodId: 18, share: 0, live: true }, 40), 0);
-});
-
-test('player, team and odds use exactly the same minutes-based live forecast', () => {
+test('a cold first half leaves the normal second-half projection in the player, team and odds forecasts', () => {
   const week = warningWeek();
   week.gamesCap = 30;
   const side = week.matchups[0].away;
   const player = side.players[0];
   player.expectedMinutes = 32;
-  player.days['18'].stats = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, threes: 0, to: 0, min: 30, gp: 1 };
-  player.days['18'].points = 15;
+  player.days['18'].stats = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, threes: 0, to: 0, min: 18, gp: 1 };
+  player.days['18'].points = 2;
   player.days['18'].game!.status = 'live';
-  week.days[1].games!.DEN.status = 'live';
-  week.days[1].games!.DEN.minutesLeft = 12;
-  side.pointsByDay['18'] = 15;
-  side.total = 45;
+  week.days[1].games!.DEN = readNbaScoreboard({ events: [{ competitions: [{
+    status: { type: { name: 'STATUS_HALFTIME', state: 'in' } },
+    competitors: [{ team: { abbreviation: 'DEN' } }, { team: { abbreviation: 'HOU' } }],
+  }] }] }).DEN;
+  side.pointsByDay['18'] = 2;
+  side.total = 32;
   const playerFinish = playerDayProjection(player, week, () => 40, 18)!;
+  assert.equal(playerFinish, 22);
   assert.equal(sideProjection(side, week, () => 40).byDay['18'], playerFinish);
   assert.equal(sideProjection(side, week, () => 40).week, Math.round(sideMean(sideOdds(side, week, () => 40)) * 10) / 10);
 });

@@ -498,7 +498,9 @@ export function readNbaScoreboard(payload: unknown): Record<string, GameLine> {
     else gameStatus = 'upcoming';
 
     let minutesLeft: number | null = null;
-    if (gameStatus === 'live') {
+    if (statusName === 'STATUS_HALFTIME') {
+      minutesLeft = 24;
+    } else if (gameStatus === 'live') {
       minutesLeft = period <= 4 ? (4 - Math.max(1, period)) * 12 + clockSeconds / 60 : clockSeconds / 60;
     }
     const clock = gameStatus === 'live' ? periodClock(statusName, period, displayClock) : null;
@@ -912,27 +914,10 @@ export interface GameLeft {
   live: boolean;
 }
 
-/** Remaining points with a bounded update for minutes played and live efficiency. */
-export function remainingGamePoints(player: ScorePlayer, game: GameLeft, baseline: number): number {
+/** Keep the pregame scoring rate for the time left in the game. */
+export function remainingGamePoints(game: GameLeft, baseline: number): number {
   const prior = Number.isFinite(baseline) ? Math.max(0, baseline) : 0;
-  if (!game.live || prior === 0 || game.share <= 0) return prior * game.share;
-  const day = player.days[String(game.scoringPeriodId)];
-  const playedMinutes = day?.stats?.min ?? 0;
-  const history = Object.entries(player.days).filter(([key, value]) => Number(key) < game.scoringPeriodId && value.played && (value.stats?.min ?? 0) > 0);
-  const minutes = player.expectedMinutes ?? (history.length > 0 ? history.reduce((sum, [, value]) => sum + (value.stats?.min ?? 0), 0) / history.length : null);
-  if (minutes === null || minutes <= 0 || minutes > 48 || playedMinutes <= 0) return prior * game.share;
-  const elapsed = 48 * (1 - game.share);
-  if (elapsed < 6) return prior * game.share;
-  // Rotation changes count gradually; a short hot/cold stretch cannot rewrite the whole game.
-  const paceMinutes = Math.min(48, Math.max(minutes * 0.65, Math.min(minutes * 1.25, playedMinutes / elapsed * 48)));
-  const confidence = Math.min(0.5, elapsed / 96);
-  const targetMinutes = minutes * (1 - confidence) + paceMinutes * confidence;
-  const rotationMinutes = targetMinutes * game.share;
-  const remainingMinutes = Math.min(48 * game.share, Math.max(minutes * game.share * 0.25, Math.min(rotationMinutes, targetMinutes - playedMinutes)));
-  const priorRate = prior / minutes;
-  const observedRate = (prior + (day?.points ?? 0)) / (minutes + playedMinutes);
-  const rate = playedMinutes < 8 ? priorRate : Math.min(priorRate * 1.35, Math.max(priorRate * 0.65, observedRate));
-  return remainingMinutes * rate;
+  return prior * game.share;
 }
 
 /** Minutes left as a share of a 48-minute game. A live game with no clock is half done. */
@@ -1130,7 +1115,7 @@ export function gamesCapProjection(
       const game = left.get(`${player.id}:${day.scoringPeriodId}`);
       if (!played && !game) continue;
       const baseline = game ? expected(player, day.scoringPeriodId) : 0;
-      const points = game && game.share > 0 ? remainingGamePoints(player, game, baseline) / game.share : 0;
+      const points = game && game.share > 0 ? remainingGamePoints(game, baseline) / game.share : 0;
       candidates.push({
         playerId: player.id, scoringPeriodId: day.scoringPeriodId,
         expected: Number.isFinite(points) ? Math.max(0, points) : 0,
