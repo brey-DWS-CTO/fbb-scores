@@ -43,7 +43,8 @@ function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number;
   const today = todayGame(day.data, proTeam, playerId, thisSeason);
   const todayLabel = today ? `Today ${today.home ? 'vs' : '@'} ${today.opp}` : '';
   const games = count === 'all' ? thisSeason : thisSeason.slice(0, count);
-  const collapsed = count !== 'all' && games.length > 3 && !expanded;
+  const longLog = count === 'all' || count === 15;
+  const collapsed = !longLog && games.length > 3 && !expanded;
   const season = logAverages(thisSeason, scoring);
   const recent = logAverages(games, scoring);
   if (current.isLoading) return <p role="status">Loading games…</p>;
@@ -68,14 +69,16 @@ function PlayerGameLog({ playerId, name, proTeam, scoring }: { playerId: number;
       {statCells(today.stats)}
       <strong className="player-log-fpts">{today.stats ? <PointsBreakdown name={name} label={todayLabel} days={[{ rawStats: today.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints({ stats: today.stats }, scoring)} /> : '—'}</strong>
     </div>}
-    {games.length === 0 ? (!today && <p>No games this season yet.</p>) : <ol className={`player-log-list${collapsed ? ' is-collapsed' : ''}`}>
+    {games.length === 0 ? (!today && <p>No games this season yet.</p>) : <ol key={count}
+      className={`player-log-list${longLog ? ' is-scrollable' : collapsed ? ' is-collapsed' : ''}`}
+      tabIndex={longLog || collapsed ? 0 : undefined} aria-label={`${name} game log`}>
       {games.map(game => <li key={game.eventId} className="player-log-game">
         <span className="player-log-when"><span>{gameDate(game.date)}</span><small>{game.home ? 'vs ' : '@'}{game.opp}</small></span>
         {statCells(game.stats)}
         <strong className="player-log-fpts"><PointsBreakdown name={name} label={`${gameDate(game.date)} ${game.home ? 'vs' : '@'} ${game.opp}`} days={[{ rawStats: game.stats, stats: null }]} scoring={scoring} total={gameFantasyPoints(game, scoring)} /></strong>
       </li>)}
     </ol>}
-    {count !== 'all' && games.length > 3 && <button type="button" className="tap-btn mock-mini-btn player-log-more" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Collapse' : `Show all ${games.length}`}</button>}
+    {!longLog && games.length > 3 && <button type="button" className="tap-btn mock-mini-btn player-log-more" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Collapse' : `Show all ${games.length}`}</button>}
   </>;
 }
 
