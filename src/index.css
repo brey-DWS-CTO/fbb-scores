@@ -6706,3 +6706,12 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .league-standings > small { display: block; margin-top: 10px; color: var(--text-mid); font-size: .65rem; }
 .player-acquisition { display: flex; flex-direction: column; gap: 2px; color: var(--text-mid); font-size: .8rem; line-height: 1.4; font-weight: 400; }
 .player-draft-link { align-self: flex-start; color: var(--neon-teal); text-decoration: underline; }
+
+/* Keep projections, actual starts and the cap readable at narrow matchup widths. */
+.lineup-games { min-width: 0; line-height: 1.5; }
+.lineup-games small { white-space: normal; overflow-wrap: anywhere; }
+.lineup-games-top b { white-space: normal; }
+.lineup-games-cap { color: var(--text-mid); }
+.lineup-games-through { margin-top: 3px; padding-top: 3px; border-top: 1px dashed var(--panel-border); }
+.is-right .lineup-games { text-align: right; }
+.score-games { min-width: 0; }
