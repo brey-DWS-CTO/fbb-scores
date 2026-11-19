@@ -25,7 +25,7 @@ function checkRoster(raw: EspnLeagueResponse, config: EspnLmConfig): void {
   if (String(raw.id) !== config.leagueId || raw.seasonId !== config.seasonId || !Number.isSafeInteger(raw.scoringPeriodId)) throw new Error('ESPN roster binding mismatch.');
 }
 
-/** The existing LM clock calls this after its waiver settings and adds have run. */
+/** A single delayed daily queue delivery handles one batch per eligible owner. */
 export async function executeAutoBench(config: EspnLmConfig, now: Date, deps: AutoBenchDependencies): Promise<AutoBenchReceipt[]> {
   const runAt = Date.parse(deps.dailyWindow.runAt);
   if (now.getTime() < runAt || now.getTime() >= runAt + 5 * 60_000) return [];
@@ -151,16 +151,15 @@ export async function executeAutoBench(config: EspnLmConfig, now: Date, deps: Au
   return results;
 }
 
-export async function runAutoBench(now = new Date()): Promise<AutoBenchReceipt[]> {
-  // The shared scheduler wakes more often for other LM duties. Auto-bench does
-  // no roster, transaction or database work except at the daily :15 window.
+export async function runAutoBench(now = new Date(), expectedRunAt?: string): Promise<AutoBenchReceipt[]> {
+  // Invoked only by the delayed daily queue delivery. Reject stale deliveries.
   const pt = pacific(now);
   if (pt.minute < 15 || pt.minute >= 20) return [];
   const config = espnLmConfig();
   if (!config) return [];
   const games = await gamesOn(pt.date);
   const dailyWindow = autoBenchWindow(now, games);
-  if (!dailyWindow) return [];
+  if (!dailyWindow || (expectedRunAt && dailyWindow.runAt !== expectedRunAt)) return [];
   const client = new EspnClient({ leagueId: config.leagueId, seasonId: config.seasonId, cookieOverride: config.cookie });
   return executeAutoBench(config, now, {
     dailyWindow,

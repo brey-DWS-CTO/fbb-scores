@@ -1,10 +1,12 @@
 import type { Router, RequestHandler } from 'express';
 import { emptyAutoBenchState } from '../../src/lib/league/autoBench.js';
+import { scheduleAutoBench } from '../lib/autoBenchQueue.js';
+import { previewAutoBench } from '../lib/autoBenchPreview.js';
 import { espnLmConfig } from '../lib/espnLm.js';
 import { CONFIG_TEAMS, OWNERS, appendAudit, getState, mutateState, isKnownOwner } from '../lib/leagueStore.js';
 import { EspnReadOnlyLineupProvider, lineupReadsEnabled } from '../lib/lineup/espnReadOnly.js';
 import { emptyLineupState, LineupService, type LineupRepository } from '../lib/lineup/service.js';
-import { myTeamReadView, LineupReadRevokedError } from '../lib/lineup/readView.js';
+import { myTeamReadView, LineupReadRevokedError, withAutoBenchReadAccess } from '../lib/lineup/readView.js';
 import type { MoveRequest } from '../../src/lib/league/lineup.js';
 
 const repo: LineupRepository = {
@@ -56,7 +58,17 @@ export function registerLineupRoutes(router: Router, auth: RequestHandler, commi
       state.autoBench.preferences[owner] = { enabled: true, enabledAt: new Date().toISOString(), leagueId: config!.leagueId, season: config!.seasonId, teamId: team!.espnTeamId };
     });
     await appendAudit(owner, 'lineup.autoBench.preference', { enabled: req.body.enabled });
-    res.json({ enabled: req.body.enabled });
+    // Scheduling is idempotent with the daily planner. A failed queue publish does
+    // not roll back consent; report it so the owner can retry the read-only check.
+    let scheduleError: string | undefined;
+    if (req.body.enabled) {
+      try { await scheduleAutoBench(new Date()); }
+      catch { scheduleError = 'Saved your preference, but scheduling failed. Try saving again.'; }
+    }
+    res.json({ enabled: req.body.enabled, scheduleError });
+  }));
+  router.post('/auto-bench/preview', auth, directIdentity, safe(async (_req, res) => {
+    res.json(await previewAutoBench(res.locals.owner as string));
   }));
   router.get('/my-team', auth, directIdentity, safe(async (_req, res) => {
     const owner = res.locals.owner as string;
@@ -64,7 +76,16 @@ export function registerLineupRoutes(router: Router, auth: RequestHandler, commi
     const leagueId = process.env.ESPN_LEAGUE_ID;
     const binding = configured && leagueId ? { leagueId, teamId: configured.espnTeamId } : null;
     try {
-      const view = await myTeamReadView(repo, provider, owner, binding, lineupReadsEnabled());
+      const season = espnLmConfig()?.seasonId ?? Number(process.env.ESPN_SEASON_ID ?? 2027);
+      const readRepo: LineupRepository = { ...repo, async read() {
+        const saved = (await getState()).state;
+        return withAutoBenchReadAccess(saved.lineupManagement ?? emptyLineupState(), saved.autoBench?.preferences[owner], owner, binding, season);
+      } };
+      const saved = (await getState()).state;
+      const autoAccess = withAutoBenchReadAccess(emptyLineupState(), saved.autoBench?.preferences[owner], owner, binding, season).grants[owner]?.enabled === true;
+      const readsEnabled = lineupReadsEnabled() || autoAccess;
+      const readProvider = new EspnReadOnlyLineupProvider(undefined, undefined, () => readsEnabled);
+      const view = await myTeamReadView(readRepo, readProvider, owner, binding, readsEnabled);
       res.json({ ...view, safetyCutoffMinutes: cutoff() });
     } catch (error) {
       if (error instanceof LineupReadRevokedError) { res.status(403).json({ error: error.message }); return; }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { buildAutoBenchPreview } from '../server/lib/autoBenchPreview.js';
 import { executeAutoBench, type AutoBenchDependencies } from '../server/lib/autoBenchService.js';
 import { CONFIG_TEAMS } from '../server/lib/leagueStore.js';
 import { autoBenchCandidates, autoBenchWindow, emptyAutoBenchState, type AutoBenchState } from '../src/lib/league/autoBench.js';
@@ -187,4 +188,20 @@ test('each opted-in owner gets their own single daily batch', async () => {
   await executeAutoBench(config, now, f.deps);
   assert.deepEqual(owners.sort((a, b) => a - b), [team.espnTeamId, other.espnTeamId].sort((a, b) => a - b));
   assert.equal(Object.keys(f.state.autoBench.dailyRuns ?? {}).length, 2);
+});
+
+test('read-only check explains decisions and does not alter roster or daily claims', () => {
+  const f = fixture();
+  const original = structuredClone({ state: f.state, roster: f.roster, raw: f.raw });
+  const games = [{ home: 'BOS', away: 'DEN', tipoff: '2026-11-18T21:00:00Z' }];
+  const view = buildAutoBenchPreview(team.owner, config, f.state.autoBench, f.roster, f.raw, games, now);
+  assert.equal(view.rows[0].decision, 'Would bench');
+  assert.equal(view.runAt, now.toISOString());
+  assert.deepEqual({ state: f.state, roster: f.roster, raw: f.raw }, original);
+  assert.equal(f.writes(), 0);
+  f.raw.transactions![0].isLeagueManager = true;
+  assert.equal(buildAutoBenchPreview(team.owner, config, f.state.autoBench, f.roster, f.raw, games, now).rows[0].decision, 'Skipped: LM add');
+  f.raw.transactions![0].isLeagueManager = false;
+  f.roster.teams[0].roster!.entries[0].lineupSlotId = 12;
+  assert.equal(buildAutoBenchPreview(team.owner, config, f.state.autoBench, f.roster, f.raw, games, now).rows[0].decision, 'Skipped: not in your starting lineup');
 });

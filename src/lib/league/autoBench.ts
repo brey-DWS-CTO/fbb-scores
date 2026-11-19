@@ -2,14 +2,22 @@ import type { LeagueTransaction, EspnTransactionsResponse } from './transactions
 import { pacific, waiverHourFor, waiverRunAt, type DayGame } from './lmWeekend.js';
 
 export interface AutoBenchWindow { date: string; waiverAt: string; runAt: string }
+export function autoBenchSchedule(date: string, games: readonly DayGame[]): AutoBenchWindow {
+  const waiverAt = waiverRunAt(date, waiverHourFor(games).hourPT);
+  return { date, waiverAt, runAt: new Date(Date.parse(waiverAt) + 15 * 60_000).toISOString() };
+}
+export interface AutoBenchPreview {
+  checkedAt: string; runAt: string; optedIn: boolean;
+  rows: Array<{ playerId: number; name: string; decision: string }>;
+}
 /** One daily run, fifteen minutes after the same waiver time used by the LM clock. */
 export function autoBenchWindow(now: Date, games: readonly DayGame[]): AutoBenchWindow | null {
   const date = pacific(now).date;
-  const waiverAt = waiverRunAt(date, waiverHourFor(games).hourPT);
-  const due = Date.parse(waiverAt) + 15 * 60_000;
+  const schedule = autoBenchSchedule(date, games);
+  const due = Date.parse(schedule.runAt);
   // Allow a little cron jitter, without catching up at a later clock tick.
   return now.getTime() >= due && now.getTime() < due + 5 * 60_000
-    ? { date, waiverAt, runAt: new Date(due).toISOString() } : null;
+    ? schedule : null;
 }
 
 export interface AutoBenchPreference { enabled: boolean; enabledAt: string; leagueId: string; season: number; teamId: number }
