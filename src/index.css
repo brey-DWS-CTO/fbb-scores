@@ -6708,4 +6708,4 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .player-draft-link { align-self: flex-start; color: var(--neon-teal); text-decoration: underline; }
 
 .nba-game-player.is-on-court { border-inline-start: 3px solid var(--accent, #35b97c); background: color-mix(in srgb, var(--accent, #35b97c) 8%, transparent); }
-.nba-on-court-label { font-size: .65rem; font-weight: 700; color: var(--accent, #35b97c); white-space: nowrap; }
+.nba-on-court-label { font-size: .65rem; font-weight: 700; color: var(--text-main); white-space: nowrap; }

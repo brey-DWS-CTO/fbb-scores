@@ -135,3 +135,10 @@ test('failed scoreboard reads are retried rather than cached as empty days', asy
     assert.equal(data.error, null);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('live on-court players appear before minutes update, but stale final flags and DNPs do not', () => {
+  const active = { ...line('new', 'DEN', {}, false), onCourt: true };
+  assert.equal(dailyScorers([box([active])], LEAGUE_SCORING, null)[0].onCourt, true);
+  assert.equal(dailyScorers([{ ...box([active]), state: 'post' }], LEAGUE_SCORING, null).length, 0);
+  assert.equal(dailyScorers([box([{ ...active, didNotPlay: true }])], LEAGUE_SCORING, null).length, 0);
+});
