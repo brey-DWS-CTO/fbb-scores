@@ -6706,3 +6706,6 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .league-standings > small { display: block; margin-top: 10px; color: var(--text-mid); font-size: .65rem; }
 .player-acquisition { display: flex; flex-direction: column; gap: 2px; color: var(--text-mid); font-size: .8rem; line-height: 1.4; font-weight: 400; }
 .player-draft-link { align-self: flex-start; color: var(--neon-teal); text-decoration: underline; }
+
+.nba-game-player.is-on-court { border-inline-start: 3px solid var(--accent, #35b97c); background: color-mix(in srgb, var(--accent, #35b97c) 8%, transparent); }
+.nba-on-court-label { font-size: .65rem; font-weight: 700; color: var(--accent, #35b97c); white-space: nowrap; }
