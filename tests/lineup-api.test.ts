@@ -114,3 +114,22 @@ test('missed-games refresh persists all teams, protects finalized rows on failur
   const publicResponse = await fetch(`${base}/api/league/state`);
   assert.equal('missedGames' in (await publicResponse.json()).state, false);
 });
+
+test('auto-bench defaults off and only the authenticated owner can opt their own team in', async () => {
+  assert.equal((await fetch(`${base}/api/league/auto-bench`)).status, 401);
+  assert.equal((await call('auto-bench')).body.enabled, false);
+  process.env.ESPN_COOKIE_STRING = 'fixture-only';
+  assert.equal((await call('auto-bench', 'PUT', { enabled: true, owner: 'Ryan' })).status, 400);
+  assert.equal((await call('auto-bench', 'PUT', { enabled: 'true' })).status, 400);
+  assert.equal((await call('auto-bench', 'PUT', { enabled: true })).status, 200);
+  assert.equal((await call('auto-bench')).body.enabled, true);
+  assert.equal((await call('auto-bench', 'GET', undefined, 'Ryan')).body.enabled, false);
+  const saved = (await store.getState()).state.autoBench!.preferences.Brey;
+  assert.equal(saved.teamId, 7); assert.equal(saved.leagueId, '123456');
+  assert.equal((await call('auto-bench', 'PUT', { enabled: true })).status, 200);
+  assert.equal((await store.getState()).state.autoBench!.preferences.Brey.enabledAt, saved.enabledAt);
+  assert.equal('autoBench' in (await call('state')).body.state, false);
+  assert.equal((await call('auto-bench', 'PUT', { enabled: false })).status, 200);
+  assert.equal((await call('auto-bench')).body.enabled, false);
+  delete process.env.ESPN_COOKIE_STRING;
+});

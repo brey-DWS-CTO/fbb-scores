@@ -1,5 +1,7 @@
 import type { Router, RequestHandler } from 'express';
-import { CONFIG_TEAMS, OWNERS, getState, mutateState, isKnownOwner } from '../lib/leagueStore.js';
+import { emptyAutoBenchState } from '../../src/lib/league/autoBench.js';
+import { espnLmConfig } from '../lib/espnLm.js';
+import { CONFIG_TEAMS, OWNERS, appendAudit, getState, mutateState, isKnownOwner } from '../lib/leagueStore.js';
 import { EspnReadOnlyLineupProvider, lineupReadsEnabled } from '../lib/lineup/espnReadOnly.js';
 import { emptyLineupState, LineupService, type LineupRepository } from '../lib/lineup/service.js';
 import { myTeamReadView, LineupReadRevokedError } from '../lib/lineup/readView.js';
@@ -29,6 +31,33 @@ const directIdentity: RequestHandler = (_req, res, next) => {
 };
 
 export function registerLineupRoutes(router: Router, auth: RequestHandler, commissioner: RequestHandler): void {
+  router.get('/auto-bench', auth, directIdentity, safe(async (_req, res) => {
+    const owner = res.locals.owner as string;
+    const state = (await getState()).state.autoBench;
+    const config = espnLmConfig();
+    const preference = state?.preferences[owner];
+    const enabled = Boolean(preference?.enabled && config && preference.leagueId === config.leagueId && preference.season === config.seasonId);
+    const latest = Object.values(state?.receipts ?? {}).filter(row => row.owner === owner).sort((a, b) => b.at.localeCompare(a.at))[0] ?? null;
+    res.json({ enabled, available: config !== null, latest: latest ? { owner: latest.owner, teamId: latest.teamId, playerId: latest.playerId, at: latest.at, status: latest.status, note: latest.status === 'processing' ? 'Checking the pickup. Check ESPN if this does not finish.' : latest.note } : null });
+  }));
+  router.put('/auto-bench', auth, directIdentity, safe(async (req, res) => {
+    if (!req.body || typeof req.body.enabled !== 'boolean' || Object.keys(req.body).some(key => key !== 'enabled')) {
+      res.status(400).json({ error: 'Choose whether to auto-bench pickups.' }); return;
+    }
+    const owner = res.locals.owner as string;
+    const team = CONFIG_TEAMS.find(team => team.owner === owner);
+    const config = espnLmConfig();
+    if (req.body.enabled && (!config || !team)) { res.status(503).json({ error: 'ESPN automation is unavailable.' }); return; }
+    await mutateState(state => {
+      state.autoBench ??= emptyAutoBenchState();
+      if (!req.body.enabled) { if (state.autoBench.preferences[owner]) state.autoBench.preferences[owner].enabled = false; return; }
+      const old = state.autoBench.preferences[owner];
+      if (old?.enabled && old.leagueId === config!.leagueId && old.season === config!.seasonId && old.teamId === team!.espnTeamId) return;
+      state.autoBench.preferences[owner] = { enabled: true, enabledAt: new Date().toISOString(), leagueId: config!.leagueId, season: config!.seasonId, teamId: team!.espnTeamId };
+    });
+    await appendAudit(owner, 'lineup.autoBench.preference', { enabled: req.body.enabled });
+    res.json({ enabled: req.body.enabled });
+  }));
   router.get('/my-team', auth, directIdentity, safe(async (_req, res) => {
     const owner = res.locals.owner as string;
     const configured = CONFIG_TEAMS.find(team => team.owner === owner);

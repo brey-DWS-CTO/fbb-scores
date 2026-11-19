@@ -17,6 +17,7 @@ import { runMissedGamesClock } from '../lib/missedGamesService.js';
  * what went out.
  */
 import { Router, type Request, type Response } from 'express';
+import { runAutoBench } from '../lib/autoBenchService.js';
 import { runDueReminders } from '../lib/notifier.js';
 import { runGamesWarnings } from '../lib/gamesWarningService.js';
 import { refreshTeamNamesNow } from '../lib/teamNameService.js';
@@ -121,7 +122,8 @@ router.get('/lm-clock', async (req: Request, res: Response) => {
       : 'hour not checked';
     console.log(`[lm-clock] ${run.date}: ${run.skipped ?? waiver}; adds ${run.adds.length}`);
     if (run.waiver?.changed || run.adds.length > 0) console.log('[lm-clock]', JSON.stringify(run));
-    res.json(run);
+    const autoBench = await runAutoBench(new Date()).catch(() => ({ error: 'Auto-bench run failed; no automatic retry of uncertain writes.' }));
+    res.json({ ...run, autoBench });
   } catch (err) {
     console.error('[lm-clock] failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'The LM clock failed' });
