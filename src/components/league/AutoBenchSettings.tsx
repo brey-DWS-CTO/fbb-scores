@@ -17,8 +17,8 @@ export default function AutoBenchSettings() {
   };
   return <section className="panel" style={{ padding: 14, marginBlock: 14 }} aria-label="Pickup auto-benching">
     <h2>Auto-bench pickups</h2>
-    <p>ESPN may start pickups in any open eligible spot. Opt in to move your new waiver and free-agent pickups to the bench after they process. Off unless you turn it on.</p>
-    <p>Checks every 15 minutes for pickups from the last 45 minutes, until 10 minutes before the day's first game. Requires room on your bench. Older pickups and later lineup choices are left alone. Check your ESPN lineup before tip-off.</p>
+    <p>ESPN may start pickups in any open eligible spot. Opt in to move your new pickups out of the starting lineup after waivers run. LM adds are excluded. Off unless you turn it on.</p>
+    <p>Runs once per day, 15 minutes after that day's waiver time, only if you opted in and a new non-LM pickup is starting. All eligible pickups are handled together. Requires room on your bench; later lineup choices are preserved.</p>
     {query.isLoading && <p role="status">Loading your preference...</p>}
     {query.isError && <p role="alert">Could not load your preference. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
     {query.data && <label><input type="checkbox" checked={query.data.enabled} disabled={busy || (!query.data.available && !query.data.enabled)} onChange={event => void change(event.target.checked)} /> Auto-bench my new pickups</label>}

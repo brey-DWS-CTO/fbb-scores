@@ -1,4 +1,16 @@
 import type { LeagueTransaction, EspnTransactionsResponse } from './transactions.js';
+import { pacific, waiverHourFor, waiverRunAt, type DayGame } from './lmWeekend.js';
+
+export interface AutoBenchWindow { date: string; waiverAt: string; runAt: string }
+/** One daily run, fifteen minutes after the same waiver time used by the LM clock. */
+export function autoBenchWindow(now: Date, games: readonly DayGame[]): AutoBenchWindow | null {
+  const date = pacific(now).date;
+  const waiverAt = waiverRunAt(date, waiverHourFor(games).hourPT);
+  const due = Date.parse(waiverAt) + 15 * 60_000;
+  // Allow a little cron jitter, without catching up at a later clock tick.
+  return now.getTime() >= due && now.getTime() < due + 5 * 60_000
+    ? { date, waiverAt, runAt: new Date(due).toISOString() } : null;
+}
 
 export interface AutoBenchPreference { enabled: boolean; enabledAt: string; leagueId: string; season: number; teamId: number }
 export interface AutoBenchReceipt {
@@ -7,6 +19,7 @@ export interface AutoBenchReceipt {
   status: 'processing' | 'benched' | 'skipped' | 'failed' | 'unknown'; note: string;
 }
 export interface AutoBenchState {
+  dailyRuns?: Record<string, { token: string; at: string }>;
   preferences: Record<string, AutoBenchPreference>;
   receipts: Record<string, AutoBenchReceipt>;
   locks: Record<string, string>;
@@ -24,7 +37,7 @@ export function autoBenchCandidates(rows: readonly LeagueTransaction[], preferen
   return [...latest.values()].filter(row => {
     const pref = preferences[row.owner];
     const age = now.getTime() - Date.parse(row.at);
-    return (row.kind === 'waiver' || row.kind === 'add') && row.season === season
+    return !row.byLeagueManager && (row.kind === 'waiver' || row.kind === 'add') && row.season === season
       && row.scoringPeriodId === period && pref?.enabled === true && pref.teamId === row.teamId
       && pref.leagueId === leagueId && pref.season === season && row.at > pref.enabledAt
       && Number.isFinite(age) && age >= 0 && age <= 45 * 60_000;

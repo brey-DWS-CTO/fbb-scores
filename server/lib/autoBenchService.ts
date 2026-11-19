@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { autoBenchCandidates, emptyAutoBenchState, lineupChangedAfter, pickupKey, type AutoBenchReceipt, type AutoBenchState } from '../../src/lib/league/autoBench.js';
+import { autoBenchCandidates, autoBenchWindow, emptyAutoBenchState, lineupChangedAfter, pickupKey, type AutoBenchReceipt, type AutoBenchState, type AutoBenchWindow } from '../../src/lib/league/autoBench.js';
 import { normalizeTransactions, type EspnTransactionsResponse } from '../../src/lib/league/transactions.js';
 import type { EspnLeagueResponse } from '../../src/types/index.js';
 import { EspnClient } from '../../src/lib/espn/client.js';
@@ -9,6 +9,7 @@ import { gamesOn } from './nbaDay.js';
 import { pacific } from '../../src/lib/league/lmWeekend.js';
 
 export interface AutoBenchDependencies {
+  dailyWindow: AutoBenchWindow;
   clock?: () => Date;
   readState(): Promise<{ autoBench?: AutoBenchState; lineupManagement?: { rosterLocks: Record<string, string> } }>;
   mutate(fn: (state: AutoBenchState) => void): Promise<void>;
@@ -26,6 +27,8 @@ function checkRoster(raw: EspnLeagueResponse, config: EspnLmConfig): void {
 
 /** The existing LM clock calls this after its waiver settings and adds have run. */
 export async function executeAutoBench(config: EspnLmConfig, now: Date, deps: AutoBenchDependencies): Promise<AutoBenchReceipt[]> {
+  const runAt = Date.parse(deps.dailyWindow.runAt);
+  if (now.getTime() < runAt || now.getTime() >= runAt + 5 * 60_000) return [];
   const initial = await deps.readState();
   if (!Object.values(initial.autoBench?.preferences ?? {}).some(pref => pref.enabled && pref.leagueId === config.leagueId && pref.season === config.seasonId)) return [];
   // Avoid LM privileges bypassing ordinary lineup locks. Unknown schedule means no writes.
@@ -56,9 +59,26 @@ export async function executeAutoBench(config: EspnLmConfig, now: Date, deps: Au
     }
   }
   const rows = normalizeTransactions(raw, { season: config.seasonId, teams: CONFIG_TEAMS, players: new Map() });
-  const candidates = autoBenchCandidates(rows, initial.autoBench?.preferences ?? {}, config.leagueId, config.seasonId, roster.scoringPeriodId, now);
+  const candidates = autoBenchCandidates(rows, initial.autoBench?.preferences ?? {}, config.leagueId, config.seasonId, roster.scoringPeriodId, now)
+    .filter(row => row.at >= deps.dailyWindow.waiverAt && roster.teams.find(team => team.id === row.teamId)?.roster?.entries.some(entry => entry.playerPoolEntry.id === row.playerId && entry.lineupSlotId >= 0 && entry.lineupSlotId <= 11));
+  // Claim one batch per opted-in owner who actually has a new pickup starting.
+  // All pickups in that owner's batch are handled below, but a second invocation cannot claim it.
+  const batches = new Map<string, string>();
+  for (const owner of new Set(candidates.map(row => row.owner))) {
+    const key = `${config.leagueId}:${config.seasonId}:${deps.dailyWindow.date}:${owner}`;
+    const token = randomUUID();
+    if (config.dryRun) { batches.set(owner, token); continue; }
+    await deps.mutate(state => {
+      state.dailyRuns ??= {};
+      if (state.dailyRuns[key]) return;
+      if (!autoBenchCandidates(candidates.filter(row => row.owner === owner), state.preferences, config.leagueId, config.seasonId, roster.scoringPeriodId, now).length) return;
+      state.dailyRuns[key] = { token, at: now.toISOString() };
+    });
+    if ((await deps.readState()).autoBench?.dailyRuns?.[key]?.token === token) batches.set(owner, token);
+  }
   const results: AutoBenchReceipt[] = [];
   for (const row of candidates) {
+    if (!batches.has(row.owner)) continue;
     const key = pickupKey(row);
     const teamKey = `${config.leagueId}:${row.teamId}`;
     const token = randomUUID();
@@ -132,14 +152,22 @@ export async function executeAutoBench(config: EspnLmConfig, now: Date, deps: Au
 }
 
 export async function runAutoBench(now = new Date()): Promise<AutoBenchReceipt[]> {
+  // The shared scheduler wakes more often for other LM duties. Auto-bench does
+  // no roster, transaction or database work except at the daily :15 window.
+  const pt = pacific(now);
+  if (pt.minute < 15 || pt.minute >= 20) return [];
   const config = espnLmConfig();
   if (!config) return [];
+  const games = await gamesOn(pt.date);
+  const dailyWindow = autoBenchWindow(now, games);
+  if (!dailyWindow) return [];
   const client = new EspnClient({ leagueId: config.leagueId, seasonId: config.seasonId, cookieOverride: config.cookie });
   return executeAutoBench(config, now, {
+    dailyWindow,
     async readState() { return (await getState()).state; },
     async mutate(fn) { await mutateState(state => { state.autoBench ??= emptyAutoBenchState(); fn(state.autoBench); }); },
     roster: () => client.fetchScoreboard(), transactions: () => client.fetchTransactions(),
-    async firstTip() { return (await gamesOn(pacific(now).date))[0]?.tipoff ?? null; },
+    async firstTip() { return games[0]?.tipoff ?? null; },
     bench: input => lmBench(config, input),
     async audit(receipt) { await appendAudit(receipt.owner, 'lineup.autoBench', receipt); },
   });

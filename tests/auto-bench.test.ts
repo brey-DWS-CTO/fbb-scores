@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { executeAutoBench, type AutoBenchDependencies } from '../server/lib/autoBenchService.js';
 import { CONFIG_TEAMS } from '../server/lib/leagueStore.js';
-import { autoBenchCandidates, emptyAutoBenchState, type AutoBenchState } from '../src/lib/league/autoBench.js';
+import { autoBenchCandidates, autoBenchWindow, emptyAutoBenchState, type AutoBenchState } from '../src/lib/league/autoBench.js';
 import { normalizeTransactions, type EspnTransactionsResponse } from '../src/lib/league/transactions.js';
 import type { EspnLeagueResponse } from '../src/types/index.js';
 
@@ -17,6 +17,7 @@ function fixture() {
   let writes = 0;
   let reads = 0;
   const deps: AutoBenchDependencies = {
+    dailyWindow: { date: '2026-11-18', waiverAt: '2026-11-18T20:00:00Z', runAt: now.toISOString() },
     clock: () => now,
     async readState() { return structuredClone(state); },
     async mutate(fn) { fn(state.autoBench); },
@@ -107,6 +108,7 @@ test('dry run does not consume a pickup or retain a roster lock', async () => {
   const f = fixture(); f.deps.bench = async () => ({ ok: true, dryRun: true, status: null, body: '', authFailed: false });
   await executeAutoBench({ ...config, dryRun: true }, now, f.deps);
   assert.deepEqual(f.state.autoBench.receipts, {}); assert.deepEqual(f.state.autoBench.locks, {});
+  assert.equal(Object.keys(f.state.autoBench.dailyRuns ?? {}).length, 0);
 });
 
 test('an uncertain successful write is reconciled with a read, never resubmitted', async () => {
@@ -133,4 +135,56 @@ test('opt-out immediately before durable submission cancels the write', async ()
   const f = fixture(); const mutate = f.deps.mutate; let calls = 0;
   f.deps.mutate = async fn => { calls++; if (calls === 2) f.state.autoBench.preferences[team.owner].enabled = false; await mutate(fn); };
   await executeAutoBench(config, now, f.deps); assert.equal(f.writes(), 0);
+});
+
+test('daily timing follows normal and early waiver hours with daylight saving time', () => {
+  // Standard time: 3 PM waivers, 3:15 PM check.
+  assert.equal(autoBenchWindow(new Date('2026-11-18T23:15:00Z'), [])?.runAt, '2026-11-18T23:15:00.000Z');
+  assert.equal(autoBenchWindow(new Date('2026-11-18T23:00:00Z'), []), null);
+  assert.equal(autoBenchWindow(new Date('2026-11-18T23:30:00Z'), []), null);
+  // Daylight time: same Pacific hour, a different UTC offset.
+  assert.ok(autoBenchWindow(new Date('2026-10-24T22:15:00Z'), []));
+  // Noon Saturday tip: 11 AM waivers, 11:15 AM check.
+  const games = [{ home: 'BOS', away: 'DEN', tipoff: '2026-10-24T19:00:00Z' }];
+  assert.equal(autoBenchWindow(new Date('2026-10-24T18:15:00Z'), games)?.waiverAt, '2026-10-24T18:00:00.000Z');
+  assert.equal(autoBenchWindow(new Date('2026-10-24T22:15:00Z'), games), null);
+});
+test('LM adds and queued LM claims are excluded even when in the starting lineup', async () => {
+  for (const type of ['FREEAGENT', 'WAIVER']) {
+    const f = fixture(); f.raw.transactions![0].isLeagueManager = true; f.raw.transactions![0].type = type;
+    assert.deepEqual(await executeAutoBench(config, now, f.deps), []);
+    assert.equal(f.writes(), 0); assert.equal(Object.keys(f.state.autoBench.dailyRuns ?? {}).length, 0);
+  }
+});
+test('one daily batch handles every starting pickup, and a later pickup cannot trigger a second batch', async () => {
+  const f = fixture();
+  f.raw.transactions!.push({ ...f.raw.transactions![0], id: 'second', items: [{ type: 'ADD', playerId: 100, toTeamId: team.espnTeamId }] });
+  const moved: number[] = [];
+  f.deps.bench = async input => { moved.push(input.playerId); f.roster.teams[0].roster!.entries.find(entry => entry.playerPoolEntry.id === input.playerId)!.lineupSlotId = 12; return { ok: true, dryRun: false, status: 200, body: '', authFailed: false }; };
+  await executeAutoBench(config, now, f.deps);
+  assert.deepEqual(moved.sort((a, b) => a - b), [99, 100]);
+  f.roster.teams[0].roster!.entries[0].lineupSlotId = 0;
+  f.raw.transactions!.push({ ...f.raw.transactions![0], id: 'later', processDate: now.getTime() });
+  await executeAutoBench(config, now, f.deps);
+  assert.equal(moved.length, 2); assert.equal(Object.keys(f.state.autoBench.dailyRuns ?? {}).length, 1);
+});
+test('nonstarting pickups and pickups before the waiver run do not consume a daily batch', async () => {
+  const f = fixture(); f.roster.teams[0].roster!.entries[0].lineupSlotId = 12;
+  assert.deepEqual(await executeAutoBench(config, now, f.deps), []);
+  assert.equal(Object.keys(f.state.autoBench.dailyRuns ?? {}).length, 0);
+  const early = fixture(); early.raw.transactions![0].processDate = Date.parse('2026-11-18T19:55:00Z');
+  assert.deepEqual(await executeAutoBench(config, now, early.deps), []);
+  assert.equal(Object.keys(early.state.autoBench.dailyRuns ?? {}).length, 0);
+});
+
+test('each opted-in owner gets their own single daily batch', async () => {
+  const f = fixture(); const other = CONFIG_TEAMS[1];
+  f.state.autoBench.preferences[other.owner] = { ...f.state.autoBench.preferences[team.owner], teamId: other.espnTeamId };
+  f.roster.teams.push({ id: other.espnTeamId, roster: { entries: [{ lineupSlotId: 0, playerPoolEntry: { id: 200 } }] } } as unknown as EspnLeagueResponse['teams'][number]);
+  f.raw.transactions!.push({ ...f.raw.transactions![0], id: 'other-owner', teamId: other.espnTeamId, items: [{ type: 'ADD', playerId: 200, toTeamId: other.espnTeamId }] });
+  const owners: number[] = [];
+  f.deps.bench = async input => { owners.push(input.teamId); f.roster.teams.find(team => team.id === input.teamId)!.roster!.entries.find(entry => entry.playerPoolEntry.id === input.playerId)!.lineupSlotId = 12; return { ok: true, dryRun: false, status: 200, body: '', authFailed: false }; };
+  await executeAutoBench(config, now, f.deps);
+  assert.deepEqual(owners.sort((a, b) => a - b), [team.espnTeamId, other.espnTeamId].sort((a, b) => a - b));
+  assert.equal(Object.keys(f.state.autoBench.dailyRuns ?? {}).length, 2);
 });
