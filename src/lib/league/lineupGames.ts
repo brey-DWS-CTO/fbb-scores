@@ -44,3 +44,13 @@ export function gamesWarningDate(now: Date): string | null {
 export function gamesWarningKey(season: number, week: number, date: string, teamId: number): string {
   return `lineup-games:${season}:${week}:${date}:${teamId}`;
 }
+
+/** Cumulative actual starts for past dates, plus expected starts through a future date. */
+export function lineupGamesThrough(side: ScoreSide, week: ScoresWeek, period: number): number {
+  const days = week.days.filter(day => day.scoringPeriodId <= period);
+  const actual = gamesPlayed(side, { ...week, days });
+  const expected = lineupGamesLeft(side, week)
+    .filter(({ game }) => !game.live && game.scoringPeriodId <= period)
+    .reduce((sum, { game }) => sum + game.share, 0);
+  return Math.round((actual + expected) * 10) / 10;
+}

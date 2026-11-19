@@ -81,6 +81,7 @@ function SideHead({ side, owner, proj, leading, right }: SideHeadProps) {
 }
 
 interface GamesLineProps {
+  through?: number;
   side: ScoreSide;
   week: ScoresWeek;
   right?: boolean;
@@ -89,10 +90,10 @@ interface GamesLineProps {
   overage?: { label: string; open: () => void };
 }
 
-function GamesLine({ side, week, right, onEdit, overage }: GamesLineProps) {
+function GamesLine({ side, week, right, onEdit, overage, through }: GamesLineProps) {
   return (
     <div className={`score-games${right ? ' is-right' : ''}`}>
-      <LineupGamesSummary side={side} week={week} onOver={overage?.open} overDay={overage?.label} brief />
+      <LineupGamesSummary side={side} week={week} onOver={overage?.open} overDay={overage?.label} through={through} />
       {onEdit && <button type="button" className="tap-btn score-cap-btn" aria-label="Change this week's games cap" onClick={onEdit}><NavIcon name="pencil" size={12} /></button>}
     </div>
   );
@@ -490,12 +491,14 @@ export default function MatchupPage() {
             <div className="score-games-grid">
               <GamesLine
                 side={matchup.home}
+                through={view.kind === 'day' ? view.scoringPeriodId : undefined}
                 week={week}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}
                 overage={homeOver ? { label: homeOver.label, open: () => openDay(homeOver.scoringPeriodId) } : undefined}
               />
               <GamesLine
                 side={matchup.away}
+                through={view.kind === 'day' ? view.scoringPeriodId : undefined}
                 week={week}
                 onEdit={isCommish ? () => setEditingCap(true) : undefined}
                 overage={awayOver ? { label: awayOver.label, open: () => openDay(awayOver.scoringPeriodId) } : undefined}
