@@ -6707,6 +6707,20 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .player-acquisition { display: flex; flex-direction: column; gap: 2px; color: var(--text-mid); font-size: .8rem; line-height: 1.4; font-weight: 400; }
 .player-draft-link { align-self: flex-start; color: var(--neon-teal); text-decoration: underline; }
 
+.nba-game-player.is-on-court { border-inline-start: 3px solid var(--accent, #35b97c); background: color-mix(in srgb, var(--accent, #35b97c) 8%, transparent); }
+
+.nba-game-scorers-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.nba-court-legend { display: inline-flex; align-items: center; gap: 6px; font-size: .7rem; color: var(--text-mid); white-space: nowrap; }
+.nba-court-legend > span { width: 9px; height: 9px; border-radius: 50%; background: var(--accent, #35b97c); }
+.nba-sort-slider { position: relative; display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; padding: 3px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--bg-deep, var(--bg)); isolation: isolate; }
+.nba-sort-thumb { position: absolute; inset: 3px auto 3px 3px; width: calc((100% - 6px) / 2); border-radius: 999px; background: var(--panel-border); transition: transform .18s ease; z-index: -1; }
+.nba-sort-slider.is-court .nba-sort-thumb { transform: translateX(100%); }
+.nba-sort-slider button { min-height: 36px; padding: 6px 12px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-size: .75rem; color: var(--text-mid); cursor: pointer; white-space: nowrap; }
+.nba-sort-slider button[aria-pressed="true"] { color: var(--text-hi); font-weight: 700; }
+.nba-sort-slider button:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 2px; }
+.nba-game-sort { flex-wrap: wrap; gap: 10px; }
+@media (prefers-reduced-motion: reduce) { .nba-sort-thumb { transition: none; } }
+
 /* Keep projections, actual starts and the cap readable at narrow matchup widths. */
 .lineup-games { min-width: 0; line-height: 1.5; }
 .lineup-games small { white-space: normal; overflow-wrap: anywhere; }

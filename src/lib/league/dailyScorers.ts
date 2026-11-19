@@ -74,7 +74,7 @@ export function dailyScorers(boxes: readonly BoxScore[], scoring: readonly Scori
   return boxes.flatMap(box => {
     const seen = new Set<string>();
     return box.lines.filter(line => {
-      if (!line.played || seen.has(line.athleteId)) return false;
+      if ((!line.played && !(box.state === 'in' && line.onCourt === true && !line.didNotPlay)) || seen.has(line.athleteId)) return false;
       seen.add(line.athleteId);
       return true;
     }).map(line => ({ ...line, gameId: box.gameId, fpts: scoreLine(line, scoring), roster: rosters?.get(line.athleteId) ?? null }));

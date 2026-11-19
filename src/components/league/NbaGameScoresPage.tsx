@@ -84,10 +84,13 @@ export default function NbaGameScoresPage() {
   const team = normalizeTeam(params.get('team'));
   const selected = params.get('player');
   const { query, rows, rosters, scoring } = useDailyScorers(date);
+  const [sort, setSort] = useState('fantasy');
   const data = query.data;
   const game = data?.games.find(entry => gameId ? entry.id === gameId : entry.home === team || entry.away === team);
   const box = data?.boxScores.find(entry => entry.gameId === game?.id);
   const gameRows = rows.filter(row => row.gameId === game?.id);
+  const live = game?.state === 'in' && box?.state !== 'post';
+  if (sort === 'court' && live) gameRows.sort((a, b) => Number(b.onCourt === true) - Number(a.onCourt === true) || b.fpts - a.fpts);
   const winner = game ? gameWinner(game, box) : null;
   // Keep both teams and the score in view once the score panel scrolls away, like the matchup page.
   const header = useRef<HTMLElement>(null);
@@ -121,11 +124,18 @@ export default function NbaGameScoresPage() {
         </div>)}
         <span className="nba-sticky-status">{gameStatus(game, box?.detail)}</span>
       </div>
+      <div className="nba-game-sort"><div className="nba-game-scorers-heading"><h2>Game scorers</h2>{live && <span className="nba-court-legend"><span aria-hidden="true" />On court</span>}</div>
+        {live && <div className={`nba-sort-slider${sort === 'court' ? ' is-court' : ''}`} role="group" aria-label="Sort game scorers">
+          <span className="nba-sort-thumb" aria-hidden="true" />
+          <button type="button" aria-pressed={sort === 'fantasy'} onClick={() => setSort('fantasy')}>Points</button>
+          <button type="button" aria-pressed={sort === 'court'} onClick={() => setSort('court')}>On court</button>
+        </div>}
+      </div>
       {gameRows.length === 0 && <p>{game.state === 'pre' ? 'Player scores appear after tip-off.' : 'Player stats are not available yet. This page updates automatically.'}</p>}
       <div className="nba-game-teams">{[game.away, game.home].map(code => <section className="panel" key={code} aria-label={`${teamFullName(code)} scorers`}>
         <h3 title={teamFullName(code)}><TeamLogo code={code} size={22} />{code}</h3>
         <div className="daily-scorer-columns"><span>Player</span><span>FPTS</span></div>
-        <ol className="daily-scorer-list">{gameRows.filter(row => row.team === code).map(row => <li key={row.athleteId} className={`nba-game-player${row.athleteId === selected ? ' is-selected' : ''}`}>
+        <ol className="daily-scorer-list">{gameRows.filter(row => row.team === code).map(row => <li key={row.athleteId} aria-label={live && row.onCourt ? `${row.name}, on court` : undefined} className={`nba-game-player${row.athleteId === selected ? ' is-selected' : ''}${live && row.onCourt ? ' is-on-court' : ''}`}>
           <span className="nba-game-player-info">
             <strong><PlayerNews player={{ id: Number(row.athleteId), name: row.name, proTeam: row.team, position: row.position ?? '' }} scoring={scoring} /></strong>
             <small>{!rosters ? '' : row.roster ? <span className="nba-game-owner">{OWNERS.get(row.roster.teamId) ?? row.roster.name}</span> : <span className="unowned-badge" aria-label="Waivers" title="Waivers">W</span>}<span>{shortLine(row.stats)}</span></small>
