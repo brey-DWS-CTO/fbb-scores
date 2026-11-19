@@ -1,7 +1,16 @@
+import type { AutoBenchPreference } from '../../../src/lib/league/autoBench.js';
+import type { LineupState } from './service.js';
 import type { LineupSnapshot } from '../../../src/lib/league/lineup.js';
 import type { LineupProvider, TeamBinding } from './provider.js';
 import type { LineupOperation, LineupRepository, LineupGrant } from './service.js';
 
+/** Derive read access from a current, server-bound auto-bench opt-in without granting manual writes. */
+export function withAutoBenchReadAccess(state: LineupState, preference: AutoBenchPreference | undefined,
+  owner: string, binding: TeamBinding | null, season: number): LineupState {
+  if (!preference?.enabled || !binding || preference.leagueId !== binding.leagueId
+    || preference.teamId !== binding.teamId || preference.season !== season) return state;
+  return { ...state, grants: { ...state.grants, [owner]: { ...binding, owner, enabled: true } } };
+}
 export interface MyTeamReadView {
   enabled: boolean; readEnabled: boolean; executionEnabled: boolean; reason: string;
   snapshot: LineupSnapshot | null; operation: LineupOperation | null; readError?: string;

@@ -15,6 +15,7 @@ import './myTeam.css';
 import { shortName } from '../../lib/league/scores.js';
 import { NBA_TEAM_ABBREV } from '../../lib/espn/calculations.js';
 import TeamLogo from './TeamLogo.js';
+import AutoBenchSettings from './AutoBenchSettings.js';
 import NavIcon from './NavIcon.js';
 import WeeklyLineupPlanner from './WeeklyLineupPlanner.js';
 
@@ -100,6 +101,7 @@ function MyTeamSession({ identity }: { identity: Identity | null }) {
   return <main className={`my-team-page${team.data?.executionEnabled ? '' : ' my-team-readonly'}`}>
     <header className="my-team-header"><h1>My Team</h1>
       <p>{team.data?.executionEnabled ? 'Tap a player, then an eligible roster row. ESPN must confirm each change.' : `${identity?.owner ?? 'Your team'} · Read only`}</p></header>
+    <AutoBenchSettings key={identity?.owner} />
     {!identity ? <p className="panel my-team-notice">Sign in to view your team.</p> : identity.isGuest
       ? <p className="panel my-team-notice">Lineup management is available to authorized team owners.</p> : sandbox
         ? <p className="panel my-team-notice">Lineup management is unavailable in test mode.</p> : <>

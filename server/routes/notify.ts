@@ -17,6 +17,7 @@ import { runMissedGamesClock } from '../lib/missedGamesService.js';
  * what went out.
  */
 import { Router, type Request, type Response } from 'express';
+import { scheduleAutoBench } from '../lib/autoBenchQueue.js';
 import { runDueReminders } from '../lib/notifier.js';
 import { runGamesWarnings } from '../lib/gamesWarningService.js';
 import { refreshTeamNamesNow } from '../lib/teamNameService.js';
@@ -126,6 +127,13 @@ router.get('/lm-clock', async (req: Request, res: Response) => {
     console.error('[lm-clock] failed:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'The LM clock failed' });
   }
+});
+
+/** One daily planner creates a delayed delivery for that day's varying waiver time. */
+router.get('/auto-bench-schedule', async (req: Request, res: Response) => {
+  if (!allowed(req)) { res.status(401).json({ error: 'Not for you' }); return; }
+  try { res.json(await scheduleAutoBench(new Date())); }
+  catch { res.status(500).json({ error: 'Could not schedule the daily auto-bench job.' }); }
 });
 
 router.get('/lm-claims', async (req: Request, res: Response) => {

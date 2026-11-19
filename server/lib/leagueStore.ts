@@ -85,6 +85,7 @@ export interface LeagueOverrides {
 }
 
 export interface LeagueDynamicState {
+  autoBench?: import('../../src/lib/league/autoBench.js').AutoBenchState;
   missedGames?: import('../../src/lib/league/missedGames.js').MissedGamesLedger;
   /** Server-private feature grants, operation ledger and roster mutexes. */
   lineupManagement?: import('./lineup/service.js').LineupState;

@@ -6720,3 +6720,12 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .nba-sort-slider button:focus-visible { outline: 2px solid var(--text-hi); outline-offset: 2px; }
 .nba-game-sort { flex-wrap: wrap; gap: 10px; }
 @media (prefers-reduced-motion: reduce) { .nba-sort-thumb { transition: none; } }
+
+/* Keep projections, actual starts and the cap readable at narrow matchup widths. */
+.lineup-games { min-width: 0; line-height: 1.5; }
+.lineup-games small { white-space: normal; overflow-wrap: anywhere; }
+.lineup-games-top b { white-space: normal; }
+.lineup-games-cap { color: var(--text-mid); }
+.lineup-games-through { margin-top: 3px; padding-top: 3px; border-top: 1px dashed var(--panel-border); }
+.is-right .lineup-games { text-align: right; }
+.score-games { min-width: 0; }

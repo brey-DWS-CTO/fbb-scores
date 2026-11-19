@@ -184,6 +184,17 @@ export interface SchedulePreviewResponse {
 
 /* The server takes either header pair. A session wins when we have one, so a
  * phone that has used a link stops sending the PIN around. */
+export interface AutoBenchView { enabled: boolean; available: boolean; latest: import('./autoBench.js').AutoBenchReceipt | null }
+export async function fetchAutoBench(c: Credentials): Promise<AutoBenchView> {
+  return (await axios.get<AutoBenchView>('/api/league/auto-bench', { headers: authHeaders(c) })).data;
+}
+export async function saveAutoBench(c: Credentials, enabled: boolean): Promise<void> {
+  const { data } = await axios.put('/api/league/auto-bench', { enabled }, { headers: authHeaders(c) });
+  if (data.scheduleError) throw new Error(data.scheduleError);
+}
+export async function checkAutoBench(c: Credentials): Promise<import('./autoBench.js').AutoBenchPreview> {
+  return (await axios.post('/api/league/auto-bench/preview', {}, { headers: authHeaders(c) })).data;
+}
 const authHeaders = (c: Credentials): Record<string, string> =>
   c.session ? { 'x-session': c.session } : { 'x-owner': c.owner, 'x-pin': c.pin ?? '' };
 

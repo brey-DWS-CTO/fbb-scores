@@ -54,7 +54,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   { id: 'scores', label: 'SCORES', icon: 'tv', tabs: [{ to: '/scores', label: 'SCORES' }] },
-  { id: 'my-team', label: 'MY TEAM', icon: 'jersey', commishOnly: true, tabs: [{ to: '/my-team', label: 'MY TEAM' }] },
+  { id: 'my-team', label: 'MY TEAM', icon: 'jersey', tabs: [{ to: '/my-team', label: 'MY TEAM' }] },
   { id: 'cast', label: 'FANTASY CAST', shortLabel: 'CAST', icon: 'bolt', primary: true, tabs: [{ to: '/scores/cast', label: 'FANTASY CAST' }] },
   { id: 'watch', label: 'WATCH PARTIES', shortLabel: 'WATCH', icon: 'people', tabs: [{ to: '/watch', label: 'WATCH PARTIES', mode: 'in-season', pages: [{ to: '/party', label: 'PARTY' }] }] },
   { id: 'waivers', label: 'WAIVERS', icon: 'calendar', primary: true, tabs: [{ to: '/activity', label: 'ACTIVITY' }, { to: '/lm-adds', label: 'LM ADDS' }, { to: '/waivers', label: 'CALENDAR' }] },
@@ -147,7 +147,7 @@ export function visibleSections(isCommissioner: boolean, keepersPublic: boolean,
       label: archive ? 'DRAFT RESULTS' : section.label,
       home: archive ? '/draft' : section.home,
       primary: mode === 'in-season'
-        ? ['scores', 'my-team', 'cast', 'waivers', 'league'].includes(id)
+        ? (id === 'my-team' ? isCommissioner : ['scores', 'cast', 'waivers', 'league'].includes(id))
         : ['keepers', 'draft', 'cast', 'league'].includes(id),
       tabs: section.tabs.filter((tab) =>
         (!tab.commishOnly || isCommissioner)

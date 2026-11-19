@@ -698,6 +698,7 @@ function redactState<T extends { state: LeagueDynamicState }>(result: T, viewer:
   // their own route, so they stay out of the poll payload.
   delete state.achievements;
   delete state.lineupManagement;
+  delete state.autoBench;
   delete state.missedGames;
   delete state.propBets;
   // Roasts lean on the numbers, and members draft blind until it closes.

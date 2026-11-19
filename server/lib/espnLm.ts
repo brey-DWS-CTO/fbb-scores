@@ -132,6 +132,16 @@ export async function lmAdd(config: EspnLmConfig, input: LmAddInput): Promise<Es
   return post(config, '/transactions/', body, 'lm.add');
 }
 
+/** ROSTER/LINEUP wire shape: https://github.com/tlo1216/espn-fantasy-mcp#the-lineup-move-payload */
+export async function lmBench(config: EspnLmConfig, input: LmAddInput & { fromLineupSlotId: number }): Promise<EspnWriteResult> {
+  if (!Number.isSafeInteger(input.fromLineupSlotId) || input.fromLineupSlotId < 0 || input.fromLineupSlotId > 11) throw new Error('Only active slots can be auto-benched.');
+  return post(config, '/transactions/', {
+    isLeagueManager: true, isActingAsTeamOwner: false, teamId: input.teamId,
+    type: 'ROSTER', scoringPeriodId: input.scoringPeriodId, executionType: 'EXECUTE',
+    items: [{ playerId: input.playerId, type: 'LINEUP', fromLineupSlotId: input.fromLineupSlotId, toLineupSlotId: 12 }],
+  }, 'lm.autoBench');
+}
+
 /** What ESPN said, in one line for a note or a log. */
 export function describeWrite(result: EspnWriteResult): string {
   if (result.dryRun) return 'dry run, nothing sent';

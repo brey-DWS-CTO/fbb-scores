@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { gamesCapStatus, gamesWarningDate, gamesWarningKey, lineupGames } from '../src/lib/league/lineupGames.js';
+import { gamesCapStatus, gamesWarningDate, gamesWarningKey, lineupGames, lineupGamesThrough } from '../src/lib/league/lineupGames.js';
 import { warningWeek } from './helpers/lineup-games-fixture.js';
 
 test('projects uncapped lineup games, excluding bench and OUT future games', () => {
@@ -52,4 +52,15 @@ test('Friday and Sunday warnings run at 7 AM Pacific in both DST and standard ti
     assert.equal(gamesWarningDate(new Date(date)), null, date);
   }
   assert.notEqual(gamesWarningKey(2027, 3, '2026-11-06', 7), gamesWarningKey(2027, 3, '2026-11-08', 7));
+});
+
+test('cumulative day counts use actual past games and scheduled future starts', () => {
+  const week = warningWeek();
+  const side = week.matchups[0].home;
+  assert.equal(lineupGamesThrough(side, week, 17), 3);
+  assert.equal(lineupGamesThrough(side, week, 18), 5);
+  assert.equal(lineupGamesThrough(side, week, 19), 7);
+  assert.equal(lineupGamesThrough(side, week, 20), 9);
+  side.players[0].days['19'].started = false;
+  assert.equal(lineupGamesThrough(side, week, 19), 6);
 });

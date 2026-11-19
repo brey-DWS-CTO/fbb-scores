@@ -74,13 +74,13 @@ test('Waivers opens Activity and keeps its own mobile button and subpages', () =
   assert.deepEqual(sections.filter(section => section.primary).map(section => section.id), ['scores', 'cast', 'waivers', 'league']);
   assert.equal(sections.find(section => section.id === 'trades')?.primary, false);
 });
-test('Missed Games belongs to League for everyone and My Team has its own commissioner button', () => {
+test('Missed Games belongs to League for everyone and My Team is discoverable by members, with a commissioner primary button', () => {
   for (const commissioner of [false, true]) {
     const sections = visibleSections(commissioner, true, 'in-season');
     assert.equal(sectionFor('/league/missed-games', sections)?.id, 'league');
     assert.equal(sectionFor('/scores/missed-games', sections)?.id, 'league');
-    assert.equal(sectionFor('/my-team', sections)?.id, commissioner ? 'my-team' : undefined);
-    assert.equal(sections.find(s => s.id === 'my-team')?.primary, commissioner ? true : undefined);
+    assert.equal(sectionFor('/my-team', sections)?.id, 'my-team');
+    assert.equal(sections.find(s => s.id === 'my-team')?.primary, commissioner);
     assert.deepEqual(sections.find(s => s.id === 'scores')?.tabs.map(t => t.to), ['/scores']);
   }
 });
