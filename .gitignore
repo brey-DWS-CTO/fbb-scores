@@ -34,3 +34,6 @@ dist-ssr
 
 .vercel
 .env*
+
+# Local frozen projection research inputs and reports
+.forecast-research/
