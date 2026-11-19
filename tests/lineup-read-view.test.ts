@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { myTeamReadView, LineupReadRevokedError } from '../server/lib/lineup/readView.js';
+import { myTeamReadView, LineupReadRevokedError, withAutoBenchReadAccess } from '../server/lib/lineup/readView.js';
 import { DisabledEspnLineupProvider } from '../server/lib/lineup/provider.js';
 import { emptyLineupState, type LineupRepository } from '../server/lib/lineup/service.js';
 import type { LineupSnapshot } from '../src/lib/league/lineup.js';
@@ -69,4 +69,22 @@ test('failed or wrong-team reads return no roster and never expose provider exce
   provider.fail = false;
   provider.result.teamId = 8;
   assert.equal((await myTeamReadView(repo, provider, 'Owner', binding, true)).snapshot, null);
+});
+
+test('auto-bench self-consent grants only current-season own-team reads and revokes immediately', async () => {
+  const state = emptyLineupState();
+  const pref = { enabled: true, enabledAt: '2026-11-18T00:00:00Z', leagueId: binding.leagueId, teamId: binding.teamId, season: 2027 };
+  const derived = () => withAutoBenchReadAccess(state, pref, 'Owner', binding, 2027);
+  assert.equal(derived().grants.Owner.enabled, true);
+  assert.deepEqual(state.grants, {}, 'read access must not persist a manual write grant');
+  for (const patch of [{ enabled: false }, { leagueId: 'other' }, { teamId: 8 }, { season: 2026 }]) {
+    const wrong = withAutoBenchReadAccess(state, { ...pref, ...patch }, 'Owner', binding, 2027);
+    assert.equal(wrong.grants.Owner, undefined);
+  }
+  const setupState = setup();
+  const repo: LineupRepository = { async read() { return derived(); }, async mutate(fn) { fn(state); } };
+  const result = await myTeamReadView(repo, setupState.provider, 'Owner', binding, true);
+  assert.equal(result.snapshot?.teamId, binding.teamId); assert.equal(result.executionEnabled, false);
+  setupState.provider.beforeReturn = () => { pref.enabled = false; };
+  await assert.rejects(myTeamReadView(repo, setupState.provider, 'Owner', binding, true), LineupReadRevokedError);
 });

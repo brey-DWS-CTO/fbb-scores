@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -25,8 +26,31 @@ before(async () => {
   process.env.DATABASE_URL = '';
   process.env.DOTENV_CONFIG_QUIET = 'true';
   process.env.ESPN_LEAGUE_ID = '123456';
+  process.env.ESPN_SEASON_ID = '2027';
   process.env.ESPN_LINEUP_READS_ENABLED = '0';
   store = await import(pathToFileURL(path.join(tempRoot, 'server/lib/leagueStore.ts')).href);
+  // All external transports are fixtures: opting in must not publish a real queue message.
+  const queue = await import(pathToFileURL(path.join(tempRoot, 'server/lib/autoBenchQueue.ts')).href);
+  queue.autoBenchQueue.send = async () => ({ messageId: 'fixture-message' });
+  const axios = (await import('axios')).default;
+  axios.defaults.adapter = async config => {
+    const url = new URL(config.url || '', config.baseURL);
+    let data: unknown;
+    if (url.hostname === 'site.api.espn.com') data = { events: [] };
+    else if (url.hostname === 'lm-api-reads.fantasy.espn.com') {
+      const views = config.params?.view ?? url.searchParams.getAll('view');
+      if ((Array.isArray(views) ? views : [views]).includes('mTransactions2')) data = { scoringPeriodId: 6, transactions: [] };
+      else data = { id: 123456, seasonId: 2027, scoringPeriodId: 6, settings: { rosterSettings: {
+        lineupLocktimeType: 'INDIVIDUAL_GAME', rosterLocktimeType: 'FIRSTGAME_SCORINGPERIOD', isBenchUnlimited: true, lineupSlotCounts: { '0': 1, '12': 1 },
+      } }, teams: store.CONFIG_TEAMS.map(team => ({ id: team.espnTeamId, roster: { entries: [
+        { playerId: 1, lineupSlotId: 12, playerPoolEntry: { id: 1, onTeamId: team.espnTeamId, lineupLocked: false,
+          player: { id: 1, fullName: 'Fixture Player', eligibleSlots: [0, 12] } } },
+      ] } })) };
+    } else throw new Error('Unexpected network request in fixture test');
+    return { data, status: 200, statusText: 'OK', headers: {}, config };
+  };
+  // Copied TS fixtures can load Axios through CommonJS; mock both module entry points.
+  createRequire(import.meta.url)('axios').defaults.adapter = axios.defaults.adapter;
   await store.setPin('Brey', 'fixture-only');
   await store.setPin('Ryan', 'fixture-only');
   const { default: app } = await import(pathToFileURL(path.join(tempRoot, 'server/app.ts')).href);
@@ -113,4 +137,43 @@ test('missed-games refresh persists all teams, protects finalized rows on failur
   assert.equal('missedGames' in member.body.state, false);
   const publicResponse = await fetch(`${base}/api/league/state`);
   assert.equal('missedGames' in (await publicResponse.json()).state, false);
+});
+
+test('auto-bench defaults off and only the authenticated owner can opt their own team in', async () => {
+  assert.equal((await fetch(`${base}/api/league/auto-bench`)).status, 401);
+  assert.equal((await call('auto-bench')).body.enabled, false);
+  process.env.ESPN_COOKIE_STRING = 'fixture-only';
+  assert.equal((await call('auto-bench', 'PUT', { enabled: true, owner: 'Ryan' })).status, 400);
+  assert.equal((await call('auto-bench', 'PUT', { enabled: 'true' })).status, 400);
+  assert.equal((await call('auto-bench', 'PUT', { enabled: true })).status, 200);
+  assert.equal((await call('auto-bench')).body.enabled, true);
+  assert.equal((await call('auto-bench', 'GET', undefined, 'Ryan')).body.enabled, false);
+  const saved = (await store.getState()).state.autoBench!.preferences.Brey;
+  assert.equal(saved.teamId, 7); assert.equal(saved.leagueId, '123456');
+  assert.equal((await call('auto-bench', 'PUT', { enabled: true })).status, 200);
+  assert.equal((await store.getState()).state.autoBench!.preferences.Brey.enabledAt, saved.enabledAt);
+  assert.equal('autoBench' in (await call('state')).body.state, false);
+  assert.equal((await call('auto-bench', 'PUT', { enabled: false })).status, 200);
+  assert.equal((await call('auto-bench')).body.enabled, false);
+  delete process.env.ESPN_COOKIE_STRING;
+});
+
+test('any member can opt into their own My Team reads and use a check that never writes', async () => {
+  process.env.ESPN_COOKIE_STRING = 'fixture-only';
+  assert.equal((await fetch(`${base}/api/league/auto-bench/preview`, { method: 'POST' })).status, 401);
+  assert.equal((await call('my-team', 'GET', undefined, 'Ryan')).body.readEnabled, false);
+  const enabled = await call('auto-bench', 'PUT', { enabled: true }, 'Ryan');
+  assert.equal(enabled.status, 200); assert.equal(enabled.body.scheduleError, undefined);
+  const view = await call('my-team', 'GET', undefined, 'Ryan');
+  assert.equal(view.body.readEnabled, true);
+  assert.equal(view.body.snapshot.teamId, store.CONFIG_TEAMS.find(team => team.owner === 'Ryan')!.espnTeamId);
+  assert.equal(view.body.executionEnabled, false);
+  assert.equal((await store.getState()).state.lineupManagement?.grants.Ryan, undefined);
+  const before = (await store.getState()).state.autoBench;
+  const preview = await call('auto-bench/preview', 'POST', {}, 'Ryan');
+  assert.equal(preview.status, 200); assert.deepEqual(preview.body.rows, []);
+  assert.deepEqual((await store.getState()).state.autoBench, before, 'a read-only check must not consume or change automation state');
+  assert.equal((await call('auto-bench', 'PUT', { enabled: false }, 'Ryan')).status, 200);
+  assert.equal((await call('my-team', 'GET', undefined, 'Ryan')).body.readEnabled, false);
+  delete process.env.ESPN_COOKIE_STRING;
 });
