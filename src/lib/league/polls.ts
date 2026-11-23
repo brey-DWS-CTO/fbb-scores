@@ -453,3 +453,25 @@ export function optionCounts(poll: Poll): Array<{ option: string; count: number 
     (v) => v.choice === option && poll.eligibleVoters.includes(v.owner),
   ).length }));
 }
+
+/** Ballot privacy is enforced before data leaves the server. */
+export function pollForViewer(poll: Poll, owner: string, isCommissioner: boolean): Poll {
+  if (isCommissioner) return poll;
+  const visible: Poll = {
+    ...poll,
+    votes: poll.votes.filter((vote) => vote.owner === owner),
+    status: poll.status === 'passed' || poll.status === 'failed' ? 'closed' : poll.status,
+    edits: poll.edits?.map((edit) => ({ ...edit, votesCleared: 0 })),
+  };
+  // Amendment bookkeeping also reveals that a rule vote passed.
+  delete visible.seededAt;
+  delete visible.seededBy;
+  delete visible.appliedVersionId;
+  delete visible.appliedRevision;
+  delete visible.appliedAt;
+  return visible;
+}
+
+export function pollLink(id: string): string {
+  return `/votes?poll=${encodeURIComponent(id)}`;
+}

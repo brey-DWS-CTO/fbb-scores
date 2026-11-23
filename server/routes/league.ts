@@ -252,6 +252,7 @@ import {
 } from '../lib/notifier.js';
 import { appOrigin } from './auth.js';
 import {
+  pollForViewer,
   canEditPoll,
   canLaunchPoll,
   canVote,
@@ -3040,7 +3041,7 @@ async function stampSeededPolls(
   return stamped;
 }
 
-/** Everyone sees every vote. A league vote is not a secret ballot. */
+/** Members see their own ballot; only the commissioner sees results and voters. */
 router.get('/polls', requireAuth, async (_req, res, next) => {
   try {
     const polls = await seasonPolls();
@@ -3048,7 +3049,7 @@ router.get('/polls', requireAuth, async (_req, res, next) => {
     const isCommish = res.locals.isCommissioner === true;
     const launched = polls.filter((p) => p.kind !== 'standalone' && p.proposedBy === owner && p.status !== 'cancelled');
     res.json({
-      polls,
+      polls: polls.map((poll) => pollForViewer(poll, owner, isCommish)),
       you: {
         owner,
         isCommissioner: isCommish,
@@ -3133,7 +3134,7 @@ router.post('/polls', requireAuth, async (req, res, next) => {
 
     await insertPoll(poll.id, RULEBOOK_SEASON, poll);
     await appendAudit(actor(res), 'poll-open', { pollId: poll.id, kind, title, affects });
-    res.json(poll);
+    res.json(pollForViewer(poll, owner, res.locals.isCommissioner === true));
   } catch (err) {
     if (err instanceof PollWriteError) {
       res.status(409).json({ error: err.message, code: err.code });
@@ -3195,7 +3196,7 @@ router.post('/polls/:id/edit', requireAuth, requireCommissioner, async (req, res
       affects,
       threshold: next.threshold,
     });
-    res.json(updated);
+    res.json(pollForViewer(updated, owner, res.locals.isCommissioner === true));
   } catch (err) {
     if (err instanceof PollWriteError) {
       res.status(409).json({ error: err.message, code: err.code });
@@ -3233,7 +3234,7 @@ router.post('/polls/:id/vote', requireAuth, async (req, res, next) => {
     })) as Poll;
 
     await appendAudit(actor(res), 'poll-vote', { pollId: id, choice });
-    res.json(updated);
+    res.json(pollForViewer(updated, owner, res.locals.isCommissioner === true));
   } catch (err) {
     if (err instanceof PollWriteError) {
       res.status(409).json({ error: err.message, code: err.code });
@@ -3278,7 +3279,7 @@ router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
       pollId: id,
       status: updated.status,
     });
-    res.json(updated);
+    res.json(pollForViewer(updated, owner, res.locals.isCommissioner === true));
   } catch (err) {
     if (err instanceof PollWriteError) {
       res.status(409).json({ error: err.message, code: err.code });

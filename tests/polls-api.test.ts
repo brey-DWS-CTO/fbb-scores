@@ -290,7 +290,8 @@ test('six of ten carries it; five does not', async () => {
     headers: auth('Ryan'),
     body: JSON.stringify({}),
   });
-  assert.equal((closed.body as Poll).status, 'failed', 'five yes is not enough');
+  assert.equal((closed.body as Poll).status, 'closed', 'members cannot see the outcome');
+  assert.equal(((await store.getPoll(poll.id)) as Poll).status, 'failed');
 
   // Re-run with six.
   await store.clearPollsForSeason(SEASON);
@@ -301,7 +302,8 @@ test('six of ten carries it; five does not', async () => {
     headers: auth('Ryan'),
     body: JSON.stringify({}),
   });
-  assert.equal((closed.body as Poll).status, 'passed');
+  assert.equal((closed.body as Poll).status, 'closed');
+  assert.equal(((await store.getPoll(second.id)) as Poll).status, 'passed');
 });
 
 test('a member can change their vote while it is open', async () => {
@@ -559,7 +561,7 @@ async function passPoll(
     body: JSON.stringify({}),
   });
   const result = closed.body as Poll;
-  assert.equal(result.status, 'passed');
+  assert.equal(((await store.getPoll(poll.id)) as Poll).status, 'passed');
   return result;
 }
 
@@ -681,7 +683,7 @@ test('standalone options can be voted, changed, counted and closed during the se
   assert.equal((await vote('Ryan', poll.id, '26')).status, 200);
   assert.equal((await vote('Ryan', poll.id, '30')).status, 200);
   const voted = (await vote('Amy', poll.id, '30')).body as Poll;
-  assert.equal(voted.votes.length, 2);
+  assert.equal(voted.votes.length, 1, 'members receive only their own ballot');
   assert.equal((await vote('Joel', poll.id, 'yes')).status, 409);
   const closed = await request(`/api/league/polls/${poll.id}/close`, {
     method: 'POST', headers: auth('Brey'), body: '{}',
@@ -726,4 +728,22 @@ test('production Week 6 poll is created once and keeps its votes and closed stat
     if (previous === undefined) delete process.env.VERCEL_ENV;
     else process.env.VERCEL_ENV = previous;
   }
+});
+
+test('members cannot retrieve other ballots or outcomes through list, vote or close responses', async () => {
+  const poll = (await openStandalone(['26', '30'], 'Ryan')).body as Poll;
+  await vote('Amy', poll.id, '30');
+  const own = (await vote('Ryan', poll.id, '26')).body as Poll;
+  assert.deepEqual(own.votes.map((v) => v.owner), ['Ryan']);
+  const listAs = async (owner: string) => (asRecord((await request('/api/league/polls', { headers: auth(owner) })).body).polls as Poll[])[0];
+  assert.deepEqual((await listAs('Joel')).votes, []);
+  assert.deepEqual((await listAs('Amy')).votes.map((v) => v.owner), ['Amy']);
+  assert.equal((await listAs('Brey')).votes.length, 2);
+  const closed = (await request(`/api/league/polls/${poll.id}/close`, {
+    method: 'POST', headers: auth('Ryan'), body: '{}',
+  })).body as Poll;
+  assert.deepEqual(closed.votes.map((v) => v.owner), ['Ryan']);
+  assert.deepEqual((await listAs('Joel')).votes, []);
+  assert.equal((await listAs('Brey')).votes.length, 2);
+  assert.equal((await request('/api/league/audit', { headers: auth('Joel') })).status, 403);
 });
