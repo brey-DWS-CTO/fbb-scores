@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import SignInPanel from './SignInPanel.js';
@@ -18,10 +18,8 @@ import {
 } from '../../lib/league/api.js';
 import {
   pollLink,
-  optionCounts,
   validPollOptions,
   describePollEdit,
-  describeTally,
   editResetsVotes,
   pollEditChanges,
   pollKindLabel,
@@ -40,32 +38,39 @@ import { rulebookIndex2027 } from '../../lib/league/rulebookData.js';
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-/** How close a vote is to the yes count it needs. */
-function Tally({ poll }: { poll: Poll }) {
-  if (poll.kind === 'standalone') return (
-    <div className="vote-tally">
-      {optionCounts(poll).map(({ option, count }) => <p key={option}>{option}: {count} {count === 1 ? 'vote' : 'votes'}</p>)}
-      <p>{poll.eligibleVoters.length - poll.votes.filter((v) => poll.eligibleVoters.includes(v.owner)).length} yet to vote</p>
-    </div>
-  );
-  const tally = tallyPoll(poll);
-  const pct = Math.min(100, Math.round((tally.yes / Math.max(1, tally.needed)) * 100));
-  return (
-    <div className="vote-tally">
-      <div className="vote-bar" aria-hidden="true">
-        <div
-          className={tally.passed ? 'vote-bar-fill vote-bar-pass' : 'vote-bar-fill'}
-          style={{ width: `${pct}%` }}
-        />
+const RESULT_COLORS = ['#8854d0', '#168c83', '#e59b25', '#3978d4', '#d7547e', '#8b9634'];
+
+function PollResults({ poll }: { poll: Poll }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const choices = poll.kind === 'standalone' ? poll.options ?? [] : ['yes', 'no'];
+  const ballots = poll.votes.filter((vote) => poll.eligibleVoters.includes(vote.owner) && choices.includes(vote.choice));
+  const total = ballots.length;
+  const counts = choices.map((choice) => ballots.filter((vote) => vote.choice === choice).length);
+  const slices = choices.map((choice, index) => {
+    const count = counts[index];
+    const start = total ? counts.slice(0, index).reduce((sum, value) => sum + value, 0) / total * 100 : 0;
+    const end = start + (total ? count / total * 100 : 0);
+    return { choice, count, color: RESULT_COLORS[index % RESULT_COLORS.length], start, end };
+  });
+  const background = total ? `conic-gradient(${slices.map((slice) => `${slice.color} ${slice.start}% ${slice.end}%`).join(', ')})` : 'var(--cell-border)';
+  return <>
+    <button type="button" className="vote-close tap-btn" onClick={() => dialog.current?.showModal()}>RESULTS</button>
+    <dialog ref={dialog} className="score-detail poll-results" aria-label={`Results: ${poll.title}`}
+      onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+      <button type="button" className="score-detail-close tap-btn" aria-label="Close results" onClick={() => dialog.current?.close()}><NavIcon name="close" /></button>
+      <h2>{poll.title}</h2>
+      <p>Commissioner results</p>
+      <div className="poll-results-chart">
+        <div className="poll-results-pie" role="img" aria-label={total ? slices.map((slice) => `${slice.choice}: ${slice.count} votes`).join(', ') : 'No votes yet'} style={{ background }} />
+        <ul className="poll-results-legend">{slices.map((slice) => <li key={slice.choice}>
+          <span className="poll-results-swatch" style={{ background: slice.color }} aria-hidden="true" />
+          <span>{slice.choice}: {slice.count} {slice.count === 1 ? 'vote' : 'votes'} ({total ? Math.round(slice.count / total * 100) : 0}%)</span>
+        </li>)}</ul>
       </div>
-      <div className="vote-counts">
-        <span className="vote-yes">{tally.yes} yes</span>
-        <span className="vote-no">{tally.no} no</span>
-        <span className="vote-silent">{tally.notVoted} silent</span>
-        <span className="vote-needed">{describeTally(poll)}</span>
-      </div>
-    </div>
-  );
+      <h3>Votes cast</h3>
+      {total ? <ul className="poll-results-ballots">{ballots.map((vote) => <li key={vote.owner}><span>{vote.owner}</span><strong>{vote.choice}</strong></li>)}</ul> : <p>No votes yet.</p>}
+    </dialog>
+  </>;
 }
 
 /**
@@ -176,6 +181,29 @@ function PollCard({
   onEditSave: (poll: Poll, input: { title: string; detail: string; affects: string[] }) => void;
   onEditCancel: () => void;
 }) {
+  const [shareMessage, setShareMessage] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const share = async () => {
+    const url = new URL(pollLink(poll.id), window.location.origin).href;
+    setShareMessage('');
+    setSharing(true);
+    try {
+      if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+        try {
+          await navigator.share({ title: poll.title, url });
+          return;
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') return;
+        }
+      }
+      await navigator.clipboard.writeText(url);
+      setShareMessage('Poll link copied.');
+    } catch {
+      setShareMessage('Copy this poll link: ' + url);
+    } finally {
+      setSharing(false);
+    }
+  };
   const mine = voteOf(poll, owner);
   const open = poll.status === 'open';
   const canClose = open && (poll.proposedBy === owner || isCommish);
@@ -189,7 +217,12 @@ function PollCard({
         <span className="vote-meta">
           {poll.proposedBy} &middot; {formatDate(poll.openedAt)}{kind !== 'standalone' && ` - needs ${poll.threshold}%`}
         </span>
+        <button type="button" className="vote-share tap-btn" aria-label="Share poll" title="Share poll"
+          disabled={sharing} onClick={() => void share()}>
+          <NavIcon name="share" size={20} />
+        </button>
       </div>
+      {shareMessage && <p className="vote-yours" role="status">{shareMessage}</p>}
       <span className={kind === 'new-rule' ? 'vote-kind vote-kind-new' : 'vote-kind'}>
         {pollKindLabel(kind)}
       </span>
@@ -234,19 +267,7 @@ function PollCard({
             </ul>
           )}
 
-          <Link className="vote-close tap-btn" to={pollLink(poll.id)}>DIRECT LINK</Link>
-          {isCommish ? (
-            <>
-              <Tally poll={poll} />
-              <details className="vote-yours">
-                <summary>Voters and ballots (commissioner only)</summary>
-                <ul>{poll.eligibleVoters.map((voter) => {
-                  const ballot = poll.votes.find((vote) => vote.owner === voter);
-                  return <li key={voter}>{voter}: {ballot ? ballot.choice : 'Not voted'}</li>;
-                })}</ul>
-              </details>
-            </>
-          ) : <p className="vote-yours">Results and voter details are visible only to the commissioner.</p>}
+          {isCommish ? <PollResults poll={poll} /> : <p className="vote-yours">Results and voter details are visible only to the commissioner.</p>}
 
           {open && (
             <div className="vote-actions">

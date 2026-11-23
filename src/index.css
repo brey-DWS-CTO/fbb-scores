@@ -6729,3 +6729,30 @@ html.theme-light .lm-advance-panel input[type="date"] { color-scheme: light; }
 .lineup-games-through { margin-top: 3px; padding-top: 3px; border-top: 1px dashed var(--panel-border); }
 .is-right .lineup-games { text-align: right; }
 .score-games { min-width: 0; }
+
+/* A compact share action belongs with the poll metadata. */
+.vote-share {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.vote-share:hover { color: var(--text-hi); border-color: currentColor; }
+.vote-share:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+.poll-results-chart { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+.poll-results-pie { width: 180px; height: 180px; flex: 0 0 180px; border-radius: 50%; }
+.poll-results-legend { list-style: none; padding: 0; margin: 0; }
+.poll-results-legend li { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: .85rem; }
+.poll-results-swatch { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 12px; }
+.poll-results-ballots { padding: 0; list-style: none; }
+.poll-results-ballots li { display: flex; justify-content: space-between; gap: 20px; padding: 10px 0; border-bottom: 1px solid var(--cell-border); }
