@@ -17,6 +17,7 @@ import {
   fetchPublishedRulebook,
 } from '../../lib/league/api.js';
 import {
+  pollLink,
   optionCounts,
   validPollOptions,
   describePollEdit,
@@ -44,7 +45,7 @@ function Tally({ poll }: { poll: Poll }) {
   if (poll.kind === 'standalone') return (
     <div className="vote-tally">
       {optionCounts(poll).map(({ option, count }) => <p key={option}>{option}: {count} {count === 1 ? 'vote' : 'votes'}</p>)}
-      <p>{poll.eligibleVoters.length - poll.votes.filter((v) => poll.eligibleVoters.includes(v.owner)).length} yet to vote � {describeTally(poll)}</p>
+      <p>{poll.eligibleVoters.length - poll.votes.filter((v) => poll.eligibleVoters.includes(v.owner)).length} yet to vote</p>
     </div>
   );
   const tally = tallyPoll(poll);
@@ -186,7 +187,7 @@ function PollCard({
       <div className="vote-head">
         <span className="hub-heading vote-status">{poll.status.toUpperCase()}</span>
         <span className="vote-meta">
-          {poll.proposedBy} · {formatDate(poll.openedAt)} · needs {poll.threshold}%
+          {poll.proposedBy} &middot; {formatDate(poll.openedAt)}{kind !== 'standalone' && ` - needs ${poll.threshold}%`}
         </span>
       </div>
       <span className={kind === 'new-rule' ? 'vote-kind vote-kind-new' : 'vote-kind'}>
@@ -233,7 +234,19 @@ function PollCard({
             </ul>
           )}
 
-          <Tally poll={poll} />
+          <Link className="vote-close tap-btn" to={pollLink(poll.id)}>DIRECT LINK</Link>
+          {isCommish ? (
+            <>
+              <Tally poll={poll} />
+              <details className="vote-yours">
+                <summary>Voters and ballots (commissioner only)</summary>
+                <ul>{poll.eligibleVoters.map((voter) => {
+                  const ballot = poll.votes.find((vote) => vote.owner === voter);
+                  return <li key={voter}>{voter}: {ballot ? ballot.choice : 'Not voted'}</li>;
+                })}</ul>
+              </details>
+            </>
+          ) : <p className="vote-yours">Results and voter details are visible only to the commissioner.</p>}
 
           {open && (
             <div className="vote-actions">
@@ -429,7 +442,8 @@ export default function VotesPage() {
       setNotice(`${result.note} Open the rule book to write it and publish.`);
     });
 
-  const polls = data?.polls ?? [];
+  const selectedPoll = searchParams.get('poll');
+  const polls = (data?.polls ?? []).filter((poll) => !selectedPoll || poll.id === selectedPoll);
   // Any open poll knows its own roll and threshold; fall back to the usual 60%.
   const sample = polls.find((p) => p.kind !== 'standalone' && p.status === 'open') ?? polls.find((p) => p.kind !== 'standalone');
   const thresholdLine = sample
@@ -451,6 +465,8 @@ export default function VotesPage() {
         <IdentityChip />
       </header>
 
+      {selectedPoll && <p><Link to="/votes">View all votes</Link></p>}
+      {selectedPoll && data && polls.length === 0 && <p role="alert">That poll could not be found.</p>}
       {error && <p className="rules-draft-error">{error}</p>}
       {!error && notice && <p className="rules-draft-note">{notice}</p>}
 
@@ -515,7 +531,7 @@ export default function VotesPage() {
                 <label className="rule-edit-label">Options (one per line, 2 to 20)
                   <textarea className="hub-input rule-edit-textarea" rows={4} value={optionsText}
                     onChange={(e) => setOptionsText(e.target.value)} placeholder={'26\n30'} />
-                  <span className="rule-edit-hint">Most votes wins. A tie stays a tie. You can change your vote until it closes.</span>
+                  <span className="rule-edit-hint">Results are visible only to the commissioner. You can change your vote until it closes.</span>
                 </label>
               ) : <RulePicker
                 index={index}
@@ -578,7 +594,7 @@ export default function VotesPage() {
             onEditCancel={() => setEditingId(null)}
           />
         ))}
-        {open.length === 0 && !composing && (
+        {open.length === 0 && !composing && !selectedPoll && (
           <div className="panel rules-empty">Nothing is being voted on right now.</div>
         )}
 

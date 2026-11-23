@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { rulebook2027 } from '../src/lib/league/rulebookData.js';
 import {
+  pollForViewer,
+  pollLink,
   canEditPoll,
   canLaunchPoll,
   canVote,
@@ -430,4 +432,27 @@ test('one-off result reports a tie and a winning option without a rule threshold
   const closed = closePoll(voted, 'Brey', 'later');
   assert.equal(closed.status, 'closed');
   assert.equal(describeTally(closed), 'Selected: 30');
+});
+
+test('poll privacy hides other ballots, pass/fail outcomes, and reset counts from members', () => {
+  const stored = withVotes(6, 1);
+  stored.status = 'passed';
+  stored.seededAt = 'now';
+  stored.appliedRevision = 3;
+  stored.edits = [{ at: 'now', by: 'Brey', changed: ['title'], votesCleared: 4 }];
+  const member = pollForViewer(stored, MEMBERS[0], false);
+  assert.equal(member.status, 'closed');
+  assert.equal(member.seededAt, undefined);
+  assert.equal(member.appliedRevision, undefined);
+  assert.deepEqual(member.votes.map((v) => v.owner), [MEMBERS[0]]);
+  assert.equal(member.edits?.[0].votesCleared, 0);
+  assert.equal(pollForViewer(stored, 'Brey', true), stored);
+  assert.equal(stored.votes.length, 7);
+  assert.equal(stored.edits[0].votesCleared, 4);
+});
+
+test('direct poll links encode an exact poll id', () => {
+  assert.equal(pollLink('poll-2027-week-6-game-limit'), '/votes?poll=poll-2027-week-6-game-limit');
+  const id = 'poll with & and ?';
+  assert.equal(new URL(pollLink(id), 'https://example.test').searchParams.get('poll'), id);
 });
