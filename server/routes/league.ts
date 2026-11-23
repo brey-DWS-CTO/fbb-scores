@@ -2989,6 +2989,24 @@ async function currentRulebook(): Promise<Rulebook> {
 }
 
 async function seasonPolls(): Promise<Poll[]> {
+  // Stable id + insert-if-absent: deployment never resets ballots or reopens it.
+  if (process.env.VERCEL_ENV === 'production' && RULEBOOK_SEASON === 2027) {
+    const id = 'poll-2027-week-6-game-limit';
+    if (!(await getPoll(id))) {
+      try {
+        await insertPoll(id, RULEBOOK_SEASON, {
+          id, season: RULEBOOK_SEASON, kind: 'standalone',
+          title: 'What should the week 6 game limit be?',
+          detail: 'Choose the game limit for Week 6.', options: ['26', '30'],
+          proposedBy: OWNERS.find((owner) => isCommissionerOwner(owner)) ?? 'Brey',
+          affects: [], threshold: 0, eligibleVoters: [...OWNERS],
+          openedAt: new Date().toISOString(), status: 'open', votes: [],
+        } satisfies Poll);
+      } catch (err) {
+        if (!(err instanceof PollWriteError) || err.code !== 'duplicate') throw err;
+      }
+    }
+  }
   return (await listPolls(RULEBOOK_SEASON)) as Poll[];
 }
 
@@ -3028,7 +3046,7 @@ router.get('/polls', requireAuth, async (_req, res, next) => {
     const polls = await seasonPolls();
     const owner = res.locals.owner as string;
     const isCommish = res.locals.isCommissioner === true;
-    const launched = polls.filter((p) => p.proposedBy === owner && p.status !== 'cancelled');
+    const launched = polls.filter((p) => p.kind !== 'standalone' && p.proposedBy === owner && p.status !== 'cancelled');
     res.json({
       polls,
       you: {
@@ -3062,8 +3080,9 @@ function pollWords(body: { title?: unknown; detail?: unknown; affects?: unknown 
 router.post('/polls', requireAuth, async (req, res, next) => {
   try {
     const owner = res.locals.owner as string;
-    const body = req.body as { kind?: unknown; title?: unknown; detail?: unknown; affects?: unknown };
+    const body = req.body as { kind?: unknown; title?: unknown; detail?: unknown; affects?: unknown; options?: unknown };
     const kind = typeof body.kind === 'string' ? body.kind : '';
+    const options = Array.isArray(body.options) ? body.options.map((o: unknown) => typeof o === 'string' ? o.trim() : o) as string[] : undefined;
     const { title, detail, affects } = pollWords(body);
 
     const state = await getState();
@@ -3072,6 +3091,7 @@ router.post('/polls', requireAuth, async (req, res, next) => {
       members: OWNERS,
       seasonPolls: await seasonPolls(),
       kind,
+      options,
       affects,
       title,
       now: new Date(),
@@ -3098,11 +3118,12 @@ router.post('/polls', requireAuth, async (req, res, next) => {
       id: `poll-${RULEBOOK_SEASON}-${owner.toLowerCase()}-${stamp}`,
       season: RULEBOOK_SEASON,
       kind: kind as PollKind,
+      ...(kind === 'standalone' ? { options } : {}),
       title,
       detail,
       proposedBy: owner,
       affects,
-      threshold: thresholdFor(book, affects),
+      threshold: kind === 'standalone' ? 0 : thresholdFor(book, affects),
       // Frozen now, so a later roster change cannot move the goalposts.
       eligibleVoters: [...OWNERS],
       openedAt,
@@ -3150,7 +3171,7 @@ router.post('/polls/:id/edit', requireAuth, requireCommissioner, async (req, res
     }
 
     // Naming different rules can move the bar, so the threshold is read again.
-    const next: PollEditInput = { title, detail, affects, threshold: thresholdFor(book, affects) };
+    const next: PollEditInput = { title, detail, affects: existing.kind === 'standalone' ? [] : affects, threshold: existing.kind === 'standalone' ? 0 : thresholdFor(book, affects) };
     const check = canEditPoll({ poll: existing, isCommissioner: true, next });
     if (!check.ok) {
       res.status(409).json({ error: check.message, code: check.reason });
@@ -3206,7 +3227,8 @@ router.post('/polls/:id/vote', requireAuth, async (req, res, next) => {
     const at = new Date().toISOString();
     const updated = (await updatePoll(id, (current) => {
       const poll = current as Poll;
-      if (poll.status !== 'open') return poll;
+      const currentCheck = canVote(poll, owner, choice);
+      if (!currentCheck.ok) throw new PollWriteError(currentCheck.reason ?? 'bad-choice', currentCheck.message ?? 'Cannot vote');
       return castVote(poll, owner, choice as VoteChoice, at);
     })) as Poll;
 

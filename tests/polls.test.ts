@@ -419,3 +419,15 @@ test('the summary line reads in plain English', () => {
   assert.equal(describeTally(closePoll(withVotes(6), 'Brey', 't')), 'Passed, 6 of 6 needed');
   assert.equal(describeTally(poll({ status: 'cancelled' })), 'Cancelled');
 });
+
+test('one-off result reports a tie and a winning option without a rule threshold', () => {
+  const base = poll({ kind: 'standalone', options: ['26', '30', '32'], threshold: 0 });
+  let voted = castVote(base, MEMBERS[0], '26', 'now');
+  voted = castVote(voted, MEMBERS[1], '30', 'now');
+  assert.equal(describeTally(voted), 'Tie: 26, 30');
+  voted = castVote(voted, MEMBERS[0], '30', 'later');
+  assert.equal(describeTally(voted), 'Leading: 30');
+  const closed = closePoll(voted, 'Brey', 'later');
+  assert.equal(closed.status, 'closed');
+  assert.equal(describeTally(closed), 'Selected: 30');
+});

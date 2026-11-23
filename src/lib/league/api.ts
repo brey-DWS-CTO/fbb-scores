@@ -1697,7 +1697,7 @@ export async function fetchPolls(c: Credentials): Promise<PollsResponse> {
 
 export async function openPoll(
   c: Credentials,
-  input: { kind: PollKind; title: string; detail: string; affects: string[] },
+  input: { kind: PollKind; title: string; detail: string; affects: string[]; options?: string[] },
 ): Promise<Poll> {
   const { data } = await axios.post<Poll>('/api/league/polls', input, {
     headers: authHeaders(c),
@@ -1743,7 +1743,7 @@ export async function amendFromPoll(
 export async function castPollVote(
   c: Credentials,
   pollId: string,
-  choice: 'yes' | 'no',
+  choice: string,
 ): Promise<Poll> {
   const { data } = await axios.post<Poll>(
     `/api/league/polls/${encodeURIComponent(pollId)}/vote`,
