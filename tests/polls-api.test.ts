@@ -666,3 +666,64 @@ test('opening, voting, and closing are all written to the audit log', async () =
   assert.ok(rows.some((r) => r.action === 'poll-vote' && r.owner === 'Amy'));
   assert.ok(rows.some((r) => r.action === 'poll-close' && r.owner === 'Ryan'));
 });
+
+const openStandalone = (options: unknown = ['26', '30'], owner = 'Brey') => request('/api/league/polls', {
+  method: 'POST', headers: auth(owner),
+  body: JSON.stringify({ kind: 'standalone', title: 'What should the week 6 game limit be?', options }),
+});
+
+test('standalone options can be voted, changed, counted and closed during the season', async () => {
+  await store.mutateState((draft) => { draft.draft.startedAt = new Date().toISOString(); });
+  const created = await openStandalone(['26', '30', '32']);
+  assert.equal(created.status, 200);
+  const poll = created.body as Poll;
+  assert.deepEqual(poll.affects, []);
+  assert.equal((await vote('Ryan', poll.id, '26')).status, 200);
+  assert.equal((await vote('Ryan', poll.id, '30')).status, 200);
+  const voted = (await vote('Amy', poll.id, '30')).body as Poll;
+  assert.equal(voted.votes.length, 2);
+  assert.equal((await vote('Joel', poll.id, 'yes')).status, 409);
+  const closed = await request(`/api/league/polls/${poll.id}/close`, {
+    method: 'POST', headers: auth('Brey'), body: '{}',
+  });
+  assert.equal(closed.status, 200);
+  assert.equal((closed.body as Poll).status, 'closed');
+  assert.equal((await vote('Joel', poll.id, '26')).status, 409);
+  assert.equal((await request(`/api/league/polls/${poll.id}/amend`, {
+    method: 'POST', headers: auth('Brey'), body: '{}',
+  })).status, 409);
+});
+
+test('standalone polls reject missing, duplicate, empty or excessive options', async () => {
+  for (const options of [[], ['26'], ['26', '26'], ['26', ''], [26, 30], Array(21).fill('x')]) {
+    assert.equal((await openStandalone(options)).status, 409);
+  }
+});
+
+test('one-off polls do not consume the rule proposal allowance', async () => {
+  assert.equal((await openStandalone(['26', '30'], 'Ryan')).status, 200);
+  assert.equal((await openStandalone(['26', '30'], 'Ryan')).status, 200);
+  const seen = asRecord((await request('/api/league/polls', { headers: auth('Ryan') })).body);
+  assert.equal((seen.you as Record<string, unknown>).hasLaunched, false);
+  assert.equal((await openPoll('Ryan')).status, 200);
+});
+
+test('production Week 6 poll is created once and keeps its votes and closed status', async () => {
+  const previous = process.env.VERCEL_ENV;
+  process.env.VERCEL_ENV = 'production';
+  try {
+    const list = () => request('/api/league/polls', { headers: auth('Brey') });
+    const seen = asRecord((await list()).body).polls as Poll[];
+    const seeded = seen.find((p) => p.id.endsWith('-week-6-game-limit'))!;
+    assert.deepEqual(seeded.options, ['26', '30']);
+    assert.equal((await vote('Ryan', seeded.id, '30')).status, 200);
+    await request(`/api/league/polls/${seeded.id}/close`, { method: 'POST', headers: auth('Brey'), body: '{}' });
+    const again = asRecord((await list()).body).polls as Poll[];
+    assert.equal(again.length, 1);
+    assert.equal(again[0].status, 'closed');
+    assert.equal(again[0].votes.length, 1);
+  } finally {
+    if (previous === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previous;
+  }
+});

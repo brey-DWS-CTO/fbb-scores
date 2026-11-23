@@ -17,6 +17,8 @@ import {
   fetchPublishedRulebook,
 } from '../../lib/league/api.js';
 import {
+  optionCounts,
+  validPollOptions,
   describePollEdit,
   describeTally,
   editResetsVotes,
@@ -39,6 +41,12 @@ const formatDate = (iso: string) =>
 
 /** How close a vote is to the yes count it needs. */
 function Tally({ poll }: { poll: Poll }) {
+  if (poll.kind === 'standalone') return (
+    <div className="vote-tally">
+      {optionCounts(poll).map(({ option, count }) => <p key={option}>{option}: {count} {count === 1 ? 'vote' : 'votes'}</p>)}
+      <p>{poll.eligibleVoters.length - poll.votes.filter((v) => poll.eligibleVoters.includes(v.owner)).length} yet to vote · {describeTally(poll)}</p>
+    </div>
+  );
   const tally = tallyPoll(poll);
   const pct = Math.min(100, Math.round((tally.yes / Math.max(1, tally.needed)) * 100));
   return (
@@ -107,14 +115,14 @@ function PollEditForm({
         />
       </label>
 
-      <RulePicker
+      {kind !== 'standalone' && <RulePicker
         index={index}
         selected={affects}
         onChange={setAffects}
         label={kind === 'change' ? 'Which rule would change?' : 'Where should it sit? (optional)'}
         hint="Everyone voting sees exactly which rules this touches."
         max={kind === 'new-rule' ? 1 : undefined}
-      />
+      />}
 
       <p className={clears ? 'rule-edit-hint vote-edit-warn' : 'rule-edit-hint'}>
         {clears
@@ -160,7 +168,7 @@ function PollCard({
   /** Built from the published book, so rule numbers match what members read. */
   index: RulebookIndex;
   editing: boolean;
-  onVote: (poll: Poll, choice: 'yes' | 'no') => void;
+  onVote: (poll: Poll, choice: string) => void;
   onClose: (poll: Poll, cancel: boolean) => void;
   onAmend: (poll: Poll) => void;
   onEdit: (poll: Poll) => void;
@@ -229,27 +237,18 @@ function PollCard({
 
           {open && (
             <div className="vote-actions">
-              <button
-                type="button"
-                className={mine === 'yes' ? 'vote-btn vote-btn-yes vote-btn-on tap-btn' : 'vote-btn vote-btn-yes tap-btn'}
-                disabled={busy}
-                onClick={() => onVote(poll, 'yes')}
-              >
-                YES
-              </button>
-              <button
-                type="button"
-                className={mine === 'no' ? 'vote-btn vote-btn-no vote-btn-on tap-btn' : 'vote-btn vote-btn-no tap-btn'}
-                disabled={busy}
-                onClick={() => onVote(poll, 'no')}
-              >
-                NO
-              </button>
+              {(kind === 'standalone' ? poll.options ?? [] : ['yes', 'no']).map((choice) => (
+                <button key={choice} type="button"
+                  className={mine === choice ? 'vote-btn vote-btn-on tap-btn' : 'vote-btn tap-btn'}
+                  disabled={busy || !poll.eligibleVoters.includes(owner)} onClick={() => onVote(poll, choice)}>
+                  {kind === 'standalone' ? choice : choice.toUpperCase()}
+                </button>
+              ))}
             </div>
           )}
 
           {open && mine && <p className="vote-yours">You voted {mine}. You can change it until it closes.</p>}
-          {open && !mine && <p className="vote-yours">You have not voted. Silence counts as no.</p>}
+          {open && !mine && <p className="vote-yours">{kind === 'standalone' ? 'You have not voted.' : 'You have not voted. Silence counts as no.'}</p>}
 
           {canClose && (
             <div className="vote-actions vote-actions-close">
@@ -286,7 +285,7 @@ function PollCard({
 
           {/* A passed vote is a mandate. It reaches the book only when the
               commissioner writes it into the draft and publishes. */}
-          {poll.status === 'passed' && (
+          {poll.status === 'passed' && kind !== 'standalone' && (
             <div className="vote-amend">
               {poll.appliedRevision !== undefined ? (
                 <p className="vote-yours">In the book since revision {poll.appliedRevision}.</p>
@@ -334,6 +333,8 @@ export default function VotesPage() {
   const [kind, setKind] = useState<PollKind | null>(null);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
+  const [optionsText, setOptionsText] = useState('');
+  const options = optionsText.split('\n').map((o) => o.trim());
   const [affects, setAffects] = useState<string[]>([]);
   const [index, setIndex] = useState<RulebookIndex>(rulebookIndex2027);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -403,13 +404,14 @@ export default function VotesPage() {
     setKind(null);
     setTitle('');
     setDetail('');
+    setOptionsText('');
     setAffects([]);
   };
 
   const submit = () =>
     act(async () => {
       if (!kind) return;
-      await openPoll(identity, { kind, title, detail, affects });
+      await openPoll(identity, { kind, title, detail, affects: kind === 'standalone' ? [] : affects, ...(kind === 'standalone' ? { options } : {}) });
       closeComposer();
     });
 
@@ -429,7 +431,7 @@ export default function VotesPage() {
 
   const polls = data?.polls ?? [];
   // Any open poll knows its own roll and threshold; fall back to the usual 60%.
-  const sample = polls.find((p) => p.status === 'open') ?? polls[0];
+  const sample = polls.find((p) => p.kind !== 'standalone' && p.status === 'open') ?? polls.find((p) => p.kind !== 'standalone');
   const thresholdLine = sample
     ? `A change needs ${tallyPoll(sample).needed} of the ${sample.eligibleVoters.length} teams. Not voting counts as no.`
     : 'A change needs 60% of all teams. Not voting counts as no.';
@@ -456,14 +458,10 @@ export default function VotesPage() {
         <button
           type="button"
           className="rules-tool vote-start tap-btn"
-          disabled={busy || !data?.you.canLaunch}
+          disabled={busy || !data}
           onClick={() => setComposing(true)}
         >
-          {!data?.you.canLaunch
-            ? 'YOU HAVE USED YOUR VOTE THIS SEASON'
-            : identity.isCommissioner
-              ? '+ START A VOTE'
-              : '+ START YOUR VOTE'}
+          + START A VOTE
         </button>
       )}
 
@@ -471,6 +469,8 @@ export default function VotesPage() {
         <div className="rule-edit-form">
           <span className="rule-edit-label">What kind of vote is this?</span>
           <div className="vote-kind-picker">
+            <button type="button" className={kind === 'standalone' ? 'vote-kind-btn vote-kind-on tap-btn' : 'vote-kind-btn tap-btn'}
+              aria-pressed={kind === 'standalone'} onClick={() => setKind('standalone')}>ONE-OFF POLL</button>
             <button
               type="button"
               className={kind === 'change' ? 'vote-kind-btn vote-kind-on tap-btn' : 'vote-kind-btn tap-btn'}
@@ -497,7 +497,7 @@ export default function VotesPage() {
                   className="hub-input rule-edit-input"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder={kind === 'change' ? 'Expand IR to two slots' : 'Add a trade deadline'}
+                  placeholder={kind === 'standalone' ? 'What should the week 6 game limit be?' : kind === 'change' ? 'Expand IR to two slots' : 'Add a trade deadline'}
                 />
               </label>
               <label className="rule-edit-label">
@@ -511,7 +511,13 @@ export default function VotesPage() {
                 />
               </label>
 
-              <RulePicker
+              {kind === 'standalone' ? (
+                <label className="rule-edit-label">Options (one per line, 2 to 20)
+                  <textarea className="hub-input rule-edit-textarea" rows={4} value={optionsText}
+                    onChange={(e) => setOptionsText(e.target.value)} placeholder={'26\n30'} />
+                  <span className="rule-edit-hint">Most votes wins. A tie stays a tie. You can change your vote until it closes.</span>
+                </label>
+              ) : <RulePicker
                 index={index}
                 selected={affects}
                 onChange={setAffects}
@@ -527,12 +533,12 @@ export default function VotesPage() {
                     : 'Naming a rule tells the commissioner where the new one goes.'
                 }
                 max={kind === 'new-rule' ? 1 : undefined}
-              />
+              />}
             </>
           )}
 
           <p className="rule-edit-hint">
-            {identity.isCommissioner
+            {kind === 'standalone' ? 'One-off polls are available throughout the season and do not change the rule book.' : identity.isCommissioner
               ? 'As commissioner you can start as many votes as the league needs.'
               : 'One vote each per season. Cancelling gives it back.'}
           </p>
@@ -541,7 +547,7 @@ export default function VotesPage() {
               type="button"
               className="rule-edit-save tap-btn"
               disabled={
-                busy || !kind || !title.trim() || (kind === 'change' && affects.length === 0)
+                busy || !kind || !title.trim() || (kind === 'standalone' ? !validPollOptions(options) : !data?.you.canLaunch) || (kind === 'change' && affects.length === 0)
               }
               onClick={submit}
             >

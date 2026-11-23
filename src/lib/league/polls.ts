@@ -18,16 +18,16 @@
 
 import { buildRulebookIndex, type Rulebook } from './rulebook.js';
 
-export type PollStatus = 'open' | 'passed' | 'failed' | 'cancelled';
-export type VoteChoice = 'yes' | 'no';
+export type PollStatus = 'open' | 'passed' | 'failed' | 'cancelled' | 'closed';
+export type VoteChoice = string;
 
 /**
- * Every vote is one of two things, and the kind decides what a passed vote
- * seeds in the commissioner's draft: an edit of a named rule, or a new rule.
+ * Rule votes seed an edit or a new rule in the commissioner's draft.
+ * Standalone polls choose among custom options without amending the rule book.
  */
-export type PollKind = 'new-rule' | 'change';
+export type PollKind = 'new-rule' | 'change' | 'standalone';
 
-export const POLL_KINDS: PollKind[] = ['new-rule', 'change'];
+export const POLL_KINDS: PollKind[] = ['new-rule', 'change', 'standalone'];
 
 export interface PollVote {
   owner: string;
@@ -57,6 +57,8 @@ export interface Poll {
   id: string;
   season: number;
   kind: PollKind;
+  /** Choices for a standalone poll; rule votes remain yes/no. */
+  options?: string[];
   title: string;
   /** What is being proposed, in the proposer's words. */
   detail: string;
@@ -89,6 +91,7 @@ export interface Poll {
 
 /** How a kind reads on screen. */
 export function pollKindLabel(kind: PollKind): string {
+  if (kind === 'standalone') return 'ONE-OFF POLL';
   return kind === 'new-rule' ? 'NEW RULE' : 'RULE CHANGE';
 }
 
@@ -164,6 +167,7 @@ export function voteOf(poll: Poll, owner: string): VoteChoice | null {
 }
 
 export type LaunchRefusal =
+  | 'bad-options'
   | 'already-launched'
   | 'draft-started'
   | 'past-deadline'
@@ -191,6 +195,7 @@ export function canLaunchPoll(input: {
   members: string[];
   seasonPolls: Poll[];
   kind: string;
+  options?: string[];
   /** Clause ids the vote names. A change must name at least one. */
   affects: string[];
   title: string;
@@ -207,7 +212,7 @@ export function canLaunchPoll(input: {
     return {
       ok: false,
       reason: 'bad-kind',
-      message: 'Say whether this is a new rule or a change to one.',
+      message: 'Choose a new rule, a rule change, or a one-off poll.',
     };
   }
   if (!input.title.trim()) {
@@ -221,6 +226,11 @@ export function canLaunchPoll(input: {
       message: 'Pick the rule this would change.',
     };
   }
+  if (input.kind === 'standalone') {
+    if (!validPollOptions(input.options)) return { ok: false, reason: 'bad-options', message: 'Enter 2 to 20 different options (up to 100 characters each).' };
+    if (input.affects.length) return { ok: false, reason: 'bad-kind', message: 'A one-off poll cannot change a rule.' };
+    return { ok: true };
+  }
   if (input.draftStarted) {
     return { ok: false, reason: 'draft-started', message: 'The draft has started; rules are locked.' };
   }
@@ -233,7 +243,7 @@ export function canLaunchPoll(input: {
   }
   // A cancelled poll does not burn the member's one launch.
   const launched = input.seasonPolls.filter(
-    (p) => p.proposedBy === input.owner && p.status !== 'cancelled',
+    (p) => p.kind !== 'standalone' && p.proposedBy === input.owner && p.status !== 'cancelled',
   );
   if (launched.length > 0 && input.isCommissioner !== true) {
     return {
@@ -258,8 +268,8 @@ export function canVote(
   if (!poll.eligibleVoters.includes(owner)) {
     return { ok: false, reason: 'not-eligible', message: 'You are not eligible to vote here.' };
   }
-  if (choice !== 'yes' && choice !== 'no') {
-    return { ok: false, reason: 'bad-choice', message: 'A vote is yes or no.' };
+  if (!(poll.kind === 'standalone' ? poll.options ?? [] : ['yes', 'no']).includes(choice)) {
+    return { ok: false, reason: 'bad-choice', message: 'Choose one of the listed options.' };
   }
   return { ok: true };
 }
@@ -406,7 +416,7 @@ export function closePoll(poll: Poll, by: string, at: string): Poll {
   const tally = tallyPoll(poll);
   return {
     ...poll,
-    status: tally.passed ? 'passed' : 'failed',
+    status: poll.kind === 'standalone' ? 'closed' : tally.passed ? 'passed' : 'failed',
     closedAt: at,
     closedBy: by,
   };
@@ -414,6 +424,13 @@ export function closePoll(poll: Poll, by: string, at: string): Poll {
 
 /** A one-line result, for a list row or a notification. */
 export function describeTally(poll: Poll): string {
+  if (poll.kind === 'standalone' && poll.status !== 'cancelled') {
+    const counts = optionCounts(poll);
+    const high = Math.max(0, ...counts.map((o) => o.count));
+    const leaders = counts.filter((o) => o.count === high).map((o) => o.option);
+    if (!high) return 'No votes yet';
+    return `${leaders.length > 1 ? 'Tie' : poll.status === 'open' ? 'Leading' : 'Selected'}: ${leaders.join(', ')}`;
+  }
   const tally = tallyPoll(poll);
   if (poll.status === 'cancelled') return 'Cancelled';
   const core = `${tally.yes} of ${tally.needed} needed`;
@@ -423,4 +440,16 @@ export function describeTally(poll: Poll): string {
     return tally.passed ? `Passing, ${core}` : `Cannot pass, ${core}`;
   }
   return `${core}, ${tally.notVoted} yet to vote`;
+}
+
+export function validPollOptions(options: unknown): options is string[] {
+  return Array.isArray(options) && options.length >= 2 && options.length <= 20 &&
+    options.every((o) => typeof o === 'string' && o.trim().length > 0 && o === o.trim() && o.length <= 100) &&
+    new Set(options.map((o) => o.toLowerCase())).size === options.length;
+}
+
+export function optionCounts(poll: Poll): Array<{ option: string; count: number }> {
+  return (poll.options ?? []).map((option) => ({ option, count: poll.votes.filter(
+    (v) => v.choice === option && poll.eligibleVoters.includes(v.owner),
+  ).length }));
 }

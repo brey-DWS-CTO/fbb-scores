@@ -777,7 +777,7 @@ function toHistoryVersionRow(raw: RawHistoryVersionRow): LeagueHistoryVersionRow
 
 // ─── Neon Postgres backend ───────────────────────────────────────────────────
 
-class NeonBackend implements StoreBackend {
+export class NeonBackend implements StoreBackend {
   private sql: ReturnType<typeof neon>;
   private initPromise: Promise<void> | null = null;
 
@@ -2390,14 +2390,15 @@ class NeonBackend implements StoreBackend {
   async updatePoll(id: string, mutate: (current: unknown) => unknown): Promise<unknown> {
     await this.ensureInit();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const rows = (await this.sql`SELECT data, updated_at FROM polls WHERE id = ${id}`) as Array<{
+      const rows = (await this.sql`SELECT data, updated_at::text AS updated_at FROM polls WHERE id = ${id}`) as Array<{
         data: unknown;
-        updated_at: string | Date;
+        updated_at: string;
       }>;
       const row = rows[0];
       if (!row) throw new PollWriteError('not-found', 'No such vote');
       const next = mutate(row.data);
-      const stamp = new Date(row.updated_at).toISOString();
+      // Preserve PostgreSQL microseconds; Date truncates them and causes false conflicts.
+      const stamp = row.updated_at;
       const written = (await this.sql`UPDATE polls
         SET data = ${JSON.stringify(next)}::jsonb, updated_at = now()
         WHERE id = ${id} AND updated_at = ${stamp}
