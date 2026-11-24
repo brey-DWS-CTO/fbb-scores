@@ -357,17 +357,20 @@ export function weekLabel(matchupPeriodId: number, startDate: string): { label: 
  * ESPN's games cap for a week of `dayCount` days.
  *
  * ESPN stores the limit per day (30 games a week is 4.2857 a day). A value
- * of ten or more is already the whole week's cap. The rule book says 30 a
+ * of ten or more is the cap for a standard seven-day matchup and scales
+ * with the selected matchup's full calendar length. The rule book says 30 a
  * week (`season.gameLimit`) and gives the All-Star week its own formula
  * (`season.matchups.allstar.formula`); the commissioner sets both in ESPN,
  * so ESPN's number is the one that counts.
  */
 export function gamesCapFor(rosterSettings: unknown, dayCount: number): number {
-  for (const limit of Object.values(dict(dict(rosterSettings).lineupSlotStatLimits))) {
+  const settings = dict(rosterSettings);
+  const limits = dict(settings.scoringSettings).lineupSlotStatLimits ?? dict(settings.rosterSettings).lineupSlotStatLimits ?? settings.lineupSlotStatLimits;
+  for (const limit of Object.values(dict(limits))) {
     const entry = dict(limit);
     const value = num(entry.limitValue);
     if (num(entry.statId) !== 42 || value === null || value <= 0) continue;
-    return value >= 10 ? Math.round(value) : Math.round(value * dayCount);
+    return Math.round((value >= 10 ? value / 7 : value) * dayCount);
   }
   return Math.round((30 * dayCount) / 7);
 }
@@ -458,7 +461,7 @@ export function planWeek(settings: unknown, requested: number | null, anchor: Da
     currentScoringPeriodId,
     days,
     weeks,
-    gamesCap: gamesCapFor(leagueSettings.rosterSettings, days.length),
+    gamesCap: gamesCapFor(leagueSettings, days.length),
     anchor: line,
   };
 }

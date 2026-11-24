@@ -747,3 +747,65 @@ test('members cannot retrieve other ballots or outcomes through list, vote or cl
   assert.equal((await listAs('Brey')).votes.length, 2);
   assert.equal((await request('/api/league/audit', { headers: auth('Joel') })).status, 403);
 });
+
+const openGameLimit = (matchupPeriodId: unknown = 6, options: unknown = ['26', '30'], owner = 'Brey') => request('/api/league/polls', {
+  method: 'POST', headers: auth(owner), body: JSON.stringify({ kind: 'game-limit', title: 'Choose this week game limit', matchupPeriodId, options }),
+});
+const closeAs = (id: string, owner = 'Brey', cancel = false) => request(`/api/league/polls/${id}/close`, { method: 'POST', headers: auth(owner), body: JSON.stringify({ cancel }) });
+const caps = async () => asRecord((await request('/api/league/games-caps')).body).caps as Array<{ matchupPeriodId: number; cap: number }>;
+
+test('closing a game-limit poll applies the winner to that week only', async () => {
+  await store.mutateState((draft) => { draft.draft.startedAt = new Date().toISOString(); });
+  const created = await openGameLimit();
+  assert.equal(created.status, 200);
+  const poll = created.body as Poll;
+  assert.equal(poll.matchupPeriodId, 6);
+  await vote('Ryan', poll.id, '26');
+  await vote('Amy', poll.id, '26');
+  await vote('Joel', poll.id, '30');
+  assert.equal((await caps()).some((row) => row.matchupPeriodId === 6), false, 'open polls have no effect');
+  assert.equal((await closeAs(poll.id, 'Ryan')).status, 403);
+  assert.equal((await closeAs(poll.id)).status, 200);
+  assert.equal((await caps()).find((row) => row.matchupPeriodId === 6)?.cap, 26);
+  assert.equal((await caps()).some((row) => row.matchupPeriodId === 7), false);
+  assert.equal((await closeAs(poll.id)).status, 409);
+  assert.equal((await caps()).find((row) => row.matchupPeriodId === 6)?.cap, 26, 'retries do not lose the result');
+});
+
+test('a member can propose a game limit but only the commissioner can close or cancel it', async () => {
+  const poll = (await openGameLimit(7, ['24', '30'], 'Ryan')).body as Poll;
+  await vote('Amy', poll.id, '24');
+  assert.equal((await closeAs(poll.id, 'Ryan')).status, 403);
+  assert.equal((await closeAs(poll.id, 'Ryan', true)).status, 403);
+  assert.equal((await closeAs(poll.id, 'Brey', true)).status, 200);
+  assert.equal((await caps()).some((row) => row.matchupPeriodId === 7), false);
+});
+
+test('tied and empty game-limit polls stay open without setting a cap', async () => {
+  const poll = (await openGameLimit()).body as Poll;
+  assert.equal((await closeAs(poll.id)).status, 409);
+  await vote('Ryan', poll.id, '26');
+  await vote('Amy', poll.id, '30');
+  assert.equal((await closeAs(poll.id)).status, 409);
+  assert.equal(((await store.getPoll(poll.id)) as Poll).status, 'open');
+  assert.equal((await caps()).some((row) => row.matchupPeriodId === 6), false);
+});
+
+test('game-limit options and target weeks must be valid', async () => {
+  for (const week of [undefined, 0, 31, 6.5, '6']) {
+    const result = await request('/api/league/polls', { method: 'POST', headers: auth('Brey'), body: JSON.stringify({ kind: 'game-limit', title: 'Limit', matchupPeriodId: week, options: ['26', '30'] }) });
+    assert.equal(result.status, 409);
+  }
+  for (const options of [['yes', 'no'], ['0', '30'], ['26.5', '30'], ['26', '71'], ['026', '26']]) assert.equal((await openGameLimit(6, options)).status, 409);
+});
+
+test('the already closed Week 6 poll migrates without losing ballots and supplies 26 on the first scoreboard cap read', async () => {
+  const legacy: Poll = { id: 'poll-2027-week-6-game-limit', season: 2027, kind: 'standalone', title: 'What should the week 6 game limit be?', detail: '', options: ['26', '30'], proposedBy: 'Brey', affects: [], threshold: 0, eligibleVoters: ['Ryan', 'Amy', 'Brey'], openedAt: '2026-11-23T12:00:00.000Z', status: 'closed', closedAt: '2026-11-23T13:00:00.000Z', closedBy: 'Brey', votes: [{ owner: 'Ryan', choice: '26', castAt: 'now' }, { owner: 'Amy', choice: '26', castAt: 'now' }, { owner: 'Brey', choice: '30', castAt: 'now' }] };
+  await store.insertPoll(legacy.id, 2027, legacy);
+  assert.equal((await caps()).find((row) => row.matchupPeriodId === 6)?.cap, 26);
+  const migrated = (await store.getPoll(legacy.id)) as Poll;
+  assert.equal(migrated.kind, 'game-limit');
+  assert.equal(migrated.matchupPeriodId, 6);
+  assert.deepEqual(migrated.votes, legacy.votes);
+  assert.equal(migrated.status, 'closed');
+});

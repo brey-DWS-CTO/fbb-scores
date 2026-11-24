@@ -16,6 +16,7 @@
  * deadline still binds them like everyone else.
  */
 
+import { parseGamesCap } from './gamesCap.js';
 import { buildRulebookIndex, type Rulebook } from './rulebook.js';
 
 export type PollStatus = 'open' | 'passed' | 'failed' | 'cancelled' | 'closed';
@@ -25,9 +26,9 @@ export type VoteChoice = string;
  * Rule votes seed an edit or a new rule in the commissioner's draft.
  * Standalone polls choose among custom options without amending the rule book.
  */
-export type PollKind = 'new-rule' | 'change' | 'standalone';
+export type PollKind = 'new-rule' | 'change' | 'standalone' | 'game-limit';
 
-export const POLL_KINDS: PollKind[] = ['new-rule', 'change', 'standalone'];
+export const POLL_KINDS: PollKind[] = ['new-rule', 'change', 'standalone', 'game-limit'];
 
 export interface PollVote {
   owner: string;
@@ -59,6 +60,7 @@ export interface Poll {
   kind: PollKind;
   /** Choices for a standalone poll; rule votes remain yes/no. */
   options?: string[];
+  matchupPeriodId?: number;
   title: string;
   /** What is being proposed, in the proposer's words. */
   detail: string;
@@ -91,6 +93,7 @@ export interface Poll {
 
 /** How a kind reads on screen. */
 export function pollKindLabel(kind: PollKind): string {
+  if (kind === 'game-limit') return 'GAME LIMIT';
   if (kind === 'standalone') return 'ONE-OFF POLL';
   return kind === 'new-rule' ? 'NEW RULE' : 'RULE CHANGE';
 }
@@ -167,6 +170,7 @@ export function voteOf(poll: Poll, owner: string): VoteChoice | null {
 }
 
 export type LaunchRefusal =
+  | 'bad-week'
   | 'bad-options'
   | 'already-launched'
   | 'draft-started'
@@ -196,6 +200,7 @@ export function canLaunchPoll(input: {
   seasonPolls: Poll[];
   kind: string;
   options?: string[];
+  matchupPeriodId?: number;
   /** Clause ids the vote names. A change must name at least one. */
   affects: string[];
   title: string;
@@ -226,9 +231,13 @@ export function canLaunchPoll(input: {
       message: 'Pick the rule this would change.',
     };
   }
-  if (input.kind === 'standalone') {
+  if (input.kind === 'standalone' || input.kind === 'game-limit') {
     if (!validPollOptions(input.options)) return { ok: false, reason: 'bad-options', message: 'Enter 2 to 20 different options (up to 100 characters each).' };
     if (input.affects.length) return { ok: false, reason: 'bad-kind', message: 'A one-off poll cannot change a rule.' };
+    if (input.kind === 'game-limit') {
+      if (!Number.isInteger(input.matchupPeriodId) || input.matchupPeriodId! < 1 || input.matchupPeriodId! > 30) return { ok: false, reason: 'bad-week', message: 'Choose a fantasy week from 1 to 30.' };
+      if (!input.options!.every((option) => parseGamesCap(option) !== null && String(parseGamesCap(option)) === option)) return { ok: false, reason: 'bad-options', message: 'Game limits must be different whole numbers from 1 to 70.' };
+    }
     return { ok: true };
   }
   if (input.draftStarted) {
@@ -243,7 +252,7 @@ export function canLaunchPoll(input: {
   }
   // A cancelled poll does not burn the member's one launch.
   const launched = input.seasonPolls.filter(
-    (p) => p.kind !== 'standalone' && p.proposedBy === input.owner && p.status !== 'cancelled',
+    (p) => p.kind !== 'standalone' && p.kind !== 'game-limit' && p.proposedBy === input.owner && p.status !== 'cancelled',
   );
   if (launched.length > 0 && input.isCommissioner !== true) {
     return {
@@ -268,7 +277,7 @@ export function canVote(
   if (!poll.eligibleVoters.includes(owner)) {
     return { ok: false, reason: 'not-eligible', message: 'You are not eligible to vote here.' };
   }
-  if (!(poll.kind === 'standalone' ? poll.options ?? [] : ['yes', 'no']).includes(choice)) {
+  if (!((poll.kind === 'standalone' || poll.kind === 'game-limit') ? poll.options ?? [] : ['yes', 'no']).includes(choice)) {
     return { ok: false, reason: 'bad-choice', message: 'Choose one of the listed options.' };
   }
   return { ok: true };
@@ -416,7 +425,7 @@ export function closePoll(poll: Poll, by: string, at: string): Poll {
   const tally = tallyPoll(poll);
   return {
     ...poll,
-    status: poll.kind === 'standalone' ? 'closed' : tally.passed ? 'passed' : 'failed',
+    status: (poll.kind === 'standalone' || poll.kind === 'game-limit') ? 'closed' : tally.passed ? 'passed' : 'failed',
     closedAt: at,
     closedBy: by,
   };
@@ -424,7 +433,7 @@ export function closePoll(poll: Poll, by: string, at: string): Poll {
 
 /** A one-line result, for a list row or a notification. */
 export function describeTally(poll: Poll): string {
-  if (poll.kind === 'standalone' && poll.status !== 'cancelled') {
+  if ((poll.kind === 'standalone' || poll.kind === 'game-limit') && poll.status !== 'cancelled') {
     const counts = optionCounts(poll);
     const high = Math.max(0, ...counts.map((o) => o.count));
     const leaders = counts.filter((o) => o.count === high).map((o) => o.option);
@@ -474,4 +483,19 @@ export function pollForViewer(poll: Poll, owner: string, isCommissioner: boolean
 
 export function pollLink(id: string): string {
   return `/votes?poll=${encodeURIComponent(id)}`;
+}
+
+/** Migrate the shipped Week 6 poll without changing its ballots or closure. */
+export function normalizePoll(poll: Poll): Poll {
+  return poll.id === 'poll-2027-week-6-game-limit' && poll.season === 2027 && poll.kind === 'standalone'
+    ? { ...poll, kind: 'game-limit', matchupPeriodId: 6 } : poll;
+}
+
+/** A unique plurality wins; ties, empty polls and invalid caps have no winner. */
+export function winningGameLimit(poll: Poll): number | null {
+  if (poll.kind !== 'game-limit') return null;
+  const counts = optionCounts(poll);
+  const high = Math.max(0, ...counts.map((row) => row.count));
+  const leaders = counts.filter((row) => row.count === high);
+  return high > 0 && leaders.length === 1 ? parseGamesCap(leaders[0].option) : null;
 }

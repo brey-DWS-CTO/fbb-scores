@@ -833,7 +833,7 @@ test('the full week cap does not shrink as the current scoring day advances', ()
   const settings = { ...LIVE_SETTINGS, settings: { ...LIVE_SETTINGS.settings,
     rosterSettings: { lineupSlotStatLimits: { '15': { statId: 42, limitValue: 28 } } },
   } };
-  assert.equal(planWeek(settings, 1, OPENING_NIGHT).gamesCap, 28, 'ESPN can change the opening week cap');
+  assert.equal(planWeek(settings, 1, OPENING_NIGHT).gamesCap, 24, 'ESPN weekly setting is scaled to the six-day opening matchup');
 });
 
 test('uncapped NBA lines restore zeros after ESPN stops scoring, including negative games', () => {
@@ -858,4 +858,11 @@ test('later ESPN payloads cannot overwrite restored earlier-day totals with capp
   })) });
   assert.equal(week.matchups[0].home.total, 113.6);
   assert.equal(week.matchups[0].home.pointsByDay['17'], 56.8);
+});
+
+test('ESPN scoring settings supply games limits before legacy roster settings, scaled to the actual week', () => {
+  const settings = { scoringSettings: { lineupSlotStatLimits: { '15': { statId: 42, limitValue: 26 } } }, rosterSettings: { lineupSlotStatLimits: { '15': { statId: 42, limitValue: 30 } } } };
+  assert.equal(gamesCapFor(settings, 7), 26);
+  assert.equal(gamesCapFor(settings, 14), 52);
+  assert.equal(gamesCapFor({ lineupSlotStatLimits: { '15': { statId: 42, limitValue: 30 } } }, 6), 26);
 });

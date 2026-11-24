@@ -73,7 +73,7 @@ export async function reconcileFinalScores(now = new Date()) {
   if (notBefore !== null && now.getTime() < notBefore) return { skipped: 'Before scheduled final-game completion' };
   const week = await loadWeek(client, closing.matchupPeriodId);
   if (week.days.some(day => !day.games || Object.values(day.games).some(game => game.status !== 'final' && game.status !== 'off'))) return { skipped: 'Waiting for every game to finish' };
-  week.gamesCap = capForWeek(await listGamesCaps(week.season), week.matchupPeriodId);
+  week.gamesCap = capForWeek(await listGamesCaps(week.season), week.matchupPeriodId, week.gamesCap);
   const raw = await client.fetchDailyBoxScore(week.days.at(-1)!.scoringPeriodId);
   const updates = finalScoreUpdates(week, raw.schedule as unknown as EspnFinalMatchup[]);
   if (!updates.length) {

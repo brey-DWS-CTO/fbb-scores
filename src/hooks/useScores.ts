@@ -19,7 +19,7 @@ export const GAMES_CAPS_KEY = ['games-caps'] as const;
  * set, else ESPN's limit for the week, else the default.
  */
 export function useGamesCaps(): { rows: GamesCapRow[]; capFor: (matchupPeriodId: number, espnCap?: number | null) => number } {
-  const query = useQuery({ queryKey: GAMES_CAPS_KEY, queryFn: fetchGamesCaps, staleTime: 60_000 });
+  const query = useQuery({ queryKey: GAMES_CAPS_KEY, queryFn: fetchGamesCaps, staleTime: 60_000, refetchInterval: 60_000 });
   const rows = useMemo(() => query.data?.caps ?? [], [query.data]);
   const capFor = useCallback(
     (matchupPeriodId: number, espnCap: number | null = null) => capForWeek(rows, matchupPeriodId, espnCap),

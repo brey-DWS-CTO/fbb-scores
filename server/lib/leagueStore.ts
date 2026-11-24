@@ -44,6 +44,8 @@ import { foldProblem, foldedBook } from '../../src/lib/league/rulebookFold.js';
 import type { MockFinish } from '../../src/lib/league/mockStats.js';
 import { parseMockTrade, type MockTrade } from '../../src/lib/league/mockTrades.js';
 import type { DuesRow, DuesSettings } from '../../src/lib/league/dues.js';
+import { normalizePoll, type Poll } from '../../src/lib/league/polls.js';
+import { effectiveGamesCaps } from '../../src/lib/league/gamesCap.js';
 import type { GamesCapRow } from '../../src/lib/league/gamesCap.js';
 import type { StoredScheduleSnapshot } from '../../src/lib/league/schedule.js';
 import type { PickTradeProposal, PickTransfer } from '../../src/lib/keeper/types.js';
@@ -4320,7 +4322,7 @@ export async function listHistoryVersions(
 }
 
 export async function listPolls(season: number): Promise<unknown[]> {
-  return getBackend().listPolls(season);
+  return ((await getBackend().listPolls(season)) as Poll[]).map(normalizePoll);
 }
 
 /** Keys of every notification already sent this season. */
@@ -4337,7 +4339,8 @@ export async function claimSentNotice(key: string, season: number): Promise<bool
 }
 
 export async function getPoll(id: string): Promise<unknown | null> {
-  return getBackend().getPoll(id);
+  const poll = await getBackend().getPoll(id);
+  return poll ? normalizePoll(poll as Poll) : null;
 }
 
 export async function insertPoll(id: string, season: number, data: unknown): Promise<void> {
@@ -4348,7 +4351,7 @@ export async function updatePoll(
   id: string,
   mutate: (current: unknown) => unknown,
 ): Promise<unknown> {
-  return getBackend().updatePoll(id, mutate);
+  return getBackend().updatePoll(id, (current) => mutate(normalizePoll(current as Poll)));
 }
 
 /** Wipe a season's votes. Mirrors clearKeeperScenariosForSeason; used to reset a season. */
@@ -4441,7 +4444,8 @@ export async function saveDuesSettings(row: DuesSettings): Promise<void> {
 }
 
 export async function listGamesCaps(season: number): Promise<GamesCapRow[]> {
-  return getBackend().listGamesCaps(season);
+  const [manual, polls] = await Promise.all([getBackend().listGamesCaps(season), listPolls(season)]);
+  return effectiveGamesCaps(manual, polls as Poll[]);
 }
 
 export async function saveGamesCap(row: GamesCapRow): Promise<void> {

@@ -252,6 +252,7 @@ import {
 } from '../lib/notifier.js';
 import { appOrigin } from './auth.js';
 import {
+  winningGameLimit,
   pollForViewer,
   canEditPoll,
   canLaunchPoll,
@@ -2996,7 +2997,7 @@ async function seasonPolls(): Promise<Poll[]> {
     if (!(await getPoll(id))) {
       try {
         await insertPoll(id, RULEBOOK_SEASON, {
-          id, season: RULEBOOK_SEASON, kind: 'standalone',
+          id, season: RULEBOOK_SEASON, kind: 'game-limit', matchupPeriodId: 6,
           title: 'What should the week 6 game limit be?',
           detail: 'Choose the game limit for Week 6.', options: ['26', '30'],
           proposedBy: OWNERS.find((owner) => isCommissionerOwner(owner)) ?? 'Brey',
@@ -3047,7 +3048,7 @@ router.get('/polls', requireAuth, async (_req, res, next) => {
     const polls = await seasonPolls();
     const owner = res.locals.owner as string;
     const isCommish = res.locals.isCommissioner === true;
-    const launched = polls.filter((p) => p.kind !== 'standalone' && p.proposedBy === owner && p.status !== 'cancelled');
+    const launched = polls.filter((p) => p.kind !== 'standalone' && p.kind !== 'game-limit' && p.proposedBy === owner && p.status !== 'cancelled');
     res.json({
       polls: polls.map((poll) => pollForViewer(poll, owner, isCommish)),
       you: {
@@ -3081,7 +3082,7 @@ function pollWords(body: { title?: unknown; detail?: unknown; affects?: unknown 
 router.post('/polls', requireAuth, async (req, res, next) => {
   try {
     const owner = res.locals.owner as string;
-    const body = req.body as { kind?: unknown; title?: unknown; detail?: unknown; affects?: unknown; options?: unknown };
+    const body = req.body as { kind?: unknown; title?: unknown; detail?: unknown; affects?: unknown; options?: unknown; matchupPeriodId?: unknown };
     const kind = typeof body.kind === 'string' ? body.kind : '';
     const options = Array.isArray(body.options) ? body.options.map((o: unknown) => typeof o === 'string' ? o.trim() : o) as string[] : undefined;
     const { title, detail, affects } = pollWords(body);
@@ -3093,6 +3094,7 @@ router.post('/polls', requireAuth, async (req, res, next) => {
       seasonPolls: await seasonPolls(),
       kind,
       options,
+      matchupPeriodId: body.matchupPeriodId as number | undefined,
       affects,
       title,
       now: new Date(),
@@ -3119,12 +3121,13 @@ router.post('/polls', requireAuth, async (req, res, next) => {
       id: `poll-${RULEBOOK_SEASON}-${owner.toLowerCase()}-${stamp}`,
       season: RULEBOOK_SEASON,
       kind: kind as PollKind,
-      ...(kind === 'standalone' ? { options } : {}),
+      ...((kind === 'standalone' || kind === 'game-limit') ? { options } : {}),
+      ...(kind === 'game-limit' ? { matchupPeriodId: body.matchupPeriodId as number } : {}),
       title,
       detail,
       proposedBy: owner,
       affects,
-      threshold: kind === 'standalone' ? 0 : thresholdFor(book, affects),
+      threshold: (kind === 'standalone' || kind === 'game-limit') ? 0 : thresholdFor(book, affects),
       // Frozen now, so a later roster change cannot move the goalposts.
       eligibleVoters: [...OWNERS],
       openedAt,
@@ -3172,7 +3175,7 @@ router.post('/polls/:id/edit', requireAuth, requireCommissioner, async (req, res
     }
 
     // Naming different rules can move the bar, so the threshold is read again.
-    const next: PollEditInput = { title, detail, affects: existing.kind === 'standalone' ? [] : affects, threshold: existing.kind === 'standalone' ? 0 : thresholdFor(book, affects) };
+    const next: PollEditInput = { title, detail, affects: (existing.kind === 'standalone' || existing.kind === 'game-limit') ? [] : affects, threshold: (existing.kind === 'standalone' || existing.kind === 'game-limit') ? 0 : thresholdFor(book, affects) };
     const check = canEditPoll({ poll: existing, isCommissioner: true, next });
     if (!check.ok) {
       res.status(409).json({ error: check.message, code: check.reason });
@@ -3257,6 +3260,10 @@ router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
       res.status(404).json({ error: 'No such vote' });
       return;
     }
+    if (existing.kind === 'game-limit' && !isCommish) {
+      res.status(403).json({ error: 'Only the commissioner can close or cancel a game-limit poll.' });
+      return;
+    }
     if (existing.proposedBy !== owner && !isCommish) {
       res.status(403).json({ error: 'Only the member who started this vote, or a commissioner, can close it' });
       return;
@@ -3270,6 +3277,7 @@ router.post('/polls/:id/close', requireAuth, async (req, res, next) => {
     const updated = (await updatePoll(id, (current) => {
       const poll = current as Poll;
       if (poll.status !== 'open') return poll;
+      if (!cancel && poll.kind === 'game-limit' && winningGameLimit(poll) === null) throw new PollWriteError('no-winner', 'A game-limit poll needs a clear winner before closing. Tied or empty polls leave the cap unchanged.');
       return cancel
         ? { ...poll, status: 'cancelled' as const, closedAt: at, closedBy: owner }
         : closePoll(poll, owner, at);

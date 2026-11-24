@@ -53,7 +53,7 @@ export function amendmentText(poll: Poll, now: string): string {
 
 /** Whether a passed vote can be seeded into this draft. */
 export function canSeedAmendment(book: Rulebook, poll: Poll): SeedCheck {
-  if (poll.kind === 'standalone' || poll.status !== 'passed') {
+  if (poll.kind === 'standalone' || poll.kind === 'game-limit' || poll.status !== 'passed') {
     return { ok: false, reason: 'not-passed', message: 'Only a vote that passed becomes an amendment.' };
   }
   if (poll.seededAt) {
