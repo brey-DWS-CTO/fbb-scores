@@ -1697,7 +1697,7 @@ export async function fetchPolls(c: Credentials): Promise<PollsResponse> {
 
 export async function openPoll(
   c: Credentials,
-  input: { kind: PollKind; title: string; detail: string; affects: string[]; options?: string[] },
+  input: { kind: PollKind; title: string; detail: string; affects: string[]; options?: string[]; matchupPeriodId?: number },
 ): Promise<Poll> {
   const { data } = await axios.post<Poll>('/api/league/polls', input, {
     headers: authHeaders(c),

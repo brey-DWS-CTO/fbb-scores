@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { parseGamesCap } from '../../lib/league/gamesCap.js';
 import { Link, useSearchParams } from 'react-router-dom';
 import IdentityChip from './IdentityChip.js';
 import SignInPanel from './SignInPanel.js';
@@ -42,7 +44,7 @@ const RESULT_COLORS = ['#8854d0', '#168c83', '#e59b25', '#3978d4', '#d7547e', '#
 
 function PollResults({ poll }: { poll: Poll }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const choices = poll.kind === 'standalone' ? poll.options ?? [] : ['yes', 'no'];
+  const choices = (poll.kind === 'standalone' || poll.kind === 'game-limit') ? poll.options ?? [] : ['yes', 'no'];
   const ballots = poll.votes.filter((vote) => poll.eligibleVoters.includes(vote.owner) && choices.includes(vote.choice));
   const total = ballots.length;
   const counts = choices.map((choice) => ballots.filter((vote) => vote.choice === choice).length);
@@ -121,7 +123,7 @@ function PollEditForm({
         />
       </label>
 
-      {kind !== 'standalone' && <RulePicker
+      {kind !== 'standalone' && kind !== 'game-limit' && <RulePicker
         index={index}
         selected={affects}
         onChange={setAffects}
@@ -206,7 +208,7 @@ function PollCard({
   };
   const mine = voteOf(poll, owner);
   const open = poll.status === 'open';
-  const canClose = open && (poll.proposedBy === owner || isCommish);
+  const canClose = open && (poll.kind === 'game-limit' ? isCommish : poll.proposedBy === owner || isCommish);
   const kind = poll.kind ?? 'change';
   const edits = poll.edits ?? [];
 
@@ -215,7 +217,7 @@ function PollCard({
       <div className="vote-head">
         <span className="hub-heading vote-status">{poll.status.toUpperCase()}</span>
         <span className="vote-meta">
-          {poll.proposedBy} &middot; {formatDate(poll.openedAt)}{kind !== 'standalone' && ` - needs ${poll.threshold}%`}
+          {poll.proposedBy} &middot; {formatDate(poll.openedAt)}{kind !== 'standalone' && kind !== 'game-limit' && ` - needs ${poll.threshold}%`}
         </span>
         <button type="button" className="vote-share tap-btn" aria-label="Share poll" title="Share poll"
           disabled={sharing} onClick={() => void share()}>
@@ -224,7 +226,7 @@ function PollCard({
       </div>
       {shareMessage && <p className="vote-yours" role="status">{shareMessage}</p>}
       <span className={kind === 'new-rule' ? 'vote-kind vote-kind-new' : 'vote-kind'}>
-        {pollKindLabel(kind)}
+        {pollKindLabel(kind)}{kind === 'game-limit' && ` - WEEK ${poll.matchupPeriodId}`}
       </span>
 
       {editing ? (
@@ -271,18 +273,18 @@ function PollCard({
 
           {open && (
             <div className="vote-actions">
-              {(kind === 'standalone' ? poll.options ?? [] : ['yes', 'no']).map((choice) => (
+              {((kind === 'standalone' || kind === 'game-limit') ? poll.options ?? [] : ['yes', 'no']).map((choice) => (
                 <button key={choice} type="button"
                   className={mine === choice ? 'vote-btn vote-btn-on tap-btn' : 'vote-btn tap-btn'}
                   disabled={busy || !poll.eligibleVoters.includes(owner)} onClick={() => onVote(poll, choice)}>
-                  {kind === 'standalone' ? choice : choice.toUpperCase()}
+                  {(kind === 'standalone' || kind === 'game-limit') ? choice : choice.toUpperCase()}
                 </button>
               ))}
             </div>
           )}
 
           {open && mine && <p className="vote-yours">You voted {mine}. You can change it until it closes.</p>}
-          {open && !mine && <p className="vote-yours">{kind === 'standalone' ? 'You have not voted.' : 'You have not voted. Silence counts as no.'}</p>}
+          {open && !mine && <p className="vote-yours">{(kind === 'standalone' || kind === 'game-limit') ? 'You have not voted.' : 'You have not voted. Silence counts as no.'}</p>}
 
           {canClose && (
             <div className="vote-actions vote-actions-close">
@@ -319,7 +321,7 @@ function PollCard({
 
           {/* A passed vote is a mandate. It reaches the book only when the
               commissioner writes it into the draft and publishes. */}
-          {poll.status === 'passed' && kind !== 'standalone' && (
+          {poll.status === 'passed' && kind !== 'standalone' && kind !== 'game-limit' && (
             <div className="vote-amend">
               {poll.appliedRevision !== undefined ? (
                 <p className="vote-yours">In the book since revision {poll.appliedRevision}.</p>
@@ -357,6 +359,7 @@ function PollCard({
 /** /votes — league votes. Every member gets one to start each season. */
 export default function VotesPage() {
   const { identity } = useIdentity();
+  const queryClient = useQueryClient();
   const [data, setData] = useState<PollsResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -368,6 +371,7 @@ export default function VotesPage() {
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
   const [optionsText, setOptionsText] = useState('');
+  const [weekText, setWeekText] = useState('');
   const options = optionsText.split('\n').map((o) => o.trim());
   const [affects, setAffects] = useState<string[]>([]);
   const [index, setIndex] = useState<RulebookIndex>(rulebookIndex2027);
@@ -439,13 +443,14 @@ export default function VotesPage() {
     setTitle('');
     setDetail('');
     setOptionsText('');
+    setWeekText('');
     setAffects([]);
   };
 
   const submit = () =>
     act(async () => {
       if (!kind) return;
-      await openPoll(identity, { kind, title, detail, affects: kind === 'standalone' ? [] : affects, ...(kind === 'standalone' ? { options } : {}) });
+      await openPoll(identity, { kind, title, detail, affects: (kind === 'standalone' || kind === 'game-limit') ? [] : affects, ...((kind === 'standalone' || kind === 'game-limit') ? { options } : {}), ...(kind === 'game-limit' ? { matchupPeriodId: Number(weekText) } : {}) });
       closeComposer();
     });
 
@@ -466,7 +471,7 @@ export default function VotesPage() {
   const selectedPoll = searchParams.get('poll');
   const polls = (data?.polls ?? []).filter((poll) => !selectedPoll || poll.id === selectedPoll);
   // Any open poll knows its own roll and threshold; fall back to the usual 60%.
-  const sample = polls.find((p) => p.kind !== 'standalone' && p.status === 'open') ?? polls.find((p) => p.kind !== 'standalone');
+  const sample = polls.find((p) => p.kind !== 'standalone' && p.kind !== 'game-limit' && p.status === 'open') ?? polls.find((p) => p.kind !== 'standalone' && p.kind !== 'game-limit');
   const thresholdLine = sample
     ? `A change needs ${tallyPoll(sample).needed} of the ${sample.eligibleVoters.length} teams. Not voting counts as no.`
     : 'A change needs 60% of all teams. Not voting counts as no.';
@@ -506,6 +511,8 @@ export default function VotesPage() {
         <div className="rule-edit-form">
           <span className="rule-edit-label">What kind of vote is this?</span>
           <div className="vote-kind-picker">
+            <button type="button" className={kind === 'game-limit' ? 'vote-kind-btn vote-kind-on tap-btn' : 'vote-kind-btn tap-btn'}
+              aria-pressed={kind === 'game-limit'} onClick={() => setKind('game-limit')}>GAME LIMIT</button>
             <button type="button" className={kind === 'standalone' ? 'vote-kind-btn vote-kind-on tap-btn' : 'vote-kind-btn tap-btn'}
               aria-pressed={kind === 'standalone'} onClick={() => setKind('standalone')}>ONE-OFF POLL</button>
             <button
@@ -534,7 +541,7 @@ export default function VotesPage() {
                   className="hub-input rule-edit-input"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder={kind === 'standalone' ? 'What should the week 6 game limit be?' : kind === 'change' ? 'Expand IR to two slots' : 'Add a trade deadline'}
+                  placeholder={(kind === 'standalone' || kind === 'game-limit') ? 'What should the week 6 game limit be?' : kind === 'change' ? 'Expand IR to two slots' : 'Add a trade deadline'}
                 />
               </label>
               <label className="rule-edit-label">
@@ -548,7 +555,11 @@ export default function VotesPage() {
                 />
               </label>
 
-              {kind === 'standalone' ? (
+              {kind === 'game-limit' && <label className="rule-edit-label">Fantasy week
+                <input type="number" className="hub-input rule-edit-input" min={1} max={30} step={1} value={weekText} onChange={(event) => setWeekText(event.target.value)} placeholder="6" />
+                <span className="rule-edit-hint">Closing this poll applies the winning limit to this week's scoreboard. Only the commissioner can close it. Ties and empty polls leave the cap unchanged.</span>
+              </label>}
+              {(kind === 'standalone' || kind === 'game-limit') ? (
                 <label className="rule-edit-label">Options (one per line, 2 to 20)
                   <textarea className="hub-input rule-edit-textarea" rows={4} value={optionsText}
                     onChange={(e) => setOptionsText(e.target.value)} placeholder={'26\n30'} />
@@ -575,7 +586,7 @@ export default function VotesPage() {
           )}
 
           <p className="rule-edit-hint">
-            {kind === 'standalone' ? 'One-off polls are available throughout the season and do not change the rule book.' : identity.isCommissioner
+            {(kind === 'standalone' || kind === 'game-limit') ? 'One-off polls are available throughout the season and do not change the rule book.' : identity.isCommissioner
               ? 'As commissioner you can start as many votes as the league needs.'
               : 'One vote each per season. Cancelling gives it back.'}
           </p>
@@ -584,7 +595,7 @@ export default function VotesPage() {
               type="button"
               className="rule-edit-save tap-btn"
               disabled={
-                busy || !kind || !title.trim() || (kind === 'standalone' ? !validPollOptions(options) : !data?.you.canLaunch) || (kind === 'change' && affects.length === 0)
+                busy || !kind || !title.trim() || (kind === 'game-limit' && (!Number.isInteger(Number(weekText)) || Number(weekText) < 1 || Number(weekText) > 30 || !options.every((option) => parseGamesCap(option) !== null && String(parseGamesCap(option)) === option))) || ((kind === 'standalone' || kind === 'game-limit') ? !validPollOptions(options) : !data?.you.canLaunch) || (kind === 'change' && affects.length === 0)
               }
               onClick={submit}
             >
@@ -608,7 +619,10 @@ export default function VotesPage() {
             index={index}
             editing={editingId === poll.id}
             onVote={(p, choice) => act(() => castPollVote(identity, p.id, choice))}
-            onClose={(p, cancel) => act(() => closePollById(identity, p.id, cancel))}
+            onClose={(p, cancel) => act(async () => {
+              await closePollById(identity, p.id, cancel);
+              await queryClient.invalidateQueries({ queryKey: ['games-caps'] });
+            })}
             onAmend={amend}
             onEdit={(p) => setEditingId(p.id)}
             onEditSave={saveEdit}

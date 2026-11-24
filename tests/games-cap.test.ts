@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_GAMES_CAP, capForWeek, gamesText, parseGamesCap, type GamesCapRow } from '../src/lib/league/gamesCap.ts';
+import { effectiveGamesCaps, DEFAULT_GAMES_CAP, capForWeek, gamesText, parseGamesCap, type GamesCapRow } from '../src/lib/league/gamesCap.ts';
 
 const row = (matchupPeriodId: number, cap: number): GamesCapRow => ({
   season: 2027, matchupPeriodId, cap, updatedAt: '2026-11-01T00:00:00.000Z', updatedBy: 'Brey',
@@ -48,4 +48,13 @@ test('ESPN supplies every week cap unless that particular week has an override',
   assert.equal(capForWeek([row(7, 24)], 7, 30), 24, 'NBA Cup week override');
   assert.equal(capForWeek([row(7, 24)], 8, 30), 30, 'override does not leak to another week');
   assert.equal(capForWeek([], 1), 30, 'missing ESPN data uses the standard fallback');
+});
+
+test('a manual edit after a closed poll wins, while older edits do not mask the result', async () => {
+  const { normalizePoll } = await import('../src/lib/league/polls.js');
+  const poll = normalizePoll({ id: 'poll-2027-week-6-game-limit', season: 2027, kind: 'standalone', title: 'Limit', detail: '', options: ['26', '30'], affects: [], threshold: 0, proposedBy: 'Brey', eligibleVoters: ['Brey'], openedAt: '2026-11-23T12:00:00.000Z', closedAt: '2026-11-23T13:00:00.000Z', closedBy: 'Brey', status: 'closed', votes: [{ owner: 'Brey', choice: '26', castAt: 'now' }] });
+  assert.equal(effectiveGamesCaps([row(6, 30)], [poll])[0].cap, 26);
+  assert.equal(effectiveGamesCaps([{ ...row(6, 28), updatedAt: '2026-11-23T14:00:00.000Z' }], [poll])[0].cap, 28);
+  assert.equal(effectiveGamesCaps([], [{ ...poll, status: 'cancelled' }]).length, 0);
+  assert.equal(effectiveGamesCaps([], [{ ...poll, votes: [] }]).length, 0);
 });
